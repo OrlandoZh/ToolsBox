@@ -1,0 +1,413 @@
+{
+  "nodes": [
+    {
+      "id": "group-entry",
+      "type": "group",
+      "x": -80,
+      "y": -80,
+      "width": 880,
+      "height": 620,
+      "label": "命令入口",
+      "color": "4"
+    },
+    {
+      "id": "group-scripts",
+      "type": "group",
+      "x": 840,
+      "y": -80,
+      "width": 1320,
+      "height": 840,
+      "label": "脚本与共享库",
+      "color": "2"
+    },
+    {
+      "id": "group-artifacts",
+      "type": "group",
+      "x": 2200,
+      "y": -80,
+      "width": 1260,
+      "height": 840,
+      "label": "状态产物",
+      "color": "5"
+    },
+    {
+      "id": "group-read",
+      "type": "group",
+      "x": -80,
+      "y": 580,
+      "width": 3540,
+      "height": 820,
+      "label": "开发者如何读这套链路",
+      "color": "6"
+    },
+    {
+      "id": "intro",
+      "type": "text",
+      "x": 0,
+      "y": 0,
+      "width": 320,
+      "height": 220,
+      "color": "1",
+      "text": "# 开发实现视角\n\n这张白板从代码结构出发解释当前 agent 自动化链路。\n\n关注点不是“它是什么”，而是“命令进来以后，哪些脚本负责什么，数据怎么流动，最后怎么变成门禁结论”。"
+    },
+    {
+      "id": "cmd-watch",
+      "type": "text",
+      "x": 360,
+      "y": 0,
+      "width": 340,
+      "height": 220,
+      "text": "## 入口 1\n\n`npm run zotero:watch`\n\n进入：\n`package.json`\n-> `scripts/zotero.mjs watch`\n\n用途：\n开发态热重载 + 健康检查 + 两级恢复"
+    },
+    {
+      "id": "cmd-e2e",
+      "type": "text",
+      "x": 360,
+      "y": 260,
+      "width": 340,
+      "height": 220,
+      "text": "## 入口 2\n\n`npm run agent:zotero:e2e`\n\n进入：\n`package.json`\n-> `scripts/agent-zotero-e2e.mjs`\n\n用途：\n真机动作 / 测试 / 场景 / 截图闭环"
+    },
+    {
+      "id": "cmd-autofix",
+      "type": "text",
+      "x": 0,
+      "y": 260,
+      "width": 320,
+      "height": 220,
+      "text": "## 入口 3\n\n`npm run agent:zotero:autofix`\n\n进入：\n`package.json`\n-> `scripts/agent-zotero-autofix.mjs`\n\n用途：\nE2E 失败后的受控恢复与复验"
+    },
+    {
+      "id": "script-zotero",
+      "type": "file",
+      "x": 920,
+      "y": 0,
+      "width": 360,
+      "height": 220,
+      "file": "scripts/zotero.mjs"
+    },
+    {
+      "id": "script-e2e",
+      "type": "file",
+      "x": 920,
+      "y": 260,
+      "width": 360,
+      "height": 220,
+      "file": "scripts/agent-zotero-e2e.mjs"
+    },
+    {
+      "id": "script-autofix",
+      "type": "file",
+      "x": 920,
+      "y": 520,
+      "width": 360,
+      "height": 220,
+      "file": "scripts/agent-zotero-autofix.mjs"
+    },
+    {
+      "id": "lib-runtime",
+      "type": "file",
+      "x": 1320,
+      "y": 0,
+      "width": 360,
+      "height": 220,
+      "file": "scripts/zotero-agent-runtime-lib.mjs"
+    },
+    {
+      "id": "lib-watch",
+      "type": "file",
+      "x": 1320,
+      "y": 260,
+      "width": 360,
+      "height": 220,
+      "file": "scripts/zotero-watch-recovery-lib.mjs"
+    },
+    {
+      "id": "lib-e2e",
+      "type": "file",
+      "x": 1720,
+      "y": 0,
+      "width": 360,
+      "height": 220,
+      "file": "scripts/agent-zotero-e2e-lib.mjs"
+    },
+    {
+      "id": "lib-autofix",
+      "type": "file",
+      "x": 1720,
+      "y": 260,
+      "width": 360,
+      "height": 220,
+      "file": "scripts/agent-zotero-autofix-lib.mjs"
+    },
+    {
+      "id": "lib-validation",
+      "type": "file",
+      "x": 1720,
+      "y": 520,
+      "width": 360,
+      "height": 220,
+      "file": "scripts/agent-zotero-validation-lib.mjs"
+    },
+    {
+      "id": "script-monitor",
+      "type": "file",
+      "x": 2200,
+      "y": 0,
+      "width": 360,
+      "height": 220,
+      "file": "scripts/agent-monitor.mjs"
+    },
+    {
+      "id": "script-dashboard",
+      "type": "file",
+      "x": 2200,
+      "y": 260,
+      "width": 360,
+      "height": 220,
+      "file": "scripts/agent-dashboard.mjs"
+    },
+    {
+      "id": "script-gate",
+      "type": "file",
+      "x": 2200,
+      "y": 520,
+      "width": 360,
+      "height": 220,
+      "file": "scripts/agent-gate.mjs"
+    },
+    {
+      "id": "artifact-watch",
+      "type": "file",
+      "x": 2620,
+      "y": 0,
+      "width": 360,
+      "height": 220,
+      "file": "dist/zotero-watch-status.md"
+    },
+    {
+      "id": "artifact-e2e",
+      "type": "file",
+      "x": 2620,
+      "y": 260,
+      "width": 360,
+      "height": 220,
+      "file": "dist/agent-zotero-e2e.md"
+    },
+    {
+      "id": "artifact-autofix",
+      "type": "file",
+      "x": 2620,
+      "y": 520,
+      "width": 360,
+      "height": 220,
+      "file": "dist/agent-zotero-autofix.md"
+    },
+    {
+      "id": "artifact-monitor",
+      "type": "file",
+      "x": 3020,
+      "y": 0,
+      "width": 360,
+      "height": 220,
+      "file": "dist/agent-monitor.md"
+    },
+    {
+      "id": "artifact-gate",
+      "type": "file",
+      "x": 3020,
+      "y": 260,
+      "width": 360,
+      "height": 220,
+      "file": "dist/agent-gate.md"
+    },
+    {
+      "id": "artifact-dashboard",
+      "type": "file",
+      "x": 3020,
+      "y": 520,
+      "width": 360,
+      "height": 220,
+      "file": "dist/agent-dashboard.html"
+    },
+    {
+      "id": "dev-read-1",
+      "type": "text",
+      "x": 0,
+      "y": 680,
+      "width": 760,
+      "height": 260,
+      "text": "## 开发者阅读顺序\n\n1. 先看 `package.json` 的命令入口\n2. 再看入口脚本：`zotero.mjs` / `agent-zotero-e2e.mjs` / `agent-zotero-autofix.mjs`\n3. 再看共享库：runtime / e2e-lib / autofix-lib / validation-lib\n4. 最后看 `agent-monitor`、`agent-dashboard`、`agent-gate` 如何消费状态文件"
+    },
+    {
+      "id": "dev-read-2",
+      "type": "text",
+      "x": 820,
+      "y": 680,
+      "width": 820,
+      "height": 300,
+      "text": "## 文件职责映射\n\n- `zotero.mjs`：宿主启动、watch、test、scenario 入口\n- `zotero-agent-runtime-lib.mjs`：插件动作、日志桥、运行态观测\n- `zotero-watch-recovery-lib.mjs`：watch 失败时的受控恢复\n- `agent-zotero-e2e.mjs`：真机闭环编排器\n- `agent-zotero-e2e-lib.mjs`：单轮结果判定与 markdown\n- `agent-zotero-autofix.mjs`：恢复编排器\n- `agent-zotero-validation-lib.mjs`：把 E2E/autofix 归一化成汇总视图可消费的数据"
+    },
+    {
+      "id": "dev-read-3",
+      "type": "text",
+      "x": 1680,
+      "y": 680,
+      "width": 820,
+      "height": 300,
+      "color": "3",
+      "text": "## 关键数据流\n\n`zotero:watch` -> `zotero-watch-status.json`\n`agent:zotero:e2e` -> `agent-zotero-e2e.json`\n`agent:zotero:autofix` -> `agent-zotero-autofix.json`\n\n然后：\n`agent:monitor` 统一读取三类状态\n-> `agent:dashboard` 给人看\n-> `agent:gate` 给机器判定\n\n所以真正的核心不是某一个脚本，而是“状态文件 + 汇总层”。"
+    },
+    {
+      "id": "dev-read-4",
+      "type": "text",
+      "x": 2540,
+      "y": 680,
+      "width": 820,
+      "height": 300,
+      "text": "## 当前最值得记住的实现事实\n\n- 现在这套链路已经不是零散命令，而是基于 `dist/*.json` 状态文件串起来的自动化系统\n- monitor 是统一状态拼装层\n- gate 是自动裁判层\n- autofix 是失败后的恢复执行层\n- 只要继续扩展状态字段，这套链路就能继续长出更强的 agent 能力"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "fromNode": "cmd-watch",
+      "toNode": "script-zotero",
+      "toEnd": "arrow",
+      "label": "执行"
+    },
+    {
+      "id": "e2",
+      "fromNode": "cmd-e2e",
+      "toNode": "script-e2e",
+      "toEnd": "arrow",
+      "label": "执行"
+    },
+    {
+      "id": "e3",
+      "fromNode": "cmd-autofix",
+      "toNode": "script-autofix",
+      "toEnd": "arrow",
+      "label": "执行"
+    },
+    {
+      "id": "e4",
+      "fromNode": "script-zotero",
+      "toNode": "lib-runtime",
+      "toEnd": "arrow",
+      "label": "调用动作/日志桥"
+    },
+    {
+      "id": "e5",
+      "fromNode": "script-zotero",
+      "toNode": "lib-watch",
+      "toEnd": "arrow",
+      "label": "调用恢复"
+    },
+    {
+      "id": "e6",
+      "fromNode": "script-e2e",
+      "toNode": "lib-runtime",
+      "toEnd": "arrow",
+      "label": "执行功能动作"
+    },
+    {
+      "id": "e7",
+      "fromNode": "script-e2e",
+      "toNode": "lib-e2e",
+      "toEnd": "arrow",
+      "label": "判定单轮结果"
+    },
+    {
+      "id": "e8",
+      "fromNode": "script-autofix",
+      "toNode": "lib-autofix",
+      "toEnd": "arrow",
+      "label": "推导恢复步骤"
+    },
+    {
+      "id": "e9",
+      "fromNode": "script-zotero",
+      "toNode": "artifact-watch",
+      "toEnd": "arrow",
+      "label": "写出 watch 报告"
+    },
+    {
+      "id": "e10",
+      "fromNode": "script-e2e",
+      "toNode": "artifact-e2e",
+      "toEnd": "arrow",
+      "label": "写出 E2E 报告"
+    },
+    {
+      "id": "e11",
+      "fromNode": "script-autofix",
+      "toNode": "artifact-autofix",
+      "toEnd": "arrow",
+      "label": "写出 autofix 报告"
+    },
+    {
+      "id": "e12",
+      "fromNode": "artifact-watch",
+      "toNode": "script-monitor",
+      "toEnd": "arrow",
+      "label": "读取"
+    },
+    {
+      "id": "e13",
+      "fromNode": "artifact-e2e",
+      "toNode": "script-monitor",
+      "toEnd": "arrow",
+      "label": "读取"
+    },
+    {
+      "id": "e14",
+      "fromNode": "artifact-autofix",
+      "toNode": "script-monitor",
+      "toEnd": "arrow",
+      "label": "读取"
+    },
+    {
+      "id": "e15",
+      "fromNode": "script-monitor",
+      "toNode": "lib-validation",
+      "toEnd": "arrow",
+      "label": "归一化状态"
+    },
+    {
+      "id": "e16",
+      "fromNode": "script-monitor",
+      "toNode": "artifact-monitor",
+      "toEnd": "arrow",
+      "label": "输出汇总"
+    },
+    {
+      "id": "e17",
+      "fromNode": "script-monitor",
+      "toNode": "script-dashboard",
+      "toEnd": "arrow",
+      "label": "提供可视化输入"
+    },
+    {
+      "id": "e18",
+      "fromNode": "script-monitor",
+      "toNode": "script-gate",
+      "toEnd": "arrow",
+      "label": "提供门禁输入"
+    },
+    {
+      "id": "e19",
+      "fromNode": "script-dashboard",
+      "toNode": "artifact-dashboard",
+      "toEnd": "arrow",
+      "label": "HTML 输出"
+    },
+    {
+      "id": "e20",
+      "fromNode": "script-gate",
+      "toNode": "artifact-gate",
+      "toEnd": "arrow",
+      "label": "门禁报告"
+    }
+  ]
+}

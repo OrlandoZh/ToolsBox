@@ -1,0 +1,23 @@
+{
+  "addonName": "Zotero Cleanroom Template",
+  "addonId": "cleanroom-template@example.com",
+  "addonRef": "cleanroomtemplate",
+  "addonVersion": "0.1.0",
+  "description": "A clean-room Zotero plugin template with independent architecture.",
+  "author": "Your Team",
+  "homepage": "https://example.com",
+  "updateURL": "https://example.com/downloads/cleanroomtemplate/update.json",
+  "strictMinVersion": "6.999",
+  "strictMaxVersion": "8.*",
+  "prefsPrefix": "extensions.zotero.cleanroomtemplate",
+  "instanceKey": "CleanroomTemplate",
+  "icons": {
+    "48": "content/icons/icon-48.png",
+    "96": "content/icons/icon-96.png"
+  },
+  "defaultPrefs": {
+    "enabled": true,
+    "menuLabel": "",
+    "logLevel": "info"
+  }
+}

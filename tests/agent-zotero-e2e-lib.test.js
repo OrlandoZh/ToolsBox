@@ -1,0 +1,1713 @@
+import { describe, it, assert } from "./test-framework.js";
+import {
+  summarizeLogs,
+  evaluateCycle,
+  buildE2EMarkdown,
+} from "../scripts/agent-zotero-e2e-lib.mjs";
+import { normalizeDiagnosisFingerprint } from "../scripts/agent-zotero-diagnosis-lib.mjs";
+
+describe("Agent Zotero E2E Lib", () => {
+  it("should summarize logs and classify errors", () => {
+    const summary = summarizeLogs([
+      { level: "info", message: "hello" },
+      { level: "warn", message: "careful" },
+      { level: "debug", message: "[cleanroom:error] failed" },
+    ]);
+
+    assert.equal(summary.total, 3);
+    assert.equal(summary.warnCount, 1);
+    assert.equal(summary.errorCount, 1);
+    assert.equal(summary.infoCount, 1);
+  });
+
+  it("should evaluate cycle result and detect missing capabilities", () => {
+    const result = evaluateCycle({
+      checks: {
+        pluginMounted: false,
+        apiMounted: false,
+        primaryActionResult: false,
+        agentActionResult: false,
+        itemPaneSections: 0,
+        itemPaneInfoRows: 0,
+        itemTreeColumns: 0,
+        notifierActiveCount: 0,
+      },
+      tests: {
+        total: 2,
+        passed: 1,
+        failed: 1,
+      },
+      scenarios: {
+        total: 2,
+        passed: 1,
+        failed: 1,
+      },
+      logs: {
+        errorCount: 2,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: false,
+          issues: ["缺少 Reader 截图。"],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.length >= 6);
+    assert.ok(result.issues.includes("缺少 Reader 截图。"));
+    assert.ok(Array.isArray(result.hints));
+    assert.ok(result.hints.length > 0);
+    assert.ok(Array.isArray(result.diagnoses));
+    assert.ok(result.diagnoses.length > 0);
+    assert.equal(result.primaryDiagnosis?.feature, "bootstrap");
+    assert.ok(Array.isArray(result.primaryDiagnosis?.candidateFiles));
+  });
+
+  it("should render markdown report with cycle summary", () => {
+    const markdown = buildE2EMarkdown({
+      generatedAt: "2026-03-19T00:00:00.000Z",
+      strategy: "hot",
+      visualBaselineDir: "/tmp/visual-baseline",
+      visualBaselineMode: "compare",
+      passed: true,
+      issues: [],
+      hints: ["ok"],
+      diagnostics: [
+        {
+          fingerprint: "item-pane:item-pane-section-missing",
+          feature: "item-pane",
+          featureLabel: "ItemPane 注册",
+          severity: "high",
+          confidence: 0.95,
+          summary: "ItemPane Section 未注册到宿主。",
+          candidateFiles: ["src/features/item-pane.js"],
+        },
+      ],
+      cycles: [{
+        index: 1,
+        bootMode: "hot-reload",
+        passed: true,
+        summaryNote: "动作与校验通过",
+        tests: { failed: 0 },
+        scenarios: {
+          failed: 0,
+          results: [
+            { name: "baseline registration diagnostics", status: "passed" },
+            { name: "settings schema and preference pane diagnostics", status: "passed" },
+          ],
+        },
+        logs: {
+          errorCount: 0,
+          warnCount: 0,
+          recentErrors: [],
+        },
+        visuals: {
+          captures: [
+            { kind: "library", path: "/tmp/library.png", analysis: { width: 2000, height: 1200 } },
+            { kind: "reader", path: "/tmp/reader.png", analysis: { width: 2000, height: 1200 } },
+          ],
+          captureStability: {
+            stages: [
+              { kind: "library", stable: true, attemptCount: 2, selectionReason: "stable-hash-pair" },
+              { kind: "reader", stable: false, attemptCount: 3, selectionReason: "max-attempt-reached" },
+            ],
+          },
+          analysis: {
+            ok: true,
+            baselines: [
+              {
+                kind: "library",
+                canonicalTarget: "hot-reload-library.png",
+                path: "/tmp/hot-reload-library.png",
+                status: "compared",
+                ok: false,
+                metrics: {
+                  sameDimensions: false,
+                  actualWidth: 2000,
+                  actualHeight: 1200,
+                  baselineWidth: 3388,
+                  baselineHeight: 2172,
+                },
+              },
+              {
+                kind: "reader",
+                canonicalTarget: "hot-reload-reader.png",
+                path: "/tmp/hot-reload-reader.png",
+                status: "compared",
+                ok: true,
+                metrics: {
+                  changedRatio: 0,
+                  meanChannelDiff: 0,
+                },
+              },
+            ],
+            summary: {
+              baseline: {
+                comparedCount: 2,
+                missingCount: 0,
+                driftCount: 0,
+                errorCount: 0,
+                updateRequested: false,
+              },
+            },
+          },
+          warnings: [],
+        },
+      }],
+      visuals: [],
+    });
+
+    assert.ok(markdown.includes("# Agent Zotero E2E 闭环报告"));
+    assert.ok(markdown.includes("| 轮次 | 启动策略 | 状态 |"));
+    assert.ok(markdown.includes("动作与校验通过"));
+    assert.ok(markdown.includes("## 可视化验收"));
+    assert.ok(markdown.includes("## 视觉证据索引"));
+    assert.ok(markdown.includes("Cycle 1 / hot-reload / library"));
+    assert.ok(markdown.includes("[library.png](/tmp/library.png)"));
+    assert.ok(markdown.includes("[hot-reload-library.png](/tmp/hot-reload-library.png)"));
+    assert.ok(markdown.includes("## Reader 视觉主阻断"));
+    assert.ok(markdown.includes("采集未稳定"));
+    assert.ok(markdown.includes("Canonical 覆盖"));
+    assert.ok(markdown.includes("| 轮次 | 库视图截图 | Reader 截图 | 校验 | 备注 |"));
+    assert.ok(markdown.includes("视觉基线目录"));
+    assert.ok(markdown.includes("基线比对 2"));
+    assert.ok(markdown.includes("采集稳定性 library 稳定 2 次（哈希收敛）；reader 待稳 3 次（重试上限）"));
+    assert.ok(markdown.includes("## 能力覆盖"));
+    assert.ok(markdown.includes("基线注册"));
+    assert.ok(markdown.includes("## 结构化诊断"));
+    assert.ok(markdown.includes("item-pane:item-pane-section-missing"));
+  });
+
+  it("should render stable-low-drift-pair reason in markdown summaries", () => {
+    const markdown = buildE2EMarkdown({
+      generatedAt: "2026-03-26T00:00:00.000Z",
+      strategy: "hot",
+      visualBaselineDir: "/tmp/visual-baseline",
+      visualBaselineMode: "compare",
+      passed: false,
+      issues: ["reader 截图与基线像素漂移过大：12.00% > 5.00%"],
+      hints: [],
+      diagnostics: [],
+      primaryDiagnosis: {
+        fingerprint: "reader-ui:reader-visual-drift",
+        feature: "reader-ui",
+        featureLabel: "Reader 与视觉回归",
+        severity: "medium",
+        confidence: 0.88,
+        summary: "Reader 相关视觉基线发生漂移或缺失。",
+      },
+      cycles: [{
+        index: 1,
+        bootMode: "hot-reload",
+        passed: false,
+        summaryNote: "视觉漂移待人工确认",
+        tests: { failed: 0 },
+        scenarios: {
+          failed: 0,
+          results: [
+            { name: "reader event hook diagnostics", status: "passed" },
+            { name: "reader fine-grained hook diagnostics", status: "passed" },
+          ],
+        },
+        logs: {
+          errorCount: 0,
+          warnCount: 0,
+          recentErrors: [],
+        },
+        visuals: {
+          captures: [
+            { kind: "library", path: "/tmp/library.png", analysis: { width: 2000, height: 1200 } },
+            { kind: "reader", path: "/tmp/reader.png", analysis: { width: 2000, height: 1200 } },
+          ],
+          captureStability: {
+            stages: [
+              { kind: "library", stable: true, attemptCount: 2, selectedAttempt: 2, selectionReason: "stable-hash-pair" },
+              {
+                kind: "reader",
+                stable: true,
+                attemptCount: 3,
+                selectedAttempt: 3,
+                selectionReason: "stable-low-drift-pair",
+                stabilityMetrics: {
+                  sameDimensions: true,
+                  changedRatio: 0.008,
+                  meanChannelDiff: 0.9,
+                  thresholdChangedRatio: 0.0125,
+                  thresholdMeanChannelDiff: 1.25,
+                },
+              },
+            ],
+          },
+          analysis: {
+            ok: false,
+            baselines: [
+              {
+                kind: "library",
+                canonicalTarget: "hot-reload-library.png",
+                path: "/tmp/hot-reload-library.png",
+                status: "compared",
+                ok: true,
+                metrics: {
+                  changedRatio: 0,
+                  meanChannelDiff: 0,
+                },
+              },
+              {
+                kind: "reader",
+                canonicalTarget: "hot-reload-reader.png",
+                path: "/tmp/hot-reload-reader.png",
+                status: "compared",
+                ok: false,
+                metrics: {
+                  sameDimensions: true,
+                  changedRatio: 0.12,
+                  meanChannelDiff: 8,
+                },
+                issues: ["reader 截图与基线像素漂移过大：12.00% > 5.00%"],
+              },
+            ],
+            summary: {
+              baseline: {
+                comparedCount: 2,
+                missingCount: 0,
+                driftCount: 1,
+                errorCount: 0,
+                updateRequested: false,
+              },
+            },
+          },
+          warnings: [],
+        },
+      }],
+      visuals: [],
+    });
+
+    assert.ok(markdown.includes("reader 稳定 3 次（低漂移收敛）"));
+  });
+
+  it("should render mixed library-exhausted and reader-low-drift states without regressing blocker wording", () => {
+    const markdown = buildE2EMarkdown({
+      generatedAt: "2026-03-26T00:00:00.000Z",
+      strategy: "hot",
+      visualBaselineDir: "/tmp/visual-baseline",
+      visualBaselineMode: "compare",
+      passed: false,
+      issues: ["library 截图与基线像素漂移过大：11.00% > 5.00%"],
+      hints: [],
+      diagnostics: [],
+      primaryDiagnosis: {
+        fingerprint: "reader-ui:reader-visual-drift",
+        feature: "reader-ui",
+        featureLabel: "Reader 与视觉回归",
+        severity: "medium",
+        confidence: 0.88,
+        summary: "Reader 相关视觉基线发生漂移或缺失。",
+      },
+      cycles: [{
+        index: 1,
+        bootMode: "hot-reload",
+        passed: false,
+        summaryNote: "library stage 仍需收敛",
+        tests: { failed: 0 },
+        scenarios: {
+          failed: 0,
+          results: [
+            { name: "reader event hook diagnostics", status: "passed" },
+            { name: "reader fine-grained hook diagnostics", status: "passed" },
+          ],
+        },
+        logs: {
+          errorCount: 0,
+          warnCount: 0,
+          recentErrors: [],
+        },
+        visuals: {
+          captures: [
+            { kind: "library", path: "/tmp/library.png", analysis: { width: 2000, height: 1200 } },
+            { kind: "reader", path: "/tmp/reader.png", analysis: { width: 2000, height: 1200 } },
+          ],
+          captureStability: {
+            stages: [
+              {
+                kind: "library",
+                stable: false,
+                attemptCount: 3,
+                selectedAttempt: 3,
+                selectionReason: "max-attempt-reached",
+                attempts: [
+                  { index: 1, sha256: "lib-1", width: 2000, height: 1200, bounds: { x: 100, y: 80, width: 1000, height: 600 } },
+                  { index: 2, sha256: "lib-2", width: 2000, height: 1200, bounds: { x: 100, y: 80, width: 1000, height: 600 } },
+                  { index: 3, sha256: "lib-3", width: 2000, height: 1200, bounds: { x: 100, y: 80, width: 1000, height: 600 } },
+                ],
+              },
+              {
+                kind: "reader",
+                stable: true,
+                attemptCount: 3,
+                selectedAttempt: 3,
+                selectionReason: "stable-low-drift-pair",
+                attempts: [
+                  { index: 1, sha256: "reader-1", width: 2000, height: 1200, bounds: { x: 100, y: 80, width: 1000, height: 600 } },
+                  { index: 2, sha256: "reader-2", width: 2000, height: 1200, bounds: { x: 100, y: 80, width: 1000, height: 600 } },
+                  { index: 3, sha256: "reader-3", width: 2000, height: 1200, bounds: { x: 100, y: 80, width: 1000, height: 600 } },
+                ],
+                stabilityMetrics: {
+                  sameDimensions: true,
+                  changedRatio: 0.008,
+                  meanChannelDiff: 0.9,
+                  thresholdChangedRatio: 0.0125,
+                  thresholdMeanChannelDiff: 1.25,
+                },
+              },
+            ],
+          },
+          analysis: {
+            ok: false,
+            baselines: [
+              {
+                kind: "library",
+                canonicalTarget: "hot-reload-library.png",
+                path: "/tmp/hot-reload-library.png",
+                status: "compared",
+                ok: false,
+                metrics: {
+                  sameDimensions: true,
+                  changedRatio: 0.11,
+                  meanChannelDiff: 4.2,
+                },
+              },
+              {
+                kind: "reader",
+                canonicalTarget: "hot-reload-reader.png",
+                path: "/tmp/hot-reload-reader.png",
+                status: "compared",
+                ok: false,
+                metrics: {
+                  sameDimensions: true,
+                  changedRatio: 0.08,
+                  meanChannelDiff: 3.1,
+                },
+              },
+            ],
+            summary: {
+              baseline: {
+                comparedCount: 2,
+                missingCount: 0,
+                driftCount: 2,
+                errorCount: 0,
+                updateRequested: false,
+              },
+            },
+          },
+          warnings: [],
+        },
+      }],
+      visuals: [],
+    });
+
+    assert.ok(markdown.includes("采集稳定性 library 待稳 3 次（重试上限）；reader 稳定 3 次（低漂移收敛）"));
+    assert.ok(markdown.includes("用尽预算 stage：library（3 次）"));
+    assert.equal(markdown.includes("用尽预算 stage：reader（3 次）"), false);
+    assert.ok(markdown.includes("## Capture Attempt 诊断"));
+    assert.ok(markdown.includes("Cycle 1 / hot-reload / library"));
+    assert.ok(markdown.includes("Hash 全变：是"));
+    assert.ok(markdown.includes("Attempt Bounds：100,80 1000x600；100,80 1000x600；100,80 1000x600"));
+    assert.ok(markdown.includes("Stability Metrics：sameDimensions=是 / changedRatio=0.80% / meanChannelDiff=0.90 / thresholdChangedRatio=1.25% / thresholdMeanChannelDiff=1.25"));
+  });
+
+  it("should not fail cycle when visual baseline is missing but no drift is detected", () => {
+    const result = evaluateCycle({
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+          summary: {
+            baseline: {
+              comparedCount: 0,
+              missingCount: 2,
+              driftCount: 0,
+              errorCount: 0,
+              updateRequested: false,
+            },
+          },
+        },
+      },
+    });
+
+    assert.equal(result.passed, true);
+    assert.equal(result.issues.length, 0);
+  });
+
+  it("should report service health degradation as cycle issue", () => {
+    const result = evaluateCycle({
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+        serviceTotal: 2,
+        serviceHealthyCount: 1,
+        serviceUnhealthyCount: 1,
+        serviceHealthOK: false,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.some((item) => String(item).includes("服务健康异常")));
+    assert.ok(result.hints.some((item) => String(item).includes("service registry")));
+  });
+
+  it("should prioritize bootstrap diagnosis when bootstrap.js baseline file is missing", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        staticRuntimeOK: false,
+        staticRuntimeMissingCount: 1,
+        staticRuntimeMissingEntries: [{
+          file: "addon-static/bootstrap.js",
+          label: "bootstrap 启动脚本",
+          reason: "file-missing",
+        }],
+        pluginMounted: false,
+        apiMounted: false,
+        primaryActionResult: false,
+        agentActionResult: false,
+        itemPaneSections: 0,
+        itemPaneInfoRows: 0,
+        itemTreeColumns: 0,
+        notifierActiveCount: 0,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: false,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("静态运行时基线缺失：addon-static/bootstrap.js（bootstrap 启动脚本）。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "bootstrap:bootstrap-file-missing");
+    assert.ok(result.hints.some((item) => String(item).includes("addon-static/bootstrap.js")));
+  });
+
+  it("should prioritize bootstrap drift diagnosis when bootstrap.js content drifts from clean-room baseline", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        staticRuntimeOK: true,
+        staticRuntimeBaselineOK: false,
+        staticRuntimeMissingCount: 0,
+        staticRuntimeDriftCount: 1,
+        staticRuntimeDriftEntries: [{
+          file: "addon-static/bootstrap.js",
+          label: "bootstrap 启动脚本",
+          reason: "content-drift",
+        }],
+        pluginMounted: false,
+        apiMounted: false,
+        primaryActionResult: false,
+        agentActionResult: false,
+        itemPaneSections: 0,
+        itemPaneInfoRows: 0,
+        itemTreeColumns: 0,
+        notifierActiveCount: 0,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: false,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("静态运行时基线漂移：addon-static/bootstrap.js（bootstrap 启动脚本）。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "bootstrap:bootstrap-file-drift");
+    assert.ok(result.hints.some((item) => String(item).includes("canonical baseline")));
+  });
+
+  it("should prioritize reader entry diagnosis when reader summary command and menu are missing", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+        officialMenuAPIAvailable: true,
+        readerSummaryCommandRegistered: false,
+        readerSummaryMenuRegistered: false,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("Reader 摘要命令未注册。"));
+    assert.ok(result.issues.includes("Reader View 菜单项未注册。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "reader-entry:declarative-reader-mapping-drift");
+    assert.ok(result.hints.some((item) => String(item).includes("feature-composer.js")));
+  });
+
+  it("should diagnose reader event bridge registration drift when hook scenario fails", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+        readerSummaryCommandRegistered: true,
+        readerSummaryMenuRegistered: true,
+        readerEventAPIAvailable: true,
+        readerEventKnownTypeCount: 8,
+        readerEventProbeTypeCount: 7,
+        readerEventSyntheticFallbackAvailable: true,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 2,
+        passed: 1,
+        failed: 1,
+        results: [
+          {
+            name: "reader event hook diagnostics",
+            status: "failed",
+          },
+          {
+            name: "reader fine-grained hook diagnostics",
+            status: "passed",
+          },
+        ],
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("Reader 官方事件监听注册异常。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "reader-event:toolbar-bridge-registration-drift");
+    assert.ok(result.hints.some((item) => String(item).includes("registerEventListener()")));
+  });
+
+  it("should diagnose reader event synthetic fallback mapping gaps", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+        readerSummaryCommandRegistered: true,
+        readerSummaryMenuRegistered: true,
+        readerEventAPIAvailable: true,
+        readerEventKnownTypeCount: 8,
+        readerEventProbeTypeCount: 7,
+        readerEventSyntheticFallbackAvailable: false,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 2,
+        passed: 1,
+        failed: 1,
+        results: [
+          {
+            name: "reader event hook diagnostics",
+            status: "passed",
+          },
+          {
+            name: "reader fine-grained hook diagnostics",
+            status: "failed",
+          },
+        ],
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("Reader 事件桥缺少 synthetic-fallback 映射。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "reader-event:fine-grained-hook-declaration-drift");
+    assert.ok(result.hints.some((item) => String(item).includes("READER_EVENT_SYNTHETIC_FALLBACK_TYPES")));
+  });
+
+  it("should diagnose reader event declaration gaps when known or probe types regress", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+        readerSummaryCommandRegistered: true,
+        readerSummaryMenuRegistered: true,
+        readerEventAPIAvailable: true,
+        readerEventKnownTypeCount: 7,
+        readerEventProbeTypeCount: 6,
+        readerEventSyntheticFallbackAvailable: true,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 2,
+        passed: 2,
+        failed: 0,
+        results: [
+          {
+            name: "reader event hook diagnostics",
+            status: "passed",
+          },
+          {
+            name: "reader fine-grained hook diagnostics",
+            status: "passed",
+          },
+        ],
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.some((item) => String(item).includes("Reader 事件桥已知类型声明缺口")));
+    assert.ok(result.issues.some((item) => String(item).includes("Reader 事件桥 probe 声明缺口")));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "reader-event:fine-grained-hook-declaration-drift");
+    assert.ok(result.hints.some((item) => String(item).includes("READER_EVENT_KNOWN_TYPES")));
+  });
+
+  it("should prioritize menu diagnosis when primary command registration is missing", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionCommandRegistered: false,
+        readerSummaryCommandRegistered: true,
+        officialMenuAPIAvailable: true,
+        contextActionMenuRegistered: true,
+        readerSummaryMenuRegistered: true,
+        preferencePaneRegistered: true,
+        preferencePaneCount: 1,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("主命令未注册到命令面板。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "menu-action:primary-command-missing");
+    assert.ok(result.hints.some((item) => String(item).includes("*-primary-action")));
+  });
+
+  it("should prioritize menu diagnosis when context menu registration is missing", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionCommandRegistered: true,
+        readerSummaryCommandRegistered: true,
+        officialMenuAPIAvailable: true,
+        contextActionMenuRegistered: false,
+        readerSummaryMenuRegistered: true,
+        preferencePaneRegistered: true,
+        preferencePaneCount: 1,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("主窗口上下文菜单项未注册。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "menu-action:context-menu-missing");
+    assert.ok(result.hints.some((item) => String(item).includes("registerContextMenuItem")));
+  });
+
+  it("should prioritize preference pane diagnosis when preference pane registration is missing", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionCommandRegistered: true,
+        readerSummaryCommandRegistered: true,
+        officialMenuAPIAvailable: true,
+        contextActionMenuRegistered: true,
+        readerSummaryMenuRegistered: true,
+        preferencePaneRegistered: false,
+        preferencePaneCount: 0,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("偏好设置面板未注册。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "preferences:preference-pane-missing");
+    assert.ok(result.hints.some((item) => String(item).includes("preferences.xhtml")));
+  });
+
+  it("should prioritize preference pane resource diagnosis when preferences.xhtml is missing", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionCommandRegistered: true,
+        readerSummaryCommandRegistered: true,
+        officialMenuAPIAvailable: true,
+        contextActionMenuRegistered: true,
+        readerSummaryMenuRegistered: true,
+        preferencePaneRegistered: false,
+        preferencePaneCount: 0,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 1,
+        warnCount: 0,
+        recentErrors: [{
+          message: "JavaScript error: missing chrome or resource url for content/preferences.xhtml",
+        }],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("偏好设置面板未注册。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "preferences:preference-pane-resource-missing");
+    assert.ok(result.hints.some((item) => String(item).includes("addon-static/content/preferences.xhtml")));
+  });
+
+  it("should prioritize preference pane resource diagnosis from static runtime baseline check", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        staticRuntimeOK: false,
+        staticRuntimeMissingCount: 1,
+        staticRuntimeMissingEntries: [{
+          file: "addon-static/content/preferences.xhtml",
+          label: "偏好设置面板资源",
+          reason: "file-missing",
+        }],
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionCommandRegistered: true,
+        readerSummaryCommandRegistered: true,
+        officialMenuAPIAvailable: true,
+        contextActionMenuRegistered: true,
+        readerSummaryMenuRegistered: true,
+        preferencePaneRegistered: false,
+        preferencePaneCount: 0,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("静态运行时基线缺失：addon-static/content/preferences.xhtml（偏好设置面板资源）。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "preferences:preference-pane-resource-missing");
+  });
+
+  it("should diagnose preference pane resource drift from static runtime baseline check", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        staticRuntimeOK: true,
+        staticRuntimeBaselineOK: false,
+        staticRuntimeMissingCount: 0,
+        staticRuntimeDriftCount: 1,
+        staticRuntimeDriftEntries: [{
+          file: "addon-static/content/preferences.xhtml",
+          label: "偏好设置面板资源",
+          reason: "content-drift",
+        }],
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionCommandRegistered: true,
+        readerSummaryCommandRegistered: true,
+        officialMenuAPIAvailable: true,
+        contextActionMenuRegistered: true,
+        readerSummaryMenuRegistered: true,
+        preferencePaneRegistered: false,
+        preferencePaneCount: 0,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("静态运行时基线漂移：addon-static/content/preferences.xhtml（偏好设置面板资源）。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "preferences:preference-pane-resource-drift");
+  });
+
+  it("should prioritize runtime style resource diagnosis when main.css is missing", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionCommandRegistered: true,
+        readerSummaryCommandRegistered: true,
+        officialMenuAPIAvailable: true,
+        contextActionMenuRegistered: true,
+        readerSummaryMenuRegistered: true,
+        preferencePaneRegistered: true,
+        preferencePaneCount: 1,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 1,
+        warnCount: 0,
+        recentErrors: [{
+          message: "JavaScript error: missing chrome or resource url for content/style/main.css",
+        }],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("检测到 1 条 error 级日志。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "runtime-logs:style-sheet-resource-missing");
+    assert.ok(result.hints.some((item) => String(item).includes("addon-static/content/style/main.css")));
+  });
+
+  it("should prioritize runtime style resource diagnosis from static runtime baseline check", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        staticRuntimeOK: false,
+        staticRuntimeMissingCount: 1,
+        staticRuntimeMissingEntries: [{
+          file: "addon-static/content/style/main.css",
+          label: "主窗口样式资源",
+          reason: "file-missing",
+        }],
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionCommandRegistered: true,
+        readerSummaryCommandRegistered: true,
+        officialMenuAPIAvailable: true,
+        contextActionMenuRegistered: true,
+        readerSummaryMenuRegistered: true,
+        preferencePaneRegistered: true,
+        preferencePaneCount: 1,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("静态运行时基线缺失：addon-static/content/style/main.css（主窗口样式资源）。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "runtime-logs:style-sheet-resource-missing");
+  });
+
+  it("should diagnose runtime style resource drift from static runtime baseline check", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        staticRuntimeOK: true,
+        staticRuntimeBaselineOK: false,
+        staticRuntimeMissingCount: 0,
+        staticRuntimeDriftCount: 1,
+        staticRuntimeDriftEntries: [{
+          file: "addon-static/content/style/main.css",
+          label: "主窗口样式资源",
+          reason: "content-drift",
+        }],
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionCommandRegistered: true,
+        readerSummaryCommandRegistered: true,
+        officialMenuAPIAvailable: true,
+        contextActionMenuRegistered: true,
+        readerSummaryMenuRegistered: true,
+        preferencePaneRegistered: true,
+        preferencePaneCount: 1,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 1,
+        warnCount: 0,
+        recentErrors: [{
+          message: "JavaScript error: failed to load resource://cleanroom/content/style/main.css",
+        }],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("静态运行时基线漂移：addon-static/content/style/main.css（主窗口样式资源）。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "runtime-logs:style-sheet-resource-drift");
+  });
+
+  it("should diagnose icon resource drift from static runtime baseline check", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        staticRuntimeOK: true,
+        staticRuntimeBaselineOK: false,
+        staticRuntimeMissingCount: 0,
+        staticRuntimeDriftCount: 1,
+        staticRuntimeDriftEntries: [{
+          file: "addon-static/content/icons/icon-48.png",
+          label: "配置声明的 icon 资源",
+          reason: "content-drift",
+        }],
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionCommandRegistered: true,
+        readerSummaryCommandRegistered: true,
+        officialMenuAPIAvailable: true,
+        contextActionMenuRegistered: true,
+        readerSummaryMenuRegistered: true,
+        preferencePaneRegistered: true,
+        preferencePaneCount: 1,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("静态运行时基线漂移：addon-static/content/icons/icon-48.png（配置声明的 icon 资源）。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "assets:icon-resource-drift");
+    assert.ok(result.hints.some((item) => String(item).includes("基线路径")));
+  });
+
+  it("should prioritize localization diagnosis when item pane l10n ids drift from baseline", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemPaneL10nOK: false,
+        itemPaneL10nDriftCount: 1,
+        itemPaneL10nDrifts: [{
+          kind: "info-row-label",
+          expected: "cleanroom-item-pane-info-row-label",
+          actual: "cleanroom-item-pane-info-row-label-typo",
+        }],
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("ItemPane InfoRow l10nID 漂移：期望 cleanroom-item-pane-info-row-label，实际 cleanroom-item-pane-info-row-label-typo。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "localization:item-pane-info-row-l10n-id-drift");
+    assert.ok(result.hints.some((item) => String(item).includes("feature-composer.js")));
+  });
+
+  it("should prioritize localization diagnosis when locale ftl key is missing", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+        localeFTLOK: false,
+        localeFTLMissingCount: 1,
+        localeFTLMissingEntries: [{
+          locale: "zh-CN",
+          key: "cleanroom-item-pane-section-header",
+        }],
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("Locale zh-CN 缺少 FTL key cleanroom-item-pane-section-header。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "localization:item-pane-section-header-ftl-key-missing");
+    assert.ok(result.hints.some((item) => String(item).includes("main.ftl")));
+  });
+
+  it("should preserve file-missing detail when locale main ftl is absent", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+        localeFTLOK: false,
+        localeFTLMissingCount: 1,
+        localeFTLMissingEntries: [{
+          locale: "zh-CN",
+          key: "cleanroom-item-pane-section-header",
+          file: "addon-static/locale/zh-CN/main.ftl",
+          reason: "file-missing",
+        }],
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("Locale zh-CN 缺少 FTL key cleanroom-item-pane-section-header（文件 addon-static/locale/zh-CN/main.ftl 不存在）。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "localization:item-pane-section-header-ftl-key-missing");
+    assert.ok(result.hints.some((item) => String(item).includes("最小基线文件")));
+  });
+
+  it("should prioritize localization diagnosis when locale ftl value drifts", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+        localeFTLOK: false,
+        localeFTLMissingCount: 0,
+        localeFTLMissingEntries: [],
+        localeFTLValueDriftCount: 1,
+        localeFTLValueDriftEntries: [{
+          locale: "zh-CN",
+          key: "cleanroom-item-pane-section-header",
+          expectedValue: "模板示例",
+          actualValue: "模板示例-错误",
+        }],
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("Locale zh-CN FTL key cleanroom-item-pane-section-header 值漂移：期望 模板示例，实际 模板示例-错误。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "localization:item-pane-section-header-ftl-value-drift");
+    assert.ok(result.hints.some((item) => String(item).includes("单行替换")));
+  });
+
+  it("should prioritize lifecycle diagnosis when baseline registration chain is collectively missing", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 0,
+        itemPaneInfoRows: 0,
+        itemTreeColumns: 0,
+        notifierActiveCount: 0,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.equal(result.primaryDiagnosis?.fingerprint, "lifecycle:baseline-registration-missing");
+    assert.equal(result.primaryDiagnosis?.featureLabel, "生命周期与基线注册");
+    assert.ok(result.primaryDiagnosis?.candidateFiles.includes("src/app/kernel.js"));
+  });
+
+  it("should prioritize config diagnosis when plugin is mounted but disabled", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: false,
+        hasMainWindow: true,
+        primaryActionResult: false,
+        agentActionResult: false,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("插件当前为 disabled 状态。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "config:default-enabled-disabled");
+    assert.ok(result.hints.some((item) => String(item).includes("fresh profile")));
+    assert.ok(result.primaryDiagnosis?.candidateFiles.includes("config/addon.config.json"));
+  });
+});

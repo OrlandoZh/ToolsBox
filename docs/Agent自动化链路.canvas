@@ -1,0 +1,407 @@
+{
+  "nodes": [
+    {
+      "id": "group-overview",
+      "type": "group",
+      "x": -80,
+      "y": -80,
+      "width": 1380,
+      "height": 640,
+      "label": "总览与术语映射",
+      "color": "4"
+    },
+    {
+      "id": "group-runtime",
+      "type": "group",
+      "x": 1320,
+      "y": -80,
+      "width": 1500,
+      "height": 780,
+      "label": "执行闭环",
+      "color": "2"
+    },
+    {
+      "id": "group-governance",
+      "type": "group",
+      "x": -80,
+      "y": 620,
+      "width": 2900,
+      "height": 980,
+      "label": "状态产物、门禁与恢复",
+      "color": "5"
+    },
+    {
+      "id": "group-reading",
+      "type": "group",
+      "x": 2840,
+      "y": -80,
+      "width": 920,
+      "height": 1680,
+      "label": "阅读入口",
+      "color": "6"
+    },
+    {
+      "id": "title",
+      "type": "text",
+      "x": 0,
+      "y": 0,
+      "width": 420,
+      "height": 220,
+      "color": "1",
+      "text": "# Agent 自动化链路\n\n这张白板解释当前项目里，agent 如何围绕 Zotero 形成一套“启动 -> 重载 -> 动作验证 -> 日志采集 -> 门禁判断 -> 自动恢复”的闭环。\n\n阅读建议：\n1. 先看左上术语映射\n2. 再看右上执行闭环\n3. 最后看下方状态与门禁"
+    },
+    {
+      "id": "mapping-core",
+      "type": "text",
+      "x": 460,
+      "y": 0,
+      "width": 360,
+      "height": 460,
+      "text": "## 核心术语映射\n\n- `watch` -> 热重载守护\n- `reload` -> 插件重载\n- `runtime recovery` -> 运行时恢复\n- `session restart recovery` -> 会话重启恢复\n- `smoke test` -> 快速冒烟验证\n- `E2E (end-to-end)` -> 真机闭环验证\n- `autofix` -> 自动修复复验\n- `gate` -> 质量门禁\n- `monitor` -> 状态汇总器\n- `dashboard` -> 可视化仪表板"
+    },
+    {
+      "id": "mapping-zotero",
+      "type": "text",
+      "x": 860,
+      "y": 0,
+      "width": 340,
+      "height": 460,
+      "text": "## Zotero 侧术语映射\n\n- `zotero:watch` -> Zotero 热重载开发链路\n- `zotero:test` -> Zotero 集成测试入口\n- `zotero:scenario` -> Zotero 场景动作验证\n- `Browser Toolbox` -> Zotero 内置火狐开发控制台\n- `RDP` -> 远程调试协议通道\n- `profile` -> 隔离配置目录\n- `dataDir` -> 隔离数据目录\n- `visual baseline` -> 视觉基线\n- `drift` -> 视觉漂移"
+    },
+    {
+      "id": "runtime-entry",
+      "type": "text",
+      "x": 1400,
+      "y": 0,
+      "width": 320,
+      "height": 220,
+      "color": "2",
+      "text": "## 1. 启动入口\n\n- `zotero:dev`\n- `zotero:watch`\n- `zotero:console`\n- `agent:zotero:e2e`\n- `agent:zotero:autofix`\n\n它们都会先准备构建产物、隔离 profile/data，并连接 Zotero。"
+    },
+    {
+      "id": "runtime-watch",
+      "type": "text",
+      "x": 1760,
+      "y": 0,
+      "width": 340,
+      "height": 250,
+      "text": "## 2. 开发态热重载\n\n`zotero:watch`\n\n职责：\n- 监听源码变化\n- 重打包插件\n- 通过 RDP 执行 add-on reload\n- 运行宿主健康检查\n- 输出 `dist/zotero-watch-status.{json,md}`"
+    },
+    {
+      "id": "runtime-e2e",
+      "type": "text",
+      "x": 2140,
+      "y": 0,
+      "width": 360,
+      "height": 280,
+      "text": "## 3. 真机动作闭环\n\n`agent:zotero:e2e`\n\n做的事：\n- 打开 Zotero\n- 加载或重载插件\n- 运行功能动作\n- 执行 `zotero:test`\n- 执行 `zotero:scenario`\n- 采集日志与截图\n- 输出 `dist/agent-zotero-e2e.{json,md}`"
+    },
+    {
+      "id": "runtime-autofix",
+      "type": "text",
+      "x": 1760,
+      "y": 320,
+      "width": 400,
+      "height": 280,
+      "text": "## 4. 自动恢复闭环\n\n`agent:zotero:autofix`\n\n策略：\n- 先跑一次 E2E\n- 若失败，按故障模式推导恢复动作\n- 可能执行 `check` / `fresh + restart` / `zotero:test` / `zotero:scenario`\n- 再次复验\n- 输出 `dist/agent-zotero-autofix.{json,md}`"
+    },
+    {
+      "id": "runtime-flow",
+      "type": "text",
+      "x": 2200,
+      "y": 340,
+      "width": 520,
+      "height": 240,
+      "color": "3",
+      "text": "## 人类好理解的一句话\n\n当前 agent 自动化链路 =\n\n“自动打开 Zotero -> 让插件进入可运行状态 -> 执行动作与测试 -> 读取日志和截图 -> 生成状态报告 -> 如果失败就自动尝试修复 -> 再把结果交给门禁判断是否可以继续开发。”"
+    },
+    {
+      "id": "artifact-watch",
+      "type": "text",
+      "x": 0,
+      "y": 700,
+      "width": 360,
+      "height": 280,
+      "text": "## 状态产物 1\n\n`dist/zotero-watch-status.json`\n`dist/zotero-watch-status.md`\n\n中文理解：\n“热重载健康报告”\n\n记录：\n- 最近一次启动/热重载是否健康\n- 最近问题清单\n- 日志摘要\n- 是否过期"
+    },
+    {
+      "id": "artifact-e2e",
+      "type": "text",
+      "x": 400,
+      "y": 700,
+      "width": 360,
+      "height": 280,
+      "text": "## 状态产物 2\n\n`dist/agent-zotero-e2e.json`\n`dist/agent-zotero-e2e.md`\n\n中文理解：\n“真机闭环验证报告”\n\n记录：\n- E2E 是否通过\n- 测试失败数\n- 场景失败数\n- 视觉漂移\n- 修复提示"
+    },
+    {
+      "id": "artifact-autofix",
+      "type": "text",
+      "x": 800,
+      "y": 700,
+      "width": 380,
+      "height": 320,
+      "text": "## 状态产物 3\n\n`dist/agent-zotero-autofix.json`\n`dist/agent-zotero-autofix.md`\n\n中文理解：\n“自动修复与复验报告”\n\n记录：\n- 是否无需恢复 / 已恢复 / 未恢复\n- 恢复步骤列表\n- 每一步耗时\n- 失败步骤分布"
+    },
+    {
+      "id": "artifact-monitor",
+      "type": "text",
+      "x": 1240,
+      "y": 700,
+      "width": 420,
+      "height": 340,
+      "text": "## 汇总层\n\n`agent:monitor`\n\n中文理解：\n“统一状态汇总器”\n\n它把三类信息合在一起：\n- agent 执行遥测\n- Zotero watch 健康状态\n- E2E / autofix 结果\n\n输出：\n`dist/agent-monitor.json`\n`dist/agent-monitor.md`"
+    },
+    {
+      "id": "artifact-dashboard",
+      "type": "text",
+      "x": 1720,
+      "y": 700,
+      "width": 420,
+      "height": 340,
+      "text": "## 可视化层\n\n`agent:dashboard`\n\n中文理解：\n“人看得懂的控制面板”\n\n作用：\n- 把状态图形化\n- 展示热重载状态\n- 展示真机 E2E\n- 展示 autofix 摘要\n- 展示恢复步骤与耗时"
+    },
+    {
+      "id": "artifact-gate",
+      "type": "text",
+      "x": 2200,
+      "y": 700,
+      "width": 480,
+      "height": 420,
+      "color": "3",
+      "text": "## 门禁层\n\n`agent:gate`\n\n中文理解：\n“是否允许继续推进的自动裁判”\n\n开发档位当前会拦截：\n- `watch` 不健康 / 过期 / 时间异常\n- E2E 失败\n- E2E 结果过期\n- `autofix` 未跟进到最新失败\n\n输出：\n`dist/agent-gate.json`\n`dist/agent-gate.md`"
+    },
+    {
+      "id": "artifact-human",
+      "type": "text",
+      "x": 40,
+      "y": 1080,
+      "width": 2640,
+      "height": 220,
+      "text": "## 你可以把整条链路理解成\n\n源码变化 / 人工触发命令 -> Zotero 真机执行 -> 产生状态报告 -> 汇总成统一视图 -> 门禁裁决 -> 如果失败就进入恢复动作 -> 再次复验 -> 最终给出“通过 / 未通过”。\n\n所以它已经不是单纯的开发脚本集合，而是一套面向 agent 的“感知 + 执行 + 判定 + 恢复”闭环。"
+    },
+    {
+      "id": "artifact-now",
+      "type": "text",
+      "x": 2200,
+      "y": 1180,
+      "width": 520,
+      "height": 300,
+      "color": "1",
+      "text": "## 当前项目的现实状态\n\n当前基础已经具备：\n- 自动打开 Zotero\n- 自动热重载 / 重启恢复\n- 自动执行测试和场景动作\n- 自动抓日志与视觉基线\n- 自动给出门禁结论\n- 自动做受控恢复并记录步骤\n\n还可以继续增强：\n- 更细的故障分类\n- 更主动的修复策略推荐\n- 更强的多轮自愈"
+    },
+    {
+      "id": "file-readme",
+      "type": "file",
+      "x": 2920,
+      "y": 0,
+      "width": 320,
+      "height": 220,
+      "file": "README.md"
+    },
+    {
+      "id": "file-testing",
+      "type": "file",
+      "x": 3280,
+      "y": 0,
+      "width": 360,
+      "height": 220,
+      "file": "docs/ZOTERO_TESTING.md"
+    },
+    {
+      "id": "file-monitor",
+      "type": "file",
+      "x": 2920,
+      "y": 280,
+      "width": 320,
+      "height": 220,
+      "file": "dist/agent-monitor.md"
+    },
+    {
+      "id": "file-gate",
+      "type": "file",
+      "x": 3280,
+      "y": 280,
+      "width": 360,
+      "height": 220,
+      "file": "dist/agent-gate.md"
+    },
+    {
+      "id": "file-e2e",
+      "type": "file",
+      "x": 2920,
+      "y": 560,
+      "width": 320,
+      "height": 220,
+      "file": "dist/agent-zotero-e2e.md"
+    },
+    {
+      "id": "file-autofix",
+      "type": "file",
+      "x": 3280,
+      "y": 560,
+      "width": 360,
+      "height": 220,
+      "file": "dist/agent-zotero-autofix.md"
+    },
+    {
+      "id": "file-watch",
+      "type": "file",
+      "x": 2920,
+      "y": 840,
+      "width": 320,
+      "height": 220,
+      "file": "dist/zotero-watch-status.md"
+    },
+    {
+      "id": "read-tip",
+      "type": "text",
+      "x": 2920,
+      "y": 1120,
+      "width": 720,
+      "height": 220,
+      "text": "## 怎么在 Obsidian 里读这张图\n\n- 先点开上面的文件卡片，可以直接跳到对应报告\n- 再回到这张白板，对照术语映射理解英文命令和中文含义\n- 如果后面你要扩展 agent 能力，可以在“总览与术语映射”旁边继续加新节点"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-title-core",
+      "fromNode": "title",
+      "fromSide": "right",
+      "toNode": "mapping-core",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "先理解术语"
+    },
+    {
+      "id": "edge-core-zotero",
+      "fromNode": "mapping-core",
+      "fromSide": "right",
+      "toNode": "mapping-zotero",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "再映射到 Zotero"
+    },
+    {
+      "id": "edge-entry-watch",
+      "fromNode": "runtime-entry",
+      "fromSide": "right",
+      "toNode": "runtime-watch",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "开发态"
+    },
+    {
+      "id": "edge-watch-e2e",
+      "fromNode": "runtime-watch",
+      "fromSide": "right",
+      "toNode": "runtime-e2e",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "进入真机验证"
+    },
+    {
+      "id": "edge-e2e-autofix",
+      "fromNode": "runtime-e2e",
+      "fromSide": "bottom",
+      "toNode": "runtime-autofix",
+      "toSide": "top",
+      "toEnd": "arrow",
+      "label": "失败时转入恢复"
+    },
+    {
+      "id": "edge-autofix-flow",
+      "fromNode": "runtime-autofix",
+      "fromSide": "right",
+      "toNode": "runtime-flow",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "形成闭环"
+    },
+    {
+      "id": "edge-watch-artifact",
+      "fromNode": "runtime-watch",
+      "fromSide": "bottom",
+      "toNode": "artifact-watch",
+      "toSide": "top",
+      "toEnd": "arrow",
+      "label": "生成 watch 状态"
+    },
+    {
+      "id": "edge-e2e-artifact",
+      "fromNode": "runtime-e2e",
+      "fromSide": "bottom",
+      "toNode": "artifact-e2e",
+      "toSide": "top",
+      "toEnd": "arrow",
+      "label": "生成 E2E 报告"
+    },
+    {
+      "id": "edge-autofix-artifact",
+      "fromNode": "runtime-autofix",
+      "fromSide": "bottom",
+      "toNode": "artifact-autofix",
+      "toSide": "top",
+      "toEnd": "arrow",
+      "label": "生成 autofix 报告"
+    },
+    {
+      "id": "edge-watch-monitor",
+      "fromNode": "artifact-watch",
+      "fromSide": "right",
+      "toNode": "artifact-monitor",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "edge-e2e-monitor",
+      "fromNode": "artifact-e2e",
+      "fromSide": "right",
+      "toNode": "artifact-monitor",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "edge-autofix-monitor",
+      "fromNode": "artifact-autofix",
+      "fromSide": "right",
+      "toNode": "artifact-monitor",
+      "toSide": "left",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "edge-monitor-dashboard",
+      "fromNode": "artifact-monitor",
+      "fromSide": "right",
+      "toNode": "artifact-dashboard",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "可视化"
+    },
+    {
+      "id": "edge-monitor-gate",
+      "fromNode": "artifact-monitor",
+      "fromSide": "right",
+      "toNode": "artifact-gate",
+      "toSide": "left",
+      "toEnd": "arrow",
+      "label": "判定"
+    },
+    {
+      "id": "edge-gate-human",
+      "fromNode": "artifact-gate",
+      "fromSide": "bottom",
+      "toNode": "artifact-human",
+      "toSide": "top",
+      "toEnd": "arrow",
+      "label": "给出继续/阻断结论"
+    },
+    {
+      "id": "edge-human-now",
+      "fromNode": "artifact-human",
+      "fromSide": "right",
+      "toNode": "artifact-now",
+      "toSide": "left",
+      "toEnd": "arrow"
+    }
+  ]
+}

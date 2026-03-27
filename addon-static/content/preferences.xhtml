@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<vbox xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" flex="1">
+  <preferences id="cleanroom-preferences">
+    <preference id="pref-enabled" name="__PREFS_PREFIX__.enabled" type="bool" />
+    <preference id="pref-menuLabel" name="__PREFS_PREFIX__.menuLabel" type="string" />
+    <preference id="pref-logLevel" name="__PREFS_PREFIX__.logLevel" type="string" />
+  </preferences>
+
+  <groupbox>
+    <caption label="Cleanroom Template Preferences" />
+    <checkbox id="cleanroom-enabled" label="Enable plugin" preference="pref-enabled" />
+  </groupbox>
+
+  <groupbox>
+    <caption label="Menu" />
+    <hbox align="center">
+      <label value="Menu label" control="cleanroom-menu-label" />
+      <textbox id="cleanroom-menu-label" preference="pref-menuLabel" flex="1" />
+    </hbox>
+    <description>Leave empty to use localized default.</description>
+  </groupbox>
+
+  <groupbox>
+    <caption label="Logging" />
+    <hbox align="center">
+      <label value="Log level" control="cleanroom-log-level" />
+      <menulist id="cleanroom-log-level" preference="pref-logLevel">
+        <menupopup>
+          <menuitem label="debug" value="debug" />
+          <menuitem label="info" value="info" />
+          <menuitem label="warn" value="warn" />
+          <menuitem label="error" value="error" />
+        </menupopup>
+      </menulist>
+    </hbox>
+  </groupbox>
+</vbox>

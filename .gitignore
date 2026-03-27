@@ -1,0 +1,9 @@
+.DS_Store
+.env.local
+.sisyphus/
+.zotero-runtime/
+build/
+dist/
+node_modules/
+obsidian/agent-workbench/
+reference/
