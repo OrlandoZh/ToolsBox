@@ -11,8 +11,9 @@
 **方法**：
 - 从功能需求（而非代码）推导实现
 - 使用 `SPEC.md` 定义行为规格
-- 发布前使用 `LEGAL_RISK_CHECKLIST.md` 检查
-- 可选运行相似度扫描（`npm run sim`）
+- 使用 `npm run cleanroom:audit` 固定开发态 clean-room 门禁
+- 发布前使用 `LEGAL_RISK_CHECKLIST.md` 与 `npm run release:preflight` 检查
+- 在本地挂载 reference 快照时运行 `npm run cleanroom:sim`
 
 ### 2. 零外部依赖
 

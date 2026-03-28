@@ -55,5 +55,7 @@
 
 ## F. Risk-Control Layer
 - [ ] `SPEC.md` updated before feature coding.
-- [ ] `LEGAL_RISK_CHECKLIST.md` completed before distribution.
-- [ ] Similarity checks executed and reviewed (`npm run sim`).
+- [ ] `LEGAL_RISK_CHECKLIST.md` Development Gate completed with evidence before distribution.
+- [ ] `npm run cleanroom:audit` passes and writes `dist/cleanroom-audit.{json,md}`.
+- [ ] Similarity checks executed and reviewed with `npm run cleanroom:sim` when local `reference/` snapshots are mounted.
+- [ ] `npm run release:preflight` enforces release-mode clean-room audit before shipment.
