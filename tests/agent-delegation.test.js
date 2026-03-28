@@ -13,7 +13,7 @@ import {
 const projectRoot = path.resolve(".");
 
 describe("Agent Delegation", () => {
-  it("should load the rebaselined manifest with READER-HIGH-123 manual-verdict standby while retaining historical contract sources", async () => {
+  it("should load the rebaselined manifest with ENG-HIGH-103 as the active engineering batch while retaining historical contract sources", async () => {
     const manifest = await loadDelegationManifest(projectRoot);
 
     assert.equal(manifest.schemaVersion, 1);
@@ -39,9 +39,14 @@ describe("Agent Delegation", () => {
     assert.ok(Boolean(manifest.taskMap["READER-HIGH-122"]));
     assert.ok(Boolean(manifest.taskMap["READER-HIGH-123"]));
     assert.ok(Boolean(manifest.taskMap["ENG-HIGH-102"]));
+    assert.ok(Boolean(manifest.taskMap["ENG-HIGH-103"]));
     assert.ok(Boolean(manifest.taskMap["ENG-LOW-204"]));
     assert.ok(Boolean(manifest.taskMap["ENG-LOW-205"]));
     assert.ok(Boolean(manifest.taskMap["ENG-LOW-206"]));
+    assert.ok(Boolean(manifest.taskMap["ENG-LOW-207"]));
+    assert.ok(Boolean(manifest.taskMap["ENG-LOW-208"]));
+    assert.ok(Boolean(manifest.taskMap["ENG-LOW-209"]));
+    assert.ok(Boolean(manifest.taskMap["ENG-LOW-210"]));
     assert.ok(Boolean(manifest.taskMap["READER-LOW-252"]));
     assert.ok(Boolean(manifest.taskMap["READER-LOW-253"]));
     assert.ok(Boolean(manifest.taskMap["READER-LOW-254"]));
@@ -136,9 +141,14 @@ describe("Agent Delegation", () => {
     assert.equal(manifest.taskMap["READER-HIGH-122"].lane, "codex-high-logic");
     assert.equal(manifest.taskMap["READER-HIGH-123"].lane, "codex-high-logic");
     assert.equal(manifest.taskMap["ENG-HIGH-102"].lane, "codex-high-logic");
+    assert.equal(manifest.taskMap["ENG-HIGH-103"].lane, "codex-high-logic");
     assert.equal(manifest.taskMap["ENG-LOW-204"].lane, "opencode-low-logic");
     assert.equal(manifest.taskMap["ENG-LOW-205"].lane, "opencode-low-logic");
     assert.equal(manifest.taskMap["ENG-LOW-206"].lane, "opencode-low-logic");
+    assert.equal(manifest.taskMap["ENG-LOW-207"].lane, "opencode-low-logic");
+    assert.equal(manifest.taskMap["ENG-LOW-208"].lane, "opencode-low-logic");
+    assert.equal(manifest.taskMap["ENG-LOW-209"].lane, "opencode-low-logic");
+    assert.equal(manifest.taskMap["ENG-LOW-210"].lane, "opencode-low-logic");
     assert.equal(manifest.taskMap["READER-LOW-252"].lane, "opencode-low-logic");
     assert.equal(manifest.taskMap["READER-LOW-253"].lane, "opencode-low-logic");
     assert.equal(manifest.taskMap["READER-LOW-254"].lane, "opencode-low-logic");
@@ -154,7 +164,8 @@ describe("Agent Delegation", () => {
     assert.ok(manifest.taskMap["READER-HIGH-120"].title.includes("历史契约源"));
     assert.ok(manifest.taskMap["READER-HIGH-121"].title.includes("历史契约源"));
     assert.ok(manifest.taskMap["READER-HIGH-122"].title.includes("历史契约源"));
-    assert.ok(manifest.taskMap["READER-HIGH-123"].title.includes("人工 Reader verdict 待命边界"));
+    assert.ok(manifest.taskMap["READER-HIGH-123"].title.includes("历史契约源"));
+    assert.ok(manifest.taskMap["ENG-HIGH-103"].title.includes("工程化长期增强第一批"));
     assert.deepEqual(manifest.taskMap["READER-LOW-252"].dependsOn, ["READER-HIGH-119"]);
     assert.deepEqual(manifest.taskMap["READER-LOW-253"].dependsOn, ["READER-HIGH-119", "READER-LOW-252"]);
     assert.deepEqual(manifest.taskMap["READER-LOW-254"].dependsOn, ["READER-HIGH-119", "READER-LOW-253"]);
@@ -170,6 +181,17 @@ describe("Agent Delegation", () => {
     assert.deepEqual(manifest.taskMap["ENG-LOW-206"].dependsOn, ["ENG-HIGH-102", "ENG-LOW-205"]);
     assert.deepEqual(manifest.taskMap["ENG-HIGH-102"].dependsOn, ["READER-HIGH-122"]);
     assert.deepEqual(manifest.taskMap["READER-HIGH-123"].dependsOn, ["ENG-HIGH-102"]);
+    assert.deepEqual(manifest.taskMap["ENG-HIGH-103"].dependsOn, ["READER-HIGH-123"]);
+    assert.deepEqual(manifest.taskMap["ENG-LOW-207"].dependsOn, ["ENG-HIGH-103"]);
+    assert.deepEqual(manifest.taskMap["ENG-LOW-208"].dependsOn, ["ENG-HIGH-103"]);
+    assert.deepEqual(manifest.taskMap["ENG-LOW-209"].dependsOn, ["ENG-HIGH-103", "ENG-LOW-207", "ENG-LOW-208"]);
+    assert.deepEqual(manifest.taskMap["ENG-LOW-210"].dependsOn, ["ENG-HIGH-103", "ENG-LOW-209"]);
+    assert.equal(manifest.taskMap["ENG-LOW-207"].gitClosure.milestone, "module-feature");
+    assert.equal(manifest.taskMap["ENG-LOW-207"].gitClosure.commitMessage, "feat: 基本实现 runtime 生命周期边界与时序遥测");
+    assert.equal(manifest.taskMap["ENG-LOW-208"].gitClosure.milestone, "module-framework");
+    assert.equal(manifest.taskMap["ENG-LOW-208"].gitClosure.commitMessage, "feat: 完成共享失败模型脚本入口模块框架搭建");
+    assert.equal(manifest.taskMap["ENG-LOW-209"].gitClosure.milestone, "module-feature");
+    assert.equal(manifest.taskMap["ENG-LOW-210"].gitClosure.milestone, "batch-closure");
     assert.equal(manifest.taskMap["OBSIDIAN-HIGH-101"].lane, "codex-high-logic");
     assert.equal(manifest.tasks.some((task) => task.lane === "opencode-low-logic"), true);
   });
@@ -181,6 +203,7 @@ describe("Agent Delegation", () => {
     assert.equal(manifestPath, path.join(projectRoot, "config", "agent-delegation-tasks.json"));
     assert.equal(artifacts.baseDir, path.join(projectRoot, "dist", "agent-delegation", "READER-LOW-216"));
     assert.equal(artifacts.reviewJSON, path.join(projectRoot, "dist", "agent-delegation", "READER-LOW-216", "review.json"));
+    assert.equal(artifacts.gitClosureJSON, path.join(projectRoot, "dist", "agent-delegation", "READER-LOW-216", "git-closure.json"));
   });
 
   it("should build strict mco invocation for opencode tasks", async () => {

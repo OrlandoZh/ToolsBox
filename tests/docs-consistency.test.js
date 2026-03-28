@@ -21,6 +21,37 @@ function assertIncludesBatch(doc, highTaskId, lowTaskRange, lowTaskIds = []) {
 }
 
 describe("Documentation Consistency", () => {
+  it("should keep clean-room baseline documents non-placeholder and command wording aligned", () => {
+    const spec = readDoc("SPEC.md");
+    const legal = readDoc("LEGAL_RISK_CHECKLIST.md");
+    const readme = readDoc("README.md");
+    const buildChecklist = readDoc("docs/BUILD_DETAILS_CHECKLIST.md");
+    const architecture = readDoc("docs/ARCHITECTURE.md");
+    const obsidian = readDoc("docs/OBSIDIAN_INTERVENTION.md");
+
+    assert.ok(spec.includes("Zotero Cleanroom Template"));
+    assert.ok(spec.includes("Zotero 7/8"));
+    assert.ok(spec.includes("8.0.2-beta.5+c35d7f21e"));
+    assert.ok(spec.includes("macOS 已验证"));
+    assert.equal(spec.includes("Plugin name:"), false);
+    assert.equal(spec.includes("Use this file to define *what* the plugin should do"), false);
+
+    assert.ok(legal.includes("## Development Gate"));
+    assert.ok(legal.includes("## Release Gate"));
+    assert.ok(legal.includes("Evidence:"));
+
+    assert.ok(readme.includes("npm run cleanroom:audit"));
+    assert.ok(readme.includes("npm run cleanroom:sim"));
+    assert.ok(readme.includes("node scripts/agent-delegation.mjs close <taskId>"));
+    assert.ok(readme.includes("git-closure.json"));
+    assert.ok(buildChecklist.includes("npm run cleanroom:audit"));
+    assert.ok(buildChecklist.includes("npm run cleanroom:sim"));
+    assert.ok(architecture.includes("npm run cleanroom:audit"));
+    assert.ok(architecture.includes("npm run cleanroom:sim"));
+    assert.ok(obsidian.includes("等待人工 Reader verdict"));
+    assert.ok(obsidian.includes("npm run agent:zotero:e2e:update-baseline"));
+  });
+
   it("should keep P2 marked as completed in backlog and roadmap", () => {
     const backlog = readDoc("docs/CURRENT_BACKLOG.md");
     const roadmap = readDoc("docs/AGENT_AUTONOMY_ROADMAP.md");
@@ -30,28 +61,33 @@ describe("Documentation Consistency", () => {
     assert.ok(roadmap.includes("`P2` 上下文感知记忆与趋势层深化已按代码与测试落地"));
   });
 
-  it("should describe the current product stage as manual reader verdict standby", () => {
+  it("should describe the current product stage as ENG-HIGH-103 after reader-verdict closure", () => {
     const readme = readDoc("README.md");
     const backlog = readDoc("docs/CURRENT_BACKLOG.md");
     const checklist = readDoc("FRAMEWORK_CHECKLIST.md");
     const assessment = readDoc("FRAMEWORK_ASSESSMENT.md");
     const roadmap = readDoc("docs/AGENT_AUTONOMY_ROADMAP.md");
 
+    assert.ok(readme.includes("`ENG-HIGH-103`"));
+    assert.ok(backlog.includes("`ENG-HIGH-103`"));
+    assert.ok(checklist.includes("`ENG-HIGH-103`"));
+    assert.ok(assessment.includes("`ENG-HIGH-103`"));
+    assert.ok(roadmap.includes("`ENG-HIGH-103`"));
     assert.ok(readme.includes("`READER-HIGH-123`"));
     assert.ok(backlog.includes("`READER-HIGH-123`"));
     assert.ok(checklist.includes("`READER-HIGH-123`"));
     assert.ok(assessment.includes("`READER-HIGH-123`"));
     assert.ok(roadmap.includes("`READER-HIGH-123`"));
-    assert.ok(readme.includes("等待人工 Reader verdict"));
-    assert.ok(backlog.includes("等待人工 Reader verdict"));
-    assert.ok(checklist.includes("等待人工 Reader verdict"));
-    assert.ok(assessment.includes("等待人工 Reader verdict"));
-    assert.ok(roadmap.includes("等待人工 Reader verdict"));
-    assert.ok(readme.includes("不再挂新的 active Reader low-task"));
-    assert.ok(backlog.includes("不再挂新的 active Reader low-task"));
-    assert.ok(checklist.includes("不再挂新的 active Reader low-task"));
-    assert.ok(assessment.includes("不再保留新的 active Reader low-task"));
-    assert.ok(roadmap.includes("不再挂新的 active Reader low-task"));
+    assert.ok(readme.includes("工程化长期增强第一批"));
+    assert.ok(backlog.includes("工程化长期增强第一批"));
+    assert.ok(checklist.includes("工程化长期增强第一批"));
+    assert.ok(assessment.includes("工程化长期增强第一批"));
+    assert.ok(roadmap.includes("工程化长期增强第一批"));
+    assert.ok(readme.includes("历史契约源"));
+    assert.ok(backlog.includes("历史契约源"));
+    assert.ok(checklist.includes("历史契约源"));
+    assert.ok(assessment.includes("历史契约源"));
+    assert.ok(roadmap.includes("历史契约源"));
     assert.ok(readme.includes("`ENG-HIGH-102 / ENG-LOW-204~206`"));
     assert.ok(backlog.includes("`ENG-HIGH-102 / ENG-LOW-204~206`"));
     assert.ok(checklist.includes("`ENG-LOW-204~206`"));
@@ -64,35 +100,84 @@ describe("Documentation Consistency", () => {
     assert.ok(roadmap.includes("`AGENT_OBSIDIAN_VISUALS=1`"));
   });
 
-  it("should keep fresh reader evidence wording aligned with ui-regression-candidate and complete canonical coverage", () => {
+  it("should keep ENG-HIGH-103 as the single sourced next batch and keep legal gate release-only", () => {
+    const readme = readDoc("README.md");
+    const backlog = readDoc("docs/CURRENT_BACKLOG.md");
+    const checklist = readDoc("FRAMEWORK_CHECKLIST.md");
+    const assessment = readDoc("FRAMEWORK_ASSESSMENT.md");
+    const roadmap = readDoc("docs/AGENT_AUTONOMY_ROADMAP.md");
+    const legal = readDoc("LEGAL_RISK_CHECKLIST.md");
+
+    assert.ok(backlog.includes("## 当前单一事实源"));
+    assert.ok(backlog.includes("当前唯一主线批次已固定为 `ENG-HIGH-103`"));
+    assert.ok(backlog.includes("runtime 生命周期错误边界"));
+    assert.ok(backlog.includes("共享失败模型"));
+    assert.ok(backlog.includes("远端 `updateURL` 闭环验证"));
+    assert.ok(backlog.includes("`release-only` 人工流程"));
+    assert.ok(readme.includes("单一事实源"));
+    assert.ok(checklist.includes("单一事实源"));
+    assert.ok(assessment.includes("单一事实源"));
+    assert.ok(roadmap.includes("单一事实源"));
+    assert.ok(readme.includes("工程化长期增强第一批"));
+    assert.ok(checklist.includes("工程化长期增强第一批"));
+    assert.ok(assessment.includes("工程化长期增强第一批"));
+    assert.ok(roadmap.includes("工程化长期增强第一批"));
+    assert.equal(readme.includes("当前主线只剩 Reader 受控 baseline refresh 收口"), false);
+    assert.equal(assessment.includes("重新冻结下一轮高逻辑主线"), false);
+    assert.equal(roadmap.includes("重新冻结下一轮高逻辑主线"), false);
+    assert.equal(assessment.includes("后续若继续推进，应重新定义下一轮 `P1 / Reader / 工程化` 高逻辑主线"), false);
+    assert.ok(legal.includes("## Release Gate (release-only)"));
+    assert.ok(legal.includes("发版前人工流程"));
+  });
+
+  it("should keep the post-batch default next priority on engineering documentation sync", () => {
+    const readme = readDoc("README.md");
+    const backlog = readDoc("docs/CURRENT_BACKLOG.md");
+    const checklist = readDoc("FRAMEWORK_CHECKLIST.md");
+    const assessment = readDoc("FRAMEWORK_ASSESSMENT.md");
+    const roadmap = readDoc("docs/AGENT_AUTONOMY_ROADMAP.md");
+
+    assert.ok(readme.includes("工程化维护文档与自动同步机制"));
+    assert.ok(backlog.includes("工程化维护文档与自动同步机制"));
+    assert.ok(checklist.includes("工程化维护文档与自动同步机制"));
+    assert.ok(assessment.includes("工程化维护文档与自动同步机制"));
+    assert.ok(roadmap.includes("工程化维护文档与自动同步机制"));
+    assert.equal(readme.includes("收口后默认下一优先级是 Reader"), false);
+    assert.equal(backlog.includes("收口后默认下一优先级是 Reader"), false);
+    assert.equal(assessment.includes("收口后默认下一优先级是 Reader"), false);
+    assert.equal(roadmap.includes("收口后默认下一优先级是 Reader"), false);
+  });
+
+  it("should keep post-verdict wording aligned with one-time baseline refresh and stable fresh chain", () => {
     const readme = readDoc("README.md");
     const backlog = readDoc("docs/CURRENT_BACKLOG.md");
     const assessment = readDoc("FRAMEWORK_ASSESSMENT.md");
     const roadmap = readDoc("docs/AGENT_AUTONOMY_ROADMAP.md");
 
-    assert.ok(readme.includes("`reader-ui:reader-visual-drift`"));
-    assert.ok(backlog.includes("`reader-ui:reader-visual-drift`"));
-    assert.ok(assessment.includes("`reader-ui:reader-visual-drift`"));
-    assert.ok(readme.includes("ui-regression-candidate"));
-    assert.ok(backlog.includes("ui-regression-candidate"));
-    assert.ok(assessment.includes("ui-regression-candidate"));
-    assert.ok(roadmap.includes("ui-regression-candidate"));
-    assert.ok(readme.includes("complete"));
-    assert.ok(backlog.includes("complete"));
-    assert.ok(assessment.includes("complete"));
-    assert.ok(roadmap.includes("complete"));
-    assert.ok(readme.includes("npm run agent:obsidian"));
-    assert.ok(backlog.includes("npm run agent:obsidian"));
-    assert.ok(assessment.includes("npm run agent:obsidian"));
-    assert.ok(roadmap.includes("npm run agent:obsidian"));
+    assert.ok(readme.includes("`2026-03-28`"));
+    assert.ok(backlog.includes("`2026-03-28`"));
+    assert.ok(assessment.includes("`2026-03-28`"));
+    assert.ok(roadmap.includes("`2026-03-28`"));
+    assert.ok(readme.includes("npm run agent:zotero:e2e:update-baseline"));
+    assert.ok(backlog.includes("npm run agent:zotero:e2e:update-baseline"));
+    assert.ok(assessment.includes("npm run agent:zotero:e2e:update-baseline"));
+    assert.ok(roadmap.includes("npm run agent:zotero:e2e:update-baseline"));
+    assert.ok(readme.includes("`2000x1200`"));
+    assert.ok(backlog.includes("`2000x1200`"));
+    assert.ok(assessment.includes("`2000x1200`"));
+    assert.ok(roadmap.includes("`2000x1200`"));
     assert.ok(readme.includes("`watch` 为 healthy"));
-    assert.ok(readme.includes("`reader event hook diagnostics` 已通过"));
-    assert.ok(readme.includes("`reader fine-grained hook diagnostics` 已通过"));
+    assert.ok(readme.includes("`agent:zotero:e2e` 为 passed"));
+    assert.ok(readme.includes("`agent:gate` 为 passed"));
     assert.equal(readme.includes("`library` / `reader` 两个 stage 都仍为 `max-attempt-reached`"), false);
     assert.equal(backlog.includes("`library` / `reader` 两个 stage 都仍为 `max-attempt-reached`"), false);
+    assert.equal(readme.includes("当前自动结论已统一为 `ui-regression-candidate + complete -> npm run agent:obsidian`"), false);
+    assert.equal(backlog.includes("当前默认 nextAction 必须统一为 `npm run agent:obsidian`"), false);
+    assert.equal(assessment.includes("默认 nextAction 必须统一为 `npm run agent:obsidian`"), false);
+    assert.equal(roadmap.includes("当前默认 nextAction 必须统一为 `npm run agent:obsidian`"), false);
   });
 
-  it("should record recent reader batches as historical while keeping manual verdict standby as the current default path", () => {
+  it("should record recent reader batches as historical while marking READER-HIGH-123 as closed", () => {
     const readme = readDoc("README.md");
     const backlog = readDoc("docs/CURRENT_BACKLOG.md");
     const checklist = readDoc("FRAMEWORK_CHECKLIST.md");
@@ -123,14 +208,19 @@ describe("Documentation Consistency", () => {
     assert.ok(checklist.includes("`READER-LOW-258~260`"));
     assert.ok(assessment.includes("`READER-HIGH-121 / READER-LOW-258~260`"));
     assert.ok(roadmap.includes("`READER-HIGH-121 / READER-LOW-258~260`"));
-    assert.ok(readme.includes("不默认推荐 `npm run agent:zotero:e2e`、`npm run agent:zotero:e2e:update-baseline` 或 `npm run agent:zotero:autofix`"));
-    assert.ok(backlog.includes("不再人为制造新的 Reader 自动修复批次"));
-    assert.ok(assessment.includes("不回退到 rerun E2E、baseline refresh 或 autofix"));
-    assert.ok(roadmap.includes("不默认推荐 `npm run agent:zotero:e2e`、`npm run agent:zotero:e2e:update-baseline` 或 `npm run agent:zotero:autofix`"));
-    assert.ok(readme.includes("`95%`"));
-    assert.ok(backlog.includes("`95%`"));
-    assert.ok(assessment.includes("`95%`"));
-    assert.ok(roadmap.includes("`95%`"));
+    assert.ok(readme.includes("不重复第二次 baseline refresh"));
+    assert.ok(backlog.includes("不重复第二次 baseline refresh"));
+    assert.ok(assessment.includes("仅执行一次"));
+    assert.ok(roadmap.includes("不重复第二次 baseline refresh"));
+    assert.ok(readme.includes("`97%`"));
+    assert.ok(backlog.includes("`97%`"));
+    assert.ok(assessment.includes("`97%`"));
+    assert.ok(roadmap.includes("`97%`"));
+    assert.ok(readme.includes("当前 active 高逻辑源为 `ENG-HIGH-103`"));
+    assert.ok(backlog.includes("当前 active 高逻辑源为 `ENG-HIGH-103`"));
+    assert.ok(checklist.includes("当前 active 高逻辑任务源已切到 `ENG-HIGH-103`"));
+    assert.ok(assessment.includes("当前 active 高逻辑任务已切到 `ENG-HIGH-103`"));
+    assert.ok(roadmap.includes("当前 active 高逻辑 batch 为 `ENG-HIGH-103`"));
   });
 
   it("should not keep capture-stability diagnosis wording as the current phase after rebaseline", () => {

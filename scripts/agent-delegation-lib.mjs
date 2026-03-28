@@ -16,6 +16,12 @@ export const DELEGATION_REVIEW_STATUS_LABELS = Object.freeze({
   rejected: "已驳回",
 });
 
+export const DELEGATION_GIT_CLOSURE_MILESTONE_LABELS = Object.freeze({
+  "module-framework": "模块框架搭建完成",
+  "module-feature": "模块功能基本实现",
+  "batch-closure": "阶段收口",
+});
+
 const DEFAULT_MANIFEST_PATH = "config/agent-delegation-tasks.json";
 const SNAPSHOT_IGNORE_DIRS = new Set([
   ".git",
@@ -71,6 +77,32 @@ function normalizeScopePaths(scopePaths) {
     .map((entry) => toPosixRelativePath(entry));
 }
 
+function normalizeDelegationGitClosure(gitClosure, taskId, taskTitle) {
+  if (gitClosure == null) {
+    return null;
+  }
+  if (!gitClosure || typeof gitClosure !== "object" || Array.isArray(gitClosure)) {
+    throw createScriptError("validation", `Delegation task '${taskId}' has invalid gitClosure config`, {
+      failedStage: "delegation-manifest",
+    });
+  }
+
+  const milestone = normalizeString(gitClosure?.milestone) || "module-feature";
+  if (!Object.hasOwn(DELEGATION_GIT_CLOSURE_MILESTONE_LABELS, milestone)) {
+    throw createScriptError("validation", `Delegation task '${taskId}' has invalid gitClosure.milestone: ${milestone || "-"}`, {
+      failedStage: "delegation-manifest",
+    });
+  }
+
+  return {
+    enabled: gitClosure?.enabled !== false,
+    milestone,
+    milestoneLabel: DELEGATION_GIT_CLOSURE_MILESTONE_LABELS[milestone],
+    summary: normalizeString(gitClosure?.summary) || normalizeString(taskTitle) || taskId,
+    commitMessage: normalizeString(gitClosure?.commitMessage) || null,
+  };
+}
+
 function validateTaskShape(task, knownTaskIds) {
   const taskId = normalizeString(task?.taskId);
   if (!taskId) {
@@ -106,6 +138,7 @@ function validateTaskShape(task, knownTaskIds) {
     reviewChecklist: normalizeStringArray(task?.reviewChecklist, "reviewChecklist"),
     testCommands: normalizeStringArray(task?.testCommands, "testCommands"),
     handoffArtifacts: normalizeStringArray(task?.handoffArtifacts, "handoffArtifacts"),
+    gitClosure: normalizeDelegationGitClosure(task?.gitClosure, taskId, task?.title),
   };
 }
 
@@ -127,6 +160,8 @@ export function resolveDelegationTaskArtifacts(projectRoot, taskId) {
     providerStderrTXT: path.join(baseDir, "provider-stderr.txt"),
     reviewJSON: path.join(baseDir, "review.json"),
     reviewMD: path.join(baseDir, "review.md"),
+    gitClosureJSON: path.join(baseDir, "git-closure.json"),
+    gitClosureMD: path.join(baseDir, "git-closure.md"),
   };
 }
 

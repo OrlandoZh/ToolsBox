@@ -162,11 +162,13 @@ npm run verify   # 验证必需文件
 npm run lint     # 语法与 JSON 校验（clean-room 轻量 lint）
 npm run format:check  # 空白格式校验（tab/尾随空格/末尾换行）
 npm run typecheck     # 运行时 API 与 d.ts 声明漂移检查
-npm run check    # lint + format + typecheck + verify + test
+npm run cleanroom:audit # 开发态 clean-room 门禁与审计工件输出
+npm run cleanroom:sim   # 可选：对本地 reference 快照运行相似度扫描
+npm run check    # lint + format + typecheck + verify + cleanroom:audit + test
 npm run build    # 构建：生成 manifest/prefs/bootstrap，打包源码
 npm run package  # 打包：创建 .xpi 发布包
 npm run release:metadata # 生成 dist/update.json 与 release-manifest.json
-npm run release:preflight # 校验发布产物一致性并生成 release-preflight.json
+npm run release:preflight # 校验发布产物一致性 + 发布态 clean-room 门禁，并生成 release-preflight.json
 npm run release:local # 本地完整发布门禁（package + release:preflight）
 npm run release:prepare # 生成 dist/release-plan.json 与 dist/release-notes.md
 npm run release:matrix # 生成 dist/release-matrix.json / md
@@ -193,7 +195,7 @@ npm run agent:zotero:loop:human # 打开 60 秒人工介入窗口，不介入则
 npm run agent:zotero:watch-recovery # 真机回归 watch 异常恢复链并输出恢复报告
 npm run agent:zotero:autofix # E2E 失败时自动执行受控恢复动作并二次复验
 npm run test     # 运行单元测试
-npm run sim      # 可选：相似度扫描
+npm run sim      # 兼容别名，等同于 cleanroom:sim
 npm run zotero:smoke   # 在隔离 Zotero 中做真实 smoke test，必要时走 fallback 兜底
 npm run zotero:dev     # 启动隔离 Zotero，并用 proxy + native probe + fallback 加载当前插件
 npm run zotero:watch   # 热重载、失败自动恢复并输出 dist/zotero-watch-status.{json,md}
@@ -224,8 +226,9 @@ npm run zotero:scenario # 在 Zotero 内执行 zotero-scenarios/*.scenario.js
 | 文件 | 功能 |
 |------|------|
 | `config/agent-delegation-tasks.json` | 任务清单 manifest，定义 taskId、lane、scopePaths、依赖关系和审查清单 |
-| `scripts/agent-delegation.mjs` | 委托执行 CLI，提供 `list` / `run` / `review` 命令 |
+| `scripts/agent-delegation.mjs` | 委托执行 CLI，提供 `list` / `run` / `review` / `close` 命令 |
 | `scripts/agent-delegation-lib.mjs` | 委托核心库，负责 manifest 加载、prompt 构建、快照比对和审查判定 |
+| `scripts/agent-git-closure-lib.mjs` | 本地 Git 收口库，负责按 task scope 生成中文 commit message、筛选文件并执行本地 commit |
 | `tests/agent-delegation.test.js` | 委托功能测试，覆盖 manifest 加载、scope 重叠检测和审查逻辑 |
 
 ### 执行流程
@@ -233,6 +236,7 @@ npm run zotero:scenario # 在 Zotero 内执行 zotero-scenarios/*.scenario.js
 1. **list**：列出 manifest 中的所有任务及其 scope
 2. **run**：执行指定任务，调用 `mco` 启动 Opencode worker，并生成工件
 3. **review**：执行聚焦测试、比对改动范围，输出审查结论
+4. **close**：按 task scope 选取当前本地改动，执行聚焦测试，并以中文 commit message 做本地 Git 收口（默认不 push）
 
 ### 运行命令
 
@@ -245,6 +249,13 @@ node scripts/agent-delegation.mjs run <taskId>
 
 # 审查任务结果
 node scripts/agent-delegation.mjs review <taskId> --reviewer codex
+
+# 对单个模块里程碑做本地 Git 收口（先预演）
+node scripts/agent-delegation.mjs close <taskId> --dry-run
+
+# 确认后执行本地 commit，可按需覆盖中文提交信息
+node scripts/agent-delegation.mjs close <taskId>
+node scripts/agent-delegation.mjs close <taskId> --message "feat: 基本实现 xxx 模块能力"
 ```
 
 ### 审查工件
@@ -263,6 +274,8 @@ node scripts/agent-delegation.mjs review <taskId> --reviewer codex
 | `provider-stderr.txt` | 标准错误日志 |
 | `review.json` | 审查结论 |
 | `review.md` | 审查报告（人类可读） |
+| `git-closure.json` | 本地 Git 收口记录（commit message、纳入文件、聚焦测试、commit SHA） |
+| `git-closure.md` | 本地 Git 收口摘要（人类可读） |
 
 ### 审查状态
 
@@ -279,7 +292,7 @@ node scripts/agent-delegation.mjs review <taskId> --reviewer codex
 - 审查工件见 `dist/agent-delegation/DOC-LOW-001/review.json`
 - `ENG-LOW-102`（真实剩余主线与 delegation 状态文档同步）已于 `2026-03-23` 被 Codex 审查为 `accepted`
 - 审查工件见 `dist/agent-delegation/ENG-LOW-102/review.json`
-- 当前 manifest 已再次重基线到人工 Reader verdict 待命态：`ENG-HIGH-102 / ENG-LOW-204~206`、`READER-HIGH-122`、`READER-HIGH-121 / READER-LOW-258~260`、`READER-HIGH-120 / READER-LOW-255~257`、`READER-HIGH-119 / READER-LOW-252~254`、`READER-HIGH-118 / READER-LOW-249~251`、`READER-HIGH-114`、`READER-HIGH-113 / READER-LOW-237~239`、`READER-HIGH-112 / READER-LOW-234~236`、`READER-HIGH-111 / READER-LOW-231~233`、`READER-HIGH-110 / READER-LOW-228~230` 与更早批次都已转入历史契约 / review artifact；当前 active 高逻辑任务已切到 `READER-HIGH-123`，不再挂新的 active Reader low-task
+- 当前 manifest 已按 `2026-03-28` 的最新工件切到 `ENG-HIGH-103`：`ENG-HIGH-103 / ENG-LOW-207~210` 是当前 active 的“工程化长期增强第一批”；`READER-HIGH-123` 已完成唯一 Reader verdict（`预期 UI 变化`）并执行一次受控 baseline refresh，现只保留为历史契约源；`ENG-HIGH-102 / ENG-LOW-204~206`、`READER-HIGH-122`、`READER-HIGH-121 / READER-LOW-258~260`、`READER-HIGH-120 / READER-LOW-255~257`、`READER-HIGH-119 / READER-LOW-252~254`、`READER-HIGH-118 / READER-LOW-249~251`、`READER-HIGH-114`、`READER-HIGH-113 / READER-LOW-237~239`、`READER-HIGH-112 / READER-LOW-234~236`、`READER-HIGH-111 / READER-LOW-231~233`、`READER-HIGH-110 / READER-LOW-228~230` 与更早批次继续只保留为历史契约 / review artifact
 - `ENG-LOW-201`、`ENG-LOW-202`、`ENG-LOW-203` 已于 `2026-03-24` 以 `reworked-by-codex` 方式收口，并转入历史 review artifact
 - `READER-LOW-201`、`READER-LOW-202`、`READER-LOW-203` 已于 `2026-03-24` 收口并转入历史 review artifact，不再作为 active low-task
 - `READER-HIGH-102` 与 `READER-LOW-204`、`READER-LOW-205`、`READER-LOW-206` 已于 `2026-03-24` 收口并转入历史 review artifact，不再作为当前 active batch
@@ -290,30 +303,31 @@ node scripts/agent-delegation.mjs review <taskId> --reviewer codex
 - `READER-LOW-216`、`READER-LOW-217`、`READER-LOW-218` 已都有 review artifact，并已转入历史 review artifact，不再作为当前 active low-task
 - `OBSIDIAN-LOW-301`、`OBSIDIAN-LOW-302`、`OBSIDIAN-LOW-303` 已于 `2026-03-25` 以 `reworked-by-codex` 收口，并转入历史 review artifact，不再作为当前 active low-task
 - `2026-03-25` 最新 fresh `watch -> e2e -> monitor -> gate` 已确认：`watch` 为 healthy，`reader event hook diagnostics` 已通过，`reader fine-grained hook diagnostics` 已通过，`agent:zotero:e2e` / `agent:gate` 当前主阻断仍是 `reader-ui:reader-visual-drift`
-- `2026-03-27` fresh 证据已更新：`watch` 为 healthy，`reader event hook diagnostics` 与 `reader fine-grained hook diagnostics` 均已通过，当前主诊断仍为 `reader-ui:reader-visual-drift`；live blocker 已自然收敛到 `visualPrimaryBlockerKind = ui-regression-candidate`、`visualCanonicalCoverageKind = complete`
-- 上一轮受控 baseline refresh coverage 收口已完成：`restart-library.png`、`restart-reader.png`、`hot-reload-library.png`、`hot-reload-reader.png` 均已对齐到 `2000x1200`
+- `2026-03-28` 最新 fresh `watch -> e2e -> monitor -> gate -> obsidian` 已确认：`watch` 为 healthy，`agent:zotero:e2e` 为 passed，`agent:gate` 为 passed，`reader event hook diagnostics` 与 `reader fine-grained hook diagnostics` 均已通过，当前 Reader 视觉漂移计数已归零，主线已退出人工 verdict 阶段
+- `READER-HIGH-123` 已按唯一分支收口：人工窗口写入 `预期 UI 变化 -> ready / force-next / npm run agent:zotero:e2e:update-baseline` 后，仅执行了一次受控 baseline refresh；随后 `restart-library.png`、`restart-reader.png`、`hot-reload-library.png`、`hot-reload-reader.png` 均已对齐到 `2000x1200`
 - `READER-HIGH-119 / READER-LOW-252~254` 已完成并转入历史契约 / review artifact：capture attempt diagnosis 解释层已接入 validation / e2e / monitor / gate / dashboard / loop / obsidian
 - `READER-HIGH-120 / READER-LOW-255~257` 已完成并转入历史契约 / review artifact：refresh-first 与单分支选择语义只保留为历史工件
 - `READER-HIGH-121 / READER-LOW-258~260` 已完成并转入历史契约 / review artifact：reader stage 的最小 prepare/open/settle 收紧与 gate headline 对齐已落地，并把 fresh truth 拉回 `ui-regression-candidate + complete`
 - `ENG-HIGH-102 / ENG-LOW-204~206` 已完成并转入历史契约 / review artifact：watch startup health 的 bounded settle 与 truth alignment 已落地，并把 fresh watch truth 拉回 `healthy`
-- 当前产品阶段已切到“等待人工 Reader verdict”；当前 active Reader 任务源已切到 `READER-HIGH-123`，当前不再挂新的 active Reader low-task
+- 当前产品阶段已从“等待人工 Reader verdict”切换到“`ENG-HIGH-103` 工程化长期增强第一批”；`READER-HIGH-123` 已转为历史契约源，当前不再挂新的 active Reader low-task
 - Obsidian visual enhancement 已完成并转入历史契约 / review artifact：当前默认工作台继续保持 Markdown + Canvas + 人工指令窗口，`OBSIDIAN-HIGH-101` 只保留为历史高逻辑契约源，不再挂新的 active low-task
 - `AGENT_OBSIDIAN_VISUALS=1` 作为可选增强层启用：在现有 Markdown 状态页、证据页、Quickstart、Advanced Guide、人工指令窗口、`.canvas` 白板之外，额外生成 `05-Zotero-Agent-闭环流程图.md` 与 `06-Zotero-Agent-人工复核决策.excalidraw.md`
 - 当前约束固定为：`watch stale` 先于 Reader 症状引导下一步动作；`agent:zotero:e2e` / `agent:gate` 的 `exitCode=2` 继续视为“验证失败但工件有效”
-- 当前约束固定为：当前自动结论已统一为 `ui-regression-candidate + complete -> npm run agent:obsidian`
-- 当前约束固定为：在人工 verdict 明确前，不默认推荐 `npm run agent:zotero:e2e`、`npm run agent:zotero:e2e:update-baseline` 或 `npm run agent:zotero:autofix`
-- 当前约束固定为：当前主线明确为人工 Reader verdict 待命，不提前预写新的 Reader low-task 或后续分支
-- 当前完成度口径约为 `95%`：仓库已可用于实际开发；当前剩余主线只剩 Reader 最后一步人工 verdict 与 verdict 后的单分支收尾
+- 当前约束固定为：`READER-HIGH-123` 已按单分支收口完成，不重复第二次 baseline refresh；当前批次也不重开 Reader / `P1` / 远端发布主线
+- 当前约束固定为：Obsidian 工作台继续保留三模板人工 verdict 机制，但当前默认主路径已经不再是 `npm run agent:obsidian`
+- 当前完成度口径约为 `97%`：仓库已可用于实际开发；当前 Reader 主线已收尾，当前 active 高逻辑源为 `ENG-HIGH-103`
+- 当前单一事实源统一收敛在 [docs/CURRENT_BACKLOG.md](docs/CURRENT_BACKLOG.md) 的“当前单一事实源”小节；README / Checklist / Assessment / Roadmap 只引用这份当前 truth，不再各自冻结另一套“下一批主线”
+- 当前批次正式收口后，默认下一优先级固定为 `工程化维护文档与自动同步机制`，优先减少 manifest / 正式文档 / docs consistency 的口径漂移，而不是提前重开 Reader / `P1` / 远端发布
 - `READER-HIGH-109 / READER-LOW-225~227` 的逐目标视觉证据导航已完成，并转入历史 review artifact；当前直接复用这些既有证据，不再把证据导航继续挂成 active 开发批次
 - `READER-HIGH-118 / READER-LOW-249~251` 已完成并转入历史契约 / review artifact；其消费者真相一致化与单 stage choreography 收紧结论只保留为历史对照
-- Obsidian 工作台继续保留人工 verdict 能力，且当前已重新成为默认主路径：自动链给出的下一步动作固定为 `npm run agent:obsidian`
+- Obsidian 工作台继续保留人工 verdict 能力，但当前仅作为人工回放与复核界面；在 `READER-HIGH-123` 收口后，自动链已不再把 `npm run agent:obsidian` 当作当前 Reader 主阻断的默认下一步
 - 正式状态以 `dist/agent-delegation/<taskId>/review.json` 为准；上一批已完成的 low-task 仅保留在历史 review artifact 中，不再写回当前 active 任务列表
 - 委托分工脚手架已验证可用：manifest 加载、scope 重叠检测、快照比对、聚焦测试、审查结论全链路已跑通
 
 ## Agent 闭环链路
 
 - 数据采集：`agent:run` / `agent:check` / `agent:release` 记录到 `dist/agent-runs/*.json`
-- 数据汇总：`agent:monitor` 产出 `dist/agent-monitor.json` 与 `dist/agent-monitor.md`，并把 `zotero:watch` 的热重载状态、`agent:zotero:e2e` 的真机验证结果、服务健康摘要、Reader 事件桥摘要、`agent:zotero:autofix` 的恢复结果、步骤耗时、失败步骤分布，以及最小 `failure memory / fix outcome memory` 一并纳入主报告；其中 `frontpageSummary` / `readinessSummary` 会提供轻量状态、摘要结论与下一步建议，便于 agent 先快速读状态，再按需下钻明细
+- 数据汇总：`agent:monitor` 产出 `dist/agent-monitor.json` 与 `dist/agent-monitor.md`，并把 `zotero:watch` 的热重载状态、`agent:zotero:e2e` 的真机验证结果、服务健康摘要、Reader 事件桥摘要、`agent:zotero:autofix` 的恢复结果、步骤耗时、失败步骤分布、最小 `failure memory / fix outcome memory`，以及“工程化硬化信号”最小摘要一并纳入主报告；其中 `frontpageSummary` / `readinessSummary` 会提供轻量状态、摘要结论与下一步建议，便于 agent 先快速读状态，再按需下钻明细
 - 发布矩阵：`release:matrix` 会生成 stable/beta 本地发布矩阵，`agent:monitor` / `agent:dashboard` / `agent:gate:release` 会继续消费这份矩阵；当前已能区分“阻断型运行时错误”与“宿主噪声”，并已在本地 stable/beta 实跑中完成放行验证
 - 记忆层摘要：`agent:memory` 会单独生成 `dist/agent-memory.json` 与 `dist/agent-memory.md`；当前会沉淀故障指纹热度、历史最优恢复路径、当前故障是否见过、历史推荐、最近样本，以及最近多日趋势
 - 上下文感知记忆：当前 `agent:memory` / `agent:monitor` / `agent:dashboard` 已额外沉淀 `zoteroVersion`、`zoteroVersionBucket`、`latestBootMode`、`bootModes` 与 `preferredStrategy.contextMatchLevel`，并优先采用精确上下文的历史成功路径
@@ -324,12 +338,12 @@ node scripts/agent-delegation.mjs review <taskId> --reviewer codex
 - 指纹时间序列：当前 monitor / dashboard 会额外展示“重点指纹时间序列”，帮助区分同类问题是偶发、持平还是回归
 - 能力覆盖汇总：`agent:monitor` / `agent:dashboard` 会额外展示 capability manifest 的覆盖情况，区分“已覆盖 / 失败 / 未覆盖”能力
 - 工件隔离：默认写入 `dist/`；若设置 `AGENT_ARTIFACTS_DIR=/tmp/addon-template-agent-artifacts`，则 `agent:zotero:e2e` / `agent:zotero:autofix` / `agent:zotero:watch-recovery` / `agent:monitor` / `agent:dashboard` / `agent:gate` / agent 遥测都会改写到自定义目录，便于测试或故障复盘时避免污染当前真机结论
-- 可视化：`agent:dashboard` 产出 `dist/agent-dashboard.html`，主页面可直接看到 Zotero 热重载状态、最近真机验证、服务状态、Reader 事件桥摘要、自动修复摘要、关键恢复步骤与耗时
+- 可视化：`agent:dashboard` 产出 `dist/agent-dashboard.html`，主页面可直接看到 Zotero 热重载状态、最近真机验证、服务状态、Reader 事件桥摘要、自动修复摘要、关键恢复步骤与耗时，以及工程化硬化信号摘要
 - 人工介入：`agent:obsidian` 会把当前 `loop / gate / monitor / e2e` 结论导出到独立的 `obsidian/agent-workbench/` 工作台目录；默认输出仍是 Markdown 状态页、证据页、Quickstart、Advanced Guide、人工指令窗口与 `.canvas` 白板，其中白板以“项目架构 + agent 自动链 + 人工指令窗口 + 证据工件”组织，便于人工接管问题分析与修复决策
 - 可选视觉层：当设置 `AGENT_OBSIDIAN_VISUALS=1` 时，`agent:obsidian` 会额外生成 Mermaid 闭环流程图与 Excalidraw 人工复核决策图；这两份仅是 companion 视图，不参与任何 gate / loop 判定，也不替代现有人工窗口
 - 人工工作台位置：默认目录为 `obsidian/agent-workbench/`；如需统一放进单独的 Obsidian 管理空间，可设置 `AGENT_OBSIDIAN_DIR=/path/to/vault-folder`
 - 人工介入窗口：`agent:zotero:loop:human` 会先刷新 Obsidian 工作台，再打开一个短暂人工窗口；若无人修改 `10-Zotero-Agent-人工指令窗口.md`，当前回合继续按自动路径推进；若人工填写“下一步指令”或改为 `hold`，本回合会按人工意图改写路径或暂停
-- 质量闸门：`agent:gate` / `agent:gate:release` 产出 `dist/agent-gate.json` 与 `dist/agent-gate.md`；开发档位下若 `watch` 状态异常、最近 Zotero E2E 未通过、服务健康异常、Reader 事件桥退化、E2E 结果已过期、能力地图存在未覆盖能力，或失败后的 `autofix` 记录仍未跟进到最新失败轮次，会直接阻断通过；发布档位下若 `release-matrix` 缺失、失败或仍停留在“待补验证”，也会直接阻断通过
+- 质量闸门：`agent:gate` / `agent:gate:release` 产出 `dist/agent-gate.json` 与 `dist/agent-gate.md`；开发档位下若 `watch` 状态异常、最近 Zotero E2E 未通过、服务健康异常、Reader 事件桥退化、E2E 结果已过期、能力地图存在未覆盖能力，或失败后的 `autofix` 记录仍未跟进到最新失败轮次，会直接阻断通过；发布档位下若 `release-matrix` 缺失、失败或仍停留在“待补验证”，也会直接阻断通过；新增的工程化硬化信号只做非阻断摘要，不改变既有 `nextAction` 语义
 - 一键推进：`agent:pipeline` 将“执行 -> 汇总 -> 可视化 -> 闸门”串成闭环
 - 开发态热重载闭环：`zotero:watch` 会在每次重建/reload 后自动执行宿主健康检查、汇总日志；若热重载失败，会先尝试 runtime 恢复，再必要时重启 Zotero 会话，并把全过程写到 `dist/zotero-watch-status.json` 与 `dist/zotero-watch-status.md`
 - Zotero 真机闭环：`agent:zotero:e2e` / `agent:zotero:e2e:restart` 自动执行“打开 Zotero -> 重新加载插件 -> 运行动作与测试 -> 抓取日志 -> 判定结果”，产出 `dist/agent-zotero-e2e.json` 与 `dist/agent-zotero-e2e.md`
@@ -344,15 +358,17 @@ node scripts/agent-delegation.mjs review <taskId> --reviewer codex
 - 自动恢复：`agent:zotero:autofix` 会先跑 E2E；若失败，则按报告中的故障模式尝试 `check`、`fresh+restart`、`zotero:test` 等受控恢复动作；若当前仅剩库视图/Reader 视觉漂移，则会先自动刷新视觉基线，再回到 compare 模式复验；若显式带上 `--apply-whitelisted-patch` 且命中 `reader-ui:reader-visual-drift`，则还可把最新 E2E 截图安全复制回 `tests/visual-baselines/agent-zotero-e2e/` 并复验，最终输出 `dist/agent-zotero-autofix.json` 与 `dist/agent-zotero-autofix.md`
 - 注册入口补丁：`agent:zotero:e2e` 现已直接观测 `主命令 command palette`、`主窗口上下文菜单项`、`偏好设置面板` 是否注册；命中对应诊断时，`agent:zotero:autofix -- --apply-whitelisted-patch` 可在 `src/app/feature-composer.js` 中受控补回这些基线注册块，并按各自 `verification contract` 复验
 - 运行时桥接诊断：`bootstrap` 现会生成能力白名单报告，`plugin.api.runtime` 可按需读取完整报告，agent 默认只采集压缩后的 `runtimeBridge*` 摘要字段，避免上下文被大块日志淹没
-- 当前边界：这套链路已具备“自动验证 + 自动恢复 + 上下文感知历史推荐 + 重点指纹时间序列 + 多信号趋势归档”；当前主线只剩 Reader 受控 baseline refresh 收口。若这批 refresh 后 gate 通过，下一候选再回到 Engineering 长期硬化；若仍失败，则必须基于新的 fresh evidence 重新基线下一批 Reader 任务，详见 [Agent 自主开发路线图](docs/AGENT_AUTONOMY_ROADMAP.md)
+- 当前边界：这套链路已具备“自动验证 + 自动恢复 + 上下文感知历史推荐 + 重点指纹时间序列 + 多信号趋势归档”；当前唯一推进批次已经固定为 `ENG-HIGH-103`（工程化长期增强第一批）。远端发布编排、远端 `updateURL` 验证、下一轮 Reader 更深事件点与 `P1` 扩面继续延后；如未来 fresh `watch -> e2e -> gate` 再次出现真实回归，再单独冻结新的高逻辑批次，详见 [Agent 自主开发路线图](docs/AGENT_AUTONOMY_ROADMAP.md)
 - 当前新增一类 clean-room 静态资源恢复：agent 可以把“偏好设置面板未注册”进一步分流为“注册缺口”与“`preferences.xhtml` 资源缺失”，避免错误修复方向
 - 当前新增一类运行时资源恢复：agent 可以把“仅剩 error 日志”的一部分问题继续下钻为 `main.css` 样式资源缺失，而不是停在笼统的 runtime log 层
 
 ## 合规工作流
 
-1. 从功能需求填写 `SPEC.md`（不参考代码）
-2. 实现前检查 `LEGAL_RISK_CHECKLIST.md`
-3. 发布前运行 `npm run sim` 检查相似度
+1. 先在 `SPEC.md` 冻结当前模板的黑盒行为声明
+2. 维护 `LEGAL_RISK_CHECKLIST.md`，确保 Development Gate 全部可勾选且带 Evidence
+3. 日常开发运行 `npm run cleanroom:audit` 输出 `dist/cleanroom-audit.{json,md}`
+4. 本地挂载可选 `reference/` 快照后运行 `npm run cleanroom:sim` 输出 `dist/cleanroom-similarity.{json,md}`
+5. 发布前执行 `npm run release:preflight`，要求发布态 clean-room audit 与 similarity 都通过
 
 ## 文档
 

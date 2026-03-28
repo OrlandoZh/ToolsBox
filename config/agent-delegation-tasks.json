@@ -1341,7 +1341,7 @@
     },
     {
       "taskId": "READER-HIGH-123",
-      "title": "冻结人工 Reader verdict 待命边界（最新重基线）",
+      "title": "冻结 Reader 唯一 verdict 收口边界（历史契约源）",
       "lane": "codex-high-logic",
       "scopePaths": [
         "config/agent-delegation-tasks.json",
@@ -1362,11 +1362,11 @@
       "dependsOn": [
         "ENG-HIGH-102"
       ],
-      "promptTemplate": "该任务仅供 Codex 跟踪。`2026-03-27` 本地 fresh rerun（对应最新 artifact `generatedAt` 约 `2026-03-26T17:15Z~17:31Z`）已再次确认 live truth 为 `watch = healthy`、`primaryDiagnosis = reader-ui:reader-visual-drift`、`visualPrimaryBlockerKind = ui-regression-candidate`、`visualCanonicalCoverageKind = complete`，且 `reader event hook diagnostics` 与 `reader fine-grained hook diagnostics` 继续通过，monitor / gate / obsidian 的默认 nextAction 已统一回到 `npm run agent:obsidian`。因此当前产品主线重新回到人工 Reader verdict 待命态；在 verdict 明确前，不再生成新的 active Reader low-task，也不默认执行 baseline refresh、autofix 或再次扩写 watch recovery / capture-stability 修复分支。",
+      "promptTemplate": "该任务仅供 Codex 跟踪。它代表上一轮 Reader 主线的最终历史收口：`2026-03-28` 的 fresh `watch -> e2e -> monitor -> gate -> obsidian` 已确认 `watch = healthy`、`agent:zotero:e2e = passed`、`agent:gate = passed`，人工窗口也已给出唯一 verdict `预期 UI 变化 -> ready / force-next / npm run agent:zotero:e2e:update-baseline`，并只执行了一次受控 baseline refresh。因此 `READER-HIGH-123` 继续仅保留为历史契约 / 工件来源，不再作为当前 active 高逻辑主线；后续当前主线已切到 `ENG-HIGH-103` 的工程化长期增强第一批。",
       "reviewChecklist": [
-        "当前主线必须明确为人工 Reader verdict 待命",
-        "默认 nextAction 必须保持 npm run agent:obsidian",
-        "在人工 verdict 明确前，不得预写新的 Reader low-task 或后续分支"
+        "必须明确 `READER-HIGH-123` 只保留为历史契约源",
+        "不得再把 `READER-HIGH-123` 写成当前 active 高逻辑主线",
+        "需要与后续 `ENG-HIGH-103` 的单一事实源口径兼容"
       ],
       "testCommands": [],
       "handoffArtifacts": [
@@ -1376,6 +1376,201 @@
         "dist/agent-gate.json",
         "obsidian/agent-workbench/01-Zotero-Agent-当前状态总览.md",
         "obsidian/agent-workbench/10-Zotero-Agent-人工指令窗口.md"
+      ]
+    },
+    {
+      "taskId": "ENG-HIGH-103",
+      "title": "冻结工程化长期增强第一批边界（当前 active 主线）",
+      "lane": "codex-high-logic",
+      "scopePaths": [
+        "config/agent-delegation-tasks.json",
+        "docs/CURRENT_BACKLOG.md",
+        "FRAMEWORK_ASSESSMENT.md",
+        "docs/AGENT_AUTONOMY_ROADMAP.md",
+        "README.md",
+        "FRAMEWORK_CHECKLIST.md",
+        "tests/agent-delegation.test.js",
+        "tests/docs-consistency.test.js"
+      ],
+      "dependsOn": [
+        "READER-HIGH-123"
+      ],
+      "promptTemplate": "该任务仅供 Codex 跟踪。它代表当前 active 高逻辑批次：`ENG-HIGH-103` 只做工程化长期增强第一批，不重开 Reader / `P1` / 远端发布主线。当前批次固定四件事：补齐 runtime 生命周期错误边界与轻量时序遥测、把剩余核心脚本入口统一到共享失败模型、把最小 lifecycle/perf 信号并入现有 `engineeringHardening` 摘要、同步 delegation manifest 与单一事实源文档。它只定义当前批次边界、low-task ownership、验收命令与文档口径，不直接扩产品面，也不回写历史批次语义。",
+      "reviewChecklist": [
+        "必须明确当前 active 高逻辑主线已切到 `ENG-HIGH-103`",
+        "不得把 Reader / `P1` / 远端发布重新写成当前批次",
+        "必须把 `READER-HIGH-123`、`ENG-HIGH-102` 保留为历史契约 / 工件来源"
+      ],
+      "testCommands": [],
+      "handoffArtifacts": [
+        "config/agent-delegation-tasks.json",
+        "docs/CURRENT_BACKLOG.md",
+        "FRAMEWORK_ASSESSMENT.md",
+        "docs/AGENT_AUTONOMY_ROADMAP.md",
+        "README.md",
+        "FRAMEWORK_CHECKLIST.md"
+      ]
+    },
+    {
+      "taskId": "ENG-LOW-207",
+      "title": "补齐 runtime 生命周期边界与时序遥测",
+      "lane": "opencode-low-logic",
+      "scopePaths": [
+        "src/main.js",
+        "src/app/kernel.js",
+        "src/app/plugin-agent.js",
+        "src/app/plugin.js",
+        "scripts/zotero-agent-runtime-lib.mjs",
+        "tests/kernel.test.js",
+        "tests/plugin-agent.test.js",
+        "tests/agent-telemetry.test.js"
+      ],
+      "dependsOn": [
+        "ENG-HIGH-103"
+      ],
+      "promptTemplate": "该低逻辑任务只负责 runtime 生命周期边界与时序遥测：把 bootstrap、startup、startup cleanup、shutdown 的失败边界统一成稳定事件名，保证启动失败后仍可 retry、停止失败后仍回到 idle，并把 `hostReadyDurationMs`、`startupDurationMs`、`shutdownDurationMs`、`lifecycleSlowOperationCount`、`lifecycleSlowThresholdMs`、`lifecycleBoundaryEvents` 接入自检摘要。它不得扩产品配置面，也不得改变 startup / shutdown 的既有语义。",
+      "reviewChecklist": [
+        "启动失败后必须完成清理并可 retry",
+        "shutdown 失败后必须仍回到 idle",
+        "lifecycle 遥测只作为内部 / agent 字段使用"
+      ],
+      "testCommands": [
+        "node --input-type=module -e \"import './tests/kernel.test.js'; import './tests/plugin-agent.test.js'; import './tests/agent-telemetry.test.js'; import { runTests } from './tests/test-framework.js'; await runTests();\""
+      ],
+      "gitClosure": {
+        "milestone": "module-feature",
+        "summary": "runtime 生命周期边界与时序遥测",
+        "commitMessage": "feat: 基本实现 runtime 生命周期边界与时序遥测"
+      },
+      "handoffArtifacts": [
+        "src/main.js",
+        "src/app/kernel.js",
+        "src/app/plugin-agent.js",
+        "src/app/plugin.js",
+        "scripts/zotero-agent-runtime-lib.mjs"
+      ]
+    },
+    {
+      "taskId": "ENG-LOW-208",
+      "title": "把剩余核心脚本入口统一到共享失败模型",
+      "lane": "opencode-low-logic",
+      "scopePaths": [
+        "scripts/script-runtime-lib.mjs",
+        "scripts/zotero.mjs",
+        "scripts/build.mjs",
+        "scripts/package.mjs",
+        "scripts/export-project.mjs",
+        "scripts/verify.mjs",
+        "tests/zotero-runner-lib.test.js",
+        "tests/toolchain.test.js"
+      ],
+      "dependsOn": [
+        "ENG-HIGH-103"
+      ],
+      "promptTemplate": "该低逻辑任务只负责把剩余核心脚本入口统一接入共享失败模型：继续沿用既有六类错误 `args / config / environment / execution / validation / timeout`，为 `build / package / export / verify / zotero` 补齐共享 `createScriptError` / `buildScriptFailureInfo` 语义、稳定 `failedStage` 命名和共享参数 / 环境 / 配置校验，但不得新建额外 JSON 报告或新的错误大类。",
+      "reviewChecklist": [
+        "错误类别只能使用既有六类",
+        "结构化失败字段必须保持同构",
+        "不得为 `build/package/export/verify/zotero` 新建平行持久化 report"
+      ],
+      "testCommands": [
+        "node --input-type=module -e \"import './tests/zotero-runner-lib.test.js'; import './tests/toolchain.test.js'; import { runTests } from './tests/test-framework.js'; await runTests();\""
+      ],
+      "gitClosure": {
+        "milestone": "module-framework",
+        "summary": "共享失败模型脚本入口",
+        "commitMessage": "feat: 完成共享失败模型脚本入口模块框架搭建"
+      },
+      "handoffArtifacts": [
+        "scripts/script-runtime-lib.mjs",
+        "scripts/zotero.mjs",
+        "scripts/build.mjs",
+        "scripts/package.mjs",
+        "scripts/export-project.mjs",
+        "scripts/verify.mjs"
+      ]
+    },
+    {
+      "taskId": "ENG-LOW-209",
+      "title": "把 lifecycle/perf 信号并入最小工程化摘要",
+      "lane": "opencode-low-logic",
+      "scopePaths": [
+        "scripts/engineering-hardening-lib.mjs",
+        "scripts/agent-monitor.mjs",
+        "scripts/agent-gate.mjs",
+        "scripts/agent-dashboard.mjs",
+        "scripts/agent-zotero-validation-lib.mjs",
+        "types/core.d.ts",
+        "tests/agent-zotero-validation-lib.test.js",
+        "tests/agent-telemetry.test.js"
+      ],
+      "dependsOn": [
+        "ENG-HIGH-103",
+        "ENG-LOW-207",
+        "ENG-LOW-208"
+      ],
+      "promptTemplate": "该低逻辑任务只负责把 lifecycle/perf 信号接入现有 `engineeringHardening` 摘要：把 lifecycle 慢操作计数、阈值、最近慢阶段与三段时序并入 `agent:monitor` / `agent:dashboard` / `agent:gate` 的最小摘要，同时同步 `types/core.d.ts` 与 E2E 摘要字段；它不得改变 gate 的 pass/block 规则、`nextAction` 语义、HTTP 既有摘要语义或新增并行报告家族。",
+      "reviewChecklist": [
+        "只能在现有 `engineeringHardening` 节点上做加法",
+        "不得改变 gate 的 pass/block 规则或 `nextAction` 语义",
+        "类型声明必须与新增 lifecycle 字段保持一致"
+      ],
+      "testCommands": [
+        "node --input-type=module -e \"import './tests/agent-zotero-validation-lib.test.js'; import './tests/agent-telemetry.test.js'; import { runTests } from './tests/test-framework.js'; await runTests();\""
+      ],
+      "gitClosure": {
+        "milestone": "module-feature",
+        "summary": "工程化 lifecycle/perf 摘要",
+        "commitMessage": "feat: 基本实现工程化 lifecycle/perf 摘要"
+      },
+      "handoffArtifacts": [
+        "scripts/engineering-hardening-lib.mjs",
+        "scripts/agent-monitor.mjs",
+        "scripts/agent-gate.mjs",
+        "scripts/agent-dashboard.mjs",
+        "scripts/agent-zotero-validation-lib.mjs",
+        "types/core.d.ts"
+      ]
+    },
+    {
+      "taskId": "ENG-LOW-210",
+      "title": "同步 ENG-HIGH-103 manifest、文档与守卫测试",
+      "lane": "opencode-low-logic",
+      "scopePaths": [
+        "config/agent-delegation-tasks.json",
+        "README.md",
+        "docs/CURRENT_BACKLOG.md",
+        "FRAMEWORK_CHECKLIST.md",
+        "FRAMEWORK_ASSESSMENT.md",
+        "docs/AGENT_AUTONOMY_ROADMAP.md",
+        "tests/agent-delegation.test.js",
+        "tests/docs-consistency.test.js"
+      ],
+      "dependsOn": [
+        "ENG-HIGH-103",
+        "ENG-LOW-209"
+      ],
+      "promptTemplate": "该低逻辑任务只负责 manifest、文档与守卫测试同步：把 active 高逻辑源切到 `ENG-HIGH-103`，把本批写成“工程化长期增强第一批”，并明确远端 `updateURL`、远端发布编排、Reader 更深事件点和 `P1` 扩面继续延后。它必须把 README / Checklist / Assessment / Roadmap 的当前口径统一到 `docs/CURRENT_BACKLOG.md`，并更新 delegation / docs consistency 测试，但不得改产品代码。",
+      "reviewChecklist": [
+        "单一事实源必须明确当前 active 批次为 `ENG-HIGH-103`",
+        "必须明确 `READER-HIGH-123` 与 `ENG-HIGH-102` 只保留为历史来源",
+        "必须继续把远端发布 / Reader 更深事件点 / `P1` 扩面写成延后项"
+      ],
+      "testCommands": [
+        "node --input-type=module -e \"import './tests/agent-delegation.test.js'; import './tests/docs-consistency.test.js'; import { runTests } from './tests/test-framework.js'; await runTests();\""
+      ],
+      "gitClosure": {
+        "milestone": "batch-closure",
+        "summary": "ENG-HIGH-103 manifest、文档与守卫测试",
+        "commitMessage": "chore: 收口 ENG-HIGH-103 manifest、文档与守卫测试"
+      },
+      "handoffArtifacts": [
+        "config/agent-delegation-tasks.json",
+        "README.md",
+        "docs/CURRENT_BACKLOG.md",
+        "FRAMEWORK_CHECKLIST.md",
+        "FRAMEWORK_ASSESSMENT.md",
+        "docs/AGENT_AUTONOMY_ROADMAP.md"
       ]
     },
     {

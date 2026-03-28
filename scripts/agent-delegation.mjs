@@ -4,6 +4,13 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import {
+  attachDelegationGitClosureTestResults,
+  buildDelegationGitClosurePlan,
+  commitDelegationGitClosure,
+  listGitChangedFiles,
+  renderDelegationGitClosureMarkdown,
+} from "./agent-git-closure-lib.mjs";
+import {
   assertDelegationBatchSafe,
   buildDelegationPrompt,
   buildDelegationReview,
@@ -32,6 +39,7 @@ Commands:
   list [--json] [--manifest <path>]
   run <taskId> [taskId...] [--manifest <path>]
   review <taskId> [taskId...] [--reviewer <name>] [--manifest <path>]
+  close <taskId> [--dry-run] [--message <text>] [--json] [--manifest <path>]
 `);
 }
 
@@ -41,7 +49,9 @@ function parseArgs(argv) {
     taskIds: [],
     reviewer: "codex",
     json: false,
+    dryRun: false,
     manifestPath: null,
+    message: null,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -58,8 +68,17 @@ function parseArgs(argv) {
       options.json = true;
       continue;
     }
+    if (arg === "--dry-run") {
+      options.dryRun = true;
+      continue;
+    }
     if (arg === "--manifest") {
       options.manifestPath = String(argv[index + 1] || "").trim() || null;
+      index += 1;
+      continue;
+    }
+    if (arg === "--message") {
+      options.message = String(argv[index + 1] || "").trim() || null;
       index += 1;
       continue;
     }
@@ -83,8 +102,14 @@ function parseArgs(argv) {
     });
   }
 
-  if ((options.command === "run" || options.command === "review") && options.taskIds.length === 0) {
+  if ((options.command === "run" || options.command === "review" || options.command === "close") && options.taskIds.length === 0) {
     throw createScriptError("args", `${options.command} requires at least one taskId`, {
+      failedStage: "parse-args",
+    });
+  }
+
+  if (options.command === "close" && options.taskIds.length !== 1) {
+    throw createScriptError("args", "close requires exactly one taskId so each local commit stays aligned to a single module milestone", {
       failedStage: "parse-args",
     });
   }
@@ -269,6 +294,45 @@ async function reviewDelegationTask(task, reviewer) {
   return review;
 }
 
+async function closeDelegationTask(task, options) {
+  const artifacts = resolveDelegationTaskArtifacts(projectRoot, task.taskId);
+  await fs.mkdir(artifacts.baseDir, { recursive: true });
+  const changedFiles = await listGitChangedFiles(projectRoot);
+  const plan = buildDelegationGitClosurePlan(task, changedFiles, {
+    commitMessage: options.message,
+  });
+  const testResults = [];
+  for (const command of task.testCommands) {
+    testResults.push(await runTestCommand(command));
+  }
+
+  const record = attachDelegationGitClosureTestResults(plan, testResults);
+  record.closedAt = new Date().toISOString();
+  record.status = record.eligible ? (options.dryRun ? "dry-run" : "committed") : "blocked";
+  record.commitSha = null;
+  record.currentBranch = null;
+
+  if (record.eligible && !options.dryRun) {
+    const commitResult = await commitDelegationGitClosure(projectRoot, record);
+    record.commitSha = commitResult.commitSha;
+    record.currentBranch = commitResult.currentBranch;
+    record.closedAt = commitResult.committedAt;
+  }
+
+  await Promise.all([
+    writeTaskSnapshot(artifacts.gitClosureJSON, record),
+    fs.writeFile(artifacts.gitClosureMD, `${renderDelegationGitClosureMarkdown(record)}\n`, "utf-8"),
+  ]);
+
+  if (!record.eligible) {
+    throw createScriptError("validation", `Delegation git closure for '${task.taskId}' is blocked by focused test failures`, {
+      failedStage: `close:${task.taskId}`,
+    });
+  }
+
+  return record;
+}
+
 async function handleList(manifest, options) {
   if (options.json) {
     console.log(JSON.stringify({
@@ -312,6 +376,21 @@ async function main() {
     for (const task of tasks) {
       const review = await reviewDelegationTask(task, options.reviewer);
       console.log(`Delegation review completed: ${task.taskId} -> ${review.reviewStatus}`);
+    }
+    return;
+  }
+
+  if (options.command === "close") {
+    const record = await closeDelegationTask(tasks[0], options);
+    if (options.json) {
+      console.log(JSON.stringify(record, null, 2));
+      return;
+    }
+    console.log(`Delegation git closure completed: ${record.taskId} -> ${record.status}`);
+    console.log(`Commit message: ${record.commitMessage}`);
+    console.log(`Selected files: ${record.selectedFiles.length}`);
+    if (record.commitSha) {
+      console.log(`Commit SHA: ${record.commitSha}`);
     }
     return;
   }
