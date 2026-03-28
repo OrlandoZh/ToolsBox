@@ -11,13 +11,15 @@ describe("Agent Zotero E2E Lib", () => {
     const summary = summarizeLogs([
       { level: "info", message: "hello" },
       { level: "warn", message: "careful" },
-      { level: "debug", message: "[cleanroom:error] failed" },
+      { level: "debug", message: "[cleanroom:error] plugin.start.failed" },
     ]);
 
     assert.equal(summary.total, 3);
     assert.equal(summary.warnCount, 1);
     assert.equal(summary.errorCount, 1);
     assert.equal(summary.infoCount, 1);
+    assert.equal(summary.errorBoundaryHitCount, 1);
+    assert.equal(summary.errorBoundaryEvents[0]?.event, "plugin.start.failed");
   });
 
   it("should evaluate cycle result and detect missing capabilities", () => {

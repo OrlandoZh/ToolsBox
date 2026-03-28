@@ -14,6 +14,13 @@ import {
 } from "./agent-zotero-validation-lib.mjs";
 
 const READER_HOOK_SCENARIO_NAME = "reader event hook diagnostics";
+const ERROR_BOUNDARY_EVENT_PATTERNS = Object.freeze([
+  "plugin.start.failed",
+  "plugin.shutdown.failed",
+  "cleanroom.bootstrap.startup.failed",
+  "cleanroom.bootstrap.shutdown.failed",
+  "cleanroom.bootstrap.startup.cleanup.failed",
+]);
 
 function toStringSafe(value) {
   if (value === null || value === undefined) {
@@ -273,6 +280,11 @@ function classifyLog(entry) {
   return "info";
 }
 
+function detectErrorBoundaryEvent(message) {
+  const normalizedMessage = toStringSafe(message).toLowerCase();
+  return ERROR_BOUNDARY_EVENT_PATTERNS.find((pattern) => normalizedMessage.includes(pattern)) || null;
+}
+
 export function summarizeLogs(entries = []) {
   const logs = Array.isArray(entries) ? entries : [];
   const summary = {
@@ -280,9 +292,12 @@ export function summarizeLogs(entries = []) {
     errorCount: 0,
     warnCount: 0,
     infoCount: 0,
+    errorBoundaryHitCount: 0,
+    errorBoundaryEvents: [],
     recentErrors: [],
     recentWarnings: [],
   };
+  const boundaryMap = new Map();
 
   for (const entry of logs) {
     const type = classifyLog(entry);
@@ -295,6 +310,11 @@ export function summarizeLogs(entries = []) {
 
     if (type === "error") {
       summary.errorCount += 1;
+      const boundaryEvent = detectErrorBoundaryEvent(row.message);
+      if (boundaryEvent) {
+        summary.errorBoundaryHitCount += 1;
+        boundaryMap.set(boundaryEvent, (boundaryMap.get(boundaryEvent) || 0) + 1);
+      }
       if (summary.recentErrors.length < 6) {
         summary.recentErrors.push(row);
       }
@@ -309,6 +329,10 @@ export function summarizeLogs(entries = []) {
     }
     summary.infoCount += 1;
   }
+
+  summary.errorBoundaryEvents = Array.from(boundaryMap.entries())
+    .map(([event, count]) => ({ event, count }))
+    .sort((left, right) => right.count - left.count || left.event.localeCompare(right.event));
 
   return summary;
 }

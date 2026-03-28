@@ -86,6 +86,9 @@ describe("HTTP", () => {
     assert.equal(response.statusText, "OK");
     assert.deepEqual(response.headers, { "content-type": "text/plain" });
     assert.equal(response.data, "plain-text");
+    assert.equal(response.diagnostics.attemptCount, 1);
+    assert.equal(response.diagnostics.retried, false);
+    assert.equal(response.diagnostics.timeout, false);
     assert.equal(debugEntries.length, 2);
     assert.equal(debugEntries[0].message, "http.request");
     assert.equal(debugEntries[1].message, "http.response");
@@ -197,6 +200,83 @@ describe("HTTP", () => {
     assert.equal(errorEntries[0].details.method, HTTP_METHODS.GET);
   });
 
+  it("should retry failed requests and retain diagnostics", async () => {
+    let attempt = 0;
+    requestImpl = async (method, url, options) => {
+      requestCalls.push({ method, url, options });
+      attempt += 1;
+      if (attempt === 1) {
+        throw new Error("temporary failure");
+      }
+      return {
+        status: 200,
+        statusText: "OK",
+        responseHeaders: {},
+        responseText: JSON.stringify({ ok: true }),
+      };
+    };
+
+    const response = await http.get("https://example.com/retry", {
+      retryCount: 1,
+      retryDelayMs: 0,
+      slowThresholdMs: 0,
+    });
+    const diagnostics = http.getDiagnostics();
+
+    assert.equal(requestCalls.length, 2);
+    assert.equal(response.diagnostics.attemptCount, 2);
+    assert.equal(response.diagnostics.retryCount, 1);
+    assert.equal(response.diagnostics.retried, true);
+    assert.equal(diagnostics.requestCount, 1);
+    assert.equal(diagnostics.retryCount, 1);
+    assert.equal(diagnostics.successCount, 1);
+    assert.equal(diagnostics.failureCount, 0);
+    assert.equal(diagnostics.slowOperationCount, 1);
+    assert.equal(debugEntries.some((entry) => entry.message === "http.request.retry"), true);
+  });
+
+  it("should standardize timeout errors and count them in diagnostics", async () => {
+    requestImpl = async () => {
+      throw new Error("Request timed out after 5000ms");
+    };
+
+    let caught = null;
+    try {
+      await http.get("https://example.com/timeout", {
+        timeout: 5000,
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    const diagnostics = http.getDiagnostics();
+    assert.ok(caught instanceof Error);
+    assert.equal(caught.code, "HTTP_TIMEOUT");
+    assert.equal(caught.httpErrorKind, "timeout");
+    assert.equal(String(caught.message).includes("timed out after 5000ms"), true);
+    assert.equal(diagnostics.requestCount, 1);
+    assert.equal(diagnostics.failureCount, 1);
+    assert.equal(diagnostics.timeoutCount, 1);
+    assert.equal(diagnostics.lastError.kind, "timeout");
+  });
+
+  it("should stop before dispatch when signal is already aborted", async () => {
+    const signal = { aborted: true };
+
+    let caught = null;
+    try {
+      await http.get("https://example.com/aborted", { signal });
+    } catch (error) {
+      caught = error;
+    }
+
+    assert.ok(caught instanceof Error);
+    assert.equal(caught.code, "HTTP_ABORTED");
+    assert.equal(caught.name, "AbortError");
+    assert.equal(requestCalls.length, 0);
+    assert.equal(http.getDiagnostics().failureCount, 1);
+  });
+
   it("should return true for successful downloads", async () => {
     const result = await http.download("https://example.com/file.pdf", "/tmp/file.pdf", {
       headers: { Accept: "application/pdf" },
@@ -219,6 +299,25 @@ describe("HTTP", () => {
     assert.equal(result, false);
     assert.equal(errorEntries.length, 1);
     assert.equal(errorEntries[0].message, "http.download.failed");
+  });
+
+  it("should expose and reset HTTP diagnostics", async () => {
+    await http.get("https://example.com/metrics", {
+      slowThresholdMs: 0,
+    });
+
+    const beforeReset = http.getDiagnostics();
+    assert.equal(beforeReset.requestCount, 1);
+    assert.equal(beforeReset.successCount, 1);
+    assert.equal(beforeReset.slowOperationCount, 1);
+    assert.equal(beforeReset.lastRequest.url, "https://example.com/metrics");
+
+    http.resetDiagnostics();
+    const afterReset = http.getDiagnostics();
+    assert.equal(afterReset.requestCount, 0);
+    assert.equal(afterReset.successCount, 0);
+    assert.equal(afterReset.lastRequest, null);
+    assert.equal(afterReset.lastError, null);
   });
 
   it("should build query strings and URLs", () => {

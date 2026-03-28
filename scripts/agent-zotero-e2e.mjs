@@ -48,9 +48,11 @@ import {
   resolveCaptureWindowBounds,
 } from "./agent-zotero-capture-window-lib.mjs";
 import {
-  assertScript,
   buildScriptFailureInfo,
   createScriptError,
+  parseEnumOption,
+  parseIntegerOption,
+  resolvePathOption,
   writeJSONArtifact,
 } from "./script-runtime-lib.mjs";
 import { resolveZoteroE2EArtifacts } from "./zotero-agent-artifacts.mjs";
@@ -114,6 +116,24 @@ const ADDITIVE_E2E_SUMMARY_FIELDS = Object.freeze([
   "visualCaptureAttemptDiagnosisItemCount",
   "visualCaptureAttemptDiagnosisSummary",
   "visualCaptureAttemptDiagnosisItems",
+  "httpObserved",
+  "httpRequestCount",
+  "httpSuccessCount",
+  "httpFailureCount",
+  "httpTimeoutCount",
+  "httpRetryCount",
+  "httpSlowOperationCount",
+  "httpSlowThresholdMs",
+  "httpLastRequest",
+  "httpLastErrorKind",
+  "httpLastErrorMessage",
+  "hostReadyDurationMs",
+  "startupDurationMs",
+  "shutdownDurationMs",
+  "lifecycleSlowOperationCount",
+  "lifecycleSlowThresholdMs",
+  "lifecycleLastSlowStage",
+  "lifecycleBoundaryEvents",
   "readerEventReport",
 ]);
 
@@ -130,13 +150,6 @@ Options:
   --update-visual-baseline  Refresh visual baseline screenshots from current run
   --visual-baseline-dir <path>  Override visual baseline directory
 `);
-}
-
-function assert(condition, message, options = {}) {
-  assertScript(condition, message, {
-    category: options.category || "args",
-    failedStage: options.failedStage || "parse-args",
-  });
 }
 
 function uniqueStrings(values) {
@@ -268,12 +281,19 @@ function parseArgs(argv) {
       process.exit(0);
     }
     if (arg === "--cycles") {
-      options.cycles = Number.parseInt(String(argv[i + 1] || "2"), 10);
+      options.cycles = parseIntegerOption(argv[i + 1], {
+        name: "cycles",
+        min: 1,
+        max: 10,
+      });
       i += 1;
       continue;
     }
     if (arg === "--strategy") {
-      options.strategy = String(argv[i + 1] || "hot").trim();
+      options.strategy = parseEnumOption(argv[i + 1], {
+        name: "strategy",
+        allowed: ["hot", "restart"],
+      });
       i += 1;
       continue;
     }
@@ -298,7 +318,10 @@ function parseArgs(argv) {
       continue;
     }
     if (arg === "--visual-baseline-dir") {
-      options.visualBaselineDir = path.resolve(String(argv[i + 1] || ""));
+      options.visualBaselineDir = resolvePathOption(argv[i + 1], {
+        name: "visual-baseline-dir",
+        baseDir: projectRoot,
+      });
       i += 1;
       continue;
     }
@@ -307,8 +330,6 @@ function parseArgs(argv) {
     });
   }
 
-  assert(Number.isInteger(options.cycles) && options.cycles >= 1 && options.cycles <= 10, "cycles must be 1-10");
-  assert(options.strategy === "hot" || options.strategy === "restart", "strategy must be hot or restart");
   return options;
 }
 
