@@ -1881,6 +1881,8 @@ export function summarizeE2EReport(report, options = {}) {
       scenarioFailed: 0,
       logErrorCount: 0,
       logWarnCount: 0,
+      errorBoundaryHitCount: 0,
+      errorBoundaryEvents: [],
       visualDriftCount: 0,
       visualMissingCount: 0,
       visualCaptureStabilityObserved: false,
@@ -1903,6 +1905,24 @@ export function summarizeE2EReport(report, options = {}) {
       serviceHealthOK: true,
       serviceStatus: "unknown",
       serviceIssues: [],
+      httpObserved: false,
+      httpRequestCount: 0,
+      httpSuccessCount: 0,
+      httpFailureCount: 0,
+      httpTimeoutCount: 0,
+      httpRetryCount: 0,
+      httpSlowOperationCount: 0,
+      httpSlowThresholdMs: 0,
+      httpLastRequest: null,
+      httpLastErrorKind: null,
+      httpLastErrorMessage: null,
+      hostReadyDurationMs: 0,
+      startupDurationMs: 0,
+      shutdownDurationMs: 0,
+      lifecycleSlowOperationCount: 0,
+      lifecycleSlowThresholdMs: 2000,
+      lifecycleLastSlowStage: null,
+      lifecycleBoundaryEvents: [],
       registrationObserved: false,
       officialMenuAPIAvailable: null,
       primaryActionCommandRegistered: null,
@@ -2007,6 +2027,20 @@ export function summarizeE2EReport(report, options = {}) {
   const scenarioFailed = cycles.reduce((sum, cycle) => sum + Number(cycle?.scenarios?.failed || 0), 0);
   const logErrorCount = cycles.reduce((sum, cycle) => sum + Number(cycle?.logs?.errorCount || 0), 0);
   const logWarnCount = cycles.reduce((sum, cycle) => sum + Number(cycle?.logs?.warnCount || 0), 0);
+  const errorBoundaryHitCount = cycles.reduce((sum, cycle) => {
+    return sum + Number(cycle?.logs?.errorBoundaryHitCount || 0);
+  }, 0);
+  const errorBoundaryEventMap = new Map();
+  cycles.forEach((cycle) => {
+    const entries = Array.isArray(cycle?.logs?.errorBoundaryEvents) ? cycle.logs.errorBoundaryEvents : [];
+    entries.forEach((entry) => {
+      const event = String(entry?.event || "").trim();
+      if (!event) {
+        return;
+      }
+      errorBoundaryEventMap.set(event, (errorBoundaryEventMap.get(event) || 0) + Number(entry?.count || 0));
+    });
+  });
   const visualDriftCount = cycles.reduce((sum, cycle) => {
     return sum + Number(cycle?.visuals?.analysis?.summary?.baseline?.driftCount || 0);
   }, 0);
@@ -2019,6 +2053,33 @@ export function summarizeE2EReport(report, options = {}) {
   const staticRuntimeDriftCount = cycles.reduce((sum, cycle) => {
     return sum + Number(cycle?.checks?.staticRuntimeDriftCount || 0);
   }, 0);
+  const httpObserved = cycles.some((cycle) => cycle?.checks?.httpObserved === true);
+  const httpRequestCount = cycles.reduce((sum, cycle) => sum + Number(cycle?.checks?.httpRequestCount || 0), 0);
+  const httpSuccessCount = cycles.reduce((sum, cycle) => sum + Number(cycle?.checks?.httpSuccessCount || 0), 0);
+  const httpFailureCount = cycles.reduce((sum, cycle) => sum + Number(cycle?.checks?.httpFailureCount || 0), 0);
+  const httpTimeoutCount = cycles.reduce((sum, cycle) => sum + Number(cycle?.checks?.httpTimeoutCount || 0), 0);
+  const httpRetryCount = cycles.reduce((sum, cycle) => sum + Number(cycle?.checks?.httpRetryCount || 0), 0);
+  const httpSlowOperationCount = cycles.reduce((sum, cycle) => sum + Number(cycle?.checks?.httpSlowOperationCount || 0), 0);
+  const httpLatestError = latestCycle?.checks?.httpLastError && typeof latestCycle.checks.httpLastError === "object"
+    ? latestCycle.checks.httpLastError
+    : null;
+  const hostReadyDurationMs = Math.max(0, Number(latestCycle?.checks?.hostReadyDurationMs || 0));
+  const startupDurationMs = Math.max(0, Number(latestCycle?.checks?.startupDurationMs || 0));
+  const shutdownDurationMs = Math.max(0, Number(latestCycle?.checks?.shutdownDurationMs || 0));
+  const lifecycleSlowOperationCount = Math.max(0, Number(latestCycle?.checks?.lifecycleSlowOperationCount || 0));
+  const lifecycleSlowThresholdMs = Math.max(0, Number(latestCycle?.checks?.lifecycleSlowThresholdMs || 2000));
+  const lifecycleLastSlowStage = typeof latestCycle?.checks?.lifecycleLastSlowStage === "string"
+    && latestCycle.checks.lifecycleLastSlowStage.trim()
+    ? latestCycle.checks.lifecycleLastSlowStage
+    : null;
+  const lifecycleBoundaryEvents = Array.isArray(latestCycle?.checks?.lifecycleBoundaryEvents)
+    ? latestCycle.checks.lifecycleBoundaryEvents
+      .map((entry) => ({
+        event: String(entry?.event || "").trim() || "unknown",
+        count: Number(entry?.count || 0),
+      }))
+      .filter((entry) => entry.count > 0)
+    : [];
   const status = report.passed === true ? "passed" : "failed";
   const { ageMinutes, ageText } = summarizeAge(report.generatedAt, now);
   const rawDiagnoses = Array.isArray(report.diagnostics)
@@ -2126,6 +2187,10 @@ export function summarizeE2EReport(report, options = {}) {
     scenarioFailed,
     logErrorCount,
     logWarnCount,
+    errorBoundaryHitCount,
+    errorBoundaryEvents: Array.from(errorBoundaryEventMap.entries())
+      .map(([event, count]) => ({ event, count }))
+      .sort((left, right) => right.count - left.count || left.event.localeCompare(right.event)),
     visualDriftCount,
     visualMissingCount,
     visualCaptureStabilityObserved: visualCaptureStability.observed,
@@ -2153,6 +2218,24 @@ export function summarizeE2EReport(report, options = {}) {
     serviceHealthOK: serviceHealth.serviceHealthOK,
     serviceStatus: serviceHealth.serviceStatus,
     serviceIssues: serviceHealth.serviceIssues,
+    httpObserved,
+    httpRequestCount,
+    httpSuccessCount,
+    httpFailureCount,
+    httpTimeoutCount,
+    httpRetryCount,
+    httpSlowOperationCount,
+    httpSlowThresholdMs: Number(latestCycle?.checks?.httpSlowThresholdMs || 0),
+    httpLastRequest: latestCycle?.checks?.httpLastRequest || null,
+    httpLastErrorKind: httpLatestError?.kind || null,
+    httpLastErrorMessage: httpLatestError?.message || null,
+    hostReadyDurationMs,
+    startupDurationMs,
+    shutdownDurationMs,
+    lifecycleSlowOperationCount,
+    lifecycleSlowThresholdMs,
+    lifecycleLastSlowStage,
+    lifecycleBoundaryEvents,
     registrationObserved: registrationHealth.registrationObserved,
     officialMenuAPIAvailable: registrationHealth.officialMenuAPIAvailable,
     primaryActionCommandRegistered: registrationHealth.primaryActionCommandRegistered,

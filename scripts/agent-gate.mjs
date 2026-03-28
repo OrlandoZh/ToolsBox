@@ -24,6 +24,7 @@ import {
   createScriptError,
   writeJSONArtifact,
 } from "./script-runtime-lib.mjs";
+import { summarizeEngineeringHardening } from "./engineering-hardening-lib.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -548,7 +549,7 @@ function evaluateZoteroValidation(validationSummary, policy) {
     // Pure visual Reader failures should not default to autofix.
   } else if (!autofix?.present) {
     recommendations.push("如需闭环恢复验证，可运行 `npm run agent:zotero:autofix`。");
-  } else if (autofix.status === "unrecovered") {
+  } else if (autofix.status === "unrecovered" && e2e?.status !== "passed") {
     const autofixDate = parseISODate(autofix.generatedAt);
     const e2eDate = parseISODate(e2e?.generatedAt);
     if (!e2eDate || (autofixDate && autofixDate >= e2eDate)) {
@@ -972,6 +973,22 @@ function buildMarkdown(report) {
     }
   }
 
+  if (report.engineeringHardening) {
+    lines.push("", "## 工程化硬化信号", "");
+    lines.push(`- 摘要: ${report.engineeringHardening.summary || "-"}`);
+    lines.push(`- 错误边界命中: \`${report.engineeringHardening.errorBoundaryHitCount ?? 0}\``);
+    lines.push(`- 校验失败分类: \`${report.engineeringHardening.validationFailureCategories.map((item) => `${item.label} x${item.count}`).join("；") || "-"}\``);
+    lines.push(`- HTTP timeout: \`${report.engineeringHardening.httpTimeoutCount ?? 0}\``);
+    lines.push(`- HTTP retry: \`${report.engineeringHardening.httpRetryCount ?? 0}\``);
+    lines.push(`- HTTP 慢操作: \`${report.engineeringHardening.httpSlowOperationCount ?? 0}\``);
+    lines.push(`- 慢操作阈值: \`${report.engineeringHardening.httpSlowThresholdMs ?? 0}ms\``);
+    lines.push(`- 生命周期时序: \`${report.engineeringHardening.hostReadyDurationMs ?? 0}ms / ${report.engineeringHardening.startupDurationMs ?? 0}ms / ${report.engineeringHardening.shutdownDurationMs ?? 0}ms\``);
+    lines.push(`- 生命周期慢操作: \`${report.engineeringHardening.lifecycleSlowOperationCount ?? 0}\``);
+    lines.push(`- 生命周期慢阈值: \`${report.engineeringHardening.lifecycleSlowThresholdMs ?? 0}ms\``);
+    lines.push(`- 最近生命周期慢阶段: \`${report.engineeringHardening.lifecycleLastSlowStage || "-"}\``);
+    lines.push(`- 边界事件: ${(report.engineeringHardening.errorBoundaryEvents || []).map((item) => `${item.event} x${item.count}`).join("；") || "-"}`);
+  }
+
   lines.push("", "## 本地发布矩阵", "");
   if (!report.releaseMatrix?.enabled) {
     lines.push("- 当前档位未启用发布矩阵检查。");
@@ -1065,6 +1082,11 @@ async function main() {
     report.errorMessage = null;
     report.failedStage = null;
   }
+  report.engineeringHardening = summarizeEngineeringHardening({
+    e2e: report.zoteroValidation?.e2e,
+    autofix: report.zoteroValidation?.autofix,
+    gate: report,
+  });
   await fs.mkdir(resolveAgentArtifactsDir(projectRoot), { recursive: true });
   await writeJSONArtifact(gateJSONPath, report);
   await fs.writeFile(gateMDPath, `${buildMarkdown(report)}\n`, "utf-8");

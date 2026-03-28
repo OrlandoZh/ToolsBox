@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { resolveAgentArtifactPath, resolveAgentArtifactsDir } from "./agent-artifacts.mjs";
 import {
@@ -7,14 +8,22 @@ import {
   buildPureVisualReaderFailureSummary,
   buildVisualPrimaryBlockerSummary,
 } from "./agent-zotero-validation-lib.mjs";
+import {
+  buildScriptFailureInfo,
+  createScriptError,
+} from "./script-runtime-lib.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
+const scriptStartedAt = Date.now();
 
-function assert(condition, message) {
+function assert(condition, message, options = {}) {
   if (!condition) {
-    throw new Error(message);
+    throw createScriptError(options.category || "validation", message, {
+      failedStage: options.failedStage || "read-monitor",
+      details: options.details,
+    });
   }
 }
 
@@ -206,6 +215,59 @@ function createFailureRows(reasons) {
   <td>${escapeHTML(reason.reason || "未知")}</td>
   <td>${escapeHTML(reason.count ?? 0)}</td>
 </tr>`).join("\n");
+}
+
+function buildFailureHTML(failureInfo) {
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Agent Dashboard Failed</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: "SF Pro Display", "Helvetica Neue", sans-serif;
+        background: linear-gradient(160deg, #f7f1e7 0%, #f1e1cf 100%);
+        color: #2a1d15;
+      }
+      main {
+        max-width: 720px;
+        margin: 48px auto;
+        padding: 32px;
+        border-radius: 24px;
+        background: rgba(255, 252, 248, 0.9);
+        box-shadow: 0 24px 64px rgba(75, 42, 22, 0.12);
+      }
+      h1 {
+        margin: 0 0 16px;
+        font-size: 32px;
+      }
+      p {
+        line-height: 1.6;
+      }
+      ul {
+        padding-left: 20px;
+      }
+      code {
+        background: rgba(67, 33, 18, 0.08);
+        padding: 2px 6px;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Agent Dashboard 生成失败</h1>
+      <p>当前监控摘要未能成功渲染为仪表板，请先处理下面的失败画像。</p>
+      <ul>
+        <li>分类: <code>${escapeHTML(failureInfo.errorCategoryLabel || failureInfo.errorCategory || "-")}</code></li>
+        <li>阶段: <code>${escapeHTML(failureInfo.failedStage || "-")}</code></li>
+        <li>信息: ${escapeHTML(failureInfo.errorMessage || "-")}</li>
+        <li>耗时: <code>${escapeHTML(`${failureInfo.durationMs ?? 0}ms`)}</code></li>
+      </ul>
+    </main>
+  </body>
+</html>`;
 }
 
 function renderWatchStatus(summary) {
@@ -690,6 +752,54 @@ function renderZoteroValidation(summary) {
       </section>`;
 }
 
+function renderEngineeringHardening(summary) {
+  const hardening = summary.engineeringHardening || null;
+  if (!hardening) {
+    return "";
+  }
+
+  const boundaryText = Array.isArray(hardening.errorBoundaryEvents) && hardening.errorBoundaryEvents.length > 0
+    ? hardening.errorBoundaryEvents.map((item) => `${item.event} x${item.count}`).join("；")
+    : "暂无边界事件";
+  const validationText = Array.isArray(hardening.validationFailureCategories) && hardening.validationFailureCategories.length > 0
+    ? hardening.validationFailureCategories.map((item) => `${item.label} x${item.count}`).join("；")
+    : "未记录新的校验失败";
+  const statusClass = hardening.errorBoundaryHitCount > 0 || Number(hardening.httpTimeoutCount || 0) > 0
+    ? "status-warn"
+    : "status-ok";
+
+  return `<section class="panel full">
+        <h2>工程化硬化信号</h2>
+        <div class="validation-grid">
+          <div class="validation-card">
+            <div class="validation-head">
+              <div class="label">最小摘要</div>
+              <span class="status-pill ${statusClass}">${escapeHTML(hardening.errorBoundaryHitCount > 0 || Number(hardening.httpTimeoutCount || 0) > 0 ? "需关注" : "稳定")}</span>
+            </div>
+            <div class="validation-metrics">
+              <div><span class="label">错误边界命中</span><span class="metric-value">${escapeHTML(hardening.errorBoundaryHitCount ?? 0)}</span></div>
+              <div><span class="label">校验失败来源</span><span class="metric-value">${escapeHTML(hardening.validationFailureCount ?? 0)}</span></div>
+              <div><span class="label">HTTP 请求</span><span class="metric-value">${escapeHTML(hardening.httpRequestCount ?? 0)}</span></div>
+              <div><span class="label">HTTP timeout</span><span class="metric-value">${escapeHTML(hardening.httpTimeoutCount ?? 0)}</span></div>
+              <div><span class="label">HTTP retry</span><span class="metric-value">${escapeHTML(hardening.httpRetryCount ?? 0)}</span></div>
+              <div><span class="label">HTTP 慢操作</span><span class="metric-value">${escapeHTML(hardening.httpSlowOperationCount ?? 0)}</span></div>
+              <div><span class="label">生命周期慢操作</span><span class="metric-value">${escapeHTML(hardening.lifecycleSlowOperationCount ?? 0)}</span></div>
+              <div><span class="label">Host Ready</span><span class="metric-value">${escapeHTML(`${hardening.hostReadyDurationMs ?? 0}ms`)}</span></div>
+              <div><span class="label">Startup</span><span class="metric-value">${escapeHTML(`${hardening.startupDurationMs ?? 0}ms`)}</span></div>
+              <div><span class="label">Shutdown</span><span class="metric-value">${escapeHTML(`${hardening.shutdownDurationMs ?? 0}ms`)}</span></div>
+            </div>
+            <div class="subtle">${escapeHTML(hardening.summary || "暂无工程化硬化摘要")}</div>
+            <div class="subtle">边界事件: ${escapeHTML(boundaryText)}</div>
+            <div class="subtle">校验失败分类: ${escapeHTML(validationText)}</div>
+            <div class="subtle">慢操作阈值: ${escapeHTML(`${hardening.httpSlowThresholdMs ?? 0}ms`)}</div>
+            <div class="subtle">生命周期慢阈值: ${escapeHTML(`${hardening.lifecycleSlowThresholdMs ?? 0}ms`)}</div>
+            <div class="subtle">最近生命周期慢阶段: ${escapeHTML(hardening.lifecycleLastSlowStage || "-")}</div>
+            <div class="subtle">最近 HTTP 错误: ${escapeHTML(`${hardening.httpLastErrorKind || "-"} / ${hardening.httpLastErrorMessage || "-"}`)}</div>
+          </div>
+        </div>
+      </section>`;
+}
+
 function renderAgentMemory(summary) {
   const memory = summary.agentMemory || {};
   const current = memory.currentIncident || null;
@@ -1060,6 +1170,7 @@ function buildDashboardHTML(summary) {
   const recoveryCardSubtle = escapeHTML(summary.zoteroValidation?.watchRecovery?.ageText || "-");
   const frontpageSection = renderFrontpageSummary(summary);
   const validationSection = renderZoteroValidation(summary);
+  const hardeningSection = renderEngineeringHardening(summary);
   const memorySection = renderAgentMemory(summary);
   const releaseMatrixSection = renderReleaseMatrix(summary);
 
@@ -1408,6 +1519,7 @@ function buildDashboardHTML(summary) {
       ${frontpageSection}
       ${watchSection}
       ${validationSection}
+      ${hardeningSection}
       ${memorySection}
       ${releaseMatrixSection}
       <section class="grid">
@@ -1444,7 +1556,12 @@ async function main() {
 
   const source = await fs.readFile(monitorPath, "utf-8");
   const summary = JSON.parse(source);
-  assert(summary && typeof summary === "object", "Invalid monitor summary data");
+  assert(summary && typeof summary === "object", "Invalid monitor summary data", {
+    failedStage: "read-monitor",
+    details: {
+      filePath: monitorPath,
+    },
+  });
 
   const html = buildDashboardHTML(summary);
   await fs.mkdir(resolveAgentArtifactsDir(projectRoot), { recursive: true });
@@ -1452,7 +1569,17 @@ async function main() {
   console.log(`Agent dashboard generated: ${htmlPath}`);
 }
 
-main().catch((error) => {
-  console.error(error?.message || String(error));
+main().catch(async (error) => {
+  const failureInfo = buildScriptFailureInfo(error, {
+    durationMs: Math.max(0, Date.now() - scriptStartedAt),
+  });
+  const htmlPath = resolveAgentArtifactPath(projectRoot, "agent-dashboard.html");
+  try {
+    await fs.mkdir(resolveAgentArtifactsDir(projectRoot), { recursive: true });
+    await fs.writeFile(htmlPath, `${buildFailureHTML(failureInfo)}\n`, "utf-8");
+  } catch {
+    // ignore secondary failure
+  }
+  console.error(`${failureInfo.errorCategoryLabel}: ${failureInfo.errorMessage}`);
   process.exit(1);
 });

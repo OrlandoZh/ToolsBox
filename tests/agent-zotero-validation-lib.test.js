@@ -65,6 +65,34 @@ describe("Agent Zotero Validation Lib", () => {
           serviceUnhealthyCount: 1,
           serviceHealthOK: false,
           serviceStatus: "degraded",
+          httpObserved: true,
+          httpRequestCount: 3,
+          httpSuccessCount: 2,
+          httpFailureCount: 1,
+          httpTimeoutCount: 1,
+          httpRetryCount: 1,
+          httpSlowOperationCount: 1,
+          httpSlowThresholdMs: 1200,
+          httpLastError: {
+            kind: "timeout",
+            message: "HTTP request timed out after 1200ms",
+          },
+          hostReadyDurationMs: 2150,
+          startupDurationMs: 3220,
+          shutdownDurationMs: 980,
+          lifecycleSlowOperationCount: 2,
+          lifecycleSlowThresholdMs: 2000,
+          lifecycleLastSlowStage: "startup",
+          lifecycleBoundaryEvents: [
+            {
+              event: "plugin.start.failed",
+              count: 1,
+            },
+            {
+              event: "plugin.start.cleanup.failed",
+              count: 1,
+            },
+          ],
           readerEventAPIAvailable: true,
           readerEventListenerCount: 8,
           readerEventKnownTypeCount: 8,
@@ -154,7 +182,17 @@ describe("Agent Zotero Validation Lib", () => {
             },
           ],
         },
-        logs: { errorCount: 2, warnCount: 1 },
+        logs: {
+          errorCount: 2,
+          warnCount: 1,
+          errorBoundaryHitCount: 1,
+          errorBoundaryEvents: [
+            {
+              event: "plugin.start.failed",
+              count: 1,
+            },
+          ],
+        },
         visuals: {
           captures: [
             {
@@ -245,6 +283,20 @@ describe("Agent Zotero Validation Lib", () => {
     assert.equal(summary.serviceUnhealthyCount, 1);
     assert.equal(summary.serviceHealthOK, false);
     assert.equal(summary.serviceStatus, "degraded");
+    assert.equal(summary.httpObserved, true);
+    assert.equal(summary.httpTimeoutCount, 1);
+    assert.equal(summary.httpRetryCount, 1);
+    assert.equal(summary.httpSlowOperationCount, 1);
+    assert.equal(summary.hostReadyDurationMs, 2150);
+    assert.equal(summary.startupDurationMs, 3220);
+    assert.equal(summary.shutdownDurationMs, 980);
+    assert.equal(summary.lifecycleSlowOperationCount, 2);
+    assert.equal(summary.lifecycleSlowThresholdMs, 2000);
+    assert.equal(summary.lifecycleLastSlowStage, "startup");
+    assert.equal(summary.lifecycleBoundaryEvents[0]?.event, "plugin.start.failed");
+    assert.equal(summary.lifecycleBoundaryEvents[1]?.event, "plugin.start.cleanup.failed");
+    assert.equal(summary.errorBoundaryHitCount, 1);
+    assert.equal(summary.errorBoundaryEvents[0]?.event, "plugin.start.failed");
     assert.equal(summary.capabilityObserved, true);
     assert.ok(summary.capabilityScenarioBoundTotal >= 7);
     assert.ok(summary.capabilityCoveredCount >= 3);

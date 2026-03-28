@@ -255,7 +255,62 @@ export interface RequestResponse {
   headers: Record<string, string>;
   data: string;
   json?: unknown;
+  diagnostics: HTTPRequestDiagnostics;
   raw: unknown;
+}
+
+export interface HTTPRequestDiagnostics {
+  durationMs: number;
+  attemptCount: number;
+  retryCount: number;
+  retried: boolean;
+  slow: boolean;
+  slowThresholdMs: number;
+  timeout: boolean;
+  errorKind: string | null;
+}
+
+export interface HTTPDiagnosticsSummary {
+  requestCount: number;
+  successCount: number;
+  failureCount: number;
+  timeoutCount: number;
+  retryCount: number;
+  slowOperationCount: number;
+  totalDurationMs: number;
+  averageDurationMs: number;
+  slowThresholdMs: number;
+  lastRequest: {
+    method: string;
+    url: string | null;
+    durationMs: number;
+    attemptCount: number;
+    retryCount: number;
+    ok: boolean;
+    slow: boolean;
+    slowThresholdMs: number;
+    timeout: boolean;
+    status: number | null;
+  } | null;
+  lastError: {
+    kind: string;
+    message: string | null;
+  } | null;
+}
+
+export interface LifecycleBoundaryEvent {
+  event: string;
+  count: number;
+}
+
+export interface AgentLifecycleDiagnostics {
+  hostReadyDurationMs: number;
+  startupDurationMs: number;
+  shutdownDurationMs: number;
+  lifecycleSlowOperationCount: number;
+  lifecycleSlowThresholdMs: number;
+  lifecycleLastSlowStage: string | null;
+  lifecycleBoundaryEvents: LifecycleBoundaryEvent[];
 }
 
 export interface RequestOptions {
@@ -264,6 +319,10 @@ export interface RequestOptions {
   timeout?: number;
   responseType?: string;
   successCodes?: number[];
+  retryCount?: number;
+  retryDelayMs?: number;
+  signal?: AbortSignal | { aborted?: boolean } | null;
+  slowThresholdMs?: number;
 }
 
 export interface HTTP {
@@ -281,6 +340,8 @@ export interface HTTP {
   getJSON<T = unknown>(url: string, options?: RequestOptions): Promise<T>;
   postJSON<T = unknown>(url: string, data: object, options?: RequestOptions): Promise<T>;
   download(url: string, destPath: string, options?: unknown): Promise<boolean>;
+  getDiagnostics(): HTTPDiagnosticsSummary;
+  resetDiagnostics(): void;
   buildQueryString(params: Record<string, unknown>): string;
   parseQueryString(queryString: string): Record<string, string>;
   buildURL(baseUrl: string, path?: string, params?: Record<string, unknown>): string;

@@ -23,6 +23,7 @@ import {
   buildScriptFailureInfo,
   writeJSONArtifact,
 } from "./script-runtime-lib.mjs";
+import { summarizeEngineeringHardening } from "./engineering-hardening-lib.mjs";
 import {
   DEFAULT_WATCH_STALE_AFTER_MINUTES,
   summarizeZoteroWatchStatus,
@@ -487,6 +488,23 @@ function buildMarkdown(summary) {
     lines.push(`- Autofix 失败阶段: \`${summary.zoteroValidation.autofix.failedStage || "-"}\``);
     lines.push(`- Autofix 失败信息: ${summary.zoteroValidation.autofix.errorMessage || "-"}`, "");
   }
+  if (summary.engineeringHardening) {
+    lines.push("### 工程化硬化信号", "");
+    lines.push(`- 摘要: ${summary.engineeringHardening.summary || "-"}`);
+    lines.push(`- 错误边界命中: \`${summary.engineeringHardening.errorBoundaryHitCount ?? 0}\``);
+    lines.push(`- 校验失败分类: \`${summary.engineeringHardening.validationFailureCategories.map((item) => `${item.label} x${item.count}`).join("；") || "-"}\``);
+    lines.push(`- HTTP timeout: \`${summary.engineeringHardening.httpTimeoutCount ?? 0}\``);
+    lines.push(`- HTTP retry: \`${summary.engineeringHardening.httpRetryCount ?? 0}\``);
+    lines.push(`- HTTP 慢操作: \`${summary.engineeringHardening.httpSlowOperationCount ?? 0}\``);
+    lines.push(`- 慢操作阈值: \`${summary.engineeringHardening.httpSlowThresholdMs ?? 0}ms\``);
+    lines.push(`- 生命周期时序: \`${summary.engineeringHardening.hostReadyDurationMs ?? 0}ms / ${summary.engineeringHardening.startupDurationMs ?? 0}ms / ${summary.engineeringHardening.shutdownDurationMs ?? 0}ms\``);
+    lines.push(`- 生命周期慢操作: \`${summary.engineeringHardening.lifecycleSlowOperationCount ?? 0}\``);
+    lines.push(`- 生命周期慢阈值: \`${summary.engineeringHardening.lifecycleSlowThresholdMs ?? 0}ms\``);
+    lines.push(`- 最近生命周期慢阶段: \`${summary.engineeringHardening.lifecycleLastSlowStage || "-"}\``);
+    lines.push(`- 边界事件: \`${(summary.engineeringHardening.errorBoundaryEvents || []).map((item) => `${item.event} x${item.count}`).join("；") || "-"}\``);
+    lines.push(`- 最近 HTTP 错误: \`${summary.engineeringHardening.httpLastErrorKind || "-"}\` / ${summary.engineeringHardening.httpLastErrorMessage || "-"}`);
+    lines.push("");
+  }
   if (summary.zoteroValidation?.watchRecovery?.summaryNote) {
     lines.push(`- 恢复回归说明: ${summary.zoteroValidation.watchRecovery.summaryNote}`, "");
   }
@@ -713,6 +731,11 @@ async function main() {
   const agentMemory = await loadAgentMemorySummary(signalTrends);
   summary.watchStatus = watchStatus;
   summary.zoteroValidation = zoteroValidation;
+  summary.engineeringHardening = summarizeEngineeringHardening({
+    e2e: zoteroValidation.e2e,
+    autofix: zoteroValidation.autofix,
+    gate: gateReport,
+  });
   summary.releaseMatrix = releaseMatrix;
   summary.agentMemory = await writeAgentMemoryArtifacts(projectRoot, agentMemory);
   summary.frontpageSummary = buildMonitorFrontpageSummary(summary);
