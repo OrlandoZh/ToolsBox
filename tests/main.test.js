@@ -5,10 +5,12 @@ import { describe, it, beforeEach, afterEach, assert } from "./test-framework.js
 
 function createDeferred() {
   let resolve;
-  const promise = new Promise((res) => {
+  let reject;
+  const promise = new Promise((res, rej) => {
     resolve = res;
+    reject = rej;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 
 function createConfig() {
@@ -169,5 +171,53 @@ describe("Main Bootstrap", () => {
     assert.equal(preferenceRegistrations.length, 1);
     assert.equal(promptRegistrations.length, 2);
     assert.equal(menuRegistrations.length, 2);
+  });
+
+  it("should clear failed bootstrap state and allow retry", async () => {
+    const { bootstrapPlugin } = await loadMainModule(`bootstrap-retry-${Date.now()}`);
+
+    startupReady.initialization.resolve();
+    startupReady.unlock.resolve();
+    startupReady.uiReady.reject(new Error("ui not ready"));
+    startupReady.uiReady.promise.catch(() => {});
+
+    let caught = null;
+    try {
+      await bootstrapPlugin();
+    } catch (error) {
+      caught = error;
+    }
+
+    assert.ok(caught instanceof Error);
+    assert.equal(caught.message, "ui not ready");
+    assert.equal(globalThis.Zotero.CleanroomTemplate, undefined);
+
+    globalThis.Zotero.uiReadyPromise = Promise.resolve();
+    await bootstrapPlugin();
+
+    assert.ok(globalThis.Zotero.CleanroomTemplate);
+    assert.equal(preferenceRegistrations.length, 1);
+    assert.equal(promptRegistrations.length, 2);
+    assert.equal(menuRegistrations.length, 2);
+  });
+
+  it("should clear cached plugin state on shutdown so bootstrap can mount again", async () => {
+    const { bootstrapPlugin } = await loadMainModule(`bootstrap-shutdown-${Date.now()}`);
+
+    startupReady.initialization.resolve();
+    startupReady.unlock.resolve();
+    startupReady.uiReady.resolve();
+
+    await bootstrapPlugin();
+    const firstInstance = globalThis.Zotero.CleanroomTemplate;
+    await firstInstance.shutdown();
+
+    assert.equal(globalThis.Zotero.CleanroomTemplate, undefined);
+
+    await bootstrapPlugin();
+
+    assert.ok(globalThis.Zotero.CleanroomTemplate);
+    assert.ok(globalThis.Zotero.CleanroomTemplate !== firstInstance);
+    assert.equal(preferenceRegistrations.length, 2);
   });
 });

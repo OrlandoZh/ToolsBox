@@ -22,6 +22,51 @@ function _stringifyConsoleValue(value) {
   }
 }
 
+function _getZotero(chromeGlobal) {
+  if (typeof Zotero !== "undefined" && Zotero) {
+    return Zotero;
+  }
+  return chromeGlobal && chromeGlobal.Zotero
+    ? chromeGlobal.Zotero
+    : null;
+}
+
+function _logBootstrapEvent(level, event, details, chromeGlobal) {
+  var zotero = _getZotero(chromeGlobal);
+  var payload = {
+    event: String(event || "unknown"),
+  };
+
+  if (details && typeof details === "object") {
+    for (var key in details) {
+      if (Object.prototype.hasOwnProperty.call(details, key)) {
+        payload[key] = details[key];
+      }
+    }
+  }
+
+  var message = "[cleanroom.bootstrap] " + payload.event;
+  if (typeof JSON !== "undefined" && JSON && typeof JSON.stringify === "function") {
+    try {
+      message += " " + JSON.stringify(payload);
+    }
+    catch (error) {
+      message += " " + _stringifyConsoleValue(payload);
+    }
+  }
+
+  if (level === "error") {
+    if (zotero && typeof zotero.logError === "function") {
+      zotero.logError(message);
+      return;
+    }
+  }
+
+  if (zotero && typeof zotero.debug === "function") {
+    zotero.debug(message);
+  }
+}
+
 function _createConsoleBridge() {
   if (typeof console !== "undefined") {
     return console;
@@ -30,15 +75,7 @@ function _createConsoleBridge() {
   function emit(level, argsLike) {
     const args = Array.prototype.slice.call(argsLike);
     const message = args.map(_stringifyConsoleValue).join(" ");
-
-    if (level === "error" && Zotero && typeof Zotero.logError === "function") {
-      Zotero.logError(message);
-      return;
-    }
-
-    if (Zotero && typeof Zotero.debug === "function") {
-      Zotero.debug(message);
-    }
+    _logBootstrapEvent(level, "console-bridge." + level, { message: message }, _getChromeGlobal());
   }
 
   return {
@@ -320,13 +357,11 @@ function _installCapabilityWhitelist(pluginScope, chromeGlobal) {
 }
 
 function _emitCapabilityReport(report) {
-  if (!Zotero || typeof Zotero.debug !== "function") {
-    return;
-  }
-
-  Zotero.debug(
-    `[cleanroom.bootstrap] injected=${report.injected.length} skipped=${report.skipped.length} missingRequired=${report.missingRequired.length}`,
-  );
+  _logBootstrapEvent("debug", "capability-report", {
+    injected: report.injected.length,
+    skipped: report.skipped.length,
+    missingRequired: report.missingRequired.length,
+  }, _getChromeGlobal());
 }
 
 function _registerChrome(rootURI, addonRef) {
@@ -340,37 +375,82 @@ function _registerChrome(rootURI, addonRef) {
   ]);
 }
 
+async function _shutdownMountedInstance(chromeGlobal, instanceKey) {
+  var zotero = _getZotero(chromeGlobal);
+  var entry = zotero && instanceKey ? zotero[instanceKey] : null;
+  if (!entry || typeof entry.shutdown !== "function") {
+    return;
+  }
+  await entry.shutdown();
+}
+
+function _cleanupRuntimeBridge(chromeGlobal, instanceKey) {
+  var zotero = _getZotero(chromeGlobal);
+  if (zotero && instanceKey && zotero[instanceKey]) {
+    delete zotero[instanceKey];
+  }
+  delete chromeGlobal.__CLEANROOM_TEMPLATE_RUNTIME__;
+  delete chromeGlobal.__CLEANROOM_TEMPLATE_CONFIG__;
+
+  if (chromeHandle) {
+    chromeHandle.destruct();
+    chromeHandle = null;
+  }
+}
+
 async function startup({ rootURI }, reason) {
   const meta = {
     addonRef: "__ADDON_REF__",
   };
   const chromeGlobal = _getChromeGlobal();
+  const instanceKey = "__INSTANCE_KEY__";
 
-  chromeHandle = _registerChrome(rootURI, meta.addonRef);
+  try {
+    chromeHandle = _registerChrome(rootURI, meta.addonRef);
 
-  const pluginScope = {
-    rootURI,
-  };
-  const capabilityReport = _installCapabilityWhitelist(pluginScope, chromeGlobal);
+    const pluginScope = {
+      rootURI,
+    };
+    const capabilityReport = _installCapabilityWhitelist(pluginScope, chromeGlobal);
 
-  pluginScope.__CLEANROOM_TEMPLATE_RUNTIME__ = {
-    rootURI,
-    capabilityReport,
-  };
-  chromeGlobal.__CLEANROOM_TEMPLATE_RUNTIME__ = pluginScope.__CLEANROOM_TEMPLATE_RUNTIME__;
-  _emitCapabilityReport(capabilityReport);
+    pluginScope.__CLEANROOM_TEMPLATE_RUNTIME__ = {
+      rootURI,
+      capabilityReport,
+    };
+    chromeGlobal.__CLEANROOM_TEMPLATE_RUNTIME__ = pluginScope.__CLEANROOM_TEMPLATE_RUNTIME__;
+    _emitCapabilityReport(capabilityReport);
 
-  Services.scriptloader.loadSubScript(
-    `${rootURI}content/scripts/${meta.addonRef}.js`,
-    pluginScope,
-  );
+    Services.scriptloader.loadSubScript(
+      `${rootURI}content/scripts/${meta.addonRef}.js`,
+      pluginScope,
+    );
 
-  if (pluginScope.__CLEANROOM_TEMPLATE_CONFIG__) {
-    chromeGlobal.__CLEANROOM_TEMPLATE_CONFIG__ = pluginScope.__CLEANROOM_TEMPLATE_CONFIG__;
+    if (pluginScope.__CLEANROOM_TEMPLATE_CONFIG__) {
+      chromeGlobal.__CLEANROOM_TEMPLATE_CONFIG__ = pluginScope.__CLEANROOM_TEMPLATE_CONFIG__;
+    }
+
+    if (typeof pluginScope.bootstrapPlugin === "function") {
+      await pluginScope.bootstrapPlugin();
+    }
   }
-
-  if (typeof pluginScope.bootstrapPlugin === "function") {
-    await pluginScope.bootstrapPlugin();
+  catch (error) {
+    _logBootstrapEvent("error", "startup.failed", {
+      reason: reason,
+      rootURI: rootURI,
+      instanceKey: instanceKey,
+      message: String(error && error.message ? error.message : error),
+    }, chromeGlobal);
+    try {
+      await _shutdownMountedInstance(chromeGlobal, instanceKey);
+    }
+    catch (shutdownError) {
+      _logBootstrapEvent("error", "startup.cleanup.failed", {
+        instanceKey: instanceKey,
+        message: String(shutdownError && shutdownError.message ? shutdownError.message : shutdownError),
+      }, chromeGlobal);
+    }
+    _cleanupRuntimeBridge(chromeGlobal, instanceKey);
+    throw error;
   }
 }
 
@@ -395,17 +475,24 @@ async function shutdown(data, reason) {
 
   const instanceKey = "__INSTANCE_KEY__";
   const chromeGlobal = _getChromeGlobal();
+  let shutdownError = null;
 
-  if (Zotero[instanceKey] && typeof Zotero[instanceKey].shutdown === "function") {
-    await Zotero[instanceKey].shutdown();
-    delete Zotero[instanceKey];
+  try {
+    await _shutdownMountedInstance(chromeGlobal, instanceKey);
+  }
+  catch (error) {
+    shutdownError = error;
+    _logBootstrapEvent("error", "shutdown.failed", {
+      reason: reason,
+      instanceKey: instanceKey,
+      message: String(error && error.message ? error.message : error),
+    }, chromeGlobal);
+  }
+  finally {
+    _cleanupRuntimeBridge(chromeGlobal, instanceKey);
   }
 
-  delete chromeGlobal.__CLEANROOM_TEMPLATE_RUNTIME__;
-  delete chromeGlobal.__CLEANROOM_TEMPLATE_CONFIG__;
-
-  if (chromeHandle) {
-    chromeHandle.destruct();
-    chromeHandle = null;
+  if (shutdownError) {
+    throw shutdownError;
   }
 }

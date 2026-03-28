@@ -44,6 +44,10 @@ import {
   summarizeVisualBaselineEntries,
 } from "./agent-zotero-visual-lib.mjs";
 import {
+  normalizeCaptureWindowBounds,
+  resolveCaptureWindowBounds,
+} from "./agent-zotero-capture-window-lib.mjs";
+import {
   assertScript,
   buildScriptFailureInfo,
   createScriptError,
@@ -877,6 +881,45 @@ async function activateZoteroWindowForCapture(activationDelayMs = VISUAL_CAPTURE
   await sleep(Math.max(0, Number(activationDelayMs || 0)));
 }
 
+async function focusChromeCaptureWindow({ rdp, geometry = VISUAL_CAPTURE_WINDOW_GEOMETRY }) {
+  if (!rdp) {
+    return null;
+  }
+
+  const width = Number.parseInt(String(geometry?.width || VISUAL_CAPTURE_WINDOW_GEOMETRY.width), 10);
+  const height = Number.parseInt(String(geometry?.height || VISUAL_CAPTURE_WINDOW_GEOMETRY.height), 10);
+  const rawResult = await rdp.evaluateInChrome(`(() => {
+    const targetWindow = typeof Zotero?.getMainWindow === "function"
+      ? Zotero.getMainWindow()
+      : null;
+    if (!targetWindow) {
+      return null;
+    }
+
+    try {
+      targetWindow.focus();
+    } catch {}
+
+    try {
+      if (typeof targetWindow.resizeTo === "function" && ${Number.isFinite(width) ? width : 0} > 0 && ${Number.isFinite(height) ? height : 0} > 0) {
+        targetWindow.resizeTo(${Number.isFinite(width) ? width : 0}, ${Number.isFinite(height) ? height : 0});
+      }
+    } catch {}
+
+    const chromeWindow = targetWindow.top || targetWindow;
+    return {
+      x: Number(chromeWindow.screenX),
+      y: Number(chromeWindow.screenY),
+      width: Number(chromeWindow.outerWidth),
+      height: Number(chromeWindow.outerHeight),
+      title: String(chromeWindow.document?.title || targetWindow.document?.title || ""),
+      source: "chrome-target",
+    };
+  })()`);
+
+  return normalizeCaptureWindowBounds(parseChromeEvalResult(rawResult));
+}
+
 async function setZoteroWindowGeometry(geometry = VISUAL_CAPTURE_WINDOW_GEOMETRY) {
   const width = Number.parseInt(String(geometry?.width || VISUAL_CAPTURE_WINDOW_GEOMETRY.width), 10);
   const height = Number.parseInt(String(geometry?.height || VISUAL_CAPTURE_WINDOW_GEOMETRY.height), 10);
@@ -913,9 +956,22 @@ async function ensureZoteroWindowReadyForCapture(options = {}) {
   const settleDelayMs = Number.isFinite(options.settleDelayMs) && options.settleDelayMs >= 0
     ? options.settleDelayMs
     : 0;
+  const geometry = options.geometry || VISUAL_CAPTURE_WINDOW_GEOMETRY;
 
   await activateZoteroWindowForCapture(activationDelayMs);
-  const bounds = await setZoteroWindowGeometry(options.geometry || VISUAL_CAPTURE_WINDOW_GEOMETRY);
+  const initialChromeBounds = await focusChromeCaptureWindow({
+    rdp: options.rdp,
+    geometry,
+  }).catch(() => null);
+  const fallbackBounds = await setZoteroWindowGeometry(geometry).catch(() => null);
+  const refreshedChromeBounds = await focusChromeCaptureWindow({
+    rdp: options.rdp,
+    geometry,
+  }).catch(() => null);
+  const bounds = await resolveCaptureWindowBounds({
+    preferred: async () => refreshedChromeBounds || initialChromeBounds,
+    fallback: async () => fallbackBounds,
+  });
   await sleep(settleDelayMs);
   return bounds;
 }
@@ -1042,6 +1098,7 @@ async function captureStableVisualStage({
     // drift away from the intended library/reader surface while the UI settles.
     state = await prepareVisualState({ rdp, config, stage });
     const bounds = await ensureZoteroWindowReadyForCapture({
+      rdp,
       geometry: policy.targetWindowGeometry,
       activationDelayMs: policy.activationDelayMs,
       settleDelayMs: attempt === 1 ? warmupMs : Number(policy.betweenAttemptsMs || 0),

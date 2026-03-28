@@ -47,6 +47,20 @@ function createBootstrapHarness(options = {}) {
       },
       scriptloader: {
         loadSubScript(scriptURI, scope) {
+          if (typeof options.loadSubScript === "function") {
+            options.loadSubScript({
+              scope,
+              chromeGlobal,
+              onBootstrap() {
+                bootstrapInvoked += 1;
+              },
+              onPluginShutdown() {
+                pluginShutdowns += 1;
+              },
+            });
+            return;
+          }
+
           scope.__CLEANROOM_TEMPLATE_CONFIG__ = {
             instanceKey: "CleanroomTemplate",
           };
@@ -197,5 +211,79 @@ describe("Bootstrap Bridge", () => {
     );
     assert.equal(harness.debugLogs.length, 1);
     assert.deepEqual(harness.errorLogs, []);
+  });
+
+  it("should cleanup globals and chrome handle when startup fails", async () => {
+    const harness = createBootstrapHarness({
+      loadSubScript({ scope, chromeGlobal, onBootstrap, onPluginShutdown }) {
+        scope.__CLEANROOM_TEMPLATE_CONFIG__ = {
+          instanceKey: "CleanroomTemplate",
+        };
+        scope.bootstrapPlugin = async () => {
+          onBootstrap();
+          chromeGlobal.Zotero.CleanroomTemplate = {
+            api: {},
+            async shutdown() {
+              onPluginShutdown();
+            },
+          };
+          throw new Error("bootstrap failed");
+        };
+      },
+    });
+
+    let caught = null;
+    try {
+      await harness.context.startup({ rootURI: "resource://cleanroom/" }, 0);
+    } catch (error) {
+      caught = error;
+    }
+
+    assert.ok(caught instanceof Error);
+    assert.equal(caught.message, "bootstrap failed");
+    assert.equal(harness.pluginShutdowns, 1);
+    assert.equal(harness.destructCalls, 1);
+    assert.equal(harness.chromeGlobal.__CLEANROOM_TEMPLATE_RUNTIME__, undefined);
+    assert.equal(harness.chromeGlobal.__CLEANROOM_TEMPLATE_CONFIG__, undefined);
+    assert.equal(harness.chromeGlobal.Zotero.CleanroomTemplate, undefined);
+    assert.ok(harness.errorLogs.some((item) => item.includes("startup.failed")));
+  });
+
+  it("should cleanup runtime bridge even when mounted shutdown throws", async () => {
+    const harness = createBootstrapHarness({
+      loadSubScript({ scope, chromeGlobal, onBootstrap, onPluginShutdown }) {
+        scope.__CLEANROOM_TEMPLATE_CONFIG__ = {
+          instanceKey: "CleanroomTemplate",
+        };
+        scope.bootstrapPlugin = async () => {
+          onBootstrap();
+          chromeGlobal.Zotero.CleanroomTemplate = {
+            api: {},
+            async shutdown() {
+              onPluginShutdown();
+              throw new Error("shutdown failed");
+            },
+          };
+        };
+      },
+    });
+
+    await harness.context.startup({ rootURI: "resource://cleanroom/" }, 0);
+
+    let caught = null;
+    try {
+      await harness.context.shutdown({}, 0);
+    } catch (error) {
+      caught = error;
+    }
+
+    assert.ok(caught instanceof Error);
+    assert.equal(caught.message, "shutdown failed");
+    assert.equal(harness.pluginShutdowns, 1);
+    assert.equal(harness.destructCalls, 1);
+    assert.equal(harness.chromeGlobal.__CLEANROOM_TEMPLATE_RUNTIME__, undefined);
+    assert.equal(harness.chromeGlobal.__CLEANROOM_TEMPLATE_CONFIG__, undefined);
+    assert.equal(harness.chromeGlobal.Zotero.CleanroomTemplate, undefined);
+    assert.ok(harness.errorLogs.some((item) => item.includes("shutdown.failed")));
   });
 });
