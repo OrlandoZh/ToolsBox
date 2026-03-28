@@ -68,7 +68,7 @@ describe("Documentation Consistency", () => {
     });
   });
 
-  it("should keep current truth aligned with the fresh passed state and next priority", () => {
+  it("should keep current truth aligned with the fresh blocked state and next priority", () => {
     const summary = readCurrentTruthSummary(process.cwd());
     const backlog = readDoc("docs/CURRENT_BACKLOG.md");
     const readme = readDoc("README.md");
@@ -78,27 +78,25 @@ describe("Documentation Consistency", () => {
     const legal = readDoc("LEGAL_RISK_CHECKLIST.md");
 
     assert.ok(summary.includes("`ENG-HIGH-103`"));
-    assert.ok(summary.includes("工程化长期增强第一批"));
-    assert.ok(summary.includes("`READER-HIGH-123`"));
-    assert.ok(summary.includes("`ENG-HIGH-102 / ENG-LOW-204~206`"));
-    assert.ok(summary.includes("`ENG-LOW-210`"));
-    assert.ok(summary.includes("`2026-03-28T14:55:58.302Z`"));
-    assert.ok(summary.includes("`2026-03-28T14:56:25.560Z`"));
-    assert.ok(summary.includes("`2026-03-28T15:04:14.396Z`"));
-    assert.ok(summary.includes("`2026-03-28T15:04:14.471Z`"));
-    assert.ok(summary.includes("`gatePassed=true`"));
-    assert.ok(summary.includes("`agent:monitor` 前页状态为 `stable`"));
-    assert.ok(summary.includes("`agent:zotero:e2e` 为 `passed`"));
-    assert.ok(summary.includes("`agent:gate` 当前已通过"));
-    assert.ok(summary.includes("共享失败模型"));
+    assert.ok(summary.includes("`98%`"));
+    assert.ok(summary.includes("`49da303`"));
+    assert.ok(summary.includes("`27418fb`"));
+    assert.ok(summary.includes("`0aa9b4a`"));
+    assert.ok(summary.includes("`be15a92`"));
+    assert.ok(summary.includes("`2026-03-28T15:57:56.441Z`"));
+    assert.ok(summary.includes("`2026-03-28T16:04:08.529Z`"));
+    assert.ok(summary.includes("`2026-03-28T16:04:08.616Z`"));
+    assert.ok(summary.includes("`gatePassed=false`"));
+    assert.ok(summary.includes("`agent:monitor` 前页状态为 `attention`"));
+    assert.ok(summary.includes("`agent:zotero:e2e` 为 `failed`"));
+    assert.ok(summary.includes("`agent:gate` 当前阻断"));
+    assert.ok(summary.includes("`capture-unstable`"));
+    assert.ok(summary.includes("single-source truth / backlog"));
     assert.ok(summary.includes("远端 `updateURL` 闭环验证"));
     assert.ok(summary.includes("`release-only` 人工流程"));
-    assert.ok(summary.includes("工程化维护文档与自动同步机制"));
-    assert.ok(summary.includes("clean-room 治理与文档守卫"));
-    assert.ok(summary.includes("bootstrap 与采集稳定性"));
-    assert.ok(summary.includes("HTTP / release / agent 摘要 hardening"));
-    assert.equal(summary.includes("`gatePassed=false`"), false);
-    assert.equal(summary.includes("当前更准确的主阻断归因为 `capture-unstable`"), false);
+    assert.ok(summary.includes("capture 稳定性批次"));
+    assert.equal(summary.includes("`gatePassed=true`"), false);
+    assert.equal(summary.includes("工程化维护文档与自动同步机制"), false);
 
     assert.ok(backlog.includes("<!-- CURRENT-TRUTH-SUMMARY:START -->"));
     assert.ok(readme.includes("<!-- CURRENT-TRUTH-SUMMARY:START -->"));
@@ -123,8 +121,8 @@ describe("Documentation Consistency", () => {
     assert.ok(assessment.includes("`READER-HIGH-123` 已完成唯一分支收口，并转为历史契约源"));
     assert.ok(assessment.includes("`AGENT_OBSIDIAN_VISUALS=1`"));
     assert.ok(roadmap.includes("`AGENT_OBSIDIAN_VISUALS=1`"));
-    assert.equal(readme.includes("`agent:zotero:e2e` 为 `failed`"), false);
-    assert.equal(assessment.includes("`agent:gate` 当前未通过"), false);
-    assert.equal(roadmap.includes("`gatePassed=false`"), false);
+    assert.equal(readme.includes("`agent:gate` 当前已通过"), false);
+    assert.equal(assessment.includes("`gatePassed=true`"), false);
+    assert.equal(roadmap.includes("`capture-unstable` 不再是 fresh 主阻断"), false);
   });
 });
