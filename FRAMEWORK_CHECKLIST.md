@@ -14,13 +14,14 @@
 - 当前“完成度 / 当前主线 / 当前剩余项”只认 `docs/CURRENT_BACKLOG.md` 的“当前单一事实源”；Checklist 只确认资产与链路是否齐备，不再自己冻结另一套 current truth。
 
 <!-- CURRENT-TRUTH-SUMMARY:START -->
-- 当前真实完成度约为 `97%`；仓库已可继续开发，但 `ENG-HIGH-103` 仍未正式收口
-- 当前唯一主线批次已固定为 `ENG-HIGH-103`（工程化长期增强第一批）；`READER-HIGH-123`、`ENG-HIGH-102 / ENG-LOW-204~206` 继续只保留为历史契约 / review artifact 来源
-- 当前 `ENG-LOW-207`、`ENG-LOW-208`、`ENG-LOW-209` 已完成本地 milestone commit；`ENG-LOW-210` 暂未提交，需等待 fresh evidence 与文档 truth 一致后再收口
-- `2026-03-28` 最新 fresh 证据显示：`watch` 为 `healthy`（`2026-03-28T11:47:43.237Z`），`agent:zotero:e2e` 为 `failed`（`2026-03-28T11:50:18.315Z`），`agent:gate` 当前未通过（`2026-03-28T11:51:26.793Z`，`gatePassed=false`）
-- 当前更准确的主阻断归因为 `capture-unstable`：`library` / `reader` 几何仍对齐 `2000x1200`，但视觉采集未稳定；当前应先重跑 `npm run agent:zotero:e2e`，暂不进入 baseline refresh、autofix 或 obsidian-first
+- 当前真实完成度约为 `97%`；仓库已可继续开发，`ENG-HIGH-103` 的 fresh 收口验证已完成
+- 当前唯一主线批次仍以 `ENG-HIGH-103`（工程化长期增强第一批）作为最近一轮工程化事实源；`READER-HIGH-123`、`ENG-HIGH-102 / ENG-LOW-204~206` 继续只保留为历史契约 / review artifact 来源
+- 当前 `ENG-LOW-207`、`ENG-LOW-208`、`ENG-LOW-209` 已完成本地 milestone commit；`ENG-LOW-210` 的文档 / 守卫测试收口现已满足本地 `batch-closure` 条件
+- `2026-03-28` 最新 fresh 证据链已确认：`watch` 为 `healthy`（`2026-03-28T14:55:58.302Z`），`agent:zotero:e2e` 为 `passed`（`2026-03-28T14:56:25.560Z`），`agent:monitor` 前页状态为 `stable`（`2026-03-28T15:04:14.396Z`），`agent:gate` 当前已通过（`2026-03-28T15:04:14.471Z`，`gatePassed=true`）
+- 当前未观察到新的真实回归；`capture-unstable` 不再是 fresh 主阻断，本轮不重开 baseline refresh、autofix 或 obsidian-first 分支
 - 当前主线只做：runtime 生命周期错误边界与轻量时序遥测、剩余核心脚本入口的共享失败模型、`engineeringHardening` 的 lifecycle/perf 最小摘要、manifest / 文档 / docs consistency 的单一事实源收口
-- 当前明确继续延后：远端发布编排、远端 `updateURL` 闭环验证、下一轮 Reader 更深事件点、`P1` 白名单扩面；除非 fresh `watch -> e2e -> gate` 重新出现真实回归
+- 当前未提交的新增工程化改动默认拆分为三组后续维护：`clean-room 治理与文档守卫`、`bootstrap 与采集稳定性`、`HTTP / release / agent 摘要 hardening`；后续单独推进，不并回 `ENG-HIGH-103`
+- 当前明确继续延后：远端发布编排、远端 `updateURL` 闭环验证、下一轮 Reader 更深事件点、`P1` 白名单扩面；除非 future fresh `watch -> e2e -> gate` 重新出现真实回归
 - `LEGAL_RISK_CHECKLIST.md` 中的 Release Gate 继续保持 `release-only` 人工流程，不纳入本批自动化完成定义
 - 当前批次收口后，默认下一优先级固定为 `工程化维护文档与自动同步机制`
 <!-- CURRENT-TRUTH-SUMMARY:END -->

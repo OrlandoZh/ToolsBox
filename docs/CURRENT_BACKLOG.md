@@ -32,9 +32,9 @@
 
 当前主要后续方向集中在：
 
-1. 按 `ENG-HIGH-103 -> ENG-LOW-207 / ENG-LOW-208 -> ENG-LOW-209 -> ENG-LOW-210` 的顺序收口当前工程化长期增强第一批
-2. 合并前保持 `watch -> e2e -> monitor -> gate` 的 fresh 证据链可重放；如未来出现新的 Reader 差异，必须基于 fresh evidence 重新开新的高逻辑批次
-3. 保留 Obsidian 三模板 verdict 机制作为长期人工兜底，但当前不再把它当作唯一剩余主线
+1. `clean-room 治理与文档守卫`
+2. `bootstrap 与采集稳定性`
+3. `HTTP / release / agent 摘要 hardening`
 
 说明：
 
@@ -212,13 +212,14 @@
 以下摘要块会同步到 README、Checklist、Assessment、Roadmap，对外复述“当前 truth”时只改这里。
 
 <!-- CURRENT-TRUTH-SUMMARY:START -->
-- 当前真实完成度约为 `97%`；仓库已可继续开发，但 `ENG-HIGH-103` 仍未正式收口
-- 当前唯一主线批次已固定为 `ENG-HIGH-103`（工程化长期增强第一批）；`READER-HIGH-123`、`ENG-HIGH-102 / ENG-LOW-204~206` 继续只保留为历史契约 / review artifact 来源
-- 当前 `ENG-LOW-207`、`ENG-LOW-208`、`ENG-LOW-209` 已完成本地 milestone commit；`ENG-LOW-210` 暂未提交，需等待 fresh evidence 与文档 truth 一致后再收口
-- `2026-03-28` 最新 fresh 证据显示：`watch` 为 `healthy`（`2026-03-28T11:47:43.237Z`），`agent:zotero:e2e` 为 `failed`（`2026-03-28T11:50:18.315Z`），`agent:gate` 当前未通过（`2026-03-28T11:51:26.793Z`，`gatePassed=false`）
-- 当前更准确的主阻断归因为 `capture-unstable`：`library` / `reader` 几何仍对齐 `2000x1200`，但视觉采集未稳定；当前应先重跑 `npm run agent:zotero:e2e`，暂不进入 baseline refresh、autofix 或 obsidian-first
+- 当前真实完成度约为 `97%`；仓库已可继续开发，`ENG-HIGH-103` 的 fresh 收口验证已完成
+- 当前唯一主线批次仍以 `ENG-HIGH-103`（工程化长期增强第一批）作为最近一轮工程化事实源；`READER-HIGH-123`、`ENG-HIGH-102 / ENG-LOW-204~206` 继续只保留为历史契约 / review artifact 来源
+- 当前 `ENG-LOW-207`、`ENG-LOW-208`、`ENG-LOW-209` 已完成本地 milestone commit；`ENG-LOW-210` 的文档 / 守卫测试收口现已满足本地 `batch-closure` 条件
+- `2026-03-28` 最新 fresh 证据链已确认：`watch` 为 `healthy`（`2026-03-28T14:55:58.302Z`），`agent:zotero:e2e` 为 `passed`（`2026-03-28T14:56:25.560Z`），`agent:monitor` 前页状态为 `stable`（`2026-03-28T15:04:14.396Z`），`agent:gate` 当前已通过（`2026-03-28T15:04:14.471Z`，`gatePassed=true`）
+- 当前未观察到新的真实回归；`capture-unstable` 不再是 fresh 主阻断，本轮不重开 baseline refresh、autofix 或 obsidian-first 分支
 - 当前主线只做：runtime 生命周期错误边界与轻量时序遥测、剩余核心脚本入口的共享失败模型、`engineeringHardening` 的 lifecycle/perf 最小摘要、manifest / 文档 / docs consistency 的单一事实源收口
-- 当前明确继续延后：远端发布编排、远端 `updateURL` 闭环验证、下一轮 Reader 更深事件点、`P1` 白名单扩面；除非 fresh `watch -> e2e -> gate` 重新出现真实回归
+- 当前未提交的新增工程化改动默认拆分为三组后续维护：`clean-room 治理与文档守卫`、`bootstrap 与采集稳定性`、`HTTP / release / agent 摘要 hardening`；后续单独推进，不并回 `ENG-HIGH-103`
+- 当前明确继续延后：远端发布编排、远端 `updateURL` 闭环验证、下一轮 Reader 更深事件点、`P1` 白名单扩面；除非 future fresh `watch -> e2e -> gate` 重新出现真实回归
 - `LEGAL_RISK_CHECKLIST.md` 中的 Release Gate 继续保持 `release-only` 人工流程，不纳入本批自动化完成定义
 - 当前批次收口后，默认下一优先级固定为 `工程化维护文档与自动同步机制`
 <!-- CURRENT-TRUTH-SUMMARY:END -->
@@ -440,18 +441,19 @@
 
 - 避免“代码已前进，但文档还在旧阶段”
 - 避免把下一阶段增强项误判为“基础框架未完成”
-- 当前正式文档与 docs consistency 已同步到“`ENG-HIGH-103` 为当前 active 高逻辑批次、`READER-HIGH-123` 仅保留为历史契约源”口径
+- 当前正式文档与 docs consistency 已同步到“`ENG-HIGH-103` 已完成 fresh 收口验证、`READER-HIGH-123` 仅保留为历史契约源”口径
 
 ## 建议执行顺序
 
 当前阶段的固定顺序为：
 
-1. 先按 `ENG-HIGH-103 -> ENG-LOW-207 / ENG-LOW-208 -> ENG-LOW-209 -> ENG-LOW-210` 收口当前批次
-2. 合并前补跑 `npm run check`、`npm run release:preflight`、`npm run agent:dashboard`、`npm run agent:monitor`、`npm run agent:gate`
-3. 若 future fresh `watch -> e2e -> gate` 指向真实回归或证据不足，再由 Codex 新开唯一后续高逻辑批次
+1. 保持 `watch -> e2e -> monitor -> gate` 的 fresh 证据链可重放；如 truth 变化，优先只改 `docs/CURRENT_BACKLOG.md` 的单一事实源摘要
+2. 按 `clean-room 治理与文档守卫`、`bootstrap 与采集稳定性`、`HTTP / release / agent 摘要 hardening` 三组拆分当前工程化维护改动
+3. 各组分别跑聚焦验证，合并前统一补跑 `npm run check`、`npm run release:preflight`、`npm run agent:dashboard`、`npm run agent:monitor`、`npm run agent:gate`
+4. 若 future fresh `watch -> e2e -> gate` 指向真实回归或证据不足，再由 Codex 新开唯一后续高逻辑批次
 
-当前 `READER-HIGH-123` 已收尾完成并转为历史契约源；当前唯一剩余主线是 `ENG-HIGH-103` 的工程化长期增强第一批。
-当前批次正式收口后的默认下一优先级，已并入“当前单一事实源”小节；后续引用时不再跨段落复制第二套口径。
+当前 `READER-HIGH-123` 已收尾完成并转为历史契约源；`ENG-HIGH-103` 的本轮收口验证也已完成。
+下一步默认进入工程化维护分组，而不是重开 Reader / `P1` / 远端发布批次；当前批次正式收口后的默认下一优先级，已并入“当前单一事实源”小节。
 
 ## 当前不必重复投入的部分
 
@@ -465,10 +467,12 @@
 
 ## 总结
 
-当前项目真正的下一步已经固定为 `ENG-HIGH-103`（工程化长期增强第一批），而不是重新开 `P1` 或 Reader 扩面批次：
+当前项目已经完成 `ENG-HIGH-103` 的本轮收口；下一步固定转入三组工程化维护，而不是重新开 `P1` 或 Reader 扩面批次：
 
-- 给插件运行时和脚本入口补统一错误边界，保证 startup / shutdown / agent CLI / monitor / gate / obsidian 的失败都能落入稳定分类
-- 把脚本参数、环境变量、配置值校验收敛到共享校验层，优先覆盖 `zotero / e2e / autofix / release / obsidian` 入口
-- 给 HTTP 层补默认 timeout、可选 retry / cancel、慢操作统计和标准化 timeout 错误，并把最小摘要接入 `agent:monitor` / `agent:dashboard` / `agent:gate`
-- 用 docs consistency 守住当前完成度、剩余项、`release-only` legal gate 与工程化欠账的单一事实源
+- `clean-room 治理与文档守卫`
+  - 用 docs consistency、`cleanroom:audit` / `cleanroom:sim`、`run-all completeness` 与 `release-only` legal gate 守住单一事实源和开发态门禁
+- `bootstrap 与采集稳定性`
+  - 继续稳住 bootstrap bridge、static runtime baseline、capture window 解析与视觉采集相关守卫，不改产品功能面
+- `HTTP / release / agent 摘要 hardening`
+  - 继续补 HTTP timeout / retry / cancel / 慢操作摘要，以及 release metadata / preflight / prepare 与 monitor / dashboard / gate / obsidian / watch recovery / e2e 的联动可解释性
 - 远端发布编排、远端 `updateURL`、Reader 更深事件点与 `P1` 扩面继续延后，除非 fresh evidence 重新打开新的高逻辑批次

@@ -68,7 +68,7 @@ describe("Documentation Consistency", () => {
     });
   });
 
-  it("should keep current truth aligned with the fresh blocker state and next priority", () => {
+  it("should keep current truth aligned with the fresh passed state and next priority", () => {
     const summary = readCurrentTruthSummary(process.cwd());
     const backlog = readDoc("docs/CURRENT_BACKLOG.md");
     const readme = readDoc("README.md");
@@ -82,18 +82,23 @@ describe("Documentation Consistency", () => {
     assert.ok(summary.includes("`READER-HIGH-123`"));
     assert.ok(summary.includes("`ENG-HIGH-102 / ENG-LOW-204~206`"));
     assert.ok(summary.includes("`ENG-LOW-210`"));
-    assert.ok(summary.includes("`2026-03-28T11:47:43.237Z`"));
-    assert.ok(summary.includes("`2026-03-28T11:50:18.315Z`"));
-    assert.ok(summary.includes("`2026-03-28T11:51:26.793Z`"));
-    assert.ok(summary.includes("`gatePassed=false`"));
-    assert.ok(summary.includes("`capture-unstable`"));
-    assert.ok(summary.includes("`npm run agent:zotero:e2e`"));
+    assert.ok(summary.includes("`2026-03-28T14:55:58.302Z`"));
+    assert.ok(summary.includes("`2026-03-28T14:56:25.560Z`"));
+    assert.ok(summary.includes("`2026-03-28T15:04:14.396Z`"));
+    assert.ok(summary.includes("`2026-03-28T15:04:14.471Z`"));
+    assert.ok(summary.includes("`gatePassed=true`"));
+    assert.ok(summary.includes("`agent:monitor` 前页状态为 `stable`"));
+    assert.ok(summary.includes("`agent:zotero:e2e` 为 `passed`"));
+    assert.ok(summary.includes("`agent:gate` 当前已通过"));
     assert.ok(summary.includes("共享失败模型"));
     assert.ok(summary.includes("远端 `updateURL` 闭环验证"));
     assert.ok(summary.includes("`release-only` 人工流程"));
     assert.ok(summary.includes("工程化维护文档与自动同步机制"));
-    assert.equal(summary.includes("`agent:zotero:e2e` 为 `passed`"), false);
-    assert.equal(summary.includes("`agent:gate` 为 `passed`"), false);
+    assert.ok(summary.includes("clean-room 治理与文档守卫"));
+    assert.ok(summary.includes("bootstrap 与采集稳定性"));
+    assert.ok(summary.includes("HTTP / release / agent 摘要 hardening"));
+    assert.equal(summary.includes("`gatePassed=false`"), false);
+    assert.equal(summary.includes("当前更准确的主阻断归因为 `capture-unstable`"), false);
 
     assert.ok(backlog.includes("<!-- CURRENT-TRUTH-SUMMARY:START -->"));
     assert.ok(readme.includes("<!-- CURRENT-TRUTH-SUMMARY:START -->"));
@@ -103,7 +108,7 @@ describe("Documentation Consistency", () => {
     assert.ok(legal.includes("## Release Gate (release-only)"));
   });
 
-  it("should keep historical closure facts while avoiding stale fresh-passed wording", () => {
+  it("should keep historical closure facts while avoiding stale failed wording", () => {
     const backlog = readDoc("docs/CURRENT_BACKLOG.md");
     const readme = readDoc("README.md");
     const assessment = readDoc("FRAMEWORK_ASSESSMENT.md");
@@ -118,8 +123,8 @@ describe("Documentation Consistency", () => {
     assert.ok(assessment.includes("`READER-HIGH-123` 已完成唯一分支收口，并转为历史契约源"));
     assert.ok(assessment.includes("`AGENT_OBSIDIAN_VISUALS=1`"));
     assert.ok(roadmap.includes("`AGENT_OBSIDIAN_VISUALS=1`"));
-    assert.equal(readme.includes("`agent:zotero:e2e` 为 passed"), false);
-    assert.equal(assessment.includes("`agent:zotero:e2e` 与 `agent:gate` 均为 passed"), false);
-    assert.equal(roadmap.includes("`watch / e2e / gate` 当前均为 passed"), false);
+    assert.equal(readme.includes("`agent:zotero:e2e` 为 `failed`"), false);
+    assert.equal(assessment.includes("`agent:gate` 当前未通过"), false);
+    assert.equal(roadmap.includes("`gatePassed=false`"), false);
   });
 });
