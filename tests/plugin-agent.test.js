@@ -205,6 +205,20 @@ describe("Plugin Agent", () => {
           missingRequired: [],
         },
       },
+      getLifecycleTelemetrySummary() {
+        return {
+          hostReadyDurationMs: 2150,
+          startupDurationMs: 3180,
+          shutdownDurationMs: 920,
+          lifecycleSlowOperationCount: 2,
+          lifecycleSlowThresholdMs: 2000,
+          lifecycleLastSlowStage: "startup",
+          lifecycleBoundaryEvents: [
+            { event: "plugin.start.failed", count: 1 },
+            { event: "plugin.start.cleanup.failed", count: 1 },
+          ],
+        };
+      },
     });
 
     const inspected = agent.inspectItemPresentation({
@@ -240,6 +254,13 @@ describe("Plugin Agent", () => {
     }]);
     assert.equal(diagnostics.readerEventReport.syntheticFallbackAvailable, true);
     assert.ok(diagnostics.capabilityCount >= 11);
+    assert.equal(diagnostics.hostReadyDurationMs, 2150);
+    assert.equal(diagnostics.startupDurationMs, 3180);
+    assert.equal(diagnostics.shutdownDurationMs, 920);
+    assert.equal(diagnostics.lifecycleSlowOperationCount, 2);
+    assert.equal(diagnostics.lifecycleSlowThresholdMs, 2000);
+    assert.equal(diagnostics.lifecycleLastSlowStage, "startup");
+    assert.equal(diagnostics.lifecycleBoundaryEvents[0]?.event, "plugin.start.failed");
 
     const capabilities = agent.listCapabilities();
     assert.ok(capabilities.length >= 11);

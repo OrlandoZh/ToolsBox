@@ -15,6 +15,9 @@ function createMocks() {
     lifecycleReset: 0,
     registerBaselineFeatures: 0,
     info: 0,
+    error: 0,
+    startServices: 0,
+    stopServices: 0,
   };
 
   const cleanups = [];
@@ -76,6 +79,9 @@ function createMocks() {
     debug() {},
     info() {
       calls.info += 1;
+    },
+    error() {
+      calls.error += 1;
     },
   };
 
@@ -152,5 +158,196 @@ describe("Plugin Kernel", () => {
     assert.equal(mocks.calls.resetWindows, 1);
     assert.equal(mocks.calls.lifecycleReset, 1);
     assert.equal(kernel.getPhase(), "idle");
+  });
+
+  it("should reset to idle after startup failure and allow retry", async () => {
+    const mocks = createMocks();
+    let failOnce = true;
+    const kernel = createPluginKernel({
+      host: mocks.host,
+      zotero: null,
+      logger: mocks.logger,
+      lifecycle: mocks.lifecycle,
+      windows: mocks.windows,
+      settings: mocks.settings,
+      startServices: async () => {
+        mocks.calls.startServices += 1;
+      },
+      stopServices: async () => {
+        mocks.calls.stopServices += 1;
+      },
+      registerBaselineFeatures: async () => {
+        mocks.calls.registerBaselineFeatures += 1;
+        if (failOnce) {
+          failOnce = false;
+          throw new Error("baseline registration failed");
+        }
+      },
+      applySettings: () => {
+        mocks.calls.applySettings += 1;
+      },
+      onSettingsChange: () => {},
+      addonName: "Cleanroom Template",
+    });
+
+    let caught = null;
+    try {
+      await kernel.start();
+    } catch (error) {
+      caught = error;
+    }
+
+    assert.ok(caught instanceof Error);
+    assert.equal(caught.message, "baseline registration failed");
+    assert.equal(kernel.getPhase(), "idle");
+    assert.equal(mocks.calls.resetWindows, 1);
+    assert.equal(mocks.calls.lifecycleReset, 1);
+    assert.equal(mocks.calls.stopServices, 1);
+    assert.equal(mocks.calls.error, 1);
+    assert.equal(kernel.getLifecycleTelemetry().lifecycleBoundaryEvents[0]?.event, "plugin.start.failed");
+
+    await kernel.start();
+
+    assert.equal(kernel.getPhase(), "running");
+    assert.equal(mocks.calls.registerBaselineFeatures, 2);
+    assert.equal(mocks.calls.startServices, 2);
+  });
+
+  it("should record startup cleanup boundary events when failed start cleanup also fails", async () => {
+    const mocks = createMocks();
+    const kernel = createPluginKernel({
+      host: mocks.host,
+      zotero: null,
+      logger: mocks.logger,
+      lifecycle: mocks.lifecycle,
+      windows: mocks.windows,
+      settings: mocks.settings,
+      startServices: async () => {
+        mocks.calls.startServices += 1;
+      },
+      stopServices: async () => {
+        mocks.calls.stopServices += 1;
+        throw new Error("cleanup stop failed");
+      },
+      registerBaselineFeatures: async () => {
+        mocks.calls.registerBaselineFeatures += 1;
+        throw new Error("baseline registration failed");
+      },
+      applySettings: () => {
+        mocks.calls.applySettings += 1;
+      },
+      onSettingsChange: () => {},
+      addonName: "Cleanroom Template",
+    });
+
+    let caught = null;
+    try {
+      await kernel.start();
+    } catch (error) {
+      caught = error;
+    }
+
+    assert.ok(caught instanceof Error);
+    assert.equal(caught.message, "baseline registration failed");
+    const telemetry = kernel.getLifecycleTelemetry();
+    assert.equal(kernel.getPhase(), "idle");
+    assert.equal(telemetry.lifecycleBoundaryEvents.length, 2);
+    assert.equal(telemetry.lifecycleBoundaryEvents[0]?.event, "plugin.start.cleanup.failed");
+    assert.equal(telemetry.lifecycleBoundaryEvents[1]?.event, "plugin.start.failed");
+  });
+
+  it("should cleanup shutdown state even when stopServices fails", async () => {
+    const mocks = createMocks();
+    const kernel = createPluginKernel({
+      host: mocks.host,
+      zotero: null,
+      logger: mocks.logger,
+      lifecycle: mocks.lifecycle,
+      windows: mocks.windows,
+      settings: mocks.settings,
+      stopServices: async () => {
+        mocks.calls.stopServices += 1;
+        throw new Error("stop failed");
+      },
+      registerBaselineFeatures: async () => {
+        mocks.calls.registerBaselineFeatures += 1;
+      },
+      applySettings: () => {
+        mocks.calls.applySettings += 1;
+      },
+      onSettingsChange: () => {},
+      addonName: "Cleanroom Template",
+    });
+
+    await kernel.start();
+
+    let caught = null;
+    try {
+      await kernel.shutdown();
+    } catch (error) {
+      caught = error;
+    }
+
+    assert.ok(caught instanceof Error);
+    assert.equal(caught.message, "stop failed");
+    assert.equal(kernel.getPhase(), "idle");
+    assert.equal(mocks.calls.resetWindows, 1);
+    assert.equal(mocks.calls.lifecycleReset, 1);
+    assert.equal(mocks.calls.error, 1);
+    assert.equal(kernel.getLifecycleTelemetry().lifecycleBoundaryEvents[0]?.event, "plugin.shutdown.failed");
+  });
+
+  it("should capture lifecycle timings and slow-stage telemetry", async () => {
+    const mocks = createMocks();
+    const telemetryUpdates = [];
+    const originalNow = Date.now;
+    const timestamps = [100, 150, 2450, 3600, 4000, 6505];
+    let index = 0;
+    Date.now = () => {
+      const value = timestamps[Math.min(index, timestamps.length - 1)];
+      index += 1;
+      return value;
+    };
+
+    try {
+      const kernel = createPluginKernel({
+        host: mocks.host,
+        zotero: null,
+        logger: mocks.logger,
+        lifecycle: mocks.lifecycle,
+        windows: mocks.windows,
+        settings: mocks.settings,
+        registerBaselineFeatures: async () => {
+          mocks.calls.registerBaselineFeatures += 1;
+        },
+        applySettings: () => {
+          mocks.calls.applySettings += 1;
+        },
+        onSettingsChange: () => {},
+        addonName: "Cleanroom Template",
+        onLifecycleTelemetryChange(summary) {
+          telemetryUpdates.push(summary);
+        },
+      });
+
+      await kernel.start();
+
+      const startedTelemetry = kernel.getLifecycleTelemetry();
+      assert.equal(startedTelemetry.hostReadyDurationMs, 2300);
+      assert.equal(startedTelemetry.startupDurationMs, 3500);
+      assert.equal(startedTelemetry.lifecycleSlowOperationCount, 2);
+      assert.equal(startedTelemetry.lifecycleSlowThresholdMs, 2000);
+      assert.equal(startedTelemetry.lifecycleLastSlowStage, "startup");
+
+      await kernel.shutdown();
+
+      const stoppedTelemetry = kernel.getLifecycleTelemetry();
+      assert.equal(stoppedTelemetry.shutdownDurationMs, 2505);
+      assert.equal(stoppedTelemetry.lifecycleSlowOperationCount, 3);
+      assert.equal(stoppedTelemetry.lifecycleLastSlowStage, "shutdown");
+      assert.ok(telemetryUpdates.length >= 3);
+    } finally {
+      Date.now = originalNow;
+    }
   });
 });

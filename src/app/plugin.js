@@ -36,6 +36,38 @@ function formatDemoTimestamp(date = new Date()) {
   return date.toISOString().slice(11, 19);
 }
 
+function cloneLifecycleTelemetrySummary(summary = null) {
+  if (!summary || typeof summary !== "object") {
+    return {
+      hostReadyDurationMs: 0,
+      startupDurationMs: 0,
+      shutdownDurationMs: 0,
+      lifecycleSlowOperationCount: 0,
+      lifecycleSlowThresholdMs: 2000,
+      lifecycleLastSlowStage: null,
+      lifecycleBoundaryEvents: [],
+    };
+  }
+
+  return {
+    hostReadyDurationMs: Number(summary.hostReadyDurationMs || 0),
+    startupDurationMs: Number(summary.startupDurationMs || 0),
+    shutdownDurationMs: Number(summary.shutdownDurationMs || 0),
+    lifecycleSlowOperationCount: Number(summary.lifecycleSlowOperationCount || 0),
+    lifecycleSlowThresholdMs: Number(summary.lifecycleSlowThresholdMs || 2000),
+    lifecycleLastSlowStage: typeof summary.lifecycleLastSlowStage === "string"
+      && summary.lifecycleLastSlowStage.trim()
+      ? summary.lifecycleLastSlowStage
+      : null,
+    lifecycleBoundaryEvents: Array.isArray(summary.lifecycleBoundaryEvents)
+      ? summary.lifecycleBoundaryEvents.map((entry) => ({
+        event: String(entry?.event || "").trim() || "unknown",
+        count: Number(entry?.count || 0),
+      }))
+      : [],
+  };
+}
+
 export function createPlugin({ globalScope, config }) {
   const runtime = globalScope.__CLEANROOM_TEMPLATE_RUNTIME__ || {};
   const runtimeInfo = createRuntimeCapabilityState({ runtime });
@@ -230,6 +262,7 @@ export function createPlugin({ globalScope, config }) {
       "No notifier event yet.",
     ),
   };
+  let lifecycleTelemetrySummary = cloneLifecycleTelemetrySummary();
 
   function getItemTypeLabel(item) {
     if (!item) {
@@ -422,6 +455,7 @@ export function createPlugin({ globalScope, config }) {
     host,
     settings,
     prefs,
+    http,
     itemPane,
     itemTree,
     notifier,
@@ -441,6 +475,7 @@ export function createPlugin({ globalScope, config }) {
     zotero,
     serviceRegistry,
     runtimeInfo,
+    getLifecycleTelemetrySummary: () => cloneLifecycleTelemetrySummary(lifecycleTelemetrySummary),
   });
 
   const featureComposer = createFeatureComposer({
@@ -496,7 +531,11 @@ export function createPlugin({ globalScope, config }) {
         settings,
       });
     },
+    onLifecycleTelemetryChange: (summary) => {
+      lifecycleTelemetrySummary = cloneLifecycleTelemetrySummary(summary);
+    },
   });
+  lifecycleTelemetrySummary = cloneLifecycleTelemetrySummary(kernel.getLifecycleTelemetry());
 
   const api = createPluginAPI({
     host,

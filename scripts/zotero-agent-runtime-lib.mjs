@@ -144,6 +144,13 @@ export async function clearCapturedLogs(rdp) {
 
 export async function readCapturedLogs(rdp) {
   const raw = await rdp.evaluateInChrome(`(() => {
+    const errorBoundaryEventPatterns = [
+      "plugin.start.failed",
+      "plugin.shutdown.failed",
+      "cleanroom.bootstrap.startup.failed",
+      "cleanroom.bootstrap.shutdown.failed",
+      "cleanroom.bootstrap.startup.cleanup.failed",
+    ];
     const classifyLog = (entry) => {
       const level = String(entry?.level || "").toLowerCase();
       const source = String(entry?.source || "").toLowerCase();
@@ -178,6 +185,10 @@ export async function readCapturedLogs(rdp) {
       }
       return "info";
     };
+    const detectErrorBoundaryEvent = (message) => {
+      const normalizedMessage = String(message || "").toLowerCase();
+      return errorBoundaryEventPatterns.find((pattern) => normalizedMessage.includes(pattern)) || null;
+    };
 
     const list = globalThis.__CLEANROOM_AGENT_LOG_BRIDGE__?.read?.() || [];
     const summary = {
@@ -185,9 +196,12 @@ export async function readCapturedLogs(rdp) {
       errorCount: 0,
       warnCount: 0,
       infoCount: 0,
+      errorBoundaryHitCount: 0,
+      errorBoundaryEvents: [],
       recentErrors: [],
       recentWarnings: [],
     };
+    const boundaryMap = new Map();
 
     for (const entry of list) {
       const type = classifyLog(entry);
@@ -200,6 +214,11 @@ export async function readCapturedLogs(rdp) {
 
       if (type === "error") {
         summary.errorCount += 1;
+        const boundaryEvent = detectErrorBoundaryEvent(row.message);
+        if (boundaryEvent) {
+          summary.errorBoundaryHitCount += 1;
+          boundaryMap.set(boundaryEvent, (boundaryMap.get(boundaryEvent) || 0) + 1);
+        }
         if (summary.recentErrors.length < 6) {
           summary.recentErrors.push(row);
         }
@@ -216,6 +235,10 @@ export async function readCapturedLogs(rdp) {
 
       summary.infoCount += 1;
     }
+
+    summary.errorBoundaryEvents = Array.from(boundaryMap.entries())
+      .map(([event, count]) => ({ event, count }))
+      .sort((left, right) => right.count - left.count || left.event.localeCompare(right.event));
 
     return JSON.stringify(summary);
   })()`);
@@ -245,9 +268,12 @@ export function mergeLogSummaries(...summaries) {
     errorCount: 0,
     warnCount: 0,
     infoCount: 0,
+    errorBoundaryHitCount: 0,
+    errorBoundaryEvents: [],
     recentErrors: [],
     recentWarnings: [],
   };
+  const boundaryMap = new Map();
 
   for (const summary of summaries) {
     if (!summary) {
@@ -258,6 +284,15 @@ export function mergeLogSummaries(...summaries) {
     merged.errorCount += Number(summary.errorCount || 0);
     merged.warnCount += Number(summary.warnCount || 0);
     merged.infoCount += Number(summary.infoCount || 0);
+    merged.errorBoundaryHitCount += Number(summary.errorBoundaryHitCount || 0);
+    const boundaryEvents = Array.isArray(summary.errorBoundaryEvents) ? summary.errorBoundaryEvents : [];
+    boundaryEvents.forEach((entry) => {
+      const event = String(entry?.event || "").trim();
+      if (!event) {
+        return;
+      }
+      boundaryMap.set(event, (boundaryMap.get(event) || 0) + Number(entry?.count || 0));
+    });
 
     for (const entry of toEntries(summary.recentErrors)) {
       if (merged.recentErrors.length < 6) {
@@ -271,6 +306,10 @@ export function mergeLogSummaries(...summaries) {
       }
     }
   }
+
+  merged.errorBoundaryEvents = Array.from(boundaryMap.entries())
+    .map(([event, count]) => ({ event, count }))
+    .sort((left, right) => right.count - left.count || left.event.localeCompare(right.event));
 
   return merged;
 }
@@ -313,6 +352,23 @@ export async function runFunctionalActions({ rdp, config }) {
       serviceUnhealthyCount: 0,
       serviceHealthOK: true,
       serviceStatus: "idle",
+      httpObserved: false,
+      httpRequestCount: 0,
+      httpSuccessCount: 0,
+      httpFailureCount: 0,
+      httpTimeoutCount: 0,
+      httpRetryCount: 0,
+      httpSlowOperationCount: 0,
+      httpSlowThresholdMs: 0,
+      httpLastRequest: null,
+      httpLastError: null,
+      hostReadyDurationMs: 0,
+      startupDurationMs: 0,
+      shutdownDurationMs: 0,
+      lifecycleSlowOperationCount: 0,
+      lifecycleSlowThresholdMs: 2000,
+      lifecycleLastSlowStage: null,
+      lifecycleBoundaryEvents: [],
     };
 
     if (plugin && plugin.api) {
@@ -382,6 +438,33 @@ export async function runFunctionalActions({ rdp, config }) {
       checks.serviceUnhealthyCount = Number(selfCheck?.serviceUnhealthyCount || 0);
       checks.serviceHealthOK = Boolean(selfCheck?.serviceHealthOK !== false);
       checks.serviceStatus = String(selfCheck?.serviceStatus || "idle");
+      checks.httpObserved = Boolean(selfCheck?.httpObserved);
+      checks.httpRequestCount = Number(selfCheck?.httpRequestCount || 0);
+      checks.httpSuccessCount = Number(selfCheck?.httpSuccessCount || 0);
+      checks.httpFailureCount = Number(selfCheck?.httpFailureCount || 0);
+      checks.httpTimeoutCount = Number(selfCheck?.httpTimeoutCount || 0);
+      checks.httpRetryCount = Number(selfCheck?.httpRetryCount || 0);
+      checks.httpSlowOperationCount = Number(selfCheck?.httpSlowOperationCount || 0);
+      checks.httpSlowThresholdMs = Number(selfCheck?.httpSlowThresholdMs || 0);
+      checks.httpLastRequest = selfCheck?.httpLastRequest || null;
+      checks.httpLastError = selfCheck?.httpLastError || null;
+      checks.hostReadyDurationMs = Number(selfCheck?.hostReadyDurationMs || 0);
+      checks.startupDurationMs = Number(selfCheck?.startupDurationMs || 0);
+      checks.shutdownDurationMs = Number(selfCheck?.shutdownDurationMs || 0);
+      checks.lifecycleSlowOperationCount = Number(selfCheck?.lifecycleSlowOperationCount || 0);
+      checks.lifecycleSlowThresholdMs = Number(selfCheck?.lifecycleSlowThresholdMs || 2000);
+      checks.lifecycleLastSlowStage = typeof selfCheck?.lifecycleLastSlowStage === "string"
+        && selfCheck.lifecycleLastSlowStage.trim()
+        ? selfCheck.lifecycleLastSlowStage
+        : null;
+      checks.lifecycleBoundaryEvents = Array.isArray(selfCheck?.lifecycleBoundaryEvents)
+        ? selfCheck.lifecycleBoundaryEvents
+          .map((entry) => ({
+            event: String(entry?.event || "").trim() || "unknown",
+            count: Number(entry?.count || 0),
+          }))
+          .filter((entry) => entry.count > 0)
+        : [];
     }
 
     return JSON.stringify(checks);

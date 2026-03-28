@@ -171,13 +171,51 @@ describe("Agent Telemetry", () => {
           serviceUnhealthyCount: 0,
           serviceHealthOK: true,
           serviceStatus: "healthy",
+          httpObserved: true,
+          httpRequestCount: 4,
+          httpSuccessCount: 3,
+          httpFailureCount: 1,
+          httpTimeoutCount: 1,
+          httpRetryCount: 2,
+          httpSlowOperationCount: 1,
+          httpSlowThresholdMs: 1200,
+          httpLastError: {
+            kind: "timeout",
+            message: "HTTP request timed out after 1200ms",
+          },
+          hostReadyDurationMs: 2150,
+          startupDurationMs: 3180,
+          shutdownDurationMs: 860,
+          lifecycleSlowOperationCount: 2,
+          lifecycleSlowThresholdMs: 2000,
+          lifecycleLastSlowStage: "startup",
+          lifecycleBoundaryEvents: [
+            {
+              event: "plugin.start.failed",
+              count: 1,
+            },
+            {
+              event: "plugin.start.cleanup.failed",
+              count: 1,
+            },
+          ],
           readerEventAPIAvailable: true,
           readerEventListenerCount: 8,
           readerEventKnownTypeCount: 8,
           readerEventProbeTypeCount: 8,
           readerEventSyntheticFallbackAvailable: true,
         },
-        logs: { errorCount: 0, warnCount: 1 },
+        logs: {
+          errorCount: 0,
+          warnCount: 1,
+          errorBoundaryHitCount: 1,
+          errorBoundaryEvents: [
+            {
+              event: "plugin.start.failed",
+              count: 1,
+            },
+          ],
+        },
         tests: { failed: 0 },
         scenarios: {
           failed: 0,
@@ -499,6 +537,16 @@ describe("Agent Telemetry", () => {
     assert.equal(monitorJSON.zoteroValidation?.e2e?.serviceHealthyCount, 2);
     assert.equal(monitorJSON.zoteroValidation?.e2e?.serviceUnhealthyCount, 0);
     assert.equal(monitorJSON.zoteroValidation?.e2e?.serviceHealthOK, true);
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.errorBoundaryHitCount, 1);
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.httpTimeoutCount, 1);
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.httpSlowOperationCount, 1);
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.hostReadyDurationMs, 2150);
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.startupDurationMs, 3180);
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.shutdownDurationMs, 860);
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.lifecycleSlowOperationCount, 2);
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.lifecycleSlowThresholdMs, 2000);
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.lifecycleLastSlowStage, "startup");
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.lifecycleBoundaryEvents?.[0]?.event, "plugin.start.failed");
     assert.equal(monitorJSON.zoteroValidation?.e2e?.primaryDiagnosis?.fingerprint, "bootstrap:plugin-not-mounted");
     assert.equal(monitorJSON.zoteroValidation?.e2e?.diagnosisBlocking, true);
     assert.ok(Array.isArray(monitorJSON.zoteroValidation?.e2e?.recommendedActions));
@@ -563,6 +611,16 @@ describe("Agent Telemetry", () => {
     assert.ok(monitorJSON.agentMemory?.failureMemory?.hotFingerprints?.some((item) => item.fingerprint === "bootstrap:plugin-not-mounted"));
     assert.equal(monitorJSON.agentMemory?.fixOutcomeMemory?.[0]?.preferredStrategy?.strategyId, "bootstrap-runtime-bridge");
     assert.equal(monitorJSON.agentMemory?.recommendation, null);
+    assert.equal(monitorJSON.engineeringHardening?.errorBoundaryHitCount, 1);
+    assert.equal(monitorJSON.engineeringHardening?.httpTimeoutCount, 1);
+    assert.equal(monitorJSON.engineeringHardening?.httpSlowOperationCount, 1);
+    assert.equal(monitorJSON.engineeringHardening?.hostReadyDurationMs, 2150);
+    assert.equal(monitorJSON.engineeringHardening?.startupDurationMs, 3180);
+    assert.equal(monitorJSON.engineeringHardening?.shutdownDurationMs, 860);
+    assert.equal(monitorJSON.engineeringHardening?.lifecycleSlowOperationCount, 2);
+    assert.equal(monitorJSON.engineeringHardening?.lifecycleSlowThresholdMs, 2000);
+    assert.equal(monitorJSON.engineeringHardening?.lifecycleLastSlowStage, "startup");
+    assert.ok(Array.isArray(monitorJSON.engineeringHardening?.errorBoundaryEvents));
     assert.equal(memoryJSON.totalEntries, 2);
     assert.equal(memoryJSON.archive?.latestJSON, "agent-memory/latest.json");
     assert.equal(memoryJSON.signalTrends?.signals?.[1]?.signalId, "e2e");
@@ -595,6 +653,10 @@ describe("Agent Telemetry", () => {
     assert.ok(monitorMD.includes("观察失败项"));
     assert.ok(monitorMD.includes("失败类型画像"));
     assert.ok(monitorMD.includes("### Watch 恢复回归"));
+    assert.ok(monitorMD.includes("### 工程化硬化信号"));
+    assert.ok(monitorMD.includes("HTTP timeout"));
+    assert.ok(monitorMD.includes("生命周期慢操作"));
+    assert.ok(monitorMD.includes("最近生命周期慢阶段"));
     assert.ok(monitorMD.includes("恢复回归"));
     assert.ok(monitorMD.includes("session-restart-recovery"));
     assert.ok(monitorMD.includes("### 最近恢复步骤"));
@@ -614,6 +676,101 @@ describe("Agent Telemetry", () => {
     assert.ok(memoryMD.includes("近期趋势"));
     assert.ok(memoryMD.includes("运行信号趋势"));
     assert.ok(memoryMD.includes("修复结果记忆"));
+  });
+
+  it("should render lifecycle hardening fields in dashboard and gate outputs", () => {
+    writeWatchStatus({
+      generatedAt: new Date().toISOString(),
+      latestStatus: "healthy",
+      latest: {
+        trigger: "watch-change",
+        passed: true,
+        issues: [],
+      },
+    });
+    writeE2EReport({
+      generatedAt: new Date().toISOString(),
+      strategy: "restart",
+      passed: true,
+      issues: [],
+      hints: [],
+      cycles: [{
+        index: 1,
+        passed: true,
+        summaryNote: "生命周期遥测已采集",
+        checks: {
+          serviceTotal: 2,
+          serviceHealthyCount: 2,
+          serviceUnhealthyCount: 0,
+          serviceHealthOK: true,
+          serviceStatus: "healthy",
+          httpObserved: true,
+          httpRequestCount: 1,
+          httpSuccessCount: 1,
+          httpFailureCount: 0,
+          httpTimeoutCount: 0,
+          httpRetryCount: 0,
+          httpSlowOperationCount: 0,
+          httpSlowThresholdMs: 1200,
+          hostReadyDurationMs: 2050,
+          startupDurationMs: 2875,
+          shutdownDurationMs: 910,
+          lifecycleSlowOperationCount: 1,
+          lifecycleSlowThresholdMs: 2000,
+          lifecycleLastSlowStage: "startup",
+          lifecycleBoundaryEvents: [
+            {
+              event: "plugin.start.failed",
+              count: 1,
+            },
+          ],
+        },
+        logs: {
+          errorCount: 0,
+          warnCount: 0,
+          errorBoundaryHitCount: 0,
+          errorBoundaryEvents: [],
+        },
+        tests: { failed: 0 },
+        scenarios: { failed: 0, results: [] },
+        visuals: {
+          analysis: {
+            summary: {
+              baseline: {
+                driftCount: 0,
+                missingCount: 0,
+              },
+            },
+          },
+        },
+      }],
+    });
+
+    execNode(["scripts/agent-runner.mjs", "lifecycle-telemetry", "--", "node", "-e", "process.exit(0)"]);
+    execNode(["scripts/agent-monitor.mjs"]);
+    execNode(["scripts/agent-dashboard.mjs"]);
+    try {
+      execNode(["scripts/agent-gate.mjs", "--min-pass-rate", "0", "--max-recent-failed", "999"]);
+    } catch {
+      // gate may still mark the profile as failed while emitting the markdown/json artifacts we assert on here
+    }
+
+    const monitorJSON = readArtifactJSON("agent-monitor.json");
+    const monitorMD = readArtifactText("agent-monitor.md");
+    const dashboardHTML = readArtifactText("agent-dashboard.html");
+    const gateMD = readArtifactText("agent-gate.md");
+
+    assert.equal(monitorJSON.engineeringHardening?.hostReadyDurationMs, 2050);
+    assert.equal(monitorJSON.engineeringHardening?.startupDurationMs, 2875);
+    assert.equal(monitorJSON.engineeringHardening?.shutdownDurationMs, 910);
+    assert.equal(monitorJSON.engineeringHardening?.lifecycleSlowOperationCount, 1);
+    assert.equal(monitorJSON.engineeringHardening?.lifecycleLastSlowStage, "startup");
+    assert.ok(monitorMD.includes("生命周期慢操作"));
+    assert.ok(monitorMD.includes("生命周期时序"));
+    assert.ok(dashboardHTML.includes("生命周期慢操作"));
+    assert.ok(dashboardHTML.includes("最近生命周期慢阶段"));
+    assert.ok(gateMD.includes("生命周期慢操作"));
+    assert.ok(gateMD.includes("生命周期时序"));
   });
 
   it("should keep validation-stage e2e artifacts readable in monitor summary", () => {
@@ -2391,6 +2548,10 @@ describe("Agent Telemetry", () => {
     const reasonArchive = readArtifactJSON(targetFileMissingReason?.path);
 
     assert.equal(memoryJSON.present, true);
+    assert.equal(memoryJSON.errorCategory, null);
+    assert.equal(memoryJSON.errorCategoryLabel, null);
+    assert.equal(memoryJSON.errorMessage, null);
+    assert.equal(memoryJSON.failedStage, null);
     assert.equal(memoryJSON.currentIncident?.fingerprint, "bootstrap:plugin-not-mounted");
     assert.equal(memoryJSON.currentIncident?.context?.latestBootMode, "hot-reload");
     assert.equal(memoryJSON.currentIncident?.context?.zoteroVersionBucket, "8.0-stable");
@@ -3151,6 +3312,125 @@ describe("Agent Telemetry", () => {
     assert.equal(gateJSON.frontpageSummary?.status, "blocked");
     assert.ok(Array.isArray(gateJSON.frontpageSummary?.primaryBlockers));
     assert.ok(gateJSON.issues.some((item) => String(item).includes("gate-fail-case")));
+  });
+
+  it("should ignore unrecovered autofix history when fresh watch and e2e are already healthy", () => {
+    writeWatchStatus({
+      generatedAt: new Date().toISOString(),
+      latestStatus: "healthy",
+      latest: {
+        trigger: "startup",
+        passed: true,
+        issues: [],
+      },
+    });
+    writeE2EReport({
+      generatedAt: new Date(Date.now() - 60 * 1000).toISOString(),
+      strategy: "hot",
+      passed: true,
+      summaryNote: "真机验证通过",
+      testFailed: 0,
+      scenarioFailed: 0,
+      logErrorCount: 0,
+      serviceObserved: true,
+      serviceStatus: "healthy",
+      serviceTotal: 2,
+      serviceHealthyCount: 2,
+      serviceUnhealthyCount: 0,
+      serviceHealthOK: true,
+      capabilityObserved: true,
+      capabilityRequiredCount: 10,
+      capabilityCoveredCount: 10,
+      capabilityPassedCount: 10,
+      capabilityFailedCount: 0,
+      capabilityUncoveredCount: 0,
+      visualDriftCount: 0,
+      visualEvidenceObserved: true,
+      visualEvidenceItemCount: 4,
+      visualEvidenceFailingItemCount: 0,
+      visualCaptureStabilityObserved: true,
+      visualCaptureStageCount: 2,
+      visualPrimaryBlockerKind: "unknown",
+      visualCanonicalCoverageKind: "complete",
+      readerEventReport: {
+        present: true,
+        status: "passed",
+        statusLabel: "通过",
+        available: true,
+        syntheticFallbackAvailable: true,
+      },
+      cycles: [{
+        index: 1,
+        passed: true,
+        summaryNote: "真机验证通过",
+        logs: { errorCount: 0, warnCount: 0 },
+        tests: { failed: 0 },
+        scenarios: { failed: 0 },
+        visuals: {
+          analysis: {
+            summary: {
+              baseline: {
+                driftCount: 0,
+                missingCount: 0,
+              },
+            },
+          },
+        },
+      }],
+    });
+    writeAutofixReport({
+      generatedAt: new Date().toISOString(),
+      initialStrategy: "hot",
+      recovered: false,
+      outcomeLabel: "未恢复",
+      attempts: [{
+        index: 1,
+        ok: false,
+        durationMs: 50,
+        note: "初始验证失败，进入恢复流程",
+      }],
+      recommendations: ["查看 `dist/agent-zotero-autofix.md`。"],
+    });
+    writeWatchRecoveryReport({
+      generatedAt: new Date().toISOString(),
+      passed: true,
+      startupPassed: true,
+      latestTrigger: "session-restart-recovery",
+      latestPassed: true,
+      latestStatus: "healthy",
+      expectedTriggers: [
+        "watch-change",
+        "runtime-recovery",
+        "session-restart-recovery",
+      ],
+      observedTriggers: [
+        "watch-change",
+        "runtime-recovery",
+        "session-restart-recovery",
+      ],
+      summaryNote: "恢复回归通过",
+      entries: [],
+      issues: [],
+    });
+
+    execNode(["scripts/agent-runner.mjs", "gate-pass-case", "--", "node", "-e", "process.exit(0)"]);
+    execNode(["scripts/agent-monitor.mjs"]);
+    execNode([
+      "scripts/agent-gate.mjs",
+      "--profile",
+      "dev",
+      "--require",
+      "gate-pass-case",
+      "--min-pass-rate",
+      "0",
+      "--max-recent-failed",
+      "999",
+    ]);
+
+    const gateJSON = readArtifactJSON("agent-gate.json");
+    assert.equal(gateJSON.gatePassed, true);
+    assert.equal(gateJSON.frontpageSummary?.status, "ready");
+    assert.equal(gateJSON.issues.some((item) => String(item).includes("最近自动修复结果仍为未恢复")), false);
   });
 
   it("should fail dev gate when zotero watch status is unhealthy", () => {
@@ -4196,8 +4476,11 @@ describe("Agent Telemetry", () => {
     assert.equal(gateJSON.releaseMatrix?.blockingRuntimeErrorCount, 0);
     assert.equal(gateJSON.issues.length, 0);
     assert.ok(monitorMD.includes("宿主噪声画像"));
+    assert.ok(monitorMD.includes("工程化硬化信号"));
     assert.ok(dashboardHTML.includes("宿主噪声渠道"));
+    assert.ok(dashboardHTML.includes("工程化硬化信号"));
     assert.ok(gateMD.includes("宿主噪声画像"));
+    assert.ok(gateMD.includes("工程化硬化信号"));
     assert.ok(gateMD.includes("remote-settings 资源缺失"));
   });
 
@@ -5048,7 +5331,7 @@ describe("Agent Telemetry", () => {
     assert.ok(typeof monitorJSON.durationMs === "number");
     assert.ok(monitorJSON.durationMs >= 0);
     assert.ok(!monitorMD.includes("脚本失败画像"));
-    assert.ok(!monitorMD.includes("分类:"));
+    assert.ok(!monitorMD.includes("E2E 失败分类:"));
   });
 
   it("should populate error fields on gate failure", () => {

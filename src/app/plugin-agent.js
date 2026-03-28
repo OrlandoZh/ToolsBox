@@ -14,6 +14,7 @@ export function createPluginAgent({
   host,
   settings,
   prefs,
+  http,
   itemPane,
   itemTree,
   notifier,
@@ -33,6 +34,7 @@ export function createPluginAgent({
   zotero,
   serviceRegistry,
   runtimeInfo,
+  getLifecycleTelemetrySummary = null,
 }) {
   const capabilityManifest = createCapabilityManifest({ config });
 
@@ -176,6 +178,30 @@ export function createPluginAgent({
         status: "idle",
         services: [],
       };
+    const httpDiagnostics = http && typeof http.getDiagnostics === "function"
+      ? http.getDiagnostics()
+      : {
+        requestCount: 0,
+        successCount: 0,
+        failureCount: 0,
+        timeoutCount: 0,
+        retryCount: 0,
+        slowOperationCount: 0,
+        slowThresholdMs: 0,
+        lastRequest: null,
+        lastError: null,
+      };
+    const lifecycleTelemetry = typeof getLifecycleTelemetrySummary === "function"
+      ? getLifecycleTelemetrySummary()
+      : {
+        hostReadyDurationMs: 0,
+        startupDurationMs: 0,
+        shutdownDurationMs: 0,
+        lifecycleSlowOperationCount: 0,
+        lifecycleSlowThresholdMs: 2000,
+        lifecycleLastSlowStage: null,
+        lifecycleBoundaryEvents: [],
+      };
     return {
       enabled: Boolean(prefs.get("enabled")),
       hasMainWindow: Boolean(window),
@@ -210,6 +236,33 @@ export function createPluginAgent({
       serviceUnhealthyCount: Number(serviceSummary.unhealthy || 0),
       serviceHealthOK: Boolean(serviceSummary.healthOK !== false),
       serviceStatus: serviceSummary.status || "idle",
+      httpObserved: Number(httpDiagnostics.requestCount || 0) > 0,
+      httpRequestCount: Number(httpDiagnostics.requestCount || 0),
+      httpSuccessCount: Number(httpDiagnostics.successCount || 0),
+      httpFailureCount: Number(httpDiagnostics.failureCount || 0),
+      httpTimeoutCount: Number(httpDiagnostics.timeoutCount || 0),
+      httpRetryCount: Number(httpDiagnostics.retryCount || 0),
+      httpSlowOperationCount: Number(httpDiagnostics.slowOperationCount || 0),
+      httpSlowThresholdMs: Number(httpDiagnostics.slowThresholdMs || 0),
+      httpLastRequest: httpDiagnostics.lastRequest || null,
+      httpLastError: httpDiagnostics.lastError || null,
+      hostReadyDurationMs: Number(lifecycleTelemetry?.hostReadyDurationMs || 0),
+      startupDurationMs: Number(lifecycleTelemetry?.startupDurationMs || 0),
+      shutdownDurationMs: Number(lifecycleTelemetry?.shutdownDurationMs || 0),
+      lifecycleSlowOperationCount: Number(lifecycleTelemetry?.lifecycleSlowOperationCount || 0),
+      lifecycleSlowThresholdMs: Number(lifecycleTelemetry?.lifecycleSlowThresholdMs || 2000),
+      lifecycleLastSlowStage: typeof lifecycleTelemetry?.lifecycleLastSlowStage === "string"
+        && lifecycleTelemetry.lifecycleLastSlowStage.trim()
+        ? lifecycleTelemetry.lifecycleLastSlowStage
+        : null,
+      lifecycleBoundaryEvents: Array.isArray(lifecycleTelemetry?.lifecycleBoundaryEvents)
+        ? lifecycleTelemetry.lifecycleBoundaryEvents
+          .map((entry) => ({
+            event: String(entry?.event || "").trim() || "unknown",
+            count: Number(entry?.count || 0),
+          }))
+          .filter((entry) => entry.count > 0)
+        : [],
       services: Array.isArray(serviceSummary.services) ? serviceSummary.services : [],
       runtimeBridgeOK: Boolean(runtimeSummary.ok !== false),
       runtimeBridgeStatus: runtimeSummary.status || "unknown",
@@ -296,6 +349,9 @@ export function createPluginAgent({
       menuIDs: menuManager.getRegisteredMenuIds(),
       commandIDs: commandPalette.getAllCommands().map((item) => item.id),
       paneIDs: preferencePanes.getAllPanes(),
+      httpDiagnostics: http && typeof http.getDiagnostics === "function"
+        ? http.getDiagnostics()
+        : null,
     };
   }
 
