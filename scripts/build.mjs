@@ -1,8 +1,17 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { withBuildLock } from "./build-lock.mjs";
 import { applyBuildInjection } from "./build-injection-lib.mjs";
+import {
+  assertNonEmptyString,
+  assertPlainObject,
+  buildScriptFailureInfo,
+  isExecutedAsScript,
+  readJSONFile,
+  wrapScriptError,
+} from "./script-runtime-lib.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,14 +20,10 @@ const projectRoot = path.resolve(__dirname, "..");
 const configPath = path.join(projectRoot, "config", "addon.config.json");
 const staticRoot = path.join(projectRoot, "addon-static");
 const srcRoot = path.join(projectRoot, "src");
+const scriptStartedAt = Date.now();
 
 function toPosix(filePath) {
   return filePath.split(path.sep).join("/");
-}
-
-async function readJSON(filePath) {
-  const content = await fs.readFile(filePath, "utf-8");
-  return JSON.parse(content);
 }
 
 async function ensureDir(dirPath) {
@@ -47,7 +52,13 @@ async function copyDir(source, target) {
   }
 }
 
-function validateConfig(config) {
+export function validateBuildConfig(config, filePath = configPath) {
+  assertPlainObject(config, "addon.config.json", {
+    category: "config",
+    failedStage: "validate-config",
+    details: { configPath: filePath },
+  });
+
   const required = [
     "addonName",
     "addonId",
@@ -63,14 +74,29 @@ function validateConfig(config) {
     "defaultPrefs",
   ];
 
-  const missing = required.filter((key) => config[key] === undefined);
-  if (missing.length > 0) {
-    throw new Error(`Missing config keys: ${missing.join(", ")}`);
+  for (const key of required) {
+    if (key === "defaultPrefs") {
+      assertPlainObject(config[key], `addon.config.json:${key}`, {
+        category: "config",
+        failedStage: "validate-config",
+        details: { configPath: filePath, field: key },
+      });
+      continue;
+    }
+    assertNonEmptyString(config[key], `addon.config.json:${key}`, {
+      category: "config",
+      failedStage: "validate-config",
+      details: { configPath: filePath, field: key },
+    });
   }
 
-  if (typeof config.updateURL !== "string" || config.updateURL.trim() === "") {
-    throw new Error("Config key 'updateURL' must be a non-empty string for Zotero 7/8 add-on installation.");
-  }
+  assertNonEmptyString(config.defaultPrefs.logLevel, "addon.config.json:defaultPrefs.logLevel", {
+    category: "config",
+    failedStage: "validate-config",
+    details: { configPath: filePath, field: "defaultPrefs.logLevel" },
+  });
+
+  return config;
 }
 
 function buildManifest(config) {
@@ -329,60 +355,134 @@ async function writeBuildReport({ buildRoot, bundlePath, config }) {
   );
 }
 
-async function main() {
+export async function main() {
   await withBuildLock("build.mjs", async () => {
-    await applyBuildInjection();
+    try {
+      await applyBuildInjection();
+    } catch (error) {
+      throw wrapScriptError(error, {
+        failedStage: "apply-build-injection",
+      });
+    }
 
-    const config = await readJSON(configPath);
-    validateConfig(config);
+    const config = await readJSONFile(configPath, {
+      missingCategory: "environment",
+      invalidCategory: "validation",
+      missingStage: "read-config",
+      invalidStage: "read-config",
+      label: "config/addon.config.json",
+    });
+    validateBuildConfig(config, configPath);
 
     const buildRoot = path.join(projectRoot, "build", config.addonRef);
     const scriptsRoot = path.join(buildRoot, "content", "scripts");
 
-    await removeDir(buildRoot);
-    await copyDir(staticRoot, buildRoot);
-    await ensureDir(scriptsRoot);
+    try {
+      await removeDir(buildRoot);
+      await copyDir(staticRoot, buildRoot);
+      await ensureDir(scriptsRoot);
+    } catch (error) {
+      throw wrapScriptError(error, {
+        failedStage: "prepare-build-root",
+        details: { buildRoot },
+      });
+    }
 
     const manifest = buildManifest(config);
-    await fs.writeFile(
-      path.join(buildRoot, "manifest.json"),
-      JSON.stringify(manifest, null, 2),
-      "utf-8",
-    );
+    try {
+      await fs.writeFile(
+        path.join(buildRoot, "manifest.json"),
+        JSON.stringify(manifest, null, 2),
+        "utf-8",
+      );
+    } catch (error) {
+      throw wrapScriptError(error, {
+        failedStage: "write-manifest",
+        details: { buildRoot },
+      });
+    }
 
     const prefsContent = buildPrefs(config);
-    await fs.writeFile(path.join(buildRoot, "prefs.js"), `${prefsContent}\n`, "utf-8");
+    try {
+      await fs.writeFile(path.join(buildRoot, "prefs.js"), `${prefsContent}\n`, "utf-8");
+    } catch (error) {
+      throw wrapScriptError(error, {
+        failedStage: "write-prefs",
+        details: { buildRoot },
+      });
+    }
 
-    const bootstrapTemplate = await fs.readFile(path.join(buildRoot, "bootstrap.js"), "utf-8");
-    const patchedBootstrap = patchBootstrap(bootstrapTemplate, config);
-    await fs.writeFile(path.join(buildRoot, "bootstrap.js"), patchedBootstrap, "utf-8");
+    try {
+      const bootstrapTemplate = await fs.readFile(path.join(buildRoot, "bootstrap.js"), "utf-8");
+      const patchedBootstrap = patchBootstrap(bootstrapTemplate, config);
+      await fs.writeFile(path.join(buildRoot, "bootstrap.js"), patchedBootstrap, "utf-8");
+    } catch (error) {
+      throw wrapScriptError(error, {
+        failedStage: "patch-bootstrap",
+        details: { buildRoot },
+      });
+    }
 
     const prefsTemplatePath = path.join(buildRoot, "content", "preferences.xhtml");
-    const prefsTemplate = await fs.readFile(prefsTemplatePath, "utf-8");
-    const patchedPrefs = patchPreferences(prefsTemplate, config);
-    await fs.writeFile(prefsTemplatePath, patchedPrefs, "utf-8");
+    try {
+      const prefsTemplate = await fs.readFile(prefsTemplatePath, "utf-8");
+      const patchedPrefs = patchPreferences(prefsTemplate, config);
+      await fs.writeFile(prefsTemplatePath, patchedPrefs, "utf-8");
+    } catch (error) {
+      throw wrapScriptError(error, {
+        failedStage: "patch-preferences",
+        details: { buildRoot },
+      });
+    }
 
     const entryFile = path.join(srcRoot, "main.js");
-    const bundle = await bundleEntry({
-      entryFile,
-      srcRootPath: srcRoot,
-      config,
-    });
+    let bundle = null;
+    try {
+      bundle = await bundleEntry({
+        entryFile,
+        srcRootPath: srcRoot,
+        config,
+      });
+    } catch (error) {
+      throw wrapScriptError(error, {
+        failedStage: "bundle-entry",
+        details: { entryFile },
+      });
+    }
 
     const bundlePath = path.join(scriptsRoot, `${config.addonRef}.js`);
-    await fs.writeFile(bundlePath, bundle, "utf-8");
+    try {
+      await fs.writeFile(bundlePath, bundle, "utf-8");
+    } catch (error) {
+      throw wrapScriptError(error, {
+        failedStage: "write-bundle",
+        details: { bundlePath },
+      });
+    }
 
-    await writeBuildReport({
-      buildRoot,
-      bundlePath,
-      config,
-    });
+    try {
+      await writeBuildReport({
+        buildRoot,
+        bundlePath,
+        config,
+      });
+    } catch (error) {
+      throw wrapScriptError(error, {
+        failedStage: "write-build-report",
+        details: { buildRoot, bundlePath },
+      });
+    }
 
     console.log(`Build complete: ${buildRoot}`);
   });
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (isExecutedAsScript(import.meta.url)) {
+  main().catch((error) => {
+    const failureInfo = buildScriptFailureInfo(error, {
+      durationMs: Math.max(0, Date.now() - scriptStartedAt),
+    });
+    console.error(`${failureInfo.errorCategoryLabel}: ${failureInfo.errorMessage}`);
+    process.exit(1);
+  });
+}

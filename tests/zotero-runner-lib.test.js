@@ -17,11 +17,21 @@ import {
   unwrapRdpValue,
 } from "../scripts/zotero-runner-lib.mjs";
 import {
+  assertNonEmptyString,
+  assertPlainObject,
   buildScriptFailureInfo,
   createScriptError,
+  isExecutedAsScript,
+  parseBooleanEnvFlag,
+  parseEnumOption,
+  parseIntegerOption,
+  readJSONFile,
+  resolveEnvPath,
+  resolvePathOption,
   normalizeScriptErrorCategory,
   pickScriptErrorCategoryLabel,
   SCRIPT_ERROR_CATEGORY_LABELS,
+  wrapScriptError,
 } from "../scripts/script-runtime-lib.mjs";
 
 describe("Zotero Runner", () => {
@@ -183,6 +193,9 @@ ZOTERO_PLUGIN_RDP_PORT=64719
   it("should build script failure info with all fields", () => {
     const error = createScriptError("validation", "Config mismatch", {
       failedStage: "validate-config",
+      details: {
+        file: "config/addon.config.json",
+      },
     });
 
     const info = buildScriptFailureInfo(error, { durationMs: 123 });
@@ -192,6 +205,147 @@ ZOTERO_PLUGIN_RDP_PORT=64719
     assert.equal(info.errorMessage, "Config mismatch");
     assert.equal(info.failedStage, "validate-config");
     assert.equal(info.durationMs, 123);
+    assert.deepEqual(info.details, {
+      file: "config/addon.config.json",
+    });
+  });
+
+  it("should wrap script errors with stable stage and merged details", () => {
+    const original = createScriptError("validation", "Config mismatch", {
+      failedStage: "read-config",
+      details: {
+        file: "config/addon.config.json",
+      },
+    });
+
+    const wrapped = wrapScriptError(original, {
+      category: "config",
+      failedStage: "validate-config",
+      details: {
+        reason: "missing-addon-id",
+      },
+    });
+
+    const info = buildScriptFailureInfo(wrapped, { durationMs: 88 });
+    assert.equal(info.errorCategory, "config");
+    assert.equal(info.failedStage, "validate-config");
+    assert.deepEqual(info.details, {
+      file: "config/addon.config.json",
+      reason: "missing-addon-id",
+    });
+  });
+
+  it("should parse shared script runtime options safely", () => {
+    assert.equal(parseIntegerOption("3", { name: "cycles", min: 1, max: 10 }), 3);
+    assert.equal(parseEnumOption("hot", { name: "strategy", allowed: ["hot", "restart"] }), "hot");
+    assert.equal(
+      resolvePathOption("./dist/report.json", { name: "report", baseDir: "/tmp/project" }),
+      path.resolve("/tmp/project", "./dist/report.json"),
+    );
+    assert.equal(parseBooleanEnvFlag({ ENABLED: "yes" }, "ENABLED"), true);
+    assert.equal(resolveEnvPath({ AGENT_DIR: "./obsidian" }, "AGENT_DIR"), path.resolve("./obsidian"));
+  });
+
+  it("should throw structured errors for invalid shared runtime options", () => {
+    let cyclesError = null;
+    try {
+      parseIntegerOption("0", { name: "cycles", min: 1 });
+    } catch (error) {
+      cyclesError = error;
+    }
+    assert.equal(cyclesError?.scriptErrorCategory, "args");
+    assert.equal(cyclesError?.details?.option, "cycles");
+
+    let strategyError = null;
+    try {
+      parseEnumOption("warm", { name: "strategy", allowed: ["hot", "restart"] });
+    } catch (error) {
+      strategyError = error;
+    }
+    assert.equal(strategyError?.scriptErrorCategory, "args");
+    assert.equal(strategyError?.details?.allowed?.length, 2);
+
+    let envError = null;
+    try {
+      parseBooleanEnvFlag({ AGENT_OBSIDIAN_VISUALS: "maybe" }, "AGENT_OBSIDIAN_VISUALS");
+    } catch (error) {
+      envError = error;
+    }
+    assert.equal(envError?.scriptErrorCategory, "environment");
+    assert.equal(envError?.details?.envVar, "AGENT_OBSIDIAN_VISUALS");
+  });
+
+  it("should validate shared config helper inputs", () => {
+    assert.equal(assertNonEmptyString(" cleanroomtemplate ", "addonRef"), "cleanroomtemplate");
+    assert.deepEqual(assertPlainObject({ addonId: "cleanroom-template@example.com" }, "config"), {
+      addonId: "cleanroom-template@example.com",
+    });
+
+    let emptyStringError = null;
+    try {
+      assertNonEmptyString("", "addonRef", { failedStage: "validate-config" });
+    } catch (error) {
+      emptyStringError = error;
+    }
+    assert.equal(emptyStringError?.scriptErrorCategory, "validation");
+    assert.equal(emptyStringError?.failedStage, "validate-config");
+
+    let plainObjectError = null;
+    try {
+      assertPlainObject(null, "config", { category: "config", failedStage: "validate-config" });
+    } catch (error) {
+      plainObjectError = error;
+    }
+    assert.equal(plainObjectError?.scriptErrorCategory, "config");
+    assert.equal(plainObjectError?.failedStage, "validate-config");
+  });
+
+  it("should read json files with structured missing and invalid errors", async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "cleanroom-script-runtime-"));
+    const validPath = path.join(tempDir, "valid.json");
+    const invalidPath = path.join(tempDir, "invalid.json");
+    const missingPath = path.join(tempDir, "missing.json");
+    fs.writeFileSync(validPath, JSON.stringify({ ok: true }), "utf-8");
+    fs.writeFileSync(invalidPath, "{ invalid json", "utf-8");
+
+    try {
+      const parsed = await readJSONFile(validPath, {
+        failedStage: "read-config",
+        label: "valid config",
+      });
+      assert.deepEqual(parsed, { ok: true });
+
+      let invalidError = null;
+      try {
+        await readJSONFile(invalidPath, { failedStage: "read-config", label: "invalid config" });
+      } catch (error) {
+        invalidError = error;
+      }
+      assert.equal(invalidError?.scriptErrorCategory, "validation");
+      assert.equal(invalidError?.failedStage, "read-config");
+
+      let missingError = null;
+      try {
+        await readJSONFile(missingPath, { failedStage: "read-config", label: "missing config" });
+      } catch (error) {
+        missingError = error;
+      }
+      assert.equal(missingError?.scriptErrorCategory, "environment");
+      assert.equal(missingError?.failedStage, "read-config");
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should detect whether the current module is executed as a script", () => {
+    assert.equal(
+      isExecutedAsScript("file:///tmp/scripts/demo.mjs", ["node", "/tmp/scripts/demo.mjs"]),
+      true,
+    );
+    assert.equal(
+      isExecutedAsScript("file:///tmp/scripts/demo.mjs", ["node", "/tmp/scripts/other.mjs"]),
+      false,
+    );
   });
 
   it("should normalize script error category", () => {

@@ -39,10 +39,17 @@ import {
   readWatchBaselineSnapshot,
   waitForWatchBaselineSettled,
 } from "./zotero-watch-health-lib.mjs";
+import {
+  buildScriptFailureInfo,
+  createScriptError,
+  isExecutedAsScript,
+  wrapScriptError,
+} from "./script-runtime-lib.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
+const scriptStartedAt = Date.now();
 
 const MODES = {
   dev: {
@@ -112,7 +119,7 @@ Modes:
 `);
 }
 
-function parseCli(argv) {
+export function parseCli(argv) {
   const [mode, ...flags] = argv;
   if (!mode || mode === "--help" || mode === "-h") {
     usage();
@@ -120,7 +127,17 @@ function parseCli(argv) {
   }
 
   if (!MODES[mode]) {
-    throw new Error(`Unsupported mode: ${mode}`);
+    throw createScriptError("args", `Unsupported mode: ${mode}`, {
+      failedStage: "parse-args",
+    });
+  }
+
+  const allowedFlags = new Set(["--fresh", "--keep-open", "--watch", "--no-package"]);
+  const invalidFlag = flags.find((flag) => !allowedFlags.has(flag));
+  if (invalidFlag) {
+    throw createScriptError("args", `Unknown option: ${invalidFlag}`, {
+      failedStage: "parse-args",
+    });
   }
 
   return {
@@ -505,7 +522,9 @@ async function runIntegratedTests({
 }) {
   const testFiles = await discoverZoteroTests(projectRoot);
   if (testFiles.length === 0) {
-    throw new Error("No Zotero integration tests found under zotero-tests/*.test.js");
+    throw createScriptError("environment", "No Zotero integration tests found under zotero-tests/*.test.js", {
+      failedStage: "discover-tests",
+    });
   }
 
   const harnessHref = toFileHref(path.join(projectRoot, "scripts", "zotero-test-runtime.js"));
@@ -531,7 +550,12 @@ async function runIntegratedTests({
   printTestResults(parsedResult);
 
   if (parsedResult.summary.failed > 0) {
-    throw new Error(`Zotero integration tests failed: ${parsedResult.summary.failed}`);
+    throw createScriptError("validation", `Zotero integration tests failed: ${parsedResult.summary.failed}`, {
+      failedStage: "run-tests",
+      details: {
+        failed: parsedResult.summary.failed,
+      },
+    });
   }
 }
 
@@ -542,7 +566,9 @@ async function runIntegratedScenarios({
 }) {
   const scenarioFiles = await discoverZoteroScenarios(projectRoot);
   if (scenarioFiles.length === 0) {
-    throw new Error("No Zotero scenarios found under zotero-scenarios/*.scenario.js");
+    throw createScriptError("environment", "No Zotero scenarios found under zotero-scenarios/*.scenario.js", {
+      failedStage: "discover-scenarios",
+    });
   }
 
   const harnessHref = toFileHref(path.join(projectRoot, "scripts", "zotero-scenario-runtime.js"));
@@ -568,20 +594,41 @@ async function runIntegratedScenarios({
   printScenarioResults(parsedResult);
 
   if (parsedResult.summary.failed > 0) {
-    throw new Error(`Zotero scenarios failed: ${parsedResult.summary.failed}`);
+    throw createScriptError("validation", `Zotero scenarios failed: ${parsedResult.summary.failed}`, {
+      failedStage: "run-scenarios",
+      details: {
+        failed: parsedResult.summary.failed,
+      },
+    });
   }
 }
 
-async function main() {
+export async function main() {
   const { mode, fresh, keepOpen, watch, skipPackage } = parseCli(process.argv.slice(2));
   const baseMode = MODES[mode];
 
   if (!skipPackage) {
-    buildAddon(projectRoot);
+    try {
+      buildAddon(projectRoot);
+    } catch (error) {
+      throw wrapScriptError(error, {
+        failedStage: "build-addon",
+      });
+    }
   }
 
-  const { config, buildPath, xpiPath } = await readAddonRuntimeInfo(projectRoot);
-  const runnerConfig = await readRunnerConfig({ projectRoot, mode });
+  const { config, buildPath, xpiPath } = await readAddonRuntimeInfo(projectRoot)
+    .catch((error) => {
+      throw wrapScriptError(error, {
+        failedStage: "read-runtime-info",
+      });
+    });
+  const runnerConfig = await readRunnerConfig({ projectRoot, mode })
+    .catch((error) => {
+      throw wrapScriptError(error, {
+        failedStage: "read-runner-config",
+      });
+    });
   const rdpPort = runnerConfig.rdpPort || await findFreePort();
   const watchRecoveryTestOptions = readWatchRecoveryTestOptions();
 
@@ -590,11 +637,19 @@ async function main() {
     profilePath: runnerConfig.profilePath,
     dataDir: runnerConfig.dataDir,
     fresh,
+  }).catch((error) => {
+    throw wrapScriptError(error, {
+      failedStage: "prepare-runtime",
+    });
   });
   await installProxyAddon({
     profilePath: runnerConfig.profilePath,
     addonId: config.addonId,
     addonPath: buildPath,
+  }).catch((error) => {
+    throw wrapScriptError(error, {
+      failedStage: "install-proxy-addon",
+    });
   });
 
   const args = buildStartupArgs({
@@ -682,6 +737,10 @@ async function main() {
       rdpPort,
       processLogs,
       config,
+    }).catch((error) => {
+      throw wrapScriptError(error, {
+        failedStage: "launch-session",
+      });
     });
     attachExitWatcher(session.child);
     logSessionActivation({
@@ -876,7 +935,12 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(`[zotero] ${error.stack || error.message}`);
-  process.exit(1);
-});
+if (isExecutedAsScript(import.meta.url)) {
+  main().catch((error) => {
+    const failureInfo = buildScriptFailureInfo(error, {
+      durationMs: Math.max(0, Date.now() - scriptStartedAt),
+    });
+    console.error(`[zotero] ${failureInfo.errorCategoryLabel}: ${failureInfo.errorMessage}`);
+    process.exit(1);
+  });
+}

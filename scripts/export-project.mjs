@@ -1,12 +1,22 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { withBuildLock } from "./build-lock.mjs";
+import {
+  assertNonEmptyString,
+  buildScriptFailureInfo,
+  createScriptError,
+  isExecutedAsScript,
+  readJSONFile,
+  wrapScriptError,
+} from "./script-runtime-lib.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
+const scriptStartedAt = Date.now();
 
 const COPY_PATHS = [
   ".env.example",
@@ -37,16 +47,6 @@ const STATIC_RUNTIME_BASELINE_PATHS = [
   "addon-static/locale/zh-CN/main.ftl",
   "addon-static/locale/zh-TW/main.ftl",
 ];
-
-function assert(condition, message) {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
-
-async function readJSON(filePath) {
-  return JSON.parse(await fs.readFile(filePath, "utf-8"));
-}
 
 async function ensureDir(dirPath) {
   await fs.mkdir(dirPath, { recursive: true });
@@ -157,52 +157,121 @@ function buildExportManifest(config, outputName) {
   };
 }
 
-async function main() {
+export async function main() {
   await withBuildLock("export-project.mjs", async () => {
-    const config = await readJSON(path.join(projectRoot, "config", "addon.config.json"));
-    const sourcePackage = await readJSON(path.join(projectRoot, "package.json"));
+    const configPath = path.join(projectRoot, "config", "addon.config.json");
+    const packagePath = path.join(projectRoot, "package.json");
+    const config = await readJSONFile(configPath, {
+      missingCategory: "environment",
+      invalidCategory: "validation",
+      missingStage: "read-config",
+      invalidStage: "read-config",
+      label: "config/addon.config.json",
+    });
+    const sourcePackage = await readJSONFile(packagePath, {
+      missingCategory: "environment",
+      invalidCategory: "validation",
+      missingStage: "read-package-json",
+      invalidStage: "read-package-json",
+      label: "package.json",
+    });
+    assertNonEmptyString(config?.addonRef, "addon.config.json:addonRef", {
+      category: "config",
+      failedStage: "validate-config",
+      details: { configPath, field: "addonRef" },
+    });
+    assertNonEmptyString(config?.addonVersion, "addon.config.json:addonVersion", {
+      category: "config",
+      failedStage: "validate-config",
+      details: { configPath, field: "addonVersion" },
+    });
     const outputName = `${config.addonRef}-${config.addonVersion}-pure-project`;
     const distRoot = path.join(projectRoot, "dist");
     const exportRoot = path.join(distRoot, outputName);
     const zipPath = path.join(distRoot, `${outputName}.zip`);
 
-    await ensureDir(distRoot);
-    await removeDir(exportRoot);
-    await fs.rm(zipPath, { force: true });
-    await ensureDir(exportRoot);
-
-    for (const relativePath of COPY_PATHS) {
-      await copyPath(relativePath, exportRoot);
+    try {
+      await ensureDir(distRoot);
+      await removeDir(exportRoot);
+      await fs.rm(zipPath, { force: true });
+      await ensureDir(exportRoot);
+    } catch (error) {
+      throw wrapScriptError(error, {
+        failedStage: "prepare-export-root",
+        details: { exportRoot, zipPath },
+      });
     }
 
-    await fs.writeFile(
-      path.join(exportRoot, "package.json"),
-      `${JSON.stringify(buildExportPackageJSON(sourcePackage), null, 2)}\n`,
-      "utf-8",
-    );
-    await fs.writeFile(
-      path.join(exportRoot, "README.md"),
-      `${buildExportReadme(config)}\n`,
-      "utf-8",
-    );
-    await fs.writeFile(
-      path.join(exportRoot, "export-manifest.json"),
-      `${JSON.stringify(buildExportManifest(config, outputName), null, 2)}\n`,
-      "utf-8",
-    );
+    try {
+      for (const relativePath of COPY_PATHS) {
+        await copyPath(relativePath, exportRoot);
+      }
+    } catch (error) {
+      throw wrapScriptError(error, {
+        failedStage: "copy-export-paths",
+        details: { exportRoot },
+      });
+    }
+
+    try {
+      await fs.writeFile(
+        path.join(exportRoot, "package.json"),
+        `${JSON.stringify(buildExportPackageJSON(sourcePackage), null, 2)}\n`,
+        "utf-8",
+      );
+      await fs.writeFile(
+        path.join(exportRoot, "README.md"),
+        `${buildExportReadme(config)}\n`,
+        "utf-8",
+      );
+      await fs.writeFile(
+        path.join(exportRoot, "export-manifest.json"),
+        `${JSON.stringify(buildExportManifest(config, outputName), null, 2)}\n`,
+        "utf-8",
+      );
+    } catch (error) {
+      throw wrapScriptError(error, {
+        failedStage: "write-export-metadata",
+        details: { exportRoot },
+      });
+    }
 
     const zip = spawnSync("zip", ["-r", zipPath, "."], {
       cwd: exportRoot,
       stdio: "inherit",
     });
-    assert(zip.status === 0, "zip failed");
+    if (zip.error) {
+      throw createScriptError(zip.error.code === "ENOENT" ? "environment" : "execution", zip.error.message || String(zip.error), {
+        failedStage: "zip-export",
+        details: {
+          exportRoot,
+          zipPath,
+        },
+        cause: zip.error,
+      });
+    }
+    if (zip.status !== 0) {
+      throw createScriptError("execution", `zip exited with code ${zip.status ?? 1}`, {
+        failedStage: "zip-export",
+        details: {
+          exportRoot,
+          zipPath,
+          exitCode: zip.status ?? 1,
+        },
+      });
+    }
 
     console.log(`Pure project export generated: ${exportRoot}`);
     console.log(`Pure project archive generated: ${zipPath}`);
   });
 }
 
-main().catch((error) => {
-  console.error(error?.stack || error?.message || String(error));
-  process.exit(1);
-});
+if (isExecutedAsScript(import.meta.url)) {
+  main().catch((error) => {
+    const failureInfo = buildScriptFailureInfo(error, {
+      durationMs: Math.max(0, Date.now() - scriptStartedAt),
+    });
+    console.error(`${failureInfo.errorCategoryLabel}: ${failureInfo.errorMessage}`);
+    process.exit(1);
+  });
+}

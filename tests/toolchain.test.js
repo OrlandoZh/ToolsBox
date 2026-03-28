@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -18,6 +19,12 @@ function removeIfExists(filePath) {
   }
 }
 
+function makeTempReferenceRoot() {
+  const referenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "addontemplate-cleanroom-reference-"));
+  fs.writeFileSync(path.join(referenceRoot, "snapshot.md"), "temporary reference snapshot\n", "utf-8");
+  return referenceRoot;
+}
+
 const EXPORTED_STATIC_RUNTIME_BASELINE = [
   "addon-static/bootstrap.js",
   "addon-static/content/preferences.xhtml",
@@ -30,7 +37,7 @@ const EXPORTED_STATIC_RUNTIME_BASELINE = [
 ];
 
 describe("Toolchain Scripts", () => {
-  it("should pass lint/format/typecheck/verify checks", () => {
+  it("should pass lint/format/typecheck/verify/cleanroom-audit checks", () => {
     execFileSync("node", ["scripts/lint.mjs"], {
       cwd: projectRoot,
       stdio: "pipe",
@@ -44,6 +51,10 @@ describe("Toolchain Scripts", () => {
       stdio: "pipe",
     });
     execFileSync("node", ["scripts/verify.mjs"], {
+      cwd: projectRoot,
+      stdio: "pipe",
+    });
+    execFileSync("node", ["scripts/cleanroom-audit.mjs"], {
       cwd: projectRoot,
       stdio: "pipe",
     });
@@ -63,25 +74,42 @@ describe("Toolchain Scripts", () => {
     assert.ok(Array.isArray(updates));
     assert.equal(updates[0].version, config.addonVersion);
     assert.ok(typeof updates[0].update_link === "string");
+    assert.equal(releaseManifest.status, "passed");
     assert.equal(releaseManifest.addonId, config.addonId);
     assert.equal(releaseManifest.addonVersion, config.addonVersion);
+    assert.equal(releaseManifest.errorCategory, null);
+    assert.equal(releaseManifest.failedStage, null);
     assert.ok(releaseManifest.xpiName.endsWith(".xpi"));
   });
 
   it("should pass release preflight and generate integrity report", () => {
+    const referenceRoot = makeTempReferenceRoot();
+
     execFileSync("node", ["scripts/package.mjs"], {
       cwd: projectRoot,
       stdio: "pipe",
     });
-    execFileSync("node", ["scripts/release-preflight.mjs"], {
-      cwd: projectRoot,
-      stdio: "pipe",
-    });
+    try {
+      execFileSync("node", ["scripts/release-preflight.mjs"], {
+        cwd: projectRoot,
+        stdio: "pipe",
+        env: {
+          ...process.env,
+          CLEANROOM_REFERENCE_ROOT: referenceRoot,
+        },
+      });
+    } finally {
+      fs.rmSync(referenceRoot, { recursive: true, force: true });
+    }
 
     const preflightReport = readJSON(path.join(projectRoot, "dist", "release-preflight.json"));
+    assert.equal(preflightReport.status, "passed");
     assert.ok(typeof preflightReport.xpiSHA256 === "string");
     assert.equal(preflightReport.xpiSHA256.length, 64);
     assert.ok(Number(preflightReport.xpiSizeBytes) > 0);
+    assert.equal(preflightReport.cleanroomAuditStatus, "passed");
+    assert.equal(preflightReport.cleanroomAuditMode, "release");
+    assert.equal(preflightReport.cleanroomSimilarityStatus, "available");
   });
 
   it("should generate release upload plan and notes", () => {
@@ -93,7 +121,10 @@ describe("Toolchain Scripts", () => {
     const releasePlan = readJSON(path.join(projectRoot, "dist", "release-plan.json"));
     const releaseNotes = fs.readFileSync(path.join(projectRoot, "dist", "release-notes.md"), "utf-8");
 
+    assert.equal(releasePlan.status, "passed");
     assert.equal(releasePlan.addonId, "cleanroom-template@example.com");
+    assert.equal(releasePlan.errorCategory, null);
+    assert.equal(releasePlan.failedStage, null);
     assert.ok(Array.isArray(releasePlan.artifactFiles));
     assert.ok(releasePlan.artifactFiles.includes("release-notes.md"));
     assert.ok(releaseNotes.includes("## Upload Steps"));
