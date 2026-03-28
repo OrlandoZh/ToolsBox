@@ -5,13 +5,25 @@
 
 ## 最后检查日期
 
-`2026-03-27`
+`2026-03-28`
 
 ## 当前结论
 
 - 当前仓库已经是一个可投入实际开发的 clean-room Zotero 插件模板。
 - 基础插件骨架、构建、打包、真机验证、受控恢复、质量闸门、Obsidian 人工介入、纯项目导出、本地发布矩阵都已接通。
-- 当前 delegation manifest 已按 `2026-03-27` 现有新鲜工件再次重基线到人工 Reader verdict 待命态；`ENG-HIGH-102 / ENG-LOW-204~206` 的 watch startup health recovery 已完成并转历史，Reader 自动代码批次与 Obsidian visual enhancement 批次也都已完成。当前产品阶段固定为等待人工 Reader verdict，当前自动结论为 `ui-regression-candidate + complete -> npm run agent:obsidian`；当前 active 高逻辑任务已切到 `READER-HIGH-123`，不再挂新的 active Reader low-task。
+- 当前“完成度 / 当前主线 / 当前剩余项”只认 `docs/CURRENT_BACKLOG.md` 的“当前单一事实源”；Checklist 只确认资产与链路是否齐备，不再自己冻结另一套 current truth。
+
+<!-- CURRENT-TRUTH-SUMMARY:START -->
+- 当前真实完成度约为 `97%`；仓库已可继续开发，但 `ENG-HIGH-103` 仍未正式收口
+- 当前唯一主线批次已固定为 `ENG-HIGH-103`（工程化长期增强第一批）；`READER-HIGH-123`、`ENG-HIGH-102 / ENG-LOW-204~206` 继续只保留为历史契约 / review artifact 来源
+- 当前 `ENG-LOW-207`、`ENG-LOW-208`、`ENG-LOW-209` 已完成本地 milestone commit；`ENG-LOW-210` 暂未提交，需等待 fresh evidence 与文档 truth 一致后再收口
+- `2026-03-28` 最新 fresh 证据显示：`watch` 为 `healthy`（`2026-03-28T11:47:43.237Z`），`agent:zotero:e2e` 为 `failed`（`2026-03-28T11:50:18.315Z`），`agent:gate` 当前未通过（`2026-03-28T11:51:26.793Z`，`gatePassed=false`）
+- 当前更准确的主阻断归因为 `capture-unstable`：`library` / `reader` 几何仍对齐 `2000x1200`，但视觉采集未稳定；当前应先重跑 `npm run agent:zotero:e2e`，暂不进入 baseline refresh、autofix 或 obsidian-first
+- 当前主线只做：runtime 生命周期错误边界与轻量时序遥测、剩余核心脚本入口的共享失败模型、`engineeringHardening` 的 lifecycle/perf 最小摘要、manifest / 文档 / docs consistency 的单一事实源收口
+- 当前明确继续延后：远端发布编排、远端 `updateURL` 闭环验证、下一轮 Reader 更深事件点、`P1` 白名单扩面；除非 fresh `watch -> e2e -> gate` 重新出现真实回归
+- `LEGAL_RISK_CHECKLIST.md` 中的 Release Gate 继续保持 `release-only` 人工流程，不纳入本批自动化完成定义
+- 当前批次收口后，默认下一优先级固定为 `工程化维护文档与自动同步机制`
+<!-- CURRENT-TRUTH-SUMMARY:END -->
 
 ## 核心资产检查
 
@@ -27,8 +39,8 @@
 | 本地发布矩阵 | ✅ | `release:matrix` / `release:install-smoke:*` / `agent:gate:release` 已接通本地发布画像 |
 | Obsidian 人工介入 | ✅ | 已有工作台、白板、人工窗口、快速上手、介入规范；可选 Mermaid / Excalidraw companion 视图也已落地，可由 `AGENT_OBSIDIAN_VISUALS=1` 启用 |
 | 纯项目导出 | ✅ | `export:project` 已可剔除 agent/runner/reference |
-| 委托分工脚手架 | ✅ | manifest / CLI / 审查工件已落地，`DOC-LOW-001`、`ENG-LOW-102` 已完成试点验证；`ENG-LOW-201~203`、`ENG-LOW-204~206`、`READER-LOW-201~203`、`READER-LOW-204~206`、`READER-LOW-207~209`、`READER-LOW-210~212`、`READER-LOW-213~215`、`READER-LOW-216~218`、`READER-LOW-225~227`、`READER-LOW-228~230`、`READER-LOW-231~233`、`READER-LOW-234~236`、`READER-LOW-237~239`、`READER-LOW-249~251`、`READER-LOW-252~254`、`READER-LOW-255~257`、`READER-LOW-258~260` 与 `OBSIDIAN-LOW-301~303` 已转入历史 review artifact，当前 active Reader 任务源已切到 `READER-HIGH-123` |
-| 串行 low-task 收口 | ✅ | Reader 自动代码批次与 Obsidian visual enhancement 批次已全部归档到历史 review artifact；当前产品阶段为人工 Reader verdict 待命，当前默认主路径是统一 `ui-regression-candidate + complete -> npm run agent:obsidian`，在 verdict 明确前不再扩写新的 Reader low-task |
+| 委托分工脚手架 | ✅ | manifest / CLI / 审查工件已落地，`DOC-LOW-001`、`ENG-LOW-102` 已完成试点验证；`ENG-LOW-201~203`、`ENG-LOW-204~206`、`READER-LOW-201~203`、`READER-LOW-204~206`、`READER-LOW-207~209`、`READER-LOW-210~212`、`READER-LOW-213~215`、`READER-LOW-216~218`、`READER-LOW-225~227`、`READER-LOW-228~230`、`READER-LOW-231~233`、`READER-LOW-234~236`、`READER-LOW-237~239`、`READER-LOW-249~251`、`READER-LOW-252~254`、`READER-LOW-255~257`、`READER-LOW-258~260` 与 `OBSIDIAN-LOW-301~303` 已转入历史 review artifact，当前 active 高逻辑任务源已切到 `ENG-HIGH-103` |
+| 串行 low-task 收口 | ✅ | Reader 自动代码批次与 Obsidian visual enhancement 批次已全部归档到历史 review artifact；`READER-HIGH-123` 已完成唯一 Reader verdict 与单分支收口，当前主线已进入 `ENG-HIGH-103` 的工程化长期增强第一批 |
 
 ## 源码结构检查
 

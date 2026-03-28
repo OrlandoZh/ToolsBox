@@ -69,21 +69,33 @@
 - 审查工件见 `dist/agent-delegation/DOC-LOW-001/review.json`
 - `ENG-LOW-102`（真实剩余主线与 delegation 状态文档同步）已于 `2026-03-23` 被 Codex 审查为 `accepted`
 - 审查工件见 `dist/agent-delegation/ENG-LOW-102/review.json`
-- 当前 manifest 已再次重基线：`ENG-HIGH-102 / ENG-LOW-204~206`、`READER-HIGH-122`、`READER-HIGH-121 / READER-LOW-258~260`、`READER-HIGH-120 / READER-LOW-255~257`、`READER-HIGH-119 / READER-LOW-252~254`、`READER-HIGH-118 / READER-LOW-249~251`、`READER-HIGH-114`、`READER-HIGH-113 / READER-LOW-237~239`、`READER-HIGH-112 / READER-LOW-234~236`、`READER-HIGH-111 / READER-LOW-231~233`、`READER-HIGH-110 / READER-LOW-228~230`、`READER-HIGH-109 / READER-LOW-225~227`、`READER-HIGH-106` 与 `OBSIDIAN-HIGH-101` 仅保留为历史契约 / review artifact；当前 active 高逻辑任务已切到 `READER-HIGH-123`
+- 当前 manifest 已再次重基线：`ENG-HIGH-103 / ENG-LOW-207~210` 是当前 active 的工程化长期增强第一批；`READER-HIGH-123`、`ENG-HIGH-102 / ENG-LOW-204~206`、`READER-HIGH-122`、`READER-HIGH-121 / READER-LOW-258~260`、`READER-HIGH-120 / READER-LOW-255~257`、`READER-HIGH-119 / READER-LOW-252~254`、`READER-HIGH-118 / READER-LOW-249~251`、`READER-HIGH-114`、`READER-HIGH-113 / READER-LOW-237~239`、`READER-HIGH-112 / READER-LOW-234~236`、`READER-HIGH-111 / READER-LOW-231~233`、`READER-HIGH-110 / READER-LOW-228~230`、`READER-HIGH-109 / READER-LOW-225~227`、`READER-HIGH-106` 与 `OBSIDIAN-HIGH-101` 仅保留为历史契约 / review artifact
 - `READER-LOW-201`、`READER-LOW-202`、`READER-LOW-203` 已于 `2026-03-24` 收口并转入历史 review artifact
 - `READER-HIGH-102`、`READER-LOW-204`、`READER-LOW-205`、`READER-LOW-206` 已于 `2026-03-24` 收口并转入历史 review artifact
 - `READER-HIGH-103`、`READER-LOW-207`、`READER-LOW-208`、`READER-LOW-209` 已于 `2026-03-24` 收口并转入历史 review artifact
 - `READER-HIGH-104`、`READER-LOW-210`、`READER-LOW-211`、`READER-LOW-212` 已于 `2026-03-25` 收口并转入历史 review artifact
 - 上一轮 `P1` canonical fingerprint 收口已进入历史 review artifact；当前不再把该批 low-task 写成 active 项
 - `ENG-LOW-201`、`ENG-LOW-202`、`ENG-LOW-203` 已于 `2026-03-24` 以 `reworked-by-codex` 方式收口，并转入历史 review artifact
-- 当前产品阶段已切到等待人工 Reader verdict；fresh evidence 当前为 `ui-regression-candidate + complete`
-- 当前这轮 baseline refresh coverage 继续保持收口：`restart-library.png`、`restart-reader.png`、`hot-reload-library.png`、`hot-reload-reader.png` 均已对齐到 `2000x1200`
-- 当前默认 nextAction 必须统一为 `npm run agent:obsidian`
-- 当前 active Reader 任务源已切到 `READER-HIGH-123`，且不再挂新的 active Reader low-task
+- 当前 `READER-HIGH-123` 已完成唯一 Reader verdict，并已按 `预期 UI 变化 -> ready / force-next / npm run agent:zotero:e2e:update-baseline` 执行一次受控 baseline refresh
+- 当前这轮 baseline refresh coverage 已完成收口：`restart-library.png`、`restart-reader.png`、`hot-reload-library.png`、`hot-reload-reader.png` 均已对齐到 `2000x1200`
 - Obsidian visual enhancement 已完成：默认工作台保持 Markdown + Canvas + 人工指令窗口，`AGENT_OBSIDIAN_VISUALS=1` 仅额外生成已落地的 Mermaid / Excalidraw companion 视图
 - 全链路（manifest 加载、scope 重叠检测、快照比对、聚焦测试、审查结论）已跑通，委托分工脚手架已具备生产可用性
 - Reader 本轮 7 个更深事件点已完成接入与摘要收口
-- `2026-03-26` 当前收口约束已锁定：当前不默认推荐 `npm run agent:zotero:e2e`、`npm run agent:zotero:e2e:update-baseline` 或 `npm run agent:zotero:autofix`；应先保持 `ui-regression-candidate + complete -> npm run agent:obsidian` 的默认主路径，并等待唯一人工 verdict
+- `2026-03-28` 当前收口约束已锁定：`READER-HIGH-123` 已按唯一 verdict 完成单分支收口，不重复第二次 baseline refresh；是否重新进入人工 verdict / obsidian 路径，统一由 fresh `watch -> e2e -> monitor -> gate` 决定
+
+当前“完成度 / 当前主线 / 当前剩余项”只认 `docs/CURRENT_BACKLOG.md` 的“当前单一事实源”；Roadmap 通过自动同步摘要块镜像这份 truth，不再单独冻结另一套 current phase。
+
+<!-- CURRENT-TRUTH-SUMMARY:START -->
+- 当前真实完成度约为 `97%`；仓库已可继续开发，但 `ENG-HIGH-103` 仍未正式收口
+- 当前唯一主线批次已固定为 `ENG-HIGH-103`（工程化长期增强第一批）；`READER-HIGH-123`、`ENG-HIGH-102 / ENG-LOW-204~206` 继续只保留为历史契约 / review artifact 来源
+- 当前 `ENG-LOW-207`、`ENG-LOW-208`、`ENG-LOW-209` 已完成本地 milestone commit；`ENG-LOW-210` 暂未提交，需等待 fresh evidence 与文档 truth 一致后再收口
+- `2026-03-28` 最新 fresh 证据显示：`watch` 为 `healthy`（`2026-03-28T11:47:43.237Z`），`agent:zotero:e2e` 为 `failed`（`2026-03-28T11:50:18.315Z`），`agent:gate` 当前未通过（`2026-03-28T11:51:26.793Z`，`gatePassed=false`）
+- 当前更准确的主阻断归因为 `capture-unstable`：`library` / `reader` 几何仍对齐 `2000x1200`，但视觉采集未稳定；当前应先重跑 `npm run agent:zotero:e2e`，暂不进入 baseline refresh、autofix 或 obsidian-first
+- 当前主线只做：runtime 生命周期错误边界与轻量时序遥测、剩余核心脚本入口的共享失败模型、`engineeringHardening` 的 lifecycle/perf 最小摘要、manifest / 文档 / docs consistency 的单一事实源收口
+- 当前明确继续延后：远端发布编排、远端 `updateURL` 闭环验证、下一轮 Reader 更深事件点、`P1` 白名单扩面；除非 fresh `watch -> e2e -> gate` 重新出现真实回归
+- `LEGAL_RISK_CHECKLIST.md` 中的 Release Gate 继续保持 `release-only` 人工流程，不纳入本批自动化完成定义
+- 当前批次收口后，默认下一优先级固定为 `工程化维护文档与自动同步机制`
+<!-- CURRENT-TRUTH-SUMMARY:END -->
 
 用中文理解，当前系统已经是：
 
@@ -104,11 +116,11 @@
 - `agent:monitor` / `agent:dashboard` 已显示 `contextMatchLevel`
 - 本地 stable / beta 发布矩阵真机闭环已完成，宿主噪声已完成不阻断归类
 - 当前串行 Reader 自动修复型 low-task 已全部完成；`READER-HIGH-118 / READER-LOW-249~251`、`READER-HIGH-113 / READER-LOW-237~239`、`READER-HIGH-112 / READER-LOW-234~236`、`READER-HIGH-111 / READER-LOW-231~233`、`READER-HIGH-110 / READER-LOW-228~230` 与 `READER-HIGH-109 / READER-LOW-225~227` 均已归档到历史 review artifact；`READER-HIGH-114` 也已转为历史契约源
-- fresh 证据已确认：`reader event hook diagnostics` 与 `reader fine-grained hook diagnostics` 均已通过，`visualPrimaryBlockerKind` 当前为 `ui-regression-candidate`，`visualCanonicalCoverageKind` 当前为 `complete`；因此当前默认路径继续保持 `npm run agent:obsidian`
-- Obsidian 工作台继续沿用现有 `状态 / 模式 / 下一步指令 / 关注文件 / 备注` 字段，且当前重新成为默认主路径
+- 历史收口中，`reader event hook diagnostics` 与 `reader fine-grained hook diagnostics` 均已通过；当前 fresh 结论若再次变化，以上面的自动同步摘要块为准
+- Obsidian 工作台继续沿用现有 `状态 / 模式 / 下一步指令 / 关注文件 / 备注` 字段，但当前仅作为长期人工兜底与回放界面
 - `ENG-HIGH-102 / ENG-LOW-204~206` 已完成并转入历史 review artifact：watch startup health 的 bounded settle 与 truth alignment 已落地，并已把 fresh watch truth 拉回 `healthy`
-- 当前 active Reader batch 为 `READER-HIGH-123`；若 fresh evidence 再次变化，必须先由 Codex 生成新的高逻辑批次
-- 当前整体完成度口径约为 `95%`：仓库已可用于实际开发，剩余主线是 Reader 人工 verdict 与 verdict 后的单分支收尾
+- 当前 active 高逻辑 batch 仍为 `ENG-HIGH-103`；若 future fresh evidence 指向真实新回归，再由 Codex 生成新的高逻辑批次
+- 当前单一事实源统一收敛在 `docs/CURRENT_BACKLOG.md` 的“当前单一事实源”小节；Roadmap 只引用该口径，不再单独冻结另一套“下一轮 `P1 / Reader / 工程化` 批次”
 
 ## 2. 当前距离真正自主开发还差什么
 
@@ -452,21 +464,21 @@ P2 的前置底图在 `2026-03-20` 已补第一批：
 
 ### Step 1
 
-先读取最新 `e2e / autofix / gate / review artifact`，重新冻结下一轮高逻辑主线。
+直接按 `docs/CURRENT_BACKLOG.md` 的单一事实源推进当前已固定的 `ENG-HIGH-103`（工程化长期增强第一批）。
 
 原因：
 
-- 当前这批串行 low tasks 已全部完成
-- 继续推进前，需要确认最新真实缺口，而不是复述旧 pending 任务
-- 高逻辑边界仍应由 Codex 冻结，避免低逻辑委托越界
+- Reader 主线已经收尾，当前不需要重新定义第二套高逻辑主线
+- 当前真实缺口已经收敛到 runtime 生命周期边界、共享脚本失败模型、lifecycle/perf 最小摘要和文档一致性守卫
+- 先把 `ENG-HIGH-103` 做实，才能为未来 Reader / `P1` / 远端发布闭环打更稳的底座
 
 ### Step 2
 
-在新的高逻辑契约冻结后，再按 manifest 串行生成下一批低逻辑任务。
+继续延后远端发布编排、远端 `updateURL` 闭环、Reader 更深事件点和 `P1` 扩面；只有 fresh `watch -> e2e -> gate` 重新出现真实回归时，才新开高逻辑批次。
 
 ### Step 3
 
-把 `P2` 继续作为长期扩展，不和下一轮 `P1 / Reader / 工程化` 收尾混写。
+把 `P2` 继续作为长期扩展，不和当前 `ENG-HIGH-103` 的收口混写。
 
 ## 5. 和当前脚本体系的关系
 
@@ -491,19 +503,21 @@ P2 的前置底图在 `2026-03-20` 已补第一批：
 
 ## 6. 近期建议优先做的 5 项任务
 
-如果按投入产出比排序，我建议下一轮先做这 5 项：
+如果按投入产出比排序，我建议当前固定批次优先做这 5 项：
 
-1. 扩大 P1 白名单补丁类别，从“注册遗漏”继续扩到更深 Reader 声明漂移与静态基线漂移
-2. 按补丁类别继续细化 `verification contract` 与 patch sandbox，保证补丁可解释、可阻断、可归档
-3. 继续扩充 `zotero-scenarios/`，重点补 Reader 深交互与恢复后回归场景
-4. 补统一错误边界、参数校验、耗时指标和文档一致性守卫
-5. 在继续延后远端发布的前提下，把本地 release 结论稳定同步到文档与人工工作台
+1. 给插件运行时和脚本入口补统一错误边界，确保 startup / shutdown / agent CLI / monitor / gate / obsidian 的失败都落入稳定分类
+2. 把 `zotero / e2e / autofix / release / obsidian` 的参数、环境变量和配置校验收敛到共享校验层
+3. 给 HTTP 层补默认 timeout、可选 retry / cancel、慢操作统计和标准化 timeout 错误
+4. 在 `agent:monitor` / `agent:dashboard` / `agent:gate` 中只追加最小“工程化硬化信号”摘要，不改变既有结论和 `nextAction`
+5. 用 docs consistency 测试守住当前完成度、剩余项、`release-only` legal gate 和工程化欠账的单一事实源
 
 ## 7. 当前阶段结论
 
 一句话总结：
 
 当前模板已经是“可验证、可恢复、可门禁”的 agent 开发底座，但还不是“可持续自主修复”的完整 agent 框架。
+
+当前 `ENG-HIGH-103` 收口后的默认下一优先级，统一以上方自动同步摘要块为准；Roadmap 这里只保留“先减少 manifest / 正式文档 / docs consistency 口径漂移，再决定是否开启新的高逻辑批次”的方向判断。
 
 下一阶段不该先追求让 agent 大范围改代码，而应该先把：
 

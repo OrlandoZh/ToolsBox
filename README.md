@@ -164,6 +164,7 @@ npm run format:check  # 空白格式校验（tab/尾随空格/末尾换行）
 npm run typecheck     # 运行时 API 与 d.ts 声明漂移检查
 npm run cleanroom:audit # 开发态 clean-room 门禁与审计工件输出
 npm run cleanroom:sim   # 可选：对本地 reference 快照运行相似度扫描
+npm run docs:sync-current-truth # 同步正式文档中的当前 truth 摘要块
 npm run check    # lint + format + typecheck + verify + cleanroom:audit + test
 npm run build    # 构建：生成 manifest/prefs/bootstrap，打包源码
 npm run package  # 打包：创建 .xpi 发布包
@@ -302,22 +303,30 @@ node scripts/agent-delegation.mjs close <taskId> --message "feat: 基本实现 x
 - `READER-HIGH-105` 与 `READER-LOW-213`、`READER-LOW-214`、`READER-LOW-215` 已于 `2026-03-25` 收口并转入历史 review artifact，不再作为当前 active batch
 - `READER-LOW-216`、`READER-LOW-217`、`READER-LOW-218` 已都有 review artifact，并已转入历史 review artifact，不再作为当前 active low-task
 - `OBSIDIAN-LOW-301`、`OBSIDIAN-LOW-302`、`OBSIDIAN-LOW-303` 已于 `2026-03-25` 以 `reworked-by-codex` 收口，并转入历史 review artifact，不再作为当前 active low-task
-- `2026-03-25` 最新 fresh `watch -> e2e -> monitor -> gate` 已确认：`watch` 为 healthy，`reader event hook diagnostics` 已通过，`reader fine-grained hook diagnostics` 已通过，`agent:zotero:e2e` / `agent:gate` 当前主阻断仍是 `reader-ui:reader-visual-drift`
-- `2026-03-28` 最新 fresh `watch -> e2e -> monitor -> gate -> obsidian` 已确认：`watch` 为 healthy，`agent:zotero:e2e` 为 passed，`agent:gate` 为 passed，`reader event hook diagnostics` 与 `reader fine-grained hook diagnostics` 均已通过，当前 Reader 视觉漂移计数已归零，主线已退出人工 verdict 阶段
 - `READER-HIGH-123` 已按唯一分支收口：人工窗口写入 `预期 UI 变化 -> ready / force-next / npm run agent:zotero:e2e:update-baseline` 后，仅执行了一次受控 baseline refresh；随后 `restart-library.png`、`restart-reader.png`、`hot-reload-library.png`、`hot-reload-reader.png` 均已对齐到 `2000x1200`
 - `READER-HIGH-119 / READER-LOW-252~254` 已完成并转入历史契约 / review artifact：capture attempt diagnosis 解释层已接入 validation / e2e / monitor / gate / dashboard / loop / obsidian
 - `READER-HIGH-120 / READER-LOW-255~257` 已完成并转入历史契约 / review artifact：refresh-first 与单分支选择语义只保留为历史工件
 - `READER-HIGH-121 / READER-LOW-258~260` 已完成并转入历史契约 / review artifact：reader stage 的最小 prepare/open/settle 收紧与 gate headline 对齐已落地，并把 fresh truth 拉回 `ui-regression-candidate + complete`
 - `ENG-HIGH-102 / ENG-LOW-204~206` 已完成并转入历史契约 / review artifact：watch startup health 的 bounded settle 与 truth alignment 已落地，并把 fresh watch truth 拉回 `healthy`
-- 当前产品阶段已从“等待人工 Reader verdict”切换到“`ENG-HIGH-103` 工程化长期增强第一批”；`READER-HIGH-123` 已转为历史契约源，当前不再挂新的 active Reader low-task
 - Obsidian visual enhancement 已完成并转入历史契约 / review artifact：当前默认工作台继续保持 Markdown + Canvas + 人工指令窗口，`OBSIDIAN-HIGH-101` 只保留为历史高逻辑契约源，不再挂新的 active low-task
 - `AGENT_OBSIDIAN_VISUALS=1` 作为可选增强层启用：在现有 Markdown 状态页、证据页、Quickstart、Advanced Guide、人工指令窗口、`.canvas` 白板之外，额外生成 `05-Zotero-Agent-闭环流程图.md` 与 `06-Zotero-Agent-人工复核决策.excalidraw.md`
 - 当前约束固定为：`watch stale` 先于 Reader 症状引导下一步动作；`agent:zotero:e2e` / `agent:gate` 的 `exitCode=2` 继续视为“验证失败但工件有效”
 - 当前约束固定为：`READER-HIGH-123` 已按单分支收口完成，不重复第二次 baseline refresh；当前批次也不重开 Reader / `P1` / 远端发布主线
-- 当前约束固定为：Obsidian 工作台继续保留三模板人工 verdict 机制，但当前默认主路径已经不再是 `npm run agent:obsidian`
-- 当前完成度口径约为 `97%`：仓库已可用于实际开发；当前 Reader 主线已收尾，当前 active 高逻辑源为 `ENG-HIGH-103`
-- 当前单一事实源统一收敛在 [docs/CURRENT_BACKLOG.md](docs/CURRENT_BACKLOG.md) 的“当前单一事实源”小节；README / Checklist / Assessment / Roadmap 只引用这份当前 truth，不再各自冻结另一套“下一批主线”
-- 当前批次正式收口后，默认下一优先级固定为 `工程化维护文档与自动同步机制`，优先减少 manifest / 正式文档 / docs consistency 的口径漂移，而不是提前重开 Reader / `P1` / 远端发布
+- 当前约束固定为：Obsidian 工作台继续保留三模板人工 verdict 机制，但当前默认主路径是否重新进入 `npm run agent:obsidian`，统一以 fresh `watch -> e2e -> monitor -> gate` 为准
+- 当前“完成度 / 当前主线 / 当前剩余项”只认 [docs/CURRENT_BACKLOG.md](docs/CURRENT_BACKLOG.md) 的“当前单一事实源”；README 只保留下面这块自动同步摘要，不再手写第二套 current truth。
+
+<!-- CURRENT-TRUTH-SUMMARY:START -->
+- 当前真实完成度约为 `97%`；仓库已可继续开发，但 `ENG-HIGH-103` 仍未正式收口
+- 当前唯一主线批次已固定为 `ENG-HIGH-103`（工程化长期增强第一批）；`READER-HIGH-123`、`ENG-HIGH-102 / ENG-LOW-204~206` 继续只保留为历史契约 / review artifact 来源
+- 当前 `ENG-LOW-207`、`ENG-LOW-208`、`ENG-LOW-209` 已完成本地 milestone commit；`ENG-LOW-210` 暂未提交，需等待 fresh evidence 与文档 truth 一致后再收口
+- `2026-03-28` 最新 fresh 证据显示：`watch` 为 `healthy`（`2026-03-28T11:47:43.237Z`），`agent:zotero:e2e` 为 `failed`（`2026-03-28T11:50:18.315Z`），`agent:gate` 当前未通过（`2026-03-28T11:51:26.793Z`，`gatePassed=false`）
+- 当前更准确的主阻断归因为 `capture-unstable`：`library` / `reader` 几何仍对齐 `2000x1200`，但视觉采集未稳定；当前应先重跑 `npm run agent:zotero:e2e`，暂不进入 baseline refresh、autofix 或 obsidian-first
+- 当前主线只做：runtime 生命周期错误边界与轻量时序遥测、剩余核心脚本入口的共享失败模型、`engineeringHardening` 的 lifecycle/perf 最小摘要、manifest / 文档 / docs consistency 的单一事实源收口
+- 当前明确继续延后：远端发布编排、远端 `updateURL` 闭环验证、下一轮 Reader 更深事件点、`P1` 白名单扩面；除非 fresh `watch -> e2e -> gate` 重新出现真实回归
+- `LEGAL_RISK_CHECKLIST.md` 中的 Release Gate 继续保持 `release-only` 人工流程，不纳入本批自动化完成定义
+- 当前批次收口后，默认下一优先级固定为 `工程化维护文档与自动同步机制`
+<!-- CURRENT-TRUTH-SUMMARY:END -->
+
 - `READER-HIGH-109 / READER-LOW-225~227` 的逐目标视觉证据导航已完成，并转入历史 review artifact；当前直接复用这些既有证据，不再把证据导航继续挂成 active 开发批次
 - `READER-HIGH-118 / READER-LOW-249~251` 已完成并转入历史契约 / review artifact；其消费者真相一致化与单 stage choreography 收紧结论只保留为历史对照
 - Obsidian 工作台继续保留人工 verdict 能力，但当前仅作为人工回放与复核界面；在 `READER-HIGH-123` 收口后，自动链已不再把 `npm run agent:obsidian` 当作当前 Reader 主阻断的默认下一步

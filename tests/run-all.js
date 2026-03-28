@@ -22,6 +22,7 @@ import './feature-composer.test.js';
 import './reader.test.js';
 import './build.test.js';
 import './docs-consistency.test.js';
+import './docs-current-truth-lib.test.js';
 import './bootstrap-bridge.test.js';
 import './zotero-runner-lib.test.js';
 import './toolchain.test.js';
