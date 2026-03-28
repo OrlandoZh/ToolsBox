@@ -81,13 +81,43 @@ AGENT_OBSIDIAN_DIR=/你的/Obsidian/工作区 AGENT_OBSIDIAN_VISUALS=1 npm run a
 - `AGENT_OBSIDIAN_VISUALS=1` 只是可选增强层，不会改变 `watch / e2e / gate / loop` 的判定语义。
 - Mermaid / Excalidraw 只读现有 summary / evidence，不是新的判定源，也不替代 `10-Zotero-Agent-人工指令窗口.md`。
 
+## Reader Verdict 收尾约束
+
+当当前阶段显示“等待人工 Reader verdict”时，人工窗口仍然只有这 5 个字段：
+
+- `状态`
+- `模式`
+- `下一步指令`
+- `关注文件`
+- `备注`
+
+不要新增第二套输入机制，也不要把 Mermaid / Excalidraw 当成新的 verdict 来源。唯一人工输入面仍然是 `10-Zotero-Agent-人工指令窗口.md`。
+
+推荐只使用以下三种模板：
+
+1. `预期 UI 变化`
+   - `状态: ready`
+   - `模式: force-next`
+   - `下一步指令: npm run agent:zotero:e2e:update-baseline`
+   - 含义：只执行一次受控 baseline refresh，随后回到默认闭环。
+2. `真实回归`
+   - `状态: hold`
+   - `模式: hold`
+   - `关注文件:` 填 Reader / scenario 相关最小文件集合
+   - `备注:` 写清差异说明，随后再由 Codex 开最小修复批次。
+3. `证据不足`
+   - `状态: hold`
+   - `模式: hold`
+   - `备注:` 写清缺失证据项
+   - 含义：先补证据，不直接刷新 baseline。
+
 ## 人工不介入时
 
 - `npm run agent:obsidian` 只负责刷新工作台，不会阻塞自动化
 - `npm run agent:zotero:loop:human` 会提供一个短暂人工窗口
 - 如果人工没有改动 `10-Zotero-Agent-人工指令窗口.md`，agent 会按自动路径继续
-- 如果人工填写了“下一步指令”，当前回合会按人工路径调整动作顺序
-- 如果人工把 `模式` 改为 `hold`，当前回合会停在人工设定的节点，等待下一步处理
+- 如果人工填写了 `force-next + npm run agent:zotero:e2e:update-baseline`，当前回合只执行一次受控 baseline refresh，然后回到默认闭环
+- 如果人工填写了 `hold` 模式，当前回合会停在人工设定的节点，等待下一步处理
 
 ## 建议流程
 

@@ -176,6 +176,62 @@ describe("Agent Frontpage Summary Lib", () => {
     assert.equal(frontpage.primarySignals.length, 0);
   });
 
+  it("should keep stable monitor next action on fresh healthy runs even if old autofix history is unrecovered", () => {
+    const frontpage = buildMonitorFrontpageSummary({
+      watchStatus: {
+        present: true,
+        status: "healthy",
+        statusLabel: "健康",
+        ageText: "1 分钟",
+        latestTrigger: "startup",
+      },
+      zoteroValidation: {
+        e2e: {
+          present: true,
+          status: "passed",
+          statusLabel: "通过",
+          ageText: "6 分钟",
+          strategy: "hot",
+          readerEventReport: {
+            present: true,
+            status: "passed",
+            statusLabel: "通过",
+            available: true,
+            syntheticFallbackAvailable: true,
+          },
+        },
+        autofix: {
+          present: true,
+          status: "unrecovered",
+          statusLabel: "未恢复",
+          ageText: "30 小时",
+          attempts: 3,
+          patchPlanStatus: "review-ready",
+          patchPlanStatusLabel: "可进入受限补丁审阅",
+        },
+        watchRecovery: {
+          present: true,
+          status: "passed",
+          statusLabel: "通过",
+          ageText: "178 小时",
+          latestTrigger: "session-restart-recovery",
+        },
+      },
+      agentMemory: {
+        recommendation: {
+          title: "优先复用历史最优恢复路径",
+          nextAction: "npm run agent:zotero:autofix",
+          summary: "该指纹历史最优路径成功率更高。",
+        },
+      },
+    });
+
+    assert.equal(frontpage.status, "stable");
+    assert.equal(frontpage.nextAction, "npm run agent:gate");
+    assert.equal(frontpage.primarySignals.length, 0);
+    assert.equal(String(frontpage.headline || "").includes("历史建议"), false);
+  });
+
   it("should build blocked gate frontpage summary with prioritized blockers", () => {
     const frontpage = buildGateFrontpageSummary({
       gatePassed: false,

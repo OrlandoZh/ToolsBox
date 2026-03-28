@@ -17,9 +17,10 @@ import {
   summarizeVerificationContractStats,
 } from "./agent-zotero-validation-lib.mjs";
 import {
-  assertScript,
   buildScriptFailureInfo,
   createScriptError,
+  parseEnumOption,
+  parseIntegerOption,
   writeJSONArtifact,
 } from "./script-runtime-lib.mjs";
 import { resolveZoteroAutofixArtifacts } from "./zotero-agent-artifacts.mjs";
@@ -42,13 +43,6 @@ Options:
 `);
 }
 
-function assert(condition, message, options = {}) {
-  assertScript(condition, message, {
-    category: options.category || "args",
-    failedStage: options.failedStage || "parse-args",
-  });
-}
-
 function parseArgs(argv) {
   const options = {
     cycles: 2,
@@ -64,17 +58,28 @@ function parseArgs(argv) {
       process.exit(0);
     }
     if (arg === "--cycles") {
-      options.cycles = Number.parseInt(String(argv[index + 1] || "2"), 10);
+      options.cycles = parseIntegerOption(argv[index + 1], {
+        name: "cycles",
+        min: 1,
+        max: 10,
+      });
       index += 1;
       continue;
     }
     if (arg === "--strategy") {
-      options.strategy = String(argv[index + 1] || "hot").trim();
+      options.strategy = parseEnumOption(argv[index + 1], {
+        name: "strategy",
+        allowed: ["hot", "restart"],
+      });
       index += 1;
       continue;
     }
     if (arg === "--max-attempts") {
-      options.maxAttempts = Number.parseInt(String(argv[index + 1] || "4"), 10);
+      options.maxAttempts = parseIntegerOption(argv[index + 1], {
+        name: "max-attempts",
+        min: 1,
+        max: 10,
+      });
       index += 1;
       continue;
     }
@@ -87,9 +92,6 @@ function parseArgs(argv) {
     });
   }
 
-  assert(Number.isInteger(options.cycles) && options.cycles >= 1 && options.cycles <= 10, "cycles must be 1-10");
-  assert(options.strategy === "hot" || options.strategy === "restart", "strategy must be hot or restart");
-  assert(Number.isInteger(options.maxAttempts) && options.maxAttempts >= 1 && options.maxAttempts <= 10, "max-attempts must be 1-10");
   return options;
 }
 

@@ -104,4 +104,25 @@ describe("Zotero Watch Recovery Regression Lib", () => {
     assert.ok(markdown.includes("watch-change -> runtime-recovery -> session-restart-recovery"));
     assert.ok(markdown.includes("回归通过"));
   });
+
+  it("should render script failure portrait when error fields are present", () => {
+    const markdown = buildWatchRecoveryRegressionMarkdown({
+      generatedAt: "2026-03-20T08:02:00.000Z",
+      passed: false,
+      expectedTriggers: ["watch-change", "runtime-recovery", "session-restart-recovery"],
+      observedTriggers: [],
+      entries: [],
+      issues: ["Timed out after 120000ms"],
+      summaryNote: "未完整观测到预期的真机恢复链，请查看问题清单。",
+      errorCategory: "timeout",
+      errorCategoryLabel: "超时错误",
+      errorMessage: "Timed out after 120000ms",
+      failedStage: "wait-for-watch-sequence",
+      durationMs: 120000,
+    });
+
+    assert.ok(markdown.includes("## 脚本失败画像"));
+    assert.ok(markdown.includes("超时错误"));
+    assert.ok(markdown.includes("wait-for-watch-sequence"));
+  });
 });

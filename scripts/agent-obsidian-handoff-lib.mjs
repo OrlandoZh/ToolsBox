@@ -168,6 +168,20 @@ function looksLikeCommand(text) {
   return /^(npm|node|bun|pnpm|yarn|npx)\b/u.test(String(text || "").trim());
 }
 
+function extractRunnableAction(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+  if (looksLikeCommand(text)) {
+    return text;
+  }
+  const backtickMatches = Array.from(text.matchAll(/`([^`]+)`/gu))
+    .map((item) => String(item?.[1] || "").trim())
+    .filter(Boolean);
+  return backtickMatches.find((item) => looksLikeCommand(item)) || "";
+}
+
 function normalizeNextAction(value) {
   const text = String(value || "").trim();
   if (!text) {
@@ -184,6 +198,19 @@ function normalizeNextAction(value) {
     return commandMatch;
   }
   return backtickMatches[0] || text;
+}
+
+function chooseActionSource(sources) {
+  const normalized = (Array.isArray(sources) ? sources : [])
+    .filter((item) => item && typeof item === "object" && String(item.nextAction || "").trim().length > 0);
+  if (normalized.length === 0) {
+    return null;
+  }
+  const runnableSources = normalized.filter((item) => extractRunnableAction(item.nextAction));
+  if (runnableSources.length > 0) {
+    return chooseFrontpageSource(runnableSources);
+  }
+  return chooseFrontpageSource(normalized);
 }
 
 function toMarkdownLink(filePath) {
@@ -446,9 +473,7 @@ export function summarizeObsidianInterventionContext(reports = {}) {
     },
   ];
   const currentFrontpageSource = chooseFrontpageSource(frontpageSources);
-  const currentActionSource = chooseFrontpageSource(
-    frontpageSources.filter((item) => String(item.nextAction || "").trim().length > 0),
-  );
+  const currentActionSource = chooseActionSource(frontpageSources);
   const gatePrimaryBlockers = Array.isArray(gateFrontpage.primaryBlockers) ? gateFrontpage.primaryBlockers : [];
   const monitorPrimarySignals = Array.isArray(monitorFrontpage.primarySignals) ? monitorFrontpage.primarySignals : [];
 
@@ -462,13 +487,17 @@ export function summarizeObsidianInterventionContext(reports = {}) {
     || gateFrontpage.headline
     || monitorFrontpage.headline
     || "当前缺少足够的自动化结论，请人工查看工件。";
-  const nextAction = normalizeNextAction(
-    currentActionSource?.nextAction
-    || loop.nextAction
-    || loopFrontpage.nextAction
-    || gateFrontpage.nextAction
-    || monitorFrontpage.nextAction,
-  )
+  const nextActionCandidates = dedupeList([
+    currentActionSource?.nextAction,
+    loop.nextAction,
+    loopFrontpage.nextAction,
+    gateFrontpage.nextAction,
+    monitorFrontpage.nextAction,
+  ], 8);
+  const nextAction = nextActionCandidates
+    .map((item) => extractRunnableAction(item))
+    .find(Boolean)
+    || normalizeNextAction(currentActionSource?.nextAction || nextActionCandidates[0])
     || "先查看 gate / monitor / e2e 报告。";
 
   const blockers = dedupeList([
@@ -494,7 +523,7 @@ export function summarizeObsidianInterventionContext(reports = {}) {
   ], 8);
 
   const commands = dedupeList([
-    nextAction,
+    looksLikeCommand(nextAction) ? nextAction : "",
     "npm run agent:zotero:loop --dry-run",
     "npm run agent:zotero:loop:human",
     "npm run agent:gate",
@@ -599,21 +628,21 @@ export function buildObsidianVisualViewModel(summary = {}) {
       status: "ready",
       mode: "force-next",
       nextAction: "npm run agent:zotero:e2e:update-baseline",
-      note: "人工确认属于预期 UI 变化",
+      note: "人工确认属于预期 UI 变化；仅用于一次受控 baseline refresh，随后回到默认闭环。",
     },
     {
       verdict: "真实回归",
       status: "hold",
       mode: "hold",
-      nextAction: "先人工锁定 Reader / scenario 关注文件，再由 Codex 冻结下一批 Reader 高逻辑",
-      note: "人工确认属于真实回归，并记录差异说明",
+      nextAction: "保持 hold，补充 Reader / scenario 关注文件与差异说明，再由 Codex 新开最小修复批次",
+      note: "人工确认属于真实回归；不要直接刷新 baseline。",
     },
     {
       verdict: "证据不足",
       status: "hold",
       mode: "hold",
-      nextAction: "先补证据，不直接刷新 baseline",
-      note: "明确缺失证据类型，禁止直接刷 baseline",
+      nextAction: "保持 hold，明确缺失证据项并先补证据，不直接刷新 baseline",
+      note: "证据不足时只补证据，不新增第二套 verdict 输入机制。",
     },
   ];
 
@@ -693,8 +722,8 @@ export function buildObsidianVisualFlowMermaidMarkdown(viewModel = {}) {
     "  G --> O[\"agent:obsidian\"]",
     "  O --> H[\"human verdict\"]",
     "  H -->|\"预期 UI 变化\"| B[\"agent:zotero:e2e:update-baseline（一次受控）\"]",
-    "  H -->|\"真实回归\"| R[\"冻结 Reader 高逻辑并生成新批次\"]",
-    "  H -->|\"证据不足\"| P[\"补证据批次（不直接改行为）\"]",
+    "  H -->|\"真实回归\"| R[\"hold 并交给 Codex 新开最小修复批次\"]",
+    "  H -->|\"证据不足\"| P[\"hold 并补证据项（不直接刷 baseline）\"]",
     "```",
     "",
     "## 当前阻塞摘要",
@@ -1135,6 +1164,42 @@ export function buildHumanQuickstartMarkdown() {
     "> - 你知道要改的是“执行路径”，而不是随手记一点想法。",
     "> - 你的下一步指令最好能落到现有脚本命令或明确文件路径。",
     "",
+    "## Reader Verdict 三模板",
+    "",
+    "> [!important] 当前阶段如果显示“等待人工 Reader verdict”",
+    "> 仍然只改 `10-Zotero-Agent-人工指令窗口.md` 里的 5 个字段：`状态 / 模式 / 下一步指令 / 关注文件 / 备注`。",
+    "> 不要新增第二套输入方式，也不要把 Mermaid / Excalidraw 当成新的 verdict 来源。",
+    "",
+    "### 模板 1：预期 UI 变化",
+    "",
+    "```text",
+    "状态: ready",
+    "模式: force-next",
+    "下一步指令: npm run agent:zotero:e2e:update-baseline",
+    "关注文件:",
+    "备注: 人工确认属于预期 UI 变化；仅执行一次受控 baseline refresh。",
+    "```",
+    "",
+    "### 模板 2：真实回归",
+    "",
+    "```text",
+    "状态: hold",
+    "模式: hold",
+    "下一步指令:",
+    "关注文件: src/features/reader.js, zotero-scenarios/baseline.scenario.js",
+    "备注: 人工确认属于真实回归；补充差异说明后再由 Codex 新开最小修复批次。",
+    "```",
+    "",
+    "### 模板 3：证据不足",
+    "",
+    "```text",
+    "状态: hold",
+    "模式: hold",
+    "下一步指令:",
+    "关注文件:",
+    "备注: 当前证据不足；请先补齐缺失截图、日志或 scenario 证据，不直接刷新 baseline。",
+    "```",
+    "",
     "## 什么时候建议人工介入",
     "",
     "- 自动报告给出的下一步过于笼统，你已经知道更具体的命令。",
@@ -1238,6 +1303,7 @@ export function buildHumanAdvancedGuideMarkdown() {
     "- 好的写法：`npm run agent:gate`",
     "- 不好的写法：`先看看问题`",
     "- 不好的写法：`修一下 item pane`",
+    "- 当前如果处于 Reader verdict 收尾阶段，`force-next` 只建议配合 `npm run agent:zotero:e2e:update-baseline` 做一次受控 baseline refresh。",
     "",
     "### `关注文件`",
     "",
@@ -1270,6 +1336,41 @@ export function buildHumanAdvancedGuideMarkdown() {
     "下一步指令: npm run agent:zotero:watch-recovery",
     "关注文件: src/app/plugin.js, scripts/zotero-watch-recovery-regression.mjs",
     "备注: 先验证恢复链，再决定是否进入 autofix。",
+    "```",
+    "",
+    "## Reader Verdict 专用模板",
+    "",
+    "> [!important] 只在当前阶段显示“等待人工 Reader verdict”时使用",
+    "> 继续只改 5 个字段：`状态 / 模式 / 下一步指令 / 关注文件 / 备注`。",
+    "",
+    "### 1. 预期 UI 变化",
+    "",
+    "```text",
+    "状态: ready",
+    "模式: force-next",
+    "下一步指令: npm run agent:zotero:e2e:update-baseline",
+    "关注文件:",
+    "备注: 人工确认属于预期 UI 变化；只做一次受控 baseline refresh。",
+    "```",
+    "",
+    "### 2. 真实回归",
+    "",
+    "```text",
+    "状态: hold",
+    "模式: hold",
+    "下一步指令:",
+    "关注文件: src/features/reader.js, zotero-scenarios/baseline.scenario.js",
+    "备注: 人工确认属于真实回归；补充差异说明，再由 Codex 新开最小修复批次。",
+    "```",
+    "",
+    "### 3. 证据不足",
+    "",
+    "```text",
+    "状态: hold",
+    "模式: hold",
+    "下一步指令:",
+    "关注文件:",
+    "备注: 证据不足；补齐缺失截图、日志或 scenario 证据，不直接刷新 baseline。",
     "```",
     "",
     "## 高级介入常见误区",
@@ -1460,6 +1561,16 @@ export function buildHumanInterventionWindowMarkdown(summary, existingContent = 
     "- `下一步指令` 建议填写一个现有命令，例如 `npm run agent:zotero:autofix`。",
     "- `关注文件` 可填写逗号分隔路径，例如 `src/app/plugin.js, src/features/item-pane.js`。",
     "",
+    ...(manualVerdictStage
+      ? [
+          "## Reader Verdict 推荐模板",
+          "",
+          "- `预期 UI 变化`：`状态: ready`、`模式: force-next`、`下一步指令: npm run agent:zotero:e2e:update-baseline`。",
+          "- `真实回归`：`状态: hold`、`模式: hold`，并补充 `关注文件` 与差异说明；不要直接刷新 baseline。",
+          "- `证据不足`：`状态: hold`、`模式: hold`，并在 `备注` 中写明缺失证据项；不要直接刷新 baseline。",
+          "",
+        ]
+      : []),
     preservedHumanSection,
     "",
   ];

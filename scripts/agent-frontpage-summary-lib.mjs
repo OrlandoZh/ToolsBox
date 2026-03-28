@@ -227,6 +227,15 @@ export function buildMonitorFrontpageSummary(summary) {
   const pureVisualNextAction = pureVisualReaderFailure
     ? pickPureVisualReaderNextAction(e2e)
     : null;
+  const readerEventHealthy = !readerEventRelevant
+    || (
+      readerEvent.status === "passed"
+      && readerEvent.syntheticFallbackAvailable !== false
+    );
+  const stable = watch.status === "healthy"
+    && e2e.status === "passed"
+    && watchRecovery.status === "passed"
+    && readerEventHealthy;
 
   const primarySignals = [];
   if (!watch.present) {
@@ -268,20 +277,9 @@ export function buildMonitorFrontpageSummary(summary) {
     }
   }
 
-  if (autofix.present && autofix.status === "unrecovered") {
+  if (!stable && autofix.present && autofix.status === "unrecovered") {
     primarySignals.push("最近自动修复未恢复成功，建议回看补丁计划与诊断。");
   }
-
-  const stable = watch.status === "healthy"
-    && e2e.status === "passed"
-    && watchRecovery.status === "passed"
-    && (
-      !readerEventRelevant
-      || (
-        readerEvent.status === "passed"
-        && readerEvent.syntheticFallbackAvailable !== false
-      )
-    );
   const incomplete = primarySignals.length > 0
     && primarySignals.every((item) => item.includes("缺少"));
 
@@ -323,6 +321,7 @@ export function buildMonitorFrontpageSummary(summary) {
       readerEvent,
       readerEventRelevant,
       pureVisualReaderFailure,
+      stable,
     }),
     memoryRecommendation,
     watch: normalizeStatusSlice(watch),
@@ -369,6 +368,7 @@ function pickMonitorNextAction({
   readerEvent,
   readerEventRelevant,
   pureVisualReaderFailure,
+  stable,
 }) {
   if (!watch.present || watch.status !== "healthy") {
     return "npm run zotero:watch";
@@ -390,6 +390,9 @@ function pickMonitorNextAction({
   }
   if (!watchRecovery.present || watchRecovery.status !== "passed") {
     return "npm run agent:zotero:watch-recovery";
+  }
+  if (stable) {
+    return "npm run agent:gate";
   }
   if (autofix.present && autofix.status === "unrecovered") {
     return memoryRecommendation?.nextAction || "npm run agent:zotero:autofix";

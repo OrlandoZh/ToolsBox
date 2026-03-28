@@ -192,6 +192,34 @@ describe("Agent Obsidian Handoff Lib", () => {
     assert.ok(summary.commands.includes("npm run agent:obsidian"));
   });
 
+  it("should prefer the latest runnable command when gate has only a non-runnable success message", () => {
+    const summary = summarizeObsidianInterventionContext({
+      gate: {
+        generatedAt: "2026-03-27T18:37:59.705Z",
+        frontpageSummary: {
+          statusLabel: "可继续",
+          headline: "watch、真机验证与恢复回归均已通过，当前闭环状态稳定。",
+          primaryBlockers: [],
+          nextAction: "当前已满足 agent 质量闸门，可继续推进后续开发或发布流程。",
+        },
+      },
+      monitor: {
+        generatedAt: "2026-03-27T18:37:59.635Z",
+        frontpageSummary: {
+          statusLabel: "稳定",
+          headline: "watch、真机验证与恢复回归均正常，当前可作为 agent 持续开发的稳定基线。",
+          primarySignals: [],
+          nextAction: "npm run agent:gate",
+        },
+      },
+    });
+
+    assert.equal(summary.statusLabel, "可继续");
+    assert.equal(summary.nextAction, "npm run agent:gate");
+    assert.ok(summary.commands.includes("npm run agent:gate"));
+    assert.equal(summary.commands.includes("当前已满足 agent 质量闸门，可继续推进后续开发或发布流程。"), false);
+  });
+
   it("should render obsidian markdown handoff", () => {
     const markdown = buildObsidianInterventionMarkdown({
       generatedAt: "2026-03-20T12:00:00.000Z",
@@ -304,6 +332,9 @@ describe("Agent Obsidian Handoff Lib", () => {
     assert.equal(model.verdictBranches.length, 3);
     assert.equal(model.verdictBranches[0].status, "ready");
     assert.equal(model.verdictBranches[0].mode, "force-next");
+    assert.equal(model.verdictBranches[0].nextAction, "npm run agent:zotero:e2e:update-baseline");
+    assert.ok(String(model.verdictBranches[1].nextAction).includes("最小修复批次"));
+    assert.ok(String(model.verdictBranches[2].note).includes("不新增第二套"));
   });
 
   it("should render optional mermaid visual companion markdown", () => {
@@ -369,10 +400,15 @@ describe("Agent Obsidian Handoff Lib", () => {
 
     assert.ok(quickstart.includes("# Zotero Agent 人工快速上手"));
     assert.ok(quickstart.includes("## 快速入口"));
+    assert.ok(quickstart.includes("## Reader Verdict 三模板"));
+    assert.ok(quickstart.includes("npm run agent:zotero:e2e:update-baseline"));
     assert.ok(quickstart.includes("[[04-Zotero-Agent-高级介入规范]]"));
     assert.ok(advanced.includes("# Zotero Agent 高级介入规范"));
     assert.ok(advanced.includes("## 字段语义说明"));
     assert.ok(advanced.includes("## 哪些内容不要改"));
+    assert.ok(advanced.includes("## Reader Verdict 专用模板"));
+    assert.ok(advanced.includes("真实回归"));
+    assert.ok(advanced.includes("证据不足"));
   });
 
   it("should preserve and parse human intervention window", () => {
@@ -405,6 +441,24 @@ describe("Agent Obsidian Handoff Lib", () => {
     assert.equal(parsed.nextActionOverride, "npm run agent:zotero:watch-recovery");
     assert.ok(parsed.focusFiles.includes("src/app/plugin.js"));
     assert.equal(parsed.intervened, true);
+  });
+
+  it("should render Reader verdict templates without changing the input surface", () => {
+    const content = buildHumanInterventionWindowMarkdown({
+      generatedAt: "2026-03-27T08:00:00.000Z",
+      statusLabel: "需关注",
+      headline: "当前主阻断为 Reader 视觉回归候选。",
+      nextAction: "npm run agent:obsidian",
+      visualPrimaryBlockerKind: "ui-regression-candidate",
+      visualCanonicalCoverageKind: "complete",
+      patchSummary: {},
+    });
+
+    assert.ok(content.includes("## Reader Verdict 推荐模板"));
+    assert.ok(content.includes("状态: ready"));
+    assert.ok(content.includes("npm run agent:zotero:e2e:update-baseline"));
+    assert.ok(content.includes("真实回归"));
+    assert.ok(content.includes("证据不足"));
   });
 
   it("should display all fixed unsupported blocker categories in obsidian handoff", () => {

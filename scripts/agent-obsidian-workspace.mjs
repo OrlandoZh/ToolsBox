@@ -1,21 +1,26 @@
 import path from "node:path";
 import process from "node:process";
+import {
+  parseBooleanEnvFlag,
+  resolveEnvPath,
+} from "./script-runtime-lib.mjs";
 
 export function resolveObsidianVisualsEnabled(env = process.env) {
-  const value = String(env?.AGENT_OBSIDIAN_VISUALS || "").trim().toLowerCase();
-  return value === "1" || value === "true" || value === "yes" || value === "on";
+  return parseBooleanEnvFlag(env, "AGENT_OBSIDIAN_VISUALS", {
+    defaultValue: false,
+  });
 }
 
-export function resolveObsidianWorkspaceDir(projectRoot) {
-  const customDir = String(process.env.AGENT_OBSIDIAN_DIR || "").trim();
+export function resolveObsidianWorkspaceDir(projectRoot, env = process.env) {
+  const customDir = resolveEnvPath(env, "AGENT_OBSIDIAN_DIR");
   if (customDir) {
-    return path.resolve(customDir);
+    return customDir;
   }
   return path.join(projectRoot, "obsidian", "agent-workbench");
 }
 
-export function resolveObsidianWorkspaceFiles(projectRoot) {
-  const dir = resolveObsidianWorkspaceDir(projectRoot);
+export function resolveObsidianWorkspaceFiles(projectRoot, env = process.env) {
+  const dir = resolveObsidianWorkspaceDir(projectRoot, env);
   return {
     dir,
     architectureCanvas: path.join(dir, "00-Zotero-Agent-项目架构与闭环.canvas"),

@@ -8,6 +8,12 @@ import {
   summarizeWatchRecoveryRegression,
 } from "./zotero-watch-recovery-regression-lib.mjs";
 import { resolveZoteroWatchRecoveryArtifacts } from "./zotero-agent-artifacts.mjs";
+import {
+  buildScriptFailureInfo,
+  createScriptError,
+  parseIntegerOption,
+  writeJSONArtifact,
+} from "./script-runtime-lib.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,6 +22,7 @@ const zoteroArtifacts = resolveZoteroWatchRecoveryArtifacts(projectRoot);
 const runtimeDir = path.join(projectRoot, ".zotero-runtime", "watch-recovery");
 const buildInjectFile = path.join(runtimeDir, "build-inject.txt");
 const triggerFile = path.join(projectRoot, "config", ".watch-recovery-trigger.tmp");
+const scriptStartedAt = Date.now();
 
 function usage() {
   console.log(`Usage: node scripts/zotero-watch-recovery-regression.mjs [options]
@@ -28,7 +35,9 @@ Options:
 
 function assert(condition, message) {
   if (!condition) {
-    throw new Error(message);
+    throw createScriptError("validation", message, {
+      failedStage: "parse-args",
+    });
   }
 }
 
@@ -45,7 +54,11 @@ function parseArgs(argv) {
       process.exit(0);
     }
     if (arg === "--timeout-ms") {
-      options.timeoutMs = Number.parseInt(String(argv[index + 1] || "120000"), 10);
+      options.timeoutMs = parseIntegerOption(argv[index + 1], {
+        name: "timeout-ms",
+        min: 30000,
+        max: 600000,
+      });
       index += 1;
       continue;
     }
@@ -53,16 +66,36 @@ function parseArgs(argv) {
       options.fresh = false;
       continue;
     }
-    throw new Error(`Unknown option: ${arg}`);
+    throw createScriptError("args", `Unknown option: ${arg}`, {
+      failedStage: "parse-args",
+    });
   }
 
-  assert(Number.isInteger(options.timeoutMs) && options.timeoutMs >= 30000 && options.timeoutMs <= 600000, "timeout-ms must be 30000-600000");
+  assert(Number.isInteger(options.timeoutMs), "timeout-ms must be 30000-600000");
   return options;
 }
 
 async function readJSON(filePath) {
-  const content = await fs.readFile(filePath, "utf-8");
-  return JSON.parse(content);
+  const content = await fs.readFile(filePath, "utf-8")
+    .catch((error) => {
+      if (error?.code === "ENOENT") {
+        throw createScriptError("environment", `Missing JSON file: ${filePath}`, {
+          failedStage: "read-watch-status",
+          details: { filePath },
+          cause: error,
+        });
+      }
+      throw error;
+    });
+  try {
+    return JSON.parse(content);
+  } catch (error) {
+    throw createScriptError("validation", `Invalid JSON file: ${filePath}`, {
+      failedStage: "read-watch-status",
+      details: { filePath },
+      cause: error,
+    });
+  }
 }
 
 async function removeIfExists(filePath) {
@@ -87,7 +120,10 @@ async function waitFor(condition, timeoutMs, intervalMs = 1000) {
   if (lastError) {
     throw lastError;
   }
-  throw new Error(`Timed out after ${timeoutMs}ms`);
+  throw createScriptError("timeout", `Timed out after ${timeoutMs}ms`, {
+    failedStage: "wait-for-watch-sequence",
+    details: { timeoutMs },
+  });
 }
 
 async function waitForStartup(sessionStartedAtISO, timeoutMs) {
@@ -124,7 +160,7 @@ async function waitForRecoverySequence(sessionStartedAtISO, timeoutMs) {
 
 async function writeReport(report) {
   await fs.mkdir(zoteroArtifacts.artifactsDir, { recursive: true });
-  await fs.writeFile(zoteroArtifacts.reportJSON, `${JSON.stringify(report, null, 2)}\n`, "utf-8");
+  await writeJSONArtifact(zoteroArtifacts.reportJSON, report);
   await fs.writeFile(zoteroArtifacts.reportMD, `${buildWatchRecoveryRegressionMarkdown(report)}\n`, "utf-8");
 }
 
@@ -161,10 +197,18 @@ async function main() {
     await fs.writeFile(triggerFile, `${Date.now()}\n`, "utf-8");
 
     const { summary } = await waitForRecoverySequence(sessionStartedAtISO, options.timeoutMs);
+    summary.durationMs = Math.max(0, Date.now() - scriptStartedAt);
+    summary.errorCategory = null;
+    summary.errorCategoryLabel = null;
+    summary.errorMessage = null;
+    summary.failedStage = null;
     await writeReport(summary);
     console.log(`Zotero watch recovery regression report generated: ${zoteroArtifacts.reportJSON}`);
   }
   catch (error) {
+    const failureInfo = buildScriptFailureInfo(error, {
+      durationMs: Math.max(0, Date.now() - scriptStartedAt),
+    });
     let watchStatus = null;
     try {
       watchStatus = await readJSON(zoteroArtifacts.watchStatusJSON);
@@ -175,9 +219,14 @@ async function main() {
     const summary = summarizeWatchRecoveryRegression(watchStatus || {});
     summary.passed = false;
     summary.generatedAt = new Date().toISOString();
+    summary.durationMs = failureInfo.durationMs;
+    summary.errorCategory = failureInfo.errorCategory;
+    summary.errorCategoryLabel = failureInfo.errorCategoryLabel;
+    summary.errorMessage = failureInfo.errorMessage;
+    summary.failedStage = failureInfo.failedStage;
     summary.issues = Array.from(new Set([
       ...(summary.issues || []),
-      error?.message || String(error),
+      failureInfo.errorMessage,
       childExitCode === null ? "" : `watch 进程提前退出，退出码 ${childExitCode}`,
     ].filter(Boolean)));
     summary.summaryNote = "真机恢复回归未通过，请结合问题清单与 zotero-watch-status 报告排查。";
@@ -196,6 +245,9 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(`[zotero-watch-recovery-regression] ${error.stack || error.message}`);
+  const failureInfo = buildScriptFailureInfo(error, {
+    durationMs: Math.max(0, Date.now() - scriptStartedAt),
+  });
+  console.error(`[zotero-watch-recovery-regression] ${failureInfo.errorCategoryLabel}: ${failureInfo.errorMessage}`);
   process.exit(1);
 });

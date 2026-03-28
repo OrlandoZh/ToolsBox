@@ -95,6 +95,18 @@ export function buildWatchRecoveryRegressionMarkdown(report) {
     `- 最新通过: \`${report.latestPassed ? "true" : "false"}\``,
     `- 最新状态: \`${report.latestStatus || "-"}\``,
     "",
+  ];
+
+  if (report.errorCategoryLabel || report.failedStage) {
+    lines.push("## 脚本失败画像", "");
+    lines.push(`- 分类: \`${report.errorCategoryLabel || report.errorCategory || "-"}\``);
+    lines.push(`- 阶段: \`${report.failedStage || "-"}\``);
+    lines.push(`- 信息: ${report.errorMessage || "-"}`);
+    lines.push(`- 耗时: \`${report.durationMs ?? 0}ms\``);
+    lines.push("");
+  }
+
+  lines.push(
     "## 期望触发序列",
     "",
     `- ${Array.isArray(report.expectedTriggers) ? report.expectedTriggers.join(" -> ") : "-"}`,
@@ -107,7 +119,7 @@ export function buildWatchRecoveryRegressionMarkdown(report) {
     "",
     "| 触发 | 结果 | 时间 | 说明 |",
     "|---|---|---|---|",
-  ];
+  );
 
   for (const entry of report.entries || []) {
     lines.push(`| ${entry.trigger || "-"} | ${entry.passed ? "通过" : "失败"} | ${entry.at || "-"} | ${entry.summaryNote || "-"} |`);

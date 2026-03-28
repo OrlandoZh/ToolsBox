@@ -56,4 +56,11 @@ describe("Agent Obsidian Workspace", () => {
     assert.equal(resolveObsidianVisualsEnabled({ AGENT_OBSIDIAN_VISUALS: "true" }), true);
     assert.equal(resolveObsidianVisualsEnabled({ AGENT_OBSIDIAN_VISUALS: "yes" }), true);
   });
+
+  it("should reject invalid obsidian workspace environment values", () => {
+    assert.throws(
+      () => resolveObsidianVisualsEnabled({ AGENT_OBSIDIAN_VISUALS: "maybe" }),
+      (error) => error?.scriptErrorCategory === "environment" && error?.details?.envVar === "AGENT_OBSIDIAN_VISUALS",
+    );
+  });
 });
