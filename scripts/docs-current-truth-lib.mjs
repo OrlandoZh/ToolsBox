@@ -9,6 +9,10 @@ export const CURRENT_TRUTH_CONSUMER_FILES = [
   "docs/AGENT_AUTONOMY_ROADMAP.md",
 ];
 export const CURRENT_TRUTH_SECTION_HEADING = "## 当前单一事实源";
+export const CURRENT_TRUTH_SECTION_HEADINGS = [
+  CURRENT_TRUTH_SECTION_HEADING,
+  "## 当前 truth（双层口径）",
+];
 export const CURRENT_TRUTH_MARKER_START = "<!-- CURRENT-TRUTH-SUMMARY:START -->";
 export const CURRENT_TRUTH_MARKER_END = "<!-- CURRENT-TRUTH-SUMMARY:END -->";
 
@@ -28,17 +32,20 @@ export function readTextFile(filePath) {
   return normalizeNewlines(fs.readFileSync(filePath, "utf-8"));
 }
 
-export function extractHeadingSection(documentText, heading = CURRENT_TRUTH_SECTION_HEADING) {
+export function extractHeadingSection(documentText, heading = CURRENT_TRUTH_SECTION_HEADINGS) {
   const normalized = normalizeNewlines(documentText);
-  const pattern = new RegExp(
-    `(^|\\n)${escapeRegExp(heading)}\\n([\\s\\S]*?)(?=\\n##\\s|$)`,
-    "u",
-  );
-  const match = normalized.match(pattern);
-  if (!match) {
-    throw new Error(`Missing heading section: ${heading}`);
+  const headings = Array.isArray(heading) ? heading : [heading];
+  for (const candidate of headings) {
+    const pattern = new RegExp(
+      `(^|\\n)${escapeRegExp(candidate)}\\n([\\s\\S]*?)(?=\\n##\\s|$)`,
+      "u",
+    );
+    const match = normalized.match(pattern);
+    if (match) {
+      return match[2];
+    }
   }
-  return match[2];
+  throw new Error(`Missing heading section: ${headings.join(" | ")}`);
 }
 
 export function extractMarkedBlock(documentText, {
@@ -83,8 +90,21 @@ export function replaceMarkedBlock(documentText, content, markers = {}) {
 export function readCurrentTruthSummary(rootDir = process.cwd()) {
   const sourcePath = path.join(rootDir, CURRENT_TRUTH_SOURCE_FILE);
   const sourceText = readTextFile(sourcePath);
-  const sectionText = extractHeadingSection(sourceText, CURRENT_TRUTH_SECTION_HEADING);
+  const sectionText = extractHeadingSection(sourceText, CURRENT_TRUTH_SECTION_HEADINGS);
   return extractMarkedBlock(sectionText);
+}
+
+export function extractCurrentTruthActiveBatchId(summaryText) {
+  const text = String(summaryText || "");
+  const directMatch = text.match(/当前 active 高逻辑已切到 `([^`]+)`/u);
+  if (directMatch?.[1]) {
+    return String(directMatch[1]).trim() || null;
+  }
+  const fallbackMatch = text.match(/active `([^`]+)` 只允许/u);
+  if (fallbackMatch?.[1]) {
+    return String(fallbackMatch[1]).trim() || null;
+  }
+  return null;
 }
 
 export function buildCurrentTruthSyncPlan({
@@ -95,7 +115,7 @@ export function buildCurrentTruthSyncPlan({
   const absoluteRoot = path.resolve(rootDir);
   const sourcePath = path.join(absoluteRoot, sourceFile);
   const sourceText = readTextFile(sourcePath);
-  const sectionText = extractHeadingSection(sourceText, CURRENT_TRUTH_SECTION_HEADING);
+  const sectionText = extractHeadingSection(sourceText, CURRENT_TRUTH_SECTION_HEADINGS);
   const summaryContent = extractMarkedBlock(sectionText);
 
   const consumers = consumerFiles.map((relativePath) => {

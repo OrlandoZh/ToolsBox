@@ -98,6 +98,23 @@ describe("Agent Frontpage Summary Lib", () => {
     assert.equal(nextAction, "当前主阻断仍是视觉基线几何不匹配，但 canonical baseline 只部分覆盖；仍不匹配：hot-reload-library.png、hot-reload-reader.png。当前先执行 `npm run agent:obsidian` 固化证据并决定后续人工收口，不再默认重复刷新 baseline。");
   });
 
+  it("should prefer e2e rerun over autofix or obsidian for capture-command-failed", () => {
+    const nextAction = selectAgentNextAction([
+      "重新执行 `npm run agent:zotero:autofix`，确认恢复动作是否能覆盖这次新的失败。",
+      "当前主阻断已排除采集稳定性、几何漂移与 canonical coverage 缺口；先执行 `npm run agent:obsidian` 固化 Reader UI / scenario 的人工复核结论。",
+      "library（截图调用失败：could not create image from rect）；先复核窗口 bounds、前台激活与 screencapture 调用，再重新执行 `npm run agent:zotero:e2e`，暂不建议进入 autofix、刷新视觉基线或走 obsidian-first。",
+    ], {
+      watchStatus: "healthy",
+      e2eStatus: "failed",
+      watchRecoveryStatus: "passed",
+      pureVisualReaderFailure: true,
+      visualPrimaryBlockerKind: "capture-command-failed",
+      readerEventStatus: "passed",
+    });
+
+    assert.equal(nextAction, "library（截图调用失败：could not create image from rect）；先复核窗口 bounds、前台激活与 screencapture 调用，再重新执行 `npm run agent:zotero:e2e`，暂不建议进入 autofix、刷新视觉基线或走 obsidian-first。");
+  });
+
   it("should prefer obsidian for pure visual ui regression candidates after canonical coverage is complete", () => {
     const nextAction = selectAgentNextAction([
       "当前主阻断已排除采集稳定性、几何漂移与 canonical coverage 缺口；先执行 `npm run agent:obsidian` 固化 Reader UI / scenario 的人工复核结论。",

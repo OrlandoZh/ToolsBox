@@ -123,6 +123,7 @@ function createBaseHarness() {
         },
         error: {
           message: error.message,
+          details: error.details || null,
         },
       };
     },
@@ -225,5 +226,61 @@ describe("Zotero Watch Recovery Lib", () => {
     );
     assert.ok(logger.errors.length >= 2);
     assert.equal(harness.watchReport.reloads[1].error.message, "restart failed");
+  });
+
+  it("should preserve launch failure details when session restart recovery fails before RDP connects", async () => {
+    const logger = createLogger();
+    const harness = createBaseHarness();
+    harness.createWatchHealthEntry = async ({ index, trigger }) => ({
+      index,
+      trigger,
+      passed: false,
+      issues: ["unhealthy"],
+      hints: [],
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+        recentWarnings: [],
+      },
+      summaryNote: trigger,
+    });
+    harness.launchManagedSession = async () => {
+      const error = new Error("restart failed");
+      error.details = {
+        launchFailure: {
+          kind: "child-exit-before-rdp",
+          attemptCount: 2,
+          connectDurationMs: 900,
+          childExit: {
+            code: 11,
+            signal: "SIGSEGV",
+          },
+          processLogTail: [
+            {
+              at: "2026-03-29T00:00:00.000Z",
+              source: "zotero.stderr",
+              message: "crash",
+            },
+          ],
+        },
+      };
+      throw error;
+    };
+
+    const result = await runWatchRecoveryFlow({
+      ...harness,
+      logger,
+    });
+
+    assert.equal(result.recovered, false);
+    assert.equal(
+      harness.watchReport.reloads[1].error.details.launchFailure.kind,
+      "child-exit-before-rdp",
+    );
+    assert.equal(
+      harness.watchReport.reloads[1].error.details.launchFailure.childExit.code,
+      11,
+    );
   });
 });

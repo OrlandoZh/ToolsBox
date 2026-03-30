@@ -5,9 +5,14 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { runCleanroomAudit } from "./cleanroom-audit-lib.mjs";
 import {
+  buildPendingRemoteReleaseVerification,
+  verifyRemoteRelease,
+} from "./release-remote-verification-lib.mjs";
+import {
   assertScript,
   buildScriptFailureInfo,
   createScriptError,
+  parseIntegerOption,
   resolvePathOption,
   writeJSONArtifact,
 } from "./script-runtime-lib.mjs";
@@ -74,24 +79,67 @@ function summarizeReport(report) {
     updateLink: report.updateLink,
     strictMinVersion: report.strictMinVersion,
     strictMaxVersion: report.strictMaxVersion,
+    remoteVerification: report.remoteVerification || null,
   };
 }
 
 function parseArgs(argv) {
   const options = {
     projectRoot: defaultProjectRoot,
+    verifyRemote: false,
+    remoteUpdateURL: null,
+    remoteExpectedUpdateLink: null,
+    remoteTimeoutMs: 8000,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--help" || arg === "-h") {
-      console.log("Usage: node scripts/release-preflight.mjs [--project-root <path>]");
+      console.log([
+        "Usage: node scripts/release-preflight.mjs [--project-root <path>] [--verify-remote]",
+        "  [--remote-update-url <url>] [--remote-expected-update-link <url>] [--remote-timeout-ms <ms>]",
+      ].join(" "));
       process.exit(0);
     }
     if (arg === "--project-root") {
       options.projectRoot = resolvePathOption(argv[index + 1], {
         name: "project-root",
         baseDir: defaultProjectRoot,
+      });
+      index += 1;
+      continue;
+    }
+    if (arg === "--verify-remote") {
+      options.verifyRemote = true;
+      continue;
+    }
+    if (arg === "--remote-update-url") {
+      const candidate = String(argv[index + 1] || "").trim();
+      if (!candidate) {
+        throw createScriptError("args", "remote-update-url must be a non-empty URL", {
+          failedStage: "parse-args",
+        });
+      }
+      options.remoteUpdateURL = candidate;
+      index += 1;
+      continue;
+    }
+    if (arg === "--remote-expected-update-link") {
+      const candidate = String(argv[index + 1] || "").trim();
+      if (!candidate) {
+        throw createScriptError("args", "remote-expected-update-link must be a non-empty URL", {
+          failedStage: "parse-args",
+        });
+      }
+      options.remoteExpectedUpdateLink = candidate;
+      index += 1;
+      continue;
+    }
+    if (arg === "--remote-timeout-ms") {
+      options.remoteTimeoutMs = parseIntegerOption(argv[index + 1], {
+        name: "remote-timeout-ms",
+        min: 1,
+        failedStage: "parse-args",
       });
       index += 1;
       continue;
@@ -210,6 +258,21 @@ async function main() {
     },
   });
 
+  const remoteVerification = options.verifyRemote
+    ? await verifyRemoteRelease({
+      config,
+      releaseManifest,
+      remoteUpdateURL: options.remoteUpdateURL,
+      expectedUpdateLink: options.remoteExpectedUpdateLink,
+      timeoutMs: options.remoteTimeoutMs,
+    })
+    : buildPendingRemoteReleaseVerification({
+      config,
+      releaseManifest,
+      remoteUpdateURL: options.remoteUpdateURL,
+      expectedUpdateLink: options.remoteExpectedUpdateLink,
+    });
+
   const preflightReport = summarizeReport({
     addonId: config.addonId,
     addonVersion: config.addonVersion,
@@ -219,6 +282,7 @@ async function main() {
     updateLink: releaseManifest.updateLink,
     strictMinVersion: config.strictMinVersion,
     strictMaxVersion: config.strictMaxVersion,
+    remoteVerification,
   });
   preflightReport.cleanroomAuditStatus = cleanroomAudit.status;
   preflightReport.cleanroomAuditMode = cleanroomAudit.mode;
@@ -234,7 +298,7 @@ async function main() {
   await fs.mkdir(path.dirname(preflightPath), { recursive: true });
   await writeJSONArtifact(preflightPath, preflightReport);
 
-  console.log(`Release preflight passed: ${preflightPath}`);
+  console.log(`Release preflight passed: ${preflightPath} (remote: ${remoteVerification.statusLabel})`);
 }
 
 main().catch(async (error) => {

@@ -260,6 +260,13 @@ function createScenarioHelpers(baseContext) {
     const item = Zotero?.Items && typeof Zotero.Items.get === "function"
       ? Zotero.Items.get(itemID)
       : null;
+    const libraryID = typeof item?.libraryID === "number"
+      ? item.libraryID
+      : typeof Zotero?.Libraries?.userLibraryID === "number"
+        ? Zotero.Libraries.userLibraryID
+        : null;
+    let libraryRootSelected = false;
+    let itemsViewLoaded = false;
 
     await waitFor(
       () => Boolean(pane.collectionsView && pane.itemsView),
@@ -272,14 +279,15 @@ function createScenarioHelpers(baseContext) {
 
     if (pane.collectionsView && typeof pane.collectionsView.selectLibrary === "function") {
       try {
-        const libraryID = item?.libraryID ?? Zotero?.Libraries?.userLibraryID;
         await pane.collectionsView.selectLibrary(libraryID);
+        libraryRootSelected = true;
       }
       catch {}
     }
 
     if (pane.itemsView && typeof pane.itemsView.waitForLoad === "function") {
       await pane.itemsView.waitForLoad();
+      itemsViewLoaded = true;
     }
 
     if (typeof pane.selectItem === "function") {
@@ -293,7 +301,10 @@ function createScenarioHelpers(baseContext) {
     }
 
     await waitFor(
-      () => getSelectedItemIDs().includes(itemID),
+      () => {
+        const selectedIDs = getSelectedItemIDs();
+        return selectedIDs.length === 1 && selectedIDs[0] === itemID;
+      },
       {
         timeoutMs: options.timeoutMs ?? 5000,
         intervalMs: options.intervalMs ?? 100,
@@ -301,9 +312,16 @@ function createScenarioHelpers(baseContext) {
       },
     );
 
+    const selectedIDs = getSelectedItemIDs();
+
     return {
       itemID,
-      selectedIDs: getSelectedItemIDs(),
+      libraryID,
+      libraryRootSelected,
+      itemsViewLoaded,
+      selectionSingleItem: selectedIDs.length === 1 && selectedIDs[0] === itemID,
+      selectedIDs,
+      selectedCount: selectedIDs.length,
     };
   }
 

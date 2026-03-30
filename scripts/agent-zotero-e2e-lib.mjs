@@ -9,6 +9,7 @@ import {
 } from "../src/features/reader.js";
 import {
   buildVisualPrimaryBlockerSummary,
+  pickVisualCaptureFailureKindLabel,
   pickVisualCaptureSelectionReasonLabel,
   summarizeE2EReport,
 } from "./agent-zotero-validation-lib.mjs";
@@ -84,6 +85,11 @@ function formatMaybeNumber(value, digits = 2) {
     : "-";
 }
 
+function normalizeFiniteNumber(value) {
+  const normalized = Number(value);
+  return Number.isFinite(normalized) ? normalized : null;
+}
+
 function formatBooleanLabel(value) {
   if (value === true) {
     return "是";
@@ -99,6 +105,149 @@ function formatListSummary(values) {
     .map((item) => String(item || "").trim())
     .filter(Boolean);
   return list.length > 0 ? list.join("；") : "-";
+}
+
+export async function ensureLibraryVisualStageReady(options = {}) {
+  const normalizeNumber = (value) => {
+    const normalized = Number(value);
+    return Number.isFinite(normalized) ? normalized : null;
+  };
+  const normalizeStringArray = (value) => {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+    return Array.from(new Set(
+      value
+        .map((entry) => String(entry ?? "").trim())
+        .filter(Boolean),
+    )).sort((left, right) => left.localeCompare(right));
+  };
+
+  const itemID = normalizeNumber(options.itemID);
+  if (itemID === null) {
+    throw new Error("ensureLibraryVisualStageReady requires a finite itemID");
+  }
+  if (typeof options.waitForViews !== "function") {
+    throw new Error("ensureLibraryVisualStageReady requires waitForViews");
+  }
+  if (typeof options.selectItem !== "function") {
+    throw new Error("ensureLibraryVisualStageReady requires selectItem");
+  }
+  if (typeof options.waitForSelection !== "function") {
+    throw new Error("ensureLibraryVisualStageReady requires waitForSelection");
+  }
+
+  const libraryID = normalizeNumber(options.libraryID);
+  const preparation = {
+    itemID,
+    libraryID,
+    viewsReady: false,
+    libraryRootSelected: null,
+    itemsViewLoaded: null,
+    selectionMatched: false,
+    selectionSingleItem: false,
+    selectedTabID: null,
+    windowTitle: null,
+    suppressedBannerIDs: [],
+    retainedBannerIDs: [],
+    visibleBannerIDs: [],
+  };
+
+  await options.waitForViews();
+  preparation.viewsReady = true;
+
+  if (typeof options.stabilizeHostSurface === "function") {
+    const hostSurface = await options.stabilizeHostSurface();
+    preparation.suppressedBannerIDs = normalizeStringArray(hostSurface?.suppressedBannerIDs);
+    preparation.retainedBannerIDs = normalizeStringArray(hostSurface?.retainedBannerIDs);
+    preparation.visibleBannerIDs = normalizeStringArray(hostSurface?.visibleBannerIDs);
+  }
+
+  if (libraryID !== null && typeof options.selectLibrary === "function") {
+    preparation.libraryRootSelected = await options.selectLibrary(libraryID) !== false;
+  }
+
+  if (typeof options.waitForItemsLoad === "function") {
+    preparation.itemsViewLoaded = await options.waitForItemsLoad() !== false;
+  }
+
+  await options.selectItem(itemID);
+  const selectionResult = await options.waitForSelection(itemID);
+  const selectedIDs = Array.isArray(selectionResult?.selectedIDs)
+    ? selectionResult.selectedIDs
+      .map((entry) => normalizeNumber(entry))
+      .filter((entry) => entry !== null)
+    : [];
+  const selection = {
+    itemID,
+    selectedIDs,
+    selectedCount: normalizeNumber(selectionResult?.selectedCount) ?? selectedIDs.length,
+  };
+  preparation.selectionMatched = selectedIDs.includes(itemID);
+  preparation.selectionSingleItem = selectedIDs.length === 1 && selectedIDs[0] === itemID;
+
+  if (typeof options.waitForPaint === "function") {
+    await options.waitForPaint();
+  }
+
+  if (typeof options.readSelectedTabID === "function") {
+    const selectedTabID = options.readSelectedTabID();
+    preparation.selectedTabID = selectedTabID === null || selectedTabID === undefined
+      ? null
+      : String(selectedTabID);
+  }
+
+  if (typeof options.readWindowTitle === "function") {
+    const windowTitle = options.readWindowTitle();
+    preparation.windowTitle = windowTitle === null || windowTitle === undefined
+      ? null
+      : String(windowTitle);
+  }
+
+  const summary = typeof options.inspectItem === "function"
+    ? await options.inspectItem(itemID)
+    : null;
+
+  return {
+    itemID,
+    libraryID,
+    summary,
+    selection,
+    preparation,
+    settleSnapshot: {
+      stage: "library",
+      itemID: summary?.itemID ?? itemID,
+      title: summary?.title ?? null,
+      summary: summary?.summary ?? null,
+      columnValue: summary?.columnValue ?? null,
+      selectedCount: selection.selectedCount,
+      selectedIDs: selection.selectedIDs,
+      visibleBannerIDs: preparation.visibleBannerIDs,
+    },
+  };
+}
+
+function buildLaunchFailureSummary(launchFailure) {
+  if (!launchFailure || typeof launchFailure !== "object") {
+    return null;
+  }
+
+  switch (launchFailure.kind) {
+    case "child-exit-before-rdp":
+      return "Zotero 子进程在 RDP 建联前已退出/崩溃。";
+    case "rdp-connect-timeout":
+      return "Zotero 子进程仍存活，但 RDP 端口未在重试窗口内就绪。";
+    case "rdp-connect-error":
+      return "Zotero RDP 建联失败，且错误已超出可重试范围。";
+    default:
+      return null;
+  }
+}
+
+function formatProcessLogTailEntry(entry) {
+  const message = String(entry?.message || "").trim() || "-";
+  const source = String(entry?.source || "unknown").trim() || "unknown";
+  return `- [${formatDateTime(entry?.at)}] \`${source}\`: ${message}`;
 }
 
 function formatAttemptDiagnosisMetrics(metrics) {
@@ -238,6 +387,10 @@ function buildVisualCaptureStabilityRemark(visuals) {
   }
 
   const parts = stages.slice(0, 2).map((entry) => {
+    if (entry?.failureKind) {
+      const attemptCount = Number(entry?.attemptCount || 0);
+      return `${entry?.kind || "visual"} 失败 ${attemptCount} 次（${pickVisualCaptureFailureKindLabel(entry.failureKind)}）`;
+    }
     const stableText = entry?.stable === true ? "稳定" : "待稳";
     const attemptCount = Number(entry?.attemptCount || 0);
     const reasonText = pickVisualCaptureSelectionReasonLabel(entry?.selectionReason);
@@ -773,6 +926,40 @@ export function buildE2EMarkdown(report) {
     report.hints.forEach((item) => lines.push(`- ${item}`));
   }
 
+  const launchFailure = report?.details?.launchFailure || null;
+  const runtimeSanitization = report?.details?.runtimeSanitization || null;
+  if (launchFailure) {
+    lines.push("", "## 启动诊断", "");
+    lines.push(`- 类型: \`${launchFailure.kind || "-"}\``);
+    lines.push(`- 摘要: ${buildLaunchFailureSummary(launchFailure) || "-"}`);
+    lines.push(`- 尝试次数: \`${launchFailure.attemptCount ?? 0}\``);
+    lines.push(`- 建联耗时: \`${launchFailure.connectDurationMs ?? 0}ms\``);
+    const childExit = launchFailure.childExit;
+    lines.push(
+      `- 子进程退出: \`${childExit ? `${childExit.code ?? "null"} / ${childExit.signal || "-"}` : "-"}\``,
+    );
+    const lastConnectError = launchFailure.lastConnectError;
+    lines.push(
+      `- 最近建联错误: ${
+        lastConnectError
+          ? `\`${lastConnectError.code || lastConnectError.name || "error"}\` ${lastConnectError.message || "-"}`
+          : "-"
+      }`,
+    );
+    if (runtimeSanitization) {
+      lines.push(
+        `- Runtime 清理: managed=\`${runtimeSanitization.managed ? "yes" : "no"}\` / fresh=\`${runtimeSanitization.fresh ? "yes" : "no"}\` / profileReset=\`${runtimeSanitization.profileReset ? "yes" : "no"}\` / dataReset=\`${runtimeSanitization.dataReset ? "yes" : "no"}\` / removedMarkers=\`${Array.isArray(runtimeSanitization.removedMarkers) ? runtimeSanitization.removedMarkers.length : 0}\``,
+      );
+    }
+    lines.push("", "### 启动前进程日志尾部", "");
+    const processLogTail = Array.isArray(launchFailure.processLogTail) ? launchFailure.processLogTail : [];
+    if (processLogTail.length === 0) {
+      lines.push("- 无");
+    } else {
+      processLogTail.forEach((entry) => lines.push(formatProcessLogTailEntry(entry)));
+    }
+  }
+
   if (summary.present && (
     summary.visualCaptureStabilityObserved
     || Number(summary.visualGeometryMismatchCount || 0) > 0
@@ -920,8 +1107,17 @@ export function buildE2EMarkdown(report) {
         const selectionReasonLabel = item.selectionReason
           ? `${pickVisualCaptureSelectionReasonLabel(item.selectionReason)} (${item.selectionReason})`
           : "-";
+        const failureKindLabel = item.failureKind
+          ? `${pickVisualCaptureFailureKindLabel(item.failureKind)} (${item.failureKind})`
+          : "-";
         lines.push(`### Cycle ${item.cycleIndex ?? "-"} / ${item.bootMode || "-"} / ${item.kind || "visual"}`);
         lines.push(`- 选取原因：${selectionReasonLabel}`);
+        lines.push(`- Stage 失败：${failureKindLabel}`);
+        lines.push(`- 失败信息：${item.failureMessage || "-"}`);
+        lines.push(`- Bounds 来源：${item.boundsSource || "-"}`);
+        lines.push(`- 窗口标题：${item.windowTitle || "-"}`);
+        lines.push(`- 命令退出码：${item.commandExitCode ?? "-"}`);
+        lines.push(`- Stderr：${item.stderr || "-"}`);
         lines.push(`- 已选尝试 / 总次数：${item.selectedAttempt ?? "-"} / ${item.attemptCount ?? 0}`);
         lines.push(`- Hash 全变：${formatBooleanLabel(item.allHashesUnique)}`);
         lines.push(`- Bounds 固定：${formatBooleanLabel(item.boundsStable)}`);
@@ -930,6 +1126,30 @@ export function buildE2EMarkdown(report) {
         lines.push(`- Attempt Bounds：${formatListSummary(item.attemptBounds)}`);
         lines.push(`- Attempt Raster Sizes：${formatListSummary(item.attemptRasterSizes)}`);
         lines.push(`- Stability Metrics：${formatAttemptDiagnosisMetrics(item.stabilityMetrics)}`);
+        lines.push("");
+      });
+    }
+  }
+
+  if (summary.visualPreCaptureSettleObserved || Array.isArray(summary.visualPreCaptureSettleStages)) {
+    lines.push("", "## Pre-capture Settle 诊断", "");
+    lines.push(`- 已观测 stage: \`${summary.visualPreCaptureSettleStageCount ?? 0}\``);
+    lines.push(`- 已达成 stage: \`${summary.visualPreCaptureSettleSettledStageCount ?? 0}\``);
+    lines.push(`- 超时 stage: \`${summary.visualPreCaptureSettleTimedOutStageCount ?? 0}\``);
+    lines.push(`- 摘要: ${summary.visualPreCaptureSettleSummary || "-"}`);
+    lines.push("");
+    if (!Array.isArray(summary.visualPreCaptureSettleStages) || summary.visualPreCaptureSettleStages.length === 0) {
+      lines.push("- 当前没有可展开的 pre-capture settle 诊断。", "");
+    } else {
+      summary.visualPreCaptureSettleStages.forEach((item) => {
+        lines.push(`### ${item.kind || "visual"}`);
+        lines.push(`- 状态：\`${item.settled ? "达成" : (item.timedOut ? "超时" : "待定")}\``);
+        lines.push(`- 稳定样本：\`${item.consecutiveStableSamples ?? 0} / ${item.stableSampleTarget ?? 0}\``);
+        lines.push(`- 轮询次数：\`${item.pollCount ?? 0}\``);
+        lines.push(`- 重置次数：\`${item.resetCount ?? 0}\``);
+        lines.push(`- 最终复核：\`${item.verificationMatched === null ? "-" : (item.verificationMatched ? "一致" : "变更")}\``);
+        lines.push(`- 快照摘要：${item.snapshotSummary || "-"}`);
+        lines.push(`- 诊断摘要：${item.summary || "-"}`);
         lines.push("");
       });
     }

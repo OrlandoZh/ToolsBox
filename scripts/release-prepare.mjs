@@ -3,15 +3,20 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import {
+  buildPendingRemoteReleaseVerification,
+  normalizeRemoteReleaseVerification,
+} from "./release-remote-verification-lib.mjs";
+import {
   assertScript,
   buildScriptFailureInfo,
   createScriptError,
+  resolvePathOption,
   writeJSONArtifact,
 } from "./script-runtime-lib.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, "..");
+const defaultProjectRoot = path.resolve(__dirname, "..");
 const scriptStartedAt = Date.now();
 
 function assert(condition, message, options = {}) {
@@ -77,7 +82,30 @@ function collectWarnings(config, releaseManifest) {
   return warnings;
 }
 
-function buildReleaseNotesMarkdown({ config, releaseManifest, preflight, warnings }) {
+function collectRemoteWarnings(remoteVerification) {
+  if (!remoteVerification || typeof remoteVerification !== "object") {
+    return [];
+  }
+
+  if (remoteVerification.status === "passed") {
+    return [];
+  }
+  if (remoteVerification.status === "unconfigured") {
+    return [
+      remoteVerification.summary || "远端发布验证尚未配置完成",
+    ];
+  }
+  if (remoteVerification.status === "pending") {
+    return [
+      remoteVerification.summary || "远端 update.json / update_link 尚未验证",
+    ];
+  }
+  return Array.isArray(remoteVerification.issues) && remoteVerification.issues.length > 0
+    ? remoteVerification.issues
+    : [remoteVerification.summary || "远端发布验证未通过"];
+}
+
+function buildReleaseNotesMarkdown({ config, releaseManifest, preflight, warnings, remoteVerification }) {
   const lines = [
     `# Release ${config.addonVersion}`,
     "",
@@ -98,6 +126,13 @@ function buildReleaseNotesMarkdown({ config, releaseManifest, preflight, warning
     "- `npm run release:local` passed",
     "- `npm run zotero:test` passed",
     "",
+    "## Remote Verification",
+    `- Status: \`${remoteVerification?.statusLabel || "缺失"}\``,
+    `- Summary: ${remoteVerification?.summary || "-"}`,
+    `- update.json target: \`${remoteVerification?.effectiveUpdateURL || releaseManifest.updateURL || "-"}\``,
+    `- Expected update_link: \`${remoteVerification?.expectedUpdateLink || releaseManifest.updateLink || "-"}\``,
+    `- Observed update_link: \`${remoteVerification?.observedUpdateLink || "-"}\``,
+    "",
     "## Changelog",
     "- Replace this section with user-facing changes.",
     "",
@@ -105,8 +140,16 @@ function buildReleaseNotesMarkdown({ config, releaseManifest, preflight, warning
     "1. Upload `.xpi` and `update.json` to your release CDN or GitHub Release assets.",
     "2. Verify uploaded `update.json` contains the same `update_link` as above.",
     "3. Verify `update_link` points to the uploaded `.xpi` and is publicly reachable.",
-    "4. Publish release notes with checksum.",
+    "4. Run `npm run release:preflight -- --verify-remote` to record remote verification against the live release URLs.",
+    "5. Re-run `npm run release:prepare && npm run release:matrix` to refresh release-facing consumers.",
+    "6. Publish release notes with checksum.",
   ];
+
+  if (Array.isArray(remoteVerification?.issues) && remoteVerification.issues.length > 0) {
+    lines.push("## Remote Verification Issues", "");
+    remoteVerification.issues.forEach((item) => lines.push(`- ${item}`));
+    lines.push("");
+  }
 
   if (warnings.length > 0) {
     lines.push("", "## Release Warnings");
@@ -119,7 +162,47 @@ function buildReleaseNotesMarkdown({ config, releaseManifest, preflight, warning
   return lines.join("\n");
 }
 
+function parseArgs(argv) {
+  const options = {
+    projectRoot: defaultProjectRoot,
+  };
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--help" || arg === "-h") {
+      console.log("Usage: node scripts/release-prepare.mjs [--project-root <path>]");
+      process.exit(0);
+    }
+    if (arg === "--project-root") {
+      options.projectRoot = resolvePathOption(argv[index + 1], {
+        name: "project-root",
+        baseDir: defaultProjectRoot,
+      });
+      index += 1;
+      continue;
+    }
+    throw createScriptError("args", `Unknown option: ${arg}`, {
+      failedStage: "parse-args",
+    });
+  }
+
+  return options;
+}
+
+function resolveFailureProjectRoot(argv = process.argv.slice(2)) {
+  const index = argv.indexOf("--project-root");
+  if (index === -1) {
+    return defaultProjectRoot;
+  }
+  const candidate = String(argv[index + 1] || "").trim();
+  return candidate
+    ? path.resolve(defaultProjectRoot, candidate)
+    : defaultProjectRoot;
+}
+
 async function main() {
+  const options = parseArgs(process.argv.slice(2));
+  const projectRoot = options.projectRoot;
   const configPath = path.join(projectRoot, "config", "addon.config.json");
   const releaseManifestPath = path.join(projectRoot, "dist", "release-manifest.json");
   const preflightPath = path.join(projectRoot, "dist", "release-preflight.json");
@@ -155,7 +238,14 @@ async function main() {
     details: { filePath: preflightPath, status: preflight.status || null },
   });
 
-  const warnings = collectWarnings(config, releaseManifest);
+  const remoteVerification = normalizeRemoteReleaseVerification(preflight.remoteVerification, {
+    config,
+    releaseManifest,
+  }) || buildPendingRemoteReleaseVerification({ config, releaseManifest });
+  const warnings = [
+    ...collectWarnings(config, releaseManifest),
+    ...collectRemoteWarnings(remoteVerification),
+  ];
 
   const plan = {
     generatedAt: new Date().toISOString(),
@@ -174,6 +264,7 @@ async function main() {
     checksum: preflight.xpiSHA256,
     sizeBytes: preflight.xpiSizeBytes,
     warnings,
+    remoteVerification,
     checks: {
       updateManifestHasEntry: Boolean(updateManifest.addons?.[config.addonId]?.updates?.[0]),
       updateLinkMatchesManifest:
@@ -191,6 +282,7 @@ async function main() {
     releaseManifest,
     preflight,
     warnings,
+    remoteVerification,
   });
 
   await writeJSONArtifact(path.join(projectRoot, "dist", "release-plan.json"), plan);
@@ -211,8 +303,8 @@ main().catch(async (error) => {
     durationMs: Math.max(0, Date.now() - scriptStartedAt),
   });
   try {
-    const releasePlanPath = path.join(projectRoot, "dist", "release-plan.json");
-    const releaseNotesPath = path.join(projectRoot, "dist", "release-notes.md");
+    const releasePlanPath = path.join(resolveFailureProjectRoot(), "dist", "release-plan.json");
+    const releaseNotesPath = path.join(resolveFailureProjectRoot(), "dist", "release-notes.md");
     await fs.mkdir(path.dirname(releasePlanPath), { recursive: true });
     await writeJSONArtifact(releasePlanPath, {
       generatedAt: new Date().toISOString(),
@@ -225,6 +317,7 @@ main().catch(async (error) => {
       checksum: null,
       sizeBytes: 0,
       warnings: [],
+      remoteVerification: null,
       checks: {},
       ...failureInfo,
     });

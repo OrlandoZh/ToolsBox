@@ -1,5 +1,6 @@
 import { describe, it, assert } from "./test-framework.js";
 import {
+  buildVisualCaptureFailureStageSummary,
   buildVisualExhaustedStageSummary,
   buildPureVisualReaderFailureSummary,
   buildVisualCanonicalCoverageSummary,
@@ -345,6 +346,210 @@ describe("Agent Zotero Validation Lib", () => {
     assert.equal(summary.readerHostStateObserved, true);
     assert.equal(summary.readerSidebarView, null);
     assert.equal(summary.readerHostStateSummary.includes("侧边栏视图"), true);
+  });
+
+  it("should preserve launch diagnostics details in the summarized e2e report", () => {
+    const summary = summarizeE2EReport({
+      generatedAt: "2026-03-30T07:20:28.663Z",
+      passed: false,
+      errorCategory: "execution",
+      failedStage: "launch-session",
+      errorMessage: "Zotero child exited before RDP became reachable on port 50343.",
+      details: {
+        runtimeSanitization: {
+          managed: true,
+          fresh: true,
+          profileReset: true,
+          dataReset: true,
+          removedMarkers: [],
+        },
+        launchFailure: {
+          kind: "child-exit-before-rdp",
+          rdpPort: 50343,
+          connectDurationMs: 142,
+          attemptCount: 1,
+          childExit: {
+            code: 0,
+            signal: null,
+          },
+          lastConnectError: {
+            code: "ECONNREFUSED",
+            message: "connect ECONNREFUSED 127.0.0.1:50343",
+          },
+          processLogTail: [],
+        },
+      },
+      cycles: [],
+    });
+
+    assert.equal(summary.errorCategory, "execution");
+    assert.equal(summary.failedStage, "launch-session");
+    assert.equal(summary.details.launchFailure?.kind, "child-exit-before-rdp");
+    assert.equal(summary.details.launchFailure?.rdpPort, 50343);
+    assert.equal(summary.details.runtimeSanitization?.managed, true);
+    assert.equal(summary.details.runtimeSanitization?.profileReset, true);
+  });
+
+  it("should prioritize capture-command-failed above unstable and geometry mismatch", () => {
+    const summary = summarizeE2EReport({
+      generatedAt: "2026-03-29T17:31:23.539Z",
+      passed: false,
+      issues: ["could not create image from rect"],
+      diagnostics: [{
+        fingerprint: "reader-ui:reader-visual-drift",
+        feature: "reader-ui",
+        featureLabel: "Reader 与视觉回归",
+        severity: "medium",
+        confidence: 0.88,
+        summary: "Reader 相关视觉基线发生漂移或缺失。",
+      }],
+      primaryDiagnosis: {
+        fingerprint: "reader-ui:reader-visual-drift",
+        feature: "reader-ui",
+        featureLabel: "Reader 与视觉回归",
+        severity: "medium",
+        confidence: 0.88,
+        summary: "Reader 相关视觉基线发生漂移或缺失。",
+      },
+      cycles: [{
+        index: 1,
+        bootMode: "restart",
+        passed: false,
+        checks: {
+          readerEventAPIAvailable: true,
+          readerEventSyntheticFallbackAvailable: true,
+        },
+        tests: { failed: 0 },
+        scenarios: {
+          failed: 0,
+          results: [
+            { name: "reader event hook diagnostics", status: "passed" },
+            { name: "reader fine-grained hook diagnostics", status: "passed" },
+          ],
+        },
+        logs: { errorCount: 0, warnCount: 1 },
+        visuals: {
+          captures: [
+            { kind: "library", path: "/tmp/cycle-1-library.png", analysis: { width: 2000, height: 1200 } },
+            { kind: "reader", path: "/tmp/cycle-1-reader.png", analysis: { width: 2000, height: 1200 } },
+          ],
+          captureStability: {
+            stages: [
+              {
+                kind: "library",
+                stable: false,
+                attemptCount: 2,
+                selectedAttempt: 2,
+                selectionReason: "max-attempt-reached",
+                failureKind: "capture-command-failed",
+                failureCategory: "capture-command-failed",
+                failureStage: "capture-command",
+                failureMessage: "could not create image from rect",
+                bounds: {
+                  x: 100,
+                  y: 80,
+                  width: 1000,
+                  height: 600,
+                  source: "chrome-target",
+                  title: "My Library",
+                },
+                boundsSource: "chrome-target",
+                windowTitle: "My Library",
+                command: "screencapture",
+                commandExitCode: 1,
+                stderr: "could not create image from rect",
+                rect: "100,80,1000,600",
+                attempts: [
+                  {
+                    index: 1,
+                    sha256: "lib-1",
+                    width: 2000,
+                    height: 1200,
+                    bounds: { x: 100, y: 80, width: 1000, height: 600 },
+                  },
+                  {
+                    index: 2,
+                    sha256: "lib-2",
+                    width: 2000,
+                    height: 1200,
+                    bounds: { x: 100, y: 80, width: 1000, height: 600 },
+                  },
+                ],
+              },
+              {
+                kind: "reader",
+                stable: true,
+                attemptCount: 2,
+                selectedAttempt: 2,
+                selectionReason: "stable-hash-pair",
+                attempts: [
+                  {
+                    index: 1,
+                    sha256: "reader-1",
+                    width: 2000,
+                    height: 1200,
+                    bounds: { x: 100, y: 80, width: 1000, height: 600 },
+                  },
+                  {
+                    index: 2,
+                    sha256: "reader-1",
+                    width: 2000,
+                    height: 1200,
+                    bounds: { x: 100, y: 80, width: 1000, height: 600 },
+                  },
+                ],
+              },
+            ],
+          },
+          analysis: {
+            baselines: [
+              {
+                kind: "library",
+                status: "compared",
+                ok: false,
+                metrics: {
+                  sameDimensions: false,
+                  actualWidth: 2000,
+                  actualHeight: 1200,
+                  baselineWidth: 3388,
+                  baselineHeight: 2172,
+                },
+              },
+              {
+                kind: "reader",
+                status: "compared",
+                ok: false,
+                metrics: {
+                  sameDimensions: false,
+                  actualWidth: 2000,
+                  actualHeight: 1200,
+                  baselineWidth: 3388,
+                  baselineHeight: 2172,
+                },
+              },
+            ],
+            summary: {
+              baseline: {
+                driftCount: 1,
+                missingCount: 0,
+              },
+            },
+          },
+        },
+      }],
+    });
+
+    assert.equal(summary.visualPrimaryBlockerKind, "capture-command-failed");
+    assert.equal(summary.visualPrimaryBlockerKindLabel, "截图调用失败");
+    assert.equal(buildVisualCaptureFailureStageSummary(summary), "library（截图调用失败：could not create image from rect）");
+    assert.ok(summary.visualCaptureAttemptDiagnosisSummary?.includes("截图调用失败 1 个"));
+    assert.equal(summary.visualCaptureAttemptDiagnosisItems[0]?.failureKind, "capture-command-failed");
+    assert.equal(summary.visualCaptureAttemptDiagnosisItems[0]?.failureMessage, "could not create image from rect");
+    assert.equal(summary.visualCaptureAttemptDiagnosisItems[0]?.boundsSource, "chrome-target");
+    assert.equal(summary.visualCaptureAttemptDiagnosisItems[0]?.commandExitCode, 1);
+    assert.equal(summary.visualCaptureAttemptDiagnosisItems[0]?.stderr, "could not create image from rect");
+    assert.ok(buildVisualPrimaryBlockerSummary(summary)?.includes("先复核窗口 bounds / 激活 / screencapture 调用"));
+    assert.equal(pickPureVisualReaderNextAction(summary), "npm run agent:zotero:e2e");
   });
 
   it("should classify stable geometry mismatch as baseline-geometry-mismatch", () => {
@@ -768,8 +973,42 @@ describe("Agent Zotero Validation Lib", () => {
           ],
           captureStability: {
             stages: [
-              { kind: "library", stable: false, attemptCount: 3, selectionReason: "max-attempt-reached" },
-              { kind: "reader", stable: false, attemptCount: 3, selectionReason: "max-attempt-reached" },
+              {
+                kind: "library",
+                stable: false,
+                attemptCount: 3,
+                selectionReason: "max-attempt-reached",
+                preCaptureSettle: {
+                  stage: "library",
+                  settled: true,
+                  timedOut: false,
+                  pollCount: 3,
+                  resetCount: 1,
+                  stableSampleTarget: 2,
+                  consecutiveStableSamples: 2,
+                  verificationMatched: true,
+                  snapshotSummary: "item#101 / selected 1 / Agent Item",
+                  summary: "library 达成，2/2，轮询 3 次，重置 1 次，最终复核一致",
+                },
+              },
+              {
+                kind: "reader",
+                stable: false,
+                attemptCount: 3,
+                selectionReason: "max-attempt-reached",
+                preCaptureSettle: {
+                  stage: "reader",
+                  settled: false,
+                  timedOut: true,
+                  pollCount: 8,
+                  resetCount: 3,
+                  stableSampleTarget: 3,
+                  consecutiveStableSamples: 1,
+                  verificationMatched: false,
+                  snapshotSummary: "item#202 / tab tab-2 / ann 2 / active true / window false / sidebar outline",
+                  summary: "reader 超时，1/3，轮询 8 次，重置 3 次，最终复核变更，快照 item#202 / tab tab-2 / ann 2 / active true / window false / sidebar outline",
+                },
+              },
             ],
           },
           analysis: {
@@ -816,6 +1055,13 @@ describe("Agent Zotero Validation Lib", () => {
 
     const blockerSummary = buildPureVisualReaderFailureSummary(summary) || "";
     assert.equal(summary.visualPrimaryBlockerKind, "capture-unstable");
+    assert.equal(summary.visualPreCaptureSettleObserved, true);
+    assert.equal(summary.visualPreCaptureSettleStageCount, 2);
+    assert.equal(summary.visualPreCaptureSettleSettledStageCount, 1);
+    assert.equal(summary.visualPreCaptureSettleTimedOutStageCount, 1);
+    assert.ok(String(summary.visualPreCaptureSettleSummary || "").includes("reader 超时"));
+    assert.equal(summary.visualCaptureStabilityStages[0]?.preCaptureSettle?.settled, true);
+    assert.equal(summary.visualCaptureStabilityStages[1]?.preCaptureSettle?.timedOut, true);
     assert.ok(blockerSummary.includes("用尽预算 stage：library（3 次）；reader（3 次）"));
     assert.ok(blockerSummary.includes("先重跑 E2E"));
     assert.ok(blockerSummary.includes("obsidian-first"));
@@ -2167,6 +2413,8 @@ describe("Agent Zotero Validation Lib", () => {
     assert.equal(summary.visualEvidenceItems[0].geometryMatched, true);
     assert.equal(summary.visualEvidenceItems[0].changedRatio, 0.9522);
     assert.equal(summary.visualEvidenceItems[0].meanChannelDiff, 20.95);
+    assert.ok(summary.visualEvidenceSummary?.includes("restart reader 漂移 95.22% / 20.95"));
+    assert.equal(summary.visualEvidenceSummary?.includes("reader 已对齐"), false);
   });
 
   it("should safely degrade visual evidence fields without changing the primary diagnosis", () => {

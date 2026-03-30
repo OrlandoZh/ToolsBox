@@ -89,6 +89,8 @@ export function selectAgentNextAction(recommendations, context = {}) {
         && context.visualCanonicalCoverageKind === "partial"
       ) {
         preferencePatterns.push(/agent:obsidian/u);
+      } else if (context.visualPrimaryBlockerKind === "capture-command-failed") {
+        preferencePatterns.push(/agent:zotero:e2e/u);
       } else if (
         context.visualPrimaryBlockerKind === "ui-regression-candidate"
         && context.visualCanonicalCoverageKind === "complete"

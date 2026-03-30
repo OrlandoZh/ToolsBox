@@ -14,14 +14,15 @@
 - 当前“完成度 / 当前主线 / 当前剩余项”只认 `docs/CURRENT_BACKLOG.md` 的“当前单一事实源”；Checklist 只确认资产与链路是否齐备，不再自己冻结另一套 current truth。
 
 <!-- CURRENT-TRUTH-SUMMARY:START -->
-- 当前真实完成度约为 `98%`；4 个 post-`ENG-HIGH-103` 工程化维护 batch 已完成并已提交，但 fresh gate 仍未转绿
-- 当前最近一轮工程化事实源仍承接 `ENG-HIGH-103`；其后的 4 个维护 batch 已分别落在 `49da303`、`27418fb`、`0aa9b4a`、`be15a92`
-- 当前最新 fresh 证据链显示：`watch` 为 `healthy`（`2026-03-28T16:04:08.616Z` 对应 gate 读取状态），`agent:zotero:e2e` 为 `failed`（`2026-03-28T15:57:56.441Z`），`agent:monitor` 前页状态为 `attention`（`2026-03-28T16:04:08.529Z`），`agent:gate` 当前阻断（`2026-03-28T16:04:08.616Z`，`gatePassed=false`）
-- 当前 fresh 主阻断已重新回到 `capture-unstable`；下一步是继续稳定 visual capture settle，不重开 baseline refresh、autofix 或 obsidian-first 分支
-- 当前主线只做两件事：先收正 single-source truth / backlog 口径，再推进独立 `capture-unstable` 稳定性批次
-- 当前明确继续延后：远端发布编排、远端 `updateURL` 闭环验证、下一轮 Reader 更深事件点、`P1` 白名单扩面；除非 future fresh `watch -> e2e -> gate` 出现新的真实回归类型
-- `LEGAL_RISK_CHECKLIST.md` 中的 Release Gate 继续保持 `release-only` 人工流程，不纳入本批自动化完成定义
-- 当前默认下一优先级固定为 `capture 稳定性批次`；等 fresh capture 结论变化后，再做 post-capture truth refresh
+- 当前真实完成度约为 `99%`；`ENG-HIGH-103` 的启动诊断 + runtime 清理 + `pre-capture settle`、`READER-HIGH-124 / READER-LOW-261~263` 的 capture / freshness 收口、`READER-HIGH-125` 的 library-only 根因边界冻结、以及 `READER-HIGH-126` 的 library host-noise 修复均已完成并转为历史契约 / review artifact
+- latest live rerun 已把 current truth 固定回单一事实源：最新 `watch` 工件为 `healthy`（`2026-03-30T11:34:05.136Z`），最新 direct `agent:zotero:e2e` 为 `passed`（`2026-03-30T11:31:37.694Z`，`failedStage=null`，`errorCategory=null`）
+- 最新开发态 `agent:monitor` / `agent:gate` 已在 `2026-03-30T11:35:48.300Z` / `2026-03-30T11:35:48.379Z` 回到 `stable / ready`，并继续直接消费同一份 `2026-03-30T11:31:37.694Z` E2E 摘要；freshest-valid artifact 消费与 consumer 收口继续保持生效
+- `details.runtimeSanitization` 已稳定透传到 direct E2E / monitor / gate：本轮 direct E2E 记录了 `exclusiveProjectRuntime=true`，并在启动前终止了 project-managed `watch` `zotero` / `plugin-container`；旧的 startup/RDP bring-up timeout 口径继续只保留为已收口的诊断能力
+- 最新 library `pre-capture settle` 已稳定收敛到 `visibleBannerIDs=[mac-word-plugin-install-container]`；`sync-reminder-container`、`post-upgrade-container`、`file-renaming-banner-container`、`retracted-items-container` 与 `architecture-warning-container` 会在 capture 前被压平，library drift 已消失，`reader 视图继续对齐`，且 `library / reader` 几何一致 `2000x1200`
+- `READER-LOW-261` 已把 stage-scoped capture failure 结构化落进既有 E2E / validation 展示链；`READER-LOW-262` 已引入 `capture-command-failed` / `visualPrimaryBlockerKind=capture-command-failed` 并同步 consumer；`READER-LOW-263` 已在 live rerun 上证明 freshest-valid direct artifact 消费与 truth 对齐，`visual screenshot capture` 链已恢复到稳定基线
+- 最新 release live acceptance 已补齐 stable / beta 正式安装态 smoke：`release-matrix` 最新工件为 `attention`（`2026-03-30T13:58:47.934Z`），但 stable / beta profile 均已 `passed`；`release-install-smoke-stable` / `release-install-smoke-beta` 分别在 `2026-03-30T13:38:04.172Z` / `2026-03-30T13:58:21.077Z` 记录 `readinessMode=native`、`apiReady=true`，且剩余 `loading.svg` / `remote-settings.sys.mjs` 已归类为宿主噪声
+- 最新 `agent:monitor` / `agent:gate:release` 已在 `2026-03-30T13:59:05.792Z` / `2026-03-30T13:59:05.867Z` 消费最新 release artifacts；当前 `gatePassed=false` 的唯一原因是 `updateURL` 仍指向 `https://example.com/downloads/cleanroomtemplate/update.json` placeholder、远端自定义发布端未配置，而不是安装态 smoke 或插件运行时回归
+- 当前主阻断已清零；当前唯一 active 非阻断工程 gap 继续保持 `ENG-HIGH-104 / ENG-LOW-211~213`：只处理远端发布编排与远端 `updateURL` 闭环验证，不回头重开 Reader / startup / freshness 主线；`LEGAL_RISK_CHECKLIST.md` 的 Release Gate 继续保持 `release-only` 人工流程
 <!-- CURRENT-TRUTH-SUMMARY:END -->
 
 ## 核心资产检查
@@ -38,8 +39,8 @@
 | 本地发布矩阵 | ✅ | `release:matrix` / `release:install-smoke:*` / `agent:gate:release` 已接通本地发布画像 |
 | Obsidian 人工介入 | ✅ | 已有工作台、白板、人工窗口、快速上手、介入规范；可选 Mermaid / Excalidraw companion 视图也已落地，可由 `AGENT_OBSIDIAN_VISUALS=1` 启用 |
 | 纯项目导出 | ✅ | `export:project` 已可剔除 agent/runner/reference |
-| 委托分工脚手架 | ✅ | manifest / CLI / 审查工件已落地，`DOC-LOW-001`、`ENG-LOW-102` 已完成试点验证；`ENG-LOW-201~203`、`ENG-LOW-204~206`、`READER-LOW-201~203`、`READER-LOW-204~206`、`READER-LOW-207~209`、`READER-LOW-210~212`、`READER-LOW-213~215`、`READER-LOW-216~218`、`READER-LOW-225~227`、`READER-LOW-228~230`、`READER-LOW-231~233`、`READER-LOW-234~236`、`READER-LOW-237~239`、`READER-LOW-249~251`、`READER-LOW-252~254`、`READER-LOW-255~257`、`READER-LOW-258~260` 与 `OBSIDIAN-LOW-301~303` 已转入历史 review artifact，当前 active 高逻辑任务源已切到 `ENG-HIGH-103` |
-| 串行 low-task 收口 | ✅ | Reader 自动代码批次与 Obsidian visual enhancement 批次已全部归档到历史 review artifact；`READER-HIGH-123` 已完成唯一 Reader verdict 与单分支收口，当前主线已进入 `ENG-HIGH-103` 的工程化长期增强第一批 |
+| 委托分工脚手架 | ✅ | manifest / CLI / 审查工件已落地，`DOC-LOW-001`、`ENG-LOW-102` 已完成试点验证；`ENG-LOW-201~203`、`ENG-LOW-204~206`、`READER-LOW-201~203`、`READER-LOW-204~206`、`READER-LOW-207~209`、`READER-LOW-210~212`、`READER-LOW-213~215`、`READER-LOW-216~218`、`READER-LOW-225~227`、`READER-LOW-228~230`、`READER-LOW-231~233`、`READER-LOW-234~236`、`READER-LOW-237~239`、`READER-LOW-249~251`、`READER-LOW-252~254`、`READER-LOW-255~257`、`READER-LOW-258~260` 与 `OBSIDIAN-LOW-301~303` 已转入历史 review artifact；`READER-HIGH-126` 也已完成并转为历史契约 / review artifact；默认下一轮高逻辑任务源切到 `ENG-HIGH-104 / ENG-LOW-211~213` |
+| 串行 low-task 收口 | ✅ | 启动诊断 + `pre-capture settle` 补丁、`READER-HIGH-124 / READER-LOW-261~263` 的 Reader 视觉采集 / freshness 收口、`READER-HIGH-125` 的 library-only 根因边界冻结，以及 `READER-HIGH-126` 的 library host-noise 修复都已转为历史契约 / review artifact；当前主阻断已清零 |
 
 ## 源码结构检查
 
@@ -213,9 +214,10 @@
   - `preferredStrategy` 已按 `latestBootMode + zoteroVersionBucket` 做上下文优先推荐
   - `releaseMatrix` 已进入 memory signal
   - `agent:monitor` / `agent:dashboard` 已显示 `contextMatchLevel`
-- 本地发布矩阵与发布档位 gate 闭环
+- 本地发布矩阵与发布档位 gate 消费链
   - stable / beta 正式安装态 smoke 已真机通过
-  - `remote-settings.sys.mjs` 与 `loading.svg` 已归类为宿主噪声，不再阻断发布 gate
+  - `remote-settings.sys.mjs` 与 `loading.svg` 已归类为宿主噪声，不再阻断本地安装态 smoke
+  - 最新 release gate 仍只因远端 `updateURL` / 自定义发布端未配置而阻断
 - Obsidian 人工介入窗口
 - 纯项目导出
 
@@ -225,7 +227,7 @@
 
 - `P1` 白名单受控补丁范围扩大
 - Reader 更深的宿主事件点与视觉回归
-- 当前 truth / backlog 收口与 `capture-unstable` 稳定性
+- 当前 truth / verdict 收口与 `library-only drift root-cause` 收口
 - 全局错误边界、性能监控点、部分参数验证增强
 
 详见 [docs/CURRENT_BACKLOG.md](docs/CURRENT_BACKLOG.md)。

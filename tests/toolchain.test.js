@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { describe, it, assert } from "./test-framework.js";
 
@@ -23,6 +23,27 @@ function makeTempReferenceRoot() {
   const referenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "addontemplate-cleanroom-reference-"));
   fs.writeFileSync(path.join(referenceRoot, "snapshot.md"), "temporary reference snapshot\n", "utf-8");
   return referenceRoot;
+}
+
+async function execNodeAsync(args, options = {}) {
+  const {
+    cwd = projectRoot,
+    env = process.env,
+  } = options;
+
+  await new Promise((resolve, reject) => {
+    execFile("node", args, {
+      cwd,
+      env,
+      maxBuffer: 10 * 1024 * 1024,
+    }, (error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
 }
 
 const EXPORTED_STATIC_RUNTIME_BASELINE = [
@@ -127,7 +148,9 @@ describe("Toolchain Scripts", () => {
     assert.equal(releasePlan.failedStage, null);
     assert.ok(Array.isArray(releasePlan.artifactFiles));
     assert.ok(releasePlan.artifactFiles.includes("release-notes.md"));
+    assert.equal(releasePlan.remoteVerification?.status, "unconfigured");
     assert.ok(releaseNotes.includes("## Upload Steps"));
+    assert.ok(releaseNotes.includes("## Remote Verification"));
     assert.ok(releaseNotes.includes("SHA256"));
   });
 
@@ -154,9 +177,84 @@ describe("Toolchain Scripts", () => {
     assert.equal(releaseMatrix.profiles.every((item) => item.metadataConsistent === true), true);
     assert.equal(releaseMatrix.profiles.every((item) => item.packageConsistent === true), true);
     assert.equal(releaseMatrix.profiles.every((item) => item.installSmokePresent === false), true);
+    assert.equal(releaseMatrix.remoteVerification?.status, "unconfigured");
     assert.ok(releaseMatrixMD.includes("## 渠道矩阵"));
+    assert.ok(releaseMatrixMD.includes("## 远端发布验证"));
     assert.ok(releaseMatrixMD.includes("## 运行时错误画像"));
     assert.ok(releaseMatrixMD.includes("待补验证"));
+  });
+
+  it("should verify remote release URLs and carry the result into plan and matrix", async () => {
+    execFileSync("node", ["scripts/package.mjs"], {
+      cwd: projectRoot,
+      stdio: "pipe",
+    });
+
+    let referenceRoot = null;
+
+    try {
+      const config = readJSON(path.join(projectRoot, "config", "addon.config.json"));
+      const outputName = `${config.addonRef}-${config.addonVersion}.xpi`;
+      const sourceUpdateManifest = readJSON(path.join(projectRoot, "dist", "update.json"));
+      const sourceXpiBuffer = fs.readFileSync(path.join(projectRoot, "dist", outputName));
+      const remoteUpdateLink = `data:application/x-xpinstall;base64,${sourceXpiBuffer.toString("base64")}`;
+      const remoteUpdateManifest = {
+        ...sourceUpdateManifest,
+        addons: {
+          ...sourceUpdateManifest.addons,
+          [config.addonId]: {
+            ...(sourceUpdateManifest.addons?.[config.addonId] || {}),
+            updates: [
+              {
+                ...(sourceUpdateManifest.addons?.[config.addonId]?.updates?.[0] || {}),
+                version: config.addonVersion,
+                update_link: remoteUpdateLink,
+                applications: {
+                  zotero: {
+                    strict_min_version: config.strictMinVersion,
+                    strict_max_version: config.strictMaxVersion,
+                  },
+                },
+              },
+            ],
+          },
+        },
+      };
+      const remoteUpdateURL = `data:application/json,${encodeURIComponent(JSON.stringify(remoteUpdateManifest))}`;
+      referenceRoot = makeTempReferenceRoot();
+
+      await execNodeAsync([
+        "scripts/release-preflight.mjs",
+        "--verify-remote",
+        "--remote-update-url",
+        remoteUpdateURL,
+        "--remote-expected-update-link",
+        remoteUpdateLink,
+      ], {
+        env: {
+          ...process.env,
+          CLEANROOM_REFERENCE_ROOT: referenceRoot,
+        },
+      });
+      await execNodeAsync(["scripts/release-prepare.mjs"]);
+      await execNodeAsync(["scripts/release-matrix.mjs"]);
+
+      const preflight = readJSON(path.join(projectRoot, "dist", "release-preflight.json"));
+      const releasePlan = readJSON(path.join(projectRoot, "dist", "release-plan.json"));
+      const releaseMatrix = readJSON(path.join(projectRoot, "dist", "release-matrix.json"));
+      const releaseNotes = fs.readFileSync(path.join(projectRoot, "dist", "release-notes.md"), "utf-8");
+
+      assert.equal(preflight.status, "passed");
+      assert.equal(preflight.remoteVerification?.status, "passed");
+      assert.equal(releasePlan.remoteVerification?.status, "passed");
+      assert.equal(releaseMatrix.remoteVerification?.status, "passed");
+      assert.equal(releaseMatrix.remoteVerification?.observedUpdateLink, remoteUpdateLink);
+      assert.ok(releaseNotes.includes("Status: `通过`"));
+    } finally {
+      if (referenceRoot) {
+        fs.rmSync(referenceRoot, { recursive: true, force: true });
+      }
+    }
   });
 
   it("should export pure project package without agent framework extras", () => {

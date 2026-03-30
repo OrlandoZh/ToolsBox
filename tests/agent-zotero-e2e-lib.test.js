@@ -3,10 +3,130 @@ import {
   summarizeLogs,
   evaluateCycle,
   buildE2EMarkdown,
+  ensureLibraryVisualStageReady,
 } from "../scripts/agent-zotero-e2e-lib.mjs";
 import { normalizeDiagnosisFingerprint } from "../scripts/agent-zotero-diagnosis-lib.mjs";
 
 describe("Agent Zotero E2E Lib", () => {
+  it("should enforce the library visual precondition order before inspecting the item", async () => {
+    const steps = [];
+
+    const result = await ensureLibraryVisualStageReady({
+      itemID: 101,
+      libraryID: 1,
+      waitForViews: async () => {
+        steps.push("waitForViews");
+        return true;
+      },
+      stabilizeHostSurface: async () => {
+        steps.push("stabilizeHostSurface");
+        return {
+          suppressedBannerIDs: ["sync-reminder-container", "post-upgrade-container"],
+          retainedBannerIDs: ["mac-word-plugin-install-container"],
+          visibleBannerIDs: ["mac-word-plugin-install-container"],
+        };
+      },
+      selectLibrary: async (libraryID) => {
+        steps.push(`selectLibrary:${libraryID}`);
+        return true;
+      },
+      waitForItemsLoad: async () => {
+        steps.push("waitForItemsLoad");
+        return true;
+      },
+      selectItem: async (itemID) => {
+        steps.push(`selectItem:${itemID}`);
+      },
+      waitForSelection: async (itemID) => {
+        steps.push(`waitForSelection:${itemID}`);
+        return {
+          selectedIDs: [itemID],
+          selectedCount: 1,
+        };
+      },
+      waitForPaint: async () => {
+        steps.push("waitForPaint");
+        return true;
+      },
+      inspectItem: async (itemID) => {
+        steps.push(`inspectItem:${itemID}`);
+        return {
+          itemID,
+          title: "Agent Visual Validation",
+          summary: "Agent Visual Validation #101",
+          columnValue: "book · 23",
+        };
+      },
+      readSelectedTabID: () => "library",
+      readWindowTitle: () => "My Library",
+    });
+
+    assert.deepEqual(steps, [
+      "waitForViews",
+      "stabilizeHostSurface",
+      "selectLibrary:1",
+      "waitForItemsLoad",
+      "selectItem:101",
+      "waitForSelection:101",
+      "waitForPaint",
+      "inspectItem:101",
+    ]);
+    assert.deepEqual(result.selection.selectedIDs, [101]);
+    assert.equal(result.selection.selectedCount, 1);
+    assert.equal(result.preparation.viewsReady, true);
+    assert.equal(result.preparation.libraryRootSelected, true);
+    assert.equal(result.preparation.itemsViewLoaded, true);
+    assert.equal(result.preparation.selectionMatched, true);
+    assert.equal(result.preparation.selectionSingleItem, true);
+    assert.equal(result.preparation.selectedTabID, "library");
+    assert.equal(result.preparation.windowTitle, "My Library");
+    assert.deepEqual(result.preparation.suppressedBannerIDs, [
+      "post-upgrade-container",
+      "sync-reminder-container",
+    ]);
+    assert.deepEqual(result.preparation.retainedBannerIDs, [
+      "mac-word-plugin-install-container",
+    ]);
+    assert.deepEqual(result.preparation.visibleBannerIDs, [
+      "mac-word-plugin-install-container",
+    ]);
+    assert.equal(result.settleSnapshot.columnValue, "book · 23");
+    assert.deepEqual(result.settleSnapshot.visibleBannerIDs, [
+      "mac-word-plugin-install-container",
+    ]);
+  });
+
+  it("should preserve library preparation metadata while degrading optional hooks safely", async () => {
+    const result = await ensureLibraryVisualStageReady({
+      itemID: 202,
+      waitForViews: async () => true,
+      selectItem: async () => {},
+      waitForSelection: async (itemID) => ({
+        selectedIDs: [itemID],
+      }),
+      inspectItem: async (itemID) => ({
+        itemID,
+        title: "Library Item",
+        summary: "Library Item #202",
+        columnValue: "report · 7",
+      }),
+    });
+
+    assert.equal(result.libraryID, null);
+    assert.equal(result.preparation.libraryRootSelected, null);
+    assert.equal(result.preparation.itemsViewLoaded, null);
+    assert.equal(result.preparation.selectionMatched, true);
+    assert.equal(result.preparation.selectionSingleItem, true);
+    assert.equal(result.preparation.selectedTabID, null);
+    assert.equal(result.preparation.windowTitle, null);
+    assert.deepEqual(result.preparation.suppressedBannerIDs, []);
+    assert.deepEqual(result.preparation.retainedBannerIDs, []);
+    assert.deepEqual(result.preparation.visibleBannerIDs, []);
+    assert.deepEqual(result.settleSnapshot.selectedIDs, [202]);
+    assert.equal(result.settleSnapshot.selectedCount, 1);
+    assert.deepEqual(result.settleSnapshot.visibleBannerIDs, []);
+  });
+
   it("should summarize logs and classify errors", () => {
     const summary = summarizeLogs([
       { level: "info", message: "hello" },
@@ -114,8 +234,42 @@ describe("Agent Zotero E2E Lib", () => {
           ],
           captureStability: {
             stages: [
-              { kind: "library", stable: true, attemptCount: 2, selectionReason: "stable-hash-pair" },
-              { kind: "reader", stable: false, attemptCount: 3, selectionReason: "max-attempt-reached" },
+              {
+                kind: "library",
+                stable: true,
+                attemptCount: 2,
+                selectionReason: "stable-hash-pair",
+                preCaptureSettle: {
+                  stage: "library",
+                  settled: true,
+                  timedOut: false,
+                  pollCount: 2,
+                  resetCount: 0,
+                  stableSampleTarget: 2,
+                  consecutiveStableSamples: 2,
+                  verificationMatched: true,
+                  snapshotSummary: "item#101 / selected 1 / Library Item",
+                  summary: "library 达成，2/2，轮询 2 次，最终复核一致",
+                },
+              },
+              {
+                kind: "reader",
+                stable: false,
+                attemptCount: 3,
+                selectionReason: "max-attempt-reached",
+                preCaptureSettle: {
+                  stage: "reader",
+                  settled: false,
+                  timedOut: true,
+                  pollCount: 7,
+                  resetCount: 2,
+                  stableSampleTarget: 3,
+                  consecutiveStableSamples: 1,
+                  verificationMatched: false,
+                  snapshotSummary: "item#202 / tab tab-2 / ann 1 / active true / window false / sidebar outline",
+                  summary: "reader 超时，1/3，轮询 7 次，重置 2 次，最终复核变更，快照 item#202 / tab tab-2 / ann 1 / active true / window false / sidebar outline",
+                },
+              },
             ],
           },
           analysis: {
@@ -178,6 +332,8 @@ describe("Agent Zotero E2E Lib", () => {
     assert.ok(markdown.includes("视觉基线目录"));
     assert.ok(markdown.includes("基线比对 2"));
     assert.ok(markdown.includes("采集稳定性 library 稳定 2 次（哈希收敛）；reader 待稳 3 次（重试上限）"));
+    assert.ok(markdown.includes("## Pre-capture Settle 诊断"));
+    assert.ok(markdown.includes("reader 超时"));
     assert.ok(markdown.includes("## 能力覆盖"));
     assert.ok(markdown.includes("基线注册"));
     assert.ok(markdown.includes("## 结构化诊断"));
@@ -289,6 +445,161 @@ describe("Agent Zotero E2E Lib", () => {
     });
 
     assert.ok(markdown.includes("reader 稳定 3 次（低漂移收敛）"));
+  });
+
+  it("should render structured capture-command-failed diagnosis in markdown", () => {
+    const markdown = buildE2EMarkdown({
+      generatedAt: "2026-03-29T17:31:23.539Z",
+      strategy: "restart",
+      visualBaselineDir: "/tmp/visual-baseline",
+      visualBaselineMode: "compare",
+      passed: false,
+      issues: ["could not create image from rect"],
+      hints: [],
+      diagnostics: [],
+      primaryDiagnosis: {
+        fingerprint: "reader-ui:reader-visual-drift",
+        feature: "reader-ui",
+        featureLabel: "Reader 与视觉回归",
+        severity: "medium",
+        confidence: 0.88,
+        summary: "Reader 相关视觉基线发生漂移或缺失。",
+      },
+      cycles: [{
+        index: 1,
+        bootMode: "restart",
+        passed: false,
+        summaryNote: "library 截图命令失败",
+        tests: { failed: 0 },
+        scenarios: {
+          failed: 0,
+          results: [
+            { name: "reader event hook diagnostics", status: "passed" },
+            { name: "reader fine-grained hook diagnostics", status: "passed" },
+          ],
+        },
+        logs: {
+          errorCount: 0,
+          warnCount: 1,
+          recentErrors: [],
+        },
+        visuals: {
+          captures: [
+            { kind: "reader", path: "/tmp/reader.png", analysis: { width: 2000, height: 1200 } },
+          ],
+          captureStability: {
+            stages: [
+              {
+                kind: "library",
+                stable: false,
+                attemptCount: 2,
+                selectedAttempt: 2,
+                selectionReason: "max-attempt-reached",
+                failureKind: "capture-command-failed",
+                failureCategory: "capture-command-failed",
+                failureStage: "capture-command",
+                failureMessage: "could not create image from rect",
+                boundsSource: "chrome-target",
+                windowTitle: "My Library",
+                command: "screencapture",
+                commandExitCode: 1,
+                stderr: "could not create image from rect",
+                rect: "100,80,1000,600",
+                attempts: [
+                  {
+                    index: 1,
+                    sha256: "lib-1",
+                    width: 2000,
+                    height: 1200,
+                    bounds: { x: 100, y: 80, width: 1000, height: 600 },
+                  },
+                  {
+                    index: 2,
+                    sha256: "lib-2",
+                    width: 2000,
+                    height: 1200,
+                    bounds: { x: 100, y: 80, width: 1000, height: 600 },
+                  },
+                ],
+              },
+              {
+                kind: "reader",
+                stable: true,
+                attemptCount: 2,
+                selectedAttempt: 2,
+                selectionReason: "stable-hash-pair",
+                attempts: [
+                  {
+                    index: 1,
+                    sha256: "reader-1",
+                    width: 2000,
+                    height: 1200,
+                    bounds: { x: 100, y: 80, width: 1000, height: 600 },
+                  },
+                  {
+                    index: 2,
+                    sha256: "reader-1",
+                    width: 2000,
+                    height: 1200,
+                    bounds: { x: 100, y: 80, width: 1000, height: 600 },
+                  },
+                ],
+              },
+            ],
+          },
+          analysis: {
+            ok: false,
+            baselines: [
+              {
+                kind: "library",
+                canonicalTarget: "restart-library.png",
+                path: "/tmp/restart-library.png",
+                status: "compared",
+                ok: false,
+                metrics: {
+                  sameDimensions: false,
+                  actualWidth: 2000,
+                  actualHeight: 1200,
+                  baselineWidth: 3388,
+                  baselineHeight: 2172,
+                },
+              },
+              {
+                kind: "reader",
+                canonicalTarget: "restart-reader.png",
+                path: "/tmp/restart-reader.png",
+                status: "compared",
+                ok: true,
+                metrics: {
+                  sameDimensions: true,
+                  changedRatio: 0,
+                  meanChannelDiff: 0,
+                },
+              },
+            ],
+            summary: {
+              baseline: {
+                comparedCount: 2,
+                missingCount: 0,
+                driftCount: 1,
+                errorCount: 0,
+                updateRequested: false,
+              },
+            },
+          },
+          warnings: [],
+        },
+      }],
+      visuals: [],
+    });
+
+    assert.ok(markdown.includes("## Capture Attempt 诊断"));
+    assert.ok(markdown.includes("Stage 失败：截图调用失败 (capture-command-failed)"));
+    assert.ok(markdown.includes("失败信息：could not create image from rect"));
+    assert.ok(markdown.includes("Bounds 来源：chrome-target"));
+    assert.ok(markdown.includes("窗口标题：My Library"));
+    assert.ok(markdown.includes("命令退出码：1"));
+    assert.ok(markdown.includes("Stderr：could not create image from rect"));
   });
 
   it("should render mixed library-exhausted and reader-low-drift states without regressing blocker wording", () => {
@@ -1711,5 +2022,54 @@ describe("Agent Zotero E2E Lib", () => {
     assert.equal(result.primaryDiagnosis?.fingerprint, "config:default-enabled-disabled");
     assert.ok(result.hints.some((item) => String(item).includes("fresh profile")));
     assert.ok(result.primaryDiagnosis?.candidateFiles.includes("config/addon.config.json"));
+  });
+
+  it("should render launch diagnostics for pre-RDP startup failures", () => {
+    const markdown = buildE2EMarkdown({
+      generatedAt: "2026-03-29T00:00:00.000Z",
+      strategy: "hot",
+      visualBaselineDir: "/tmp/visual-baseline",
+      visualBaselineMode: "compare",
+      passed: false,
+      issues: ["Timed out waiting for Zotero RDP on port 4555."],
+      hints: ["检查崩溃日志或 managed runtime profile。"],
+      diagnostics: [],
+      cycles: [],
+      details: {
+        runtimeSanitization: {
+          managed: true,
+          fresh: true,
+          profileReset: true,
+          dataReset: true,
+          removedMarkers: [
+            { marker: ".parentlock", path: "/tmp/.zotero-runtime/watch/profile/.parentlock" },
+          ],
+        },
+        launchFailure: {
+          kind: "rdp-connect-timeout",
+          attemptCount: 3,
+          connectDurationMs: 1500,
+          childExit: null,
+          lastConnectError: {
+            code: "ECONNREFUSED",
+            message: "connect ECONNREFUSED 127.0.0.1:4555",
+          },
+          processLogTail: [
+            {
+              at: "2026-03-29T00:00:01.000Z",
+              source: "zotero.stderr",
+              message: "startup begin",
+            },
+          ],
+        },
+      },
+    });
+
+    assert.ok(markdown.includes("## 启动诊断"));
+    assert.ok(markdown.includes("rdp-connect-timeout"));
+    assert.ok(markdown.includes("RDP 端口未在重试窗口内就绪"));
+    assert.ok(markdown.includes("Runtime 清理"));
+    assert.ok(markdown.includes("### 启动前进程日志尾部"));
+    assert.ok(markdown.includes("startup begin"));
   });
 });

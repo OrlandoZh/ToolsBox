@@ -923,7 +923,69 @@ function summarizeToolbarEvidence(readerEventReport) {
   return parts.join("；");
 }
 
-function summarizeVisualEvidence(latestCycle) {
+function formatVisualEvidenceSummaryLabel(item) {
+  const explicitTarget = String(item?.canonicalTarget || "").trim();
+  if (explicitTarget) {
+    const basename = explicitTarget.split(/[\\/]/u).pop() || explicitTarget;
+    const withoutExtension = basename.replace(/\.[^.]+$/u, "");
+    const normalized = withoutExtension.replace(/[-_]+/gu, " ").trim();
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  const bootMode = String(item?.bootMode || "").trim();
+  const kind = String(item?.kind || "visual").trim() || "visual";
+  return `${bootMode ? `${bootMode} ` : ""}${kind}`.trim();
+}
+
+function summarizeVisualEvidenceItem(item) {
+  const label = formatVisualEvidenceSummaryLabel(item);
+  const issues = Array.isArray(item?.issues) ? item.issues : [];
+  if (item?.geometryMatched === false) {
+    const actualWidth = Number(item?.actualWidth);
+    const actualHeight = Number(item?.actualHeight);
+    const baselineWidth = Number(item?.baselineWidth);
+    const baselineHeight = Number(item?.baselineHeight);
+    const actualSize = formatVisualSize(actualWidth, actualHeight);
+    const baselineSize = formatVisualSize(baselineWidth, baselineHeight);
+    if (actualSize && baselineSize) {
+      return `${label} 尺寸漂移 ${actualSize} / ${baselineSize}`;
+    }
+    return `${label} 尺寸漂移`;
+  }
+
+  const changedRatio = normalizeVisualMetricNumber(item?.changedRatio);
+  const meanChannelDiff = normalizeVisualMetricNumber(item?.meanChannelDiff);
+  if (changedRatio !== null || meanChannelDiff !== null) {
+    return `${label} 漂移 ${formatMaybePercent(changedRatio)} / ${formatMaybeNumber(meanChannelDiff)}`;
+  }
+
+  if (issues.some((entry) => /geometry/i.test(String(entry || "")))) {
+    return `${label} 基线几何不匹配`;
+  }
+  if (issues.includes("capture-missing")) {
+    return `${label} 截图缺失`;
+  }
+  if (issues.includes("baseline-missing")) {
+    return `${label} 基线缺失`;
+  }
+
+  return `${label} 漂移`;
+}
+
+function summarizeVisualEvidence(latestCycle, visualEvidence = null) {
+  const failingItems = Array.isArray(visualEvidence?.items) ? visualEvidence.items : [];
+  if (failingItems.length > 0) {
+    const parts = failingItems
+      .slice(0, 4)
+      .map((item) => summarizeVisualEvidenceItem(item))
+      .filter(Boolean);
+    if (parts.length > 0) {
+      return `${parts.join("；")}${failingItems.length > parts.length ? `；其余 ${failingItems.length - parts.length} 项见证据索引` : ""}`;
+    }
+  }
+
   const baselines = Array.isArray(latestCycle?.visuals?.analysis?.baselines)
     ? latestCycle.visuals.analysis.baselines
     : [];
@@ -1056,6 +1118,11 @@ function summarizeAttemptHashUniqueness(values) {
 }
 
 function buildVisualAttemptDiagnosisPreview(item) {
+  if (item?.failureKind) {
+    const failureLabel = pickVisualCaptureFailureKindLabel(item.failureKind);
+    const failureMessage = String(item?.failureMessage || "").trim();
+    return `${buildVisualAttemptDiagnosisLabel(item)}（${failureLabel}${failureMessage ? `：${failureMessage}` : ""}）`;
+  }
   const facts = [
     item?.boundsStable === true
       ? "bounds 固定"
@@ -1173,6 +1240,10 @@ function summarizeVisualEvidenceItems(cycles) {
           : null,
         selectionReason: String(stage?.selectionReason || "").trim() || null,
         geometryMatched,
+        actualWidth: normalizeVisualMetricNumber(metrics?.actualWidth),
+        actualHeight: normalizeVisualMetricNumber(metrics?.actualHeight),
+        baselineWidth: normalizeVisualMetricNumber(metrics?.baselineWidth),
+        baselineHeight: normalizeVisualMetricNumber(metrics?.baselineHeight),
         changedRatio: normalizeVisualMetricNumber(metrics?.changedRatio),
         meanChannelDiff: normalizeVisualMetricNumber(metrics?.meanChannelDiff),
         issues: uniqueStrings(issueList),
@@ -1254,6 +1325,19 @@ function summarizeVisualCaptureAttemptDiagnosis(cycles) {
         attemptBounds,
         attemptRasterSizes,
         stabilityMetrics: normalizeVisualStabilityMetrics(stage?.stabilityMetrics),
+        failureKind: String(stage?.failureKind || "").trim() || null,
+        failureCategory: String(stage?.failureCategory || "").trim() || null,
+        failureStage: String(stage?.failureStage || "").trim() || null,
+        failureMessage: String(stage?.failureMessage || "").trim() || null,
+        boundsSource: String(stage?.boundsSource || stage?.bounds?.source || "").trim() || null,
+        windowTitle: String(stage?.windowTitle || stage?.bounds?.title || "").trim() || null,
+        command: String(stage?.command || "").trim() || null,
+        commandExitCode: Number.isFinite(Number(stage?.commandExitCode))
+          ? Number(stage.commandExitCode)
+          : null,
+        stderr: String(stage?.stderr || "").trim() || null,
+        stdout: String(stage?.stdout || "").trim() || null,
+        rect: String(stage?.rect || "").trim() || null,
       });
     }
   }
@@ -1267,9 +1351,18 @@ function summarizeVisualCaptureAttemptDiagnosis(cycles) {
     };
   }
 
+  const commandFailureItems = items.filter((item) => isVisualCaptureCommandFailure(item));
   const exhaustedItems = items.filter((item) => item.selectionReason === "max-attempt-reached");
   const lowDriftItems = items.filter((item) => item.selectionReason === "stable-low-drift-pair");
   const summaryParts = [`已观测 ${items.length} 个 stage capture attempt 诊断`];
+
+  if (commandFailureItems.length > 0) {
+    const preview = commandFailureItems
+      .slice(0, 2)
+      .map((item) => buildVisualAttemptDiagnosisPreview(item))
+      .join("；");
+    summaryParts.push(`截图调用失败 ${commandFailureItems.length} 个：${preview}${commandFailureItems.length > 2 ? "；其余项见 attempt 诊断" : ""}`);
+  }
 
   if (exhaustedItems.length > 0) {
     const preview = exhaustedItems
@@ -1287,7 +1380,7 @@ function summarizeVisualCaptureAttemptDiagnosis(cycles) {
     summaryParts.push(`低漂移收敛 ${lowDriftItems.length} 个：${preview}${lowDriftItems.length > 1 ? "；其余项见 attempt 诊断" : ""}`);
   }
 
-  if (exhaustedItems.length === 0 && lowDriftItems.length === 0) {
+  if (commandFailureItems.length === 0 && exhaustedItems.length === 0 && lowDriftItems.length === 0) {
     summaryParts.push("当前未发现 exhausted stage，attempt 细节仅作补充参考");
   }
 
@@ -1470,6 +1563,46 @@ function normalizeVisualStabilityMetrics(metrics) {
   return hasData ? normalized : null;
 }
 
+function normalizeVisualPreCaptureSettle(record, fallbackKind = null) {
+  const source = record && typeof record === "object"
+    ? record
+    : null;
+  if (!source) {
+    return null;
+  }
+
+  const pollCount = Math.max(0, Number(source.pollCount || 0));
+  const stableSampleTarget = Math.max(0, Number(source.stableSampleTarget || 0));
+  const consecutiveStableSamples = Math.max(0, Number(source.consecutiveStableSamples || 0));
+  const resetCount = Math.max(0, Number(source.resetCount || 0));
+  const normalized = {
+    kind: String(source.stage || fallbackKind || "visual").trim() || "visual",
+    settled: source.settled === true,
+    timedOut: source.timedOut === true,
+    pollCount,
+    stableSampleTarget,
+    consecutiveStableSamples,
+    resetCount,
+    verificationMatched: typeof source.verificationMatched === "boolean"
+      ? source.verificationMatched
+      : null,
+    snapshotSummary: String(source.snapshotSummary || "").trim() || null,
+    summary: String(source.summary || "").trim() || null,
+  };
+  const hasData = (
+    normalized.settled === true
+    || normalized.timedOut === true
+    || pollCount > 0
+    || stableSampleTarget > 0
+    || consecutiveStableSamples > 0
+    || resetCount > 0
+    || normalized.verificationMatched !== null
+    || normalized.snapshotSummary !== null
+    || normalized.summary !== null
+  );
+  return hasData ? normalized : null;
+}
+
 export function pickVisualCaptureSelectionReasonLabel(reason) {
   switch (String(reason || "").trim()) {
     case "stable-hash-pair":
@@ -1480,6 +1613,41 @@ export function pickVisualCaptureSelectionReasonLabel(reason) {
     default:
       return "重试上限";
   }
+}
+
+export function pickVisualCaptureFailureKindLabel(kind) {
+  switch (String(kind || "").trim()) {
+    case "capture-command-failed":
+      return "截图调用失败";
+    case "window-bounds-unavailable":
+      return "窗口 bounds 不可用";
+    case "window-activation-failed":
+      return "窗口激活失败";
+    case "capture-analysis-failed":
+      return "截图分析失败";
+    case "visual-state-prepare-failed":
+      return "视觉状态准备失败";
+    case "capture-stage-failed":
+      return "截图阶段失败";
+    default:
+      return "截图失败";
+  }
+}
+
+function isVisualCaptureCommandFailure(entry) {
+  if (!entry || typeof entry !== "object") {
+    return false;
+  }
+  const failureCategory = String(entry.failureCategory || "").trim();
+  if (failureCategory === "capture-command-failed") {
+    return true;
+  }
+  const failureKind = String(entry.failureKind || "").trim();
+  return (
+    failureKind === "capture-command-failed"
+    || failureKind === "window-bounds-unavailable"
+    || failureKind === "window-activation-failed"
+  );
 }
 
 function summarizeVisualCaptureStability(latestCycle) {
@@ -1507,6 +1675,8 @@ function summarizeVisualCaptureStability(latestCycle) {
     const geometry = visualGeometryByKind.get(kind) || {};
     const captureSize = geometry.captureSize
       || formatVisualSize(selectedAttempt?.width, selectedAttempt?.height);
+    const failureKind = String(entry?.failureKind || "").trim() || null;
+    const failureCategory = String(entry?.failureCategory || "").trim() || null;
     return {
       kind,
       stable: entry?.stable === true,
@@ -1521,14 +1691,41 @@ function summarizeVisualCaptureStability(latestCycle) {
         ? geometry.geometryMatched
         : null,
       stabilityMetrics: normalizeVisualStabilityMetrics(entry?.stabilityMetrics),
+      preCaptureSettle: normalizeVisualPreCaptureSettle(entry?.preCaptureSettle, kind),
+      failureKind,
+      failureCategory,
+      failureStage: String(entry?.failureStage || "").trim() || null,
+      failureMessage: String(entry?.failureMessage || "").trim() || null,
+      bounds: entry?.bounds && typeof entry.bounds === "object"
+        ? {
+          x: Number.isFinite(Number(entry.bounds.x)) ? Number(entry.bounds.x) : null,
+          y: Number.isFinite(Number(entry.bounds.y)) ? Number(entry.bounds.y) : null,
+          width: Number.isFinite(Number(entry.bounds.width)) ? Number(entry.bounds.width) : null,
+          height: Number.isFinite(Number(entry.bounds.height)) ? Number(entry.bounds.height) : null,
+        }
+        : null,
+      boundsSource: String(entry?.boundsSource || entry?.bounds?.source || "").trim() || null,
+      windowTitle: String(entry?.windowTitle || entry?.bounds?.title || "").trim() || null,
+      command: String(entry?.command || "").trim() || null,
+      commandExitCode: Number.isFinite(Number(entry?.commandExitCode))
+        ? Number(entry.commandExitCode)
+        : null,
+      stderr: String(entry?.stderr || "").trim() || null,
+      stdout: String(entry?.stdout || "").trim() || null,
+      rect: String(entry?.rect || "").trim() || null,
     };
   });
   const stableStageCount = normalizedStages.filter((entry) => entry.stable).length;
   const unstableStageCount = normalizedStages.length - stableStageCount;
   const attemptCount = normalizedStages.reduce((sum, entry) => sum + entry.attemptCount, 0);
   const stageSummary = normalizedStages.map((entry) => {
+    if (entry.failureKind) {
+      return `${entry.kind} 失败（${entry.attemptCount} 次，${pickVisualCaptureFailureKindLabel(entry.failureKind)}）`;
+    }
     const stableText = entry.stable ? "稳定" : "待稳";
-    const reasonText = pickVisualCaptureSelectionReasonLabel(entry.selectionReason);
+    const reasonText = entry.selectionReason
+      ? pickVisualCaptureSelectionReasonLabel(entry.selectionReason)
+      : "未选图";
     return `${entry.kind} ${stableText}（${entry.attemptCount} 次，${reasonText}）`;
   }).join("；");
 
@@ -1544,8 +1741,40 @@ function summarizeVisualCaptureStability(latestCycle) {
   };
 }
 
+function summarizeVisualPreCaptureSettle(latestCycle) {
+  const stability = latestCycle?.visuals?.captureStability;
+  const stages = Array.isArray(stability?.stages)
+    ? stability.stages
+    : [];
+  const normalizedStages = stages
+    .map((entry) => normalizeVisualPreCaptureSettle(entry?.preCaptureSettle, entry?.kind))
+    .filter(Boolean);
+
+  if (normalizedStages.length === 0) {
+    return {
+      observed: false,
+      stageCount: 0,
+      settledStageCount: 0,
+      timedOutStageCount: 0,
+      summary: null,
+      stages: [],
+    };
+  }
+
+  return {
+    observed: true,
+    stageCount: normalizedStages.length,
+    settledStageCount: normalizedStages.filter((entry) => entry.settled === true).length,
+    timedOutStageCount: normalizedStages.filter((entry) => entry.timedOut === true).length,
+    summary: `预截图 settle：${normalizedStages.map((entry) => entry.summary || `${entry.kind} ${entry.settled ? "达成" : (entry.timedOut ? "超时" : "待定")}`).join("；")}`,
+    stages: normalizedStages,
+  };
+}
+
 export function pickVisualPrimaryBlockerKindLabel(kind) {
   switch (String(kind || "").trim()) {
+    case "capture-command-failed":
+      return "截图调用失败";
     case "capture-unstable":
       return "采集未稳定";
     case "baseline-geometry-mismatch":
@@ -1581,6 +1810,31 @@ export function buildVisualExhaustedStageSummary(e2e) {
   return exhaustedStages.map((entry) => `${entry.kind}（${entry.attemptCount} 次）`).join("；");
 }
 
+export function listVisualCaptureFailureStages(e2e) {
+  const stages = Array.isArray(e2e?.visualCaptureStabilityStages)
+    ? e2e.visualCaptureStabilityStages
+    : [];
+  return stages
+    .filter((entry) => entry?.failureKind)
+    .map((entry) => ({
+      kind: String(entry?.kind || "visual").trim() || "visual",
+      failureKind: String(entry?.failureKind || "").trim() || "capture-stage-failed",
+      failureCategory: String(entry?.failureCategory || "").trim() || null,
+      failureMessage: String(entry?.failureMessage || "").trim() || null,
+      attemptCount: Math.max(0, Number(entry?.attemptCount || 0)),
+    }));
+}
+
+export function buildVisualCaptureFailureStageSummary(e2e) {
+  const failures = listVisualCaptureFailureStages(e2e);
+  if (failures.length === 0) {
+    return null;
+  }
+  return failures
+    .map((entry) => `${entry.kind}（${pickVisualCaptureFailureKindLabel(entry.failureKind)}${entry.failureMessage ? `：${entry.failureMessage}` : ""}）`)
+    .join("；");
+}
+
 function summarizeVisualPrimaryBlocker(latestCycle, visualCaptureStability, visualDriftCount) {
   const normalizedStages = Array.isArray(visualCaptureStability?.stages)
     ? visualCaptureStability.stages
@@ -1610,7 +1864,9 @@ function summarizeVisualPrimaryBlocker(latestCycle, visualCaptureStability, visu
     })
     .filter(Boolean);
   let visualPrimaryBlockerKind = "unknown";
-  if (visualCaptureStability?.unstableStageCount > 0) {
+  if (normalizedStages.some((entry) => isVisualCaptureCommandFailure(entry))) {
+    visualPrimaryBlockerKind = "capture-command-failed";
+  } else if (visualCaptureStability?.unstableStageCount > 0) {
     visualPrimaryBlockerKind = "capture-unstable";
   } else if (visualGeometryMismatchCount > 0) {
     visualPrimaryBlockerKind = "baseline-geometry-mismatch";
@@ -1661,6 +1917,7 @@ function pickVisualRefreshPolicyLabel(kind, coverageKind = null) {
       return String(coverageKind || "").trim() === "partial"
         ? "先转人工排查"
         : "可刷新基线";
+    case "capture-command-failed":
     case "capture-unstable":
     case "ui-regression-candidate":
       return "暂不刷新基线";
@@ -1675,6 +1932,7 @@ export function buildVisualPrimaryBlockerSummary(e2e) {
   }
   const label = pickVisualPrimaryBlockerKindLabel(e2e.visualPrimaryBlockerKind);
   const exhaustedStageSummary = buildVisualExhaustedStageSummary(e2e);
+  const captureFailureSummary = buildVisualCaptureFailureStageSummary(e2e);
   const attemptDiagnosisSummary = String(e2e.visualCaptureAttemptDiagnosisSummary || "").trim() || null;
   const geometrySummary = String(e2e.visualGeometrySummary || "").trim()
     || (
@@ -1682,6 +1940,16 @@ export function buildVisualPrimaryBlockerSummary(e2e) {
         ? "几何一致"
         : (Number(e2e.visualGeometryMismatchCount || 0) > 0 ? "几何不一致" : "几何待补证")
     );
+  if (String(e2e.visualPrimaryBlockerKind || "").trim() === "capture-command-failed") {
+    const policySummary = "先复核窗口 bounds / 激活 / screencapture 调用，再重跑 E2E；暂不进入 baseline refresh、autofix 或 obsidian-first";
+    return [
+      `视觉主阻断：${label}`,
+      geometrySummary,
+      captureFailureSummary || "最近一轮存在截图调用失败 stage",
+      attemptDiagnosisSummary,
+      policySummary,
+    ].filter(Boolean).join("；");
+  }
   if (String(e2e.visualPrimaryBlockerKind || "").trim() === "capture-unstable") {
     const policySummary = "先重跑 E2E，暂不进入 baseline refresh、autofix 或 obsidian-first";
     return [
@@ -1734,6 +2002,9 @@ export function buildPureVisualReaderFailureSummary(e2e) {
 export function pickPureVisualReaderNextAction(e2e) {
   if (!isPureVisualReaderFailure(e2e)) {
     return null;
+  }
+  if (String(e2e.visualPrimaryBlockerKind || "") === "capture-command-failed") {
+    return "npm run agent:zotero:e2e";
   }
   if (String(e2e.visualPrimaryBlockerKind || "") === "baseline-geometry-mismatch") {
     if (String(e2e.visualCanonicalCoverageKind || "") === "partial") {
@@ -1893,6 +2164,12 @@ export function summarizeE2EReport(report, options = {}) {
       visualCaptureAllStagesStable: null,
       visualCaptureStabilitySummary: null,
       visualCaptureStabilityStages: [],
+      visualPreCaptureSettleObserved: false,
+      visualPreCaptureSettleStageCount: 0,
+      visualPreCaptureSettleSettledStageCount: 0,
+      visualPreCaptureSettleTimedOutStageCount: 0,
+      visualPreCaptureSettleSummary: null,
+      visualPreCaptureSettleStages: [],
       visualPrimaryBlockerKind: "unknown",
       visualPrimaryBlockerKindLabel: pickVisualPrimaryBlockerKindLabel("unknown"),
       visualGeometryMismatchCount: 0,
@@ -1957,6 +2234,10 @@ export function summarizeE2EReport(report, options = {}) {
       recommendedActions: [],
       primaryDiagnosis: null,
       diagnoses: [],
+      details: {
+        launchFailure: null,
+        runtimeSanitization: null,
+      },
       readerHostStateObserved: false,
       readerSidebarView: null,
       readerFlowMode: null,
@@ -2108,10 +2389,11 @@ export function summarizeE2EReport(report, options = {}) {
   const readerEventReport = summarizeReaderEventBridge(report, latestCycle);
   const readerHostState = summarizeReaderHostState(report, latestCycle);
   const toolbarEvidenceSummary = summarizeToolbarEvidence(readerEventReport);
-  const visualEvidenceSummary = summarizeVisualEvidence(latestCycle);
   const visualEvidence = summarizeVisualEvidenceItems(cycles);
+  const visualEvidenceSummary = summarizeVisualEvidence(latestCycle, visualEvidence);
   const visualCaptureAttemptDiagnosis = summarizeVisualCaptureAttemptDiagnosis(cycles);
   const visualCaptureStability = summarizeVisualCaptureStability(latestCycle);
+  const visualPreCaptureSettle = summarizeVisualPreCaptureSettle(latestCycle);
   const visualPrimaryBlocker = summarizeVisualPrimaryBlocker(
     latestCycle,
     visualCaptureStability,
@@ -2121,6 +2403,14 @@ export function summarizeE2EReport(report, options = {}) {
   const visualAwareRecommendedActions = [];
   if (String(primaryDiagnosis?.fingerprint || "") === "reader-ui:reader-visual-drift") {
     switch (visualPrimaryBlocker.visualPrimaryBlockerKind) {
+      case "capture-command-failed":
+        {
+          const captureFailureSummary = buildVisualCaptureFailureStageSummary({
+            visualCaptureStabilityStages: visualCaptureStability.stages,
+          });
+          visualAwareRecommendedActions.push(`${captureFailureSummary || "当前存在截图调用失败 stage"}；先复核窗口 bounds、前台激活与 screencapture 调用，再重新执行 \`npm run agent:zotero:e2e\`，暂不进入 baseline refresh、autofix 或 obsidian-first。`);
+        }
+        break;
       case "capture-unstable":
         {
           const exhaustedStageSummary = buildVisualExhaustedStageSummary({
@@ -2161,6 +2451,9 @@ export function summarizeE2EReport(report, options = {}) {
     }),
   ]).slice(0, 8);
   const runtimeContext = summarizeRuntimeContext(report);
+  const reportDetails = report.details && typeof report.details === "object"
+    ? report.details
+    : {};
 
   return {
     present: true,
@@ -2201,6 +2494,12 @@ export function summarizeE2EReport(report, options = {}) {
     visualCaptureAllStagesStable: visualCaptureStability.allStagesStable,
     visualCaptureStabilitySummary: visualCaptureStability.summary,
     visualCaptureStabilityStages: visualCaptureStability.stages,
+    visualPreCaptureSettleObserved: visualPreCaptureSettle.observed,
+    visualPreCaptureSettleStageCount: visualPreCaptureSettle.stageCount,
+    visualPreCaptureSettleSettledStageCount: visualPreCaptureSettle.settledStageCount,
+    visualPreCaptureSettleTimedOutStageCount: visualPreCaptureSettle.timedOutStageCount,
+    visualPreCaptureSettleSummary: visualPreCaptureSettle.summary,
+    visualPreCaptureSettleStages: visualPreCaptureSettle.stages,
     visualPrimaryBlockerKind: visualPrimaryBlocker.visualPrimaryBlockerKind,
     visualPrimaryBlockerKindLabel: visualPrimaryBlocker.visualPrimaryBlockerKindLabel,
     visualGeometryMismatchCount: visualPrimaryBlocker.visualGeometryMismatchCount,
@@ -2281,6 +2580,10 @@ export function summarizeE2EReport(report, options = {}) {
     recommendedActions,
     primaryDiagnosis,
     diagnoses,
+    details: {
+      launchFailure: reportDetails.launchFailure || null,
+      runtimeSanitization: reportDetails.runtimeSanitization || null,
+    },
     readerEventReport,
     toolbarEvidenceSummary,
     visualEvidenceObserved: visualEvidence.observed,

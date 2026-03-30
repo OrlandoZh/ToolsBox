@@ -8,7 +8,7 @@ import {
   summarizeLogs,
 } from "./agent-zotero-e2e-lib.mjs";
 import {
-  RdpClient,
+  connectRdpWithLaunchDiagnostics,
   buildAddon,
   buildStartupArgs,
   createWatchSnapshot,
@@ -182,6 +182,23 @@ function appendProcessLogs(processLogs, source, chunk) {
   }
 }
 
+function buildLaunchFailureSummary(launchFailure) {
+  if (!launchFailure || typeof launchFailure !== "object") {
+    return null;
+  }
+
+  switch (launchFailure.kind) {
+    case "child-exit-before-rdp":
+      return "Zotero 子进程在 RDP 建联前已退出/崩溃。";
+    case "rdp-connect-timeout":
+      return "Zotero 子进程仍存活，但 RDP 端口未在重试窗口内就绪。";
+    case "rdp-connect-error":
+      return "Zotero RDP 建联失败，且错误不再属于可重试范围。";
+    default:
+      return null;
+  }
+}
+
 async function persistWatchStatus(projectRoot, report) {
   const distDir = path.join(projectRoot, "dist");
   const jsonPath = path.join(distDir, "zotero-watch-status.json");
@@ -274,6 +291,11 @@ async function createWatchFailureEntry({
   const nativeLogSummary = summarizeLogs(nativeLogs);
   const logs = mergeLogSummaries(nativeLogSummary, runtimeLogs);
   const issues = [`热重载失败：${error?.message || String(error)}`];
+  const launchFailure = error?.details?.launchFailure || null;
+  const launchFailureSummary = buildLaunchFailureSummary(launchFailure);
+  if (launchFailureSummary) {
+    issues.push(`启动诊断：${launchFailureSummary}`);
+  }
   if (Number(logs.errorCount || 0) > 0) {
     issues.push(`检测到 ${logs.errorCount} 条 error 级日志。`);
   }
@@ -292,9 +314,10 @@ async function createWatchFailureEntry({
       "先查看 `dist/zotero-watch-status.md` 的最近错误日志和问题清单。",
       "如需完整复验，可执行 `npm run agent:zotero:e2e` 或 `npm run agent:zotero:autofix`。",
     ],
-    summaryNote: "热重载流程失败",
+    summaryNote: launchFailureSummary || "热重载流程失败",
     error: {
       message: error?.message || String(error),
+      details: error?.details || null,
     },
   };
 }
@@ -387,34 +410,55 @@ async function launchManagedSession({
   rdpPort,
   processLogs,
   config,
+  runtimeSanitization = null,
 }) {
   const child = spawnManagedChild({
     binaryPath,
     args,
     processLogs,
   });
-  const rdp = new RdpClient();
-  await rdp.connect({ port: rdpPort });
-  await installRuntimeLogBridge(rdp);
+  let rdp = null;
+  try {
+    const connection = await connectRdpWithLaunchDiagnostics({
+      child,
+      rdpPort,
+      processLogs,
+    });
+    rdp = connection.rdp;
+    await installRuntimeLogBridge(rdp);
 
-  let addon = await rdp.waitForAddonById(config.addonId);
-  const addonState = await rdp.enableAddonById(config.addonId);
-  if (addonState.found && addonState.isActive) {
-    addon = await rdp.waitForAddonById(config.addonId);
+    let addon = await rdp.waitForAddonById(config.addonId);
+    const addonState = await rdp.enableAddonById(config.addonId);
+    if (addonState.found && addonState.isActive) {
+      addon = await rdp.waitForAddonById(config.addonId);
+    }
+
+    const readiness = await ensurePluginReady({
+      rdp,
+      config,
+    });
+
+    return {
+      child,
+      rdp,
+      addon,
+      addonState,
+      readiness,
+    };
   }
-
-  const readiness = await ensurePluginReady({
-    rdp,
-    config,
-  });
-
-  return {
-    child,
-    rdp,
-    addon,
-    addonState,
-    readiness,
-  };
+  catch (error) {
+    if (rdp) {
+      rdp.disconnect();
+    }
+    await stopChildProcess(child).catch(() => {});
+    throw wrapScriptError(error, {
+      failedStage: "launch-session",
+      details: {
+        runtimeSanitization,
+        launchFailure: error?.launchFailure || null,
+      },
+    });
+  }
 }
 
 async function stopManagedSession(session) {
@@ -632,7 +676,7 @@ export async function main() {
   const rdpPort = runnerConfig.rdpPort || await findFreePort();
   const watchRecoveryTestOptions = readWatchRecoveryTestOptions();
 
-  await prepareRuntime({
+  const runtimeSanitization = await prepareRuntime({
     projectRoot,
     profilePath: runnerConfig.profilePath,
     dataDir: runnerConfig.dataDir,
@@ -737,6 +781,7 @@ export async function main() {
       rdpPort,
       processLogs,
       config,
+      runtimeSanitization,
     }).catch((error) => {
       throw wrapScriptError(error, {
         failedStage: "launch-session",
@@ -930,6 +975,21 @@ export async function main() {
     });
   }
   catch (error) {
+    if (watch && !watchReport.startup) {
+      const startupFailureEntry = await createWatchFailureEntry({
+        index: getNextWatchIndex(),
+        trigger: "startup",
+        changedFiles: [],
+        error,
+        rdp: session?.rdp,
+        processLogs,
+        processLogStart: 0,
+      });
+      watchReport.startup = startupFailureEntry;
+      const reportPaths = await persistReport();
+      console.error(`[zotero:watch] Startup failed: ${error.stack || error.message}`);
+      console.error(`[zotero:watch] Status report updated: ${reportPaths.markdownPath}`);
+    }
     await cleanup();
     throw error;
   }

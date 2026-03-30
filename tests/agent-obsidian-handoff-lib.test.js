@@ -443,6 +443,40 @@ describe("Agent Obsidian Handoff Lib", () => {
     assert.equal(parsed.intervened, true);
   });
 
+  it("should clear stale baseline refresh carry-over once the actual regression repair batch is active", () => {
+    const content = buildHumanInterventionWindowMarkdown({
+      generatedAt: "2026-03-30T10:13:41.019Z",
+      statusLabel: "需先处理",
+      headline: "视觉主阻断：疑似真实界面回归；library 几何一致 2000x1200；reader 几何一致 2000x1200；暂不刷新基线；canonical 基线覆盖完整：4/4 已对齐",
+      nextAction: "npm run agent:obsidian",
+      visualPrimaryBlockerKind: "ui-regression-candidate",
+      visualCanonicalCoverageKind: "complete",
+      currentTruthActiveBatchId: "READER-HIGH-126",
+      manualVerdictResolved: true,
+      patchSummary: {},
+    }, [
+      "# ignored",
+      "## 人工编辑区（保留）",
+      "",
+      "状态: ready",
+      "模式: force-next",
+      "下一步指令: npm run agent:zotero:e2e:update-baseline",
+      "关注文件: tests/visual-baselines/agent-zotero-e2e/restart-library.png, tests/visual-baselines/agent-zotero-e2e/restart-reader.png",
+      "备注: 人工确认属于预期 UI 变化；仅执行一次受控 baseline refresh，并按固定链路复验。",
+    ].join("\n"));
+
+    const parsed = parseHumanInterventionWindow(content);
+    assert.ok(content.includes("当前阶段：已确认真实回归，按修复路径继续"));
+    assert.equal(content.includes("## Reader Verdict 推荐模板"), false);
+    assert.equal(content.includes("npm run agent:zotero:e2e:update-baseline"), false);
+    assert.equal(parsed.status, "pending");
+    assert.equal(parsed.mode, "auto");
+    assert.equal(parsed.nextActionOverride, "");
+    assert.deepEqual(parsed.focusFiles, []);
+    assert.equal(parsed.note, "");
+    assert.equal(parsed.intervened, false);
+  });
+
   it("should render Reader verdict templates without changing the input surface", () => {
     const content = buildHumanInterventionWindowMarkdown({
       generatedAt: "2026-03-27T08:00:00.000Z",
@@ -665,6 +699,87 @@ describe("Agent Obsidian Handoff Lib", () => {
     assert.ok(humanWindow.includes("视觉导航"));
     assert.ok(humanWindow.includes("Attempt 诊断"));
     assert.ok(humanWindow.includes("已降级，先人工复核视觉证据"));
+    assert.ok(humanWindow.includes("当前主路径等待人工 Reader verdict，不默认执行 baseline refresh、autofix 或 rerun E2E。"));
+    assert.equal(humanWindow.includes("刷新基线 x2"), false);
+  });
+
+  it("should keep library-only evidence visible in obsidian workbench while leaving canonical coverage complete", () => {
+    const summary = summarizeObsidianInterventionContext({
+      gate: {
+        frontpageSummary: {
+          nextAction: "npm run agent:obsidian",
+        },
+      },
+      monitor: {
+        zoteroValidation: {
+          e2e: {
+            status: "failed",
+            visualPrimaryBlockerKind: "ui-regression-candidate",
+            visualCanonicalCoverageKind: "complete",
+            visualCanonicalMismatchedTargets: [],
+            visualEvidenceObserved: true,
+            visualEvidenceItemCount: 4,
+            visualEvidenceFailingItemCount: 2,
+            visualEvidenceSummary: "library 漂移 22.09% / 18.19；reader 已对齐",
+            visualEvidenceItems: [
+              {
+                cycleIndex: 1,
+                bootMode: "restart",
+                kind: "library",
+                canonicalTarget: "restart-library.png",
+                capturePath: "/tmp/cycle-1-library.png",
+                baselinePath: "/tmp/restart-library.png",
+                captureStable: true,
+                selectedAttempt: 2,
+                selectionReason: "stable-hash-pair",
+                geometryMatched: true,
+                changedRatio: 0.224,
+                meanChannelDiff: 18.61,
+                issues: ["library 截图与基线平均通道差异过大：18.61 > 18.00"],
+              },
+              {
+                cycleIndex: 2,
+                bootMode: "hot-reload",
+                kind: "library",
+                canonicalTarget: "hot-reload-library.png",
+                capturePath: "/tmp/cycle-2-library.png",
+                baselinePath: "/tmp/hot-reload-library.png",
+                captureStable: true,
+                selectedAttempt: 2,
+                selectionReason: "stable-hash-pair",
+                geometryMatched: true,
+                changedRatio: 0.2209,
+                meanChannelDiff: 18.19,
+                issues: ["library 截图与基线平均通道差异过大：18.19 > 18.00"],
+              },
+            ],
+          },
+          autofix: {
+            patchPlanStatusLabel: "可进入受限补丁审阅",
+            patchDraftOperations: [
+              { label: "刷新基线", count: 2 },
+            ],
+            patchApplicationStatusLabel: "未尝试",
+          },
+        },
+      },
+    });
+
+    assert.equal(summary.nextAction, "npm run agent:obsidian");
+    assert.equal(summary.visualCanonicalCoverageKind, "complete");
+    assert.deepEqual(summary.visualCanonicalMismatchedTargets, []);
+    assert.equal(summary.visualEvidenceItems.length, 2);
+    assert.ok(summary.visualEvidenceFocusSummary?.includes("restart-library.png"));
+
+    const evidenceMarkdown = buildObsidianEvidenceMarkdown(summary);
+    assert.ok(evidenceMarkdown.includes("[cycle-1-library.png](/tmp/cycle-1-library.png)"));
+    assert.ok(evidenceMarkdown.includes("[restart-library.png](/tmp/restart-library.png)"));
+    assert.ok(evidenceMarkdown.includes("[cycle-2-library.png](/tmp/cycle-2-library.png)"));
+    assert.ok(evidenceMarkdown.includes("[hot-reload-library.png](/tmp/hot-reload-library.png)"));
+
+    const humanWindow = buildHumanInterventionWindowMarkdown(summary, "");
+    assert.ok(humanWindow.includes("当前阶段：等待人工 Reader verdict"));
+    assert.ok(humanWindow.includes("restart-library.png"));
     assert.ok(humanWindow.includes("当前主路径等待人工 Reader verdict，不默认执行 baseline refresh、autofix 或 rerun E2E。"));
     assert.equal(humanWindow.includes("刷新基线 x2"), false);
   });

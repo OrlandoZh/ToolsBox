@@ -10,6 +10,7 @@ import {
   summarizeZoteroWatchStatus,
 } from "./zotero-watch-status-lib.mjs";
 import {
+  buildVisualCaptureFailureStageSummary,
   buildVisualExhaustedStageSummary,
   buildPureVisualReaderFailureSummary,
   buildVisualPrimaryBlockerSummary,
@@ -512,6 +513,12 @@ function evaluateZoteroValidation(validationSummary, policy) {
       }
       if (pureVisualReaderFailure) {
         switch (String(e2e.visualPrimaryBlockerKind || "").trim()) {
+          case "capture-command-failed":
+            {
+              const captureFailureSummary = buildVisualCaptureFailureStageSummary(e2e);
+              recommendations.push(`${captureFailureSummary || "当前主阻断属于截图调用失败"}；先复核窗口 bounds、前台激活与 screencapture 调用，再重新执行 \`npm run agent:zotero:e2e\`，暂不建议进入 autofix、刷新视觉基线或走 obsidian-first。`);
+            }
+            break;
           case "capture-unstable":
             {
               const exhaustedStageSummary = buildVisualExhaustedStageSummary(e2e);
@@ -657,10 +664,21 @@ function evaluateReleaseMatrix(releaseMatrix, policy) {
       issues.push(`发布矩阵待补验证：${item}`);
     });
   }
+  const remoteVerification = releaseMatrix.remoteVerification && typeof releaseMatrix.remoteVerification === "object"
+    ? releaseMatrix.remoteVerification
+    : null;
+  if (remoteVerification && remoteVerification.status !== "passed") {
+    const remoteLabel = remoteVerification.statusLabel || remoteVerification.status || "未知";
+    issues.push(`远端发布验证未通过：${remoteLabel} / ${remoteVerification.summary || "-"}`);
+  }
 
   if (issues.length > 0) {
     recommendations.push("先运行 `npm run release:matrix` 刷新本地发布矩阵。");
     recommendations.push("若缺少安装态验证，请补跑 `npm run release:install-smoke:stable` 与 `npm run release:install-smoke:beta`。");
+    if (remoteVerification && remoteVerification.status !== "passed") {
+      recommendations.push("确认自定义发布端已上传最新 `update.json` 与 `.xpi`，再运行 `npm run release:preflight -- --verify-remote`。");
+      recommendations.push("随后运行 `npm run release:prepare && npm run release:matrix`，刷新远端验证摘要。");
+    }
   }
 
   return {
@@ -683,6 +701,7 @@ function evaluateReleaseMatrix(releaseMatrix, policy) {
     attentionIssues: Array.isArray(releaseMatrix.attentionIssues) ? releaseMatrix.attentionIssues : [],
     hostNoiseIssues: Array.isArray(releaseMatrix.hostNoiseIssues) ? releaseMatrix.hostNoiseIssues : [],
     profiles: Array.isArray(releaseMatrix.profiles) ? releaseMatrix.profiles : [],
+    remoteVerification,
   };
 }
 
@@ -1006,6 +1025,12 @@ function buildMarkdown(report) {
     if (report.releaseMatrix.summary) {
       lines.push(`- 矩阵摘要: ${report.releaseMatrix.summary}`);
     }
+    if (report.releaseMatrix.remoteVerification) {
+      lines.push(`- 远端验证: \`${report.releaseMatrix.remoteVerification.statusLabel || report.releaseMatrix.remoteVerification.status || "未知"}\``);
+      lines.push(`- 远端摘要: ${report.releaseMatrix.remoteVerification.summary || "-"}`);
+      lines.push(`- 远端 update.json: \`${report.releaseMatrix.remoteVerification.effectiveUpdateURL || "-"}\``);
+      lines.push(`- 远端 update_link: \`${report.releaseMatrix.remoteVerification.observedUpdateLink || report.releaseMatrix.remoteVerification.expectedUpdateLink || "-"}\``);
+    }
     lines.push("");
     lines.push("| 渠道 | 状态 | 元数据 | XPI | smoke | readiness | 阻断错误 | 宿主噪声 |");
     lines.push("|---|---|---|---|---|---|---|---|");
@@ -1024,6 +1049,14 @@ function buildMarkdown(report) {
       lines.push("- 宿主噪声画像:");
       report.releaseMatrix.hostNoiseIssues.slice(0, 3).forEach((item) => {
         lines.push(`- 宿主噪声: ${item}`);
+      });
+      lines.push("");
+    }
+    if (Array.isArray(report.releaseMatrix.remoteVerification?.issues)
+      && report.releaseMatrix.remoteVerification.issues.length > 0) {
+      lines.push("- 远端验证问题:");
+      report.releaseMatrix.remoteVerification.issues.slice(0, 3).forEach((item) => {
+        lines.push(`- 远端: ${item}`);
       });
       lines.push("");
     }

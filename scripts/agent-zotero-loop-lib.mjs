@@ -1,5 +1,6 @@
 import { buildMonitorFrontpageSummary } from "./agent-frontpage-summary-lib.mjs";
 import {
+  buildVisualCaptureFailureStageSummary,
   buildVisualExhaustedStageSummary,
   isPureVisualReaderFailure,
   pickPureVisualReaderNextAction,
@@ -77,7 +78,12 @@ export function summarizeZoteroLoopState({
     issues.push(`Zotero 真机 E2E 当前为 ${e2e.statusLabel || e2e.status || "失败"}。`);
     if (pureVisualReaderFailure) {
       issues.push(`当前失败已收敛为 Reader 视觉阻断：${e2e?.visualPrimaryBlockerKindLabel || e2e?.visualPrimaryBlockerKind || "未知视觉阻断"}。`);
-      if (String(e2e?.visualPrimaryBlockerKind || "").trim() === "capture-unstable") {
+      if (String(e2e?.visualPrimaryBlockerKind || "").trim() === "capture-command-failed") {
+        const captureFailureSummary = buildVisualCaptureFailureStageSummary(e2e);
+        if (captureFailureSummary) {
+          issues.push(`截图失败 stage：${captureFailureSummary}`);
+        }
+      } else if (String(e2e?.visualPrimaryBlockerKind || "").trim() === "capture-unstable") {
         const exhaustedStageSummary = buildVisualExhaustedStageSummary(e2e);
         if (exhaustedStageSummary) {
           issues.push(`用尽预算 stage：${exhaustedStageSummary}`);

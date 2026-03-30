@@ -33,6 +33,29 @@ function formatChangedFiles(changedFiles = []) {
   return `${preview} (+${changedFiles.length - 3} more)`;
 }
 
+function buildLaunchFailureSummary(launchFailure) {
+  if (!launchFailure || typeof launchFailure !== "object") {
+    return null;
+  }
+
+  switch (launchFailure.kind) {
+    case "child-exit-before-rdp":
+      return "Zotero 子进程在 RDP 建联前已退出/崩溃。";
+    case "rdp-connect-timeout":
+      return "Zotero 子进程仍存活，但 RDP 端口未在重试窗口内就绪。";
+    case "rdp-connect-error":
+      return "Zotero RDP 建联失败，且错误已超出可重试范围。";
+    default:
+      return null;
+  }
+}
+
+function formatLogTailEntry(entry) {
+  const message = String(entry?.message || "").trim() || "-";
+  const source = String(entry?.source || "unknown").trim() || "unknown";
+  return `- [${formatDateTime(entry?.at)}] \`${source}\`: ${message}`;
+}
+
 export function buildWatchStatusMarkdown(report) {
   const latestReload = Array.isArray(report?.reloads) && report.reloads.length > 0
     ? report.reloads[report.reloads.length - 1]
@@ -43,6 +66,8 @@ export function buildWatchStatusMarkdown(report) {
     ...((report?.reloads || []).slice(-8)),
   ];
   const latestStatus = latest?.passed === false ? "失败" : "健康";
+  const latestLaunchFailure = latest?.error?.details?.launchFailure || null;
+  const latestRuntimeSanitization = latest?.error?.details?.runtimeSanitization || null;
 
   const lines = [
     "# Zotero Watch 状态",
@@ -75,6 +100,43 @@ export function buildWatchStatusMarkdown(report) {
   else {
     for (const issue of latest.issues) {
       lines.push(`- ${issue}`);
+    }
+  }
+
+  if (latestLaunchFailure) {
+    lines.push("", "## 启动诊断", "");
+    lines.push(`- 类型: \`${latestLaunchFailure.kind || "-"}\``);
+    lines.push(`- 摘要: ${buildLaunchFailureSummary(latestLaunchFailure) || "-"}`);
+    lines.push(`- 尝试次数: \`${latestLaunchFailure.attemptCount ?? 0}\``);
+    lines.push(`- 建联耗时: \`${latestLaunchFailure.connectDurationMs ?? 0}ms\``);
+    const childExit = latestLaunchFailure.childExit;
+    lines.push(
+      `- 子进程退出: \`${childExit ? `${childExit.code ?? "null"} / ${childExit.signal || "-"}` : "-"}\``,
+    );
+    const lastConnectError = latestLaunchFailure.lastConnectError;
+    lines.push(
+      `- 最近建联错误: ${
+        lastConnectError
+          ? `\`${lastConnectError.code || lastConnectError.name || "error"}\` ${lastConnectError.message || "-"}`
+          : "-"
+      }`,
+    );
+    if (latestRuntimeSanitization) {
+      lines.push(
+        `- Runtime 清理: managed=\`${latestRuntimeSanitization.managed ? "yes" : "no"}\` / fresh=\`${latestRuntimeSanitization.fresh ? "yes" : "no"}\` / profileReset=\`${latestRuntimeSanitization.profileReset ? "yes" : "no"}\` / dataReset=\`${latestRuntimeSanitization.dataReset ? "yes" : "no"}\` / removedMarkers=\`${Array.isArray(latestRuntimeSanitization.removedMarkers) ? latestRuntimeSanitization.removedMarkers.length : 0}\``,
+      );
+    }
+    lines.push("", "### 启动前进程日志尾部", "");
+    const processLogTail = Array.isArray(latestLaunchFailure.processLogTail)
+      ? latestLaunchFailure.processLogTail
+      : [];
+    if (processLogTail.length === 0) {
+      lines.push("- 无");
+    }
+    else {
+      for (const item of processLogTail) {
+        lines.push(formatLogTailEntry(item));
+      }
     }
   }
 

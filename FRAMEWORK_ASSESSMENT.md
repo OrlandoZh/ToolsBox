@@ -14,11 +14,11 @@
 | 开发闭环 | 强 | 已具备"验证 -> 恢复 -> 汇总 -> 门禁 -> 人工介入"闭环 |
 | 稳定性 | 强 | watch 两级恢复、真机 E2E、gate、dry-run 与人工窗口都已接通 |
 | 可维护性 | 中上 | 架构层次清晰，但仍有错误边界、参数校验、性能监控与文档同步等工程欠账 |
-| 自主开发成熟度 | 中上偏强 | 已到 `agent-assisted` 强阶段，`P2` 与本地发布矩阵收口已完成；当前整体完成度约 `97%`，已可用于实际开发，本轮 Reader 主线已完成唯一 verdict 与单分支收口 |
+| 自主开发成熟度 | 中上偏强 | 已到 `agent-assisted` 强阶段，`P2` 与本地发布矩阵收口已完成；当前整体完成度约 `99%`，已可用于实际开发，当前主阻断已清零 |
 
 一句话结论：
 
-**当前仓库已经是"可投入实际开发的 clean-room Zotero 开发底座"，本轮 Reader 主线已收尾完成，后续主要剩下 `ENG-HIGH-103` 的工程化长期增强第一批与长期增强项。**
+**当前仓库已经是"可投入实际开发的 clean-room Zotero 开发底座"，`ENG-HIGH-103`、`READER-HIGH-124` / `READER-LOW-261~263`、`READER-HIGH-125` 与 `READER-HIGH-126` 均已独立收口，当前已回到稳定单一事实源。**
 
 ## 1. 当前做得好的部分
 
@@ -71,7 +71,7 @@
 - Codex / Opencode 委托分工脚手架
   - `DOC-LOW-001`、`ENG-LOW-102` 已于 `2026-03-23` 被 Codex 审查为 `accepted`
   - `ENG-LOW-201`、`ENG-LOW-202`、`ENG-LOW-203` 已于 `2026-03-24` 以 `reworked-by-codex` 方式完成，并转入历史 review artifact
-  - 当前 manifest 已按 `2026-03-28` 最新工件切到 `ENG-HIGH-103`：`ENG-HIGH-103 / ENG-LOW-207~210` 是当前 active 的工程化长期增强第一批；`READER-HIGH-123` 已完成唯一 Reader verdict 与单分支收口，现只保留为历史契约源；`ENG-HIGH-102 / ENG-LOW-204~206`、`READER-HIGH-122`、`READER-HIGH-121 / READER-LOW-258~260`、`READER-HIGH-120 / READER-LOW-255~257`、`READER-HIGH-119 / READER-LOW-252~254`、`READER-HIGH-118 / READER-LOW-249~251`、`READER-HIGH-114`、`READER-HIGH-113 / READER-LOW-237~239`、`READER-HIGH-112 / READER-LOW-234~236`、`READER-HIGH-111 / READER-LOW-231~233`、`READER-HIGH-110 / READER-LOW-228~230`、`READER-HIGH-109 / READER-LOW-225~227`、`READER-HIGH-106` 与 `OBSIDIAN-HIGH-101` 均继续只保留为历史契约 / review artifact
+  - 当前 manifest 已按 `2026-03-30` 最新工作树完成 rebaseline：`ENG-HIGH-103` 的启动诊断 + runtime 清理 + `pre-capture settle`、`READER-HIGH-124 / READER-LOW-261~263` 的 capture failure 结构化 / `capture-command-failed` blocker / freshest-valid artifact 消费、`READER-HIGH-125` 的 library-only 根因边界冻结，以及 `READER-HIGH-126` 的 library host-noise 修复均已完成独立收口并转为历史契约 / review artifact；当前不再保留 active 的 library-only 高逻辑修复批次；`READER-HIGH-123`、`ENG-HIGH-102 / ENG-LOW-204~206`、`READER-HIGH-122`、`READER-HIGH-121 / READER-LOW-258~260`、`READER-HIGH-120 / READER-LOW-255~257`、`READER-HIGH-119 / READER-LOW-252~254`、`READER-HIGH-118 / READER-LOW-249~251`、`READER-HIGH-114`、`READER-HIGH-113 / READER-LOW-237~239`、`READER-HIGH-112 / READER-LOW-234~236`、`READER-HIGH-111 / READER-LOW-231~233`、`READER-HIGH-110 / READER-LOW-228~230`、`READER-HIGH-109 / READER-LOW-225~227`、`READER-HIGH-106` 与 `OBSIDIAN-HIGH-101` 均继续只保留为历史契约 / review artifact
   - `READER-LOW-201`、`READER-LOW-202`、`READER-LOW-203` 已于 `2026-03-24` 收口并转入历史 review artifact
   - `READER-HIGH-102`、`READER-LOW-204`、`READER-LOW-205`、`READER-LOW-206` 已于 `2026-03-24` 收口并转入历史 review artifact
   - `READER-HIGH-103`、`READER-LOW-207`、`READER-LOW-208`、`READER-LOW-209` 已于 `2026-03-24` 收口并转入历史 review artifact
@@ -84,7 +84,7 @@
 
 ## 2. 当前最重要的后续方向
 
-### 2.1 `ENG-HIGH-103` 已成为当前工程化长期增强批次
+### 2.1 当前最重要的是守住单一事实源并推进非阻断后续
 
 当前已经有：
 
@@ -102,14 +102,15 @@
 Assessment 对“当前完成度 / 当前主线 / 当前剩余项”的判断只认 `docs/CURRENT_BACKLOG.md` 的“当前单一事实源”；这里通过自动同步摘要块复述，不再手写第二套 fresh 结论。
 
 <!-- CURRENT-TRUTH-SUMMARY:START -->
-- 当前真实完成度约为 `98%`；4 个 post-`ENG-HIGH-103` 工程化维护 batch 已完成并已提交，但 fresh gate 仍未转绿
-- 当前最近一轮工程化事实源仍承接 `ENG-HIGH-103`；其后的 4 个维护 batch 已分别落在 `49da303`、`27418fb`、`0aa9b4a`、`be15a92`
-- 当前最新 fresh 证据链显示：`watch` 为 `healthy`（`2026-03-28T16:04:08.616Z` 对应 gate 读取状态），`agent:zotero:e2e` 为 `failed`（`2026-03-28T15:57:56.441Z`），`agent:monitor` 前页状态为 `attention`（`2026-03-28T16:04:08.529Z`），`agent:gate` 当前阻断（`2026-03-28T16:04:08.616Z`，`gatePassed=false`）
-- 当前 fresh 主阻断已重新回到 `capture-unstable`；下一步是继续稳定 visual capture settle，不重开 baseline refresh、autofix 或 obsidian-first 分支
-- 当前主线只做两件事：先收正 single-source truth / backlog 口径，再推进独立 `capture-unstable` 稳定性批次
-- 当前明确继续延后：远端发布编排、远端 `updateURL` 闭环验证、下一轮 Reader 更深事件点、`P1` 白名单扩面；除非 future fresh `watch -> e2e -> gate` 出现新的真实回归类型
-- `LEGAL_RISK_CHECKLIST.md` 中的 Release Gate 继续保持 `release-only` 人工流程，不纳入本批自动化完成定义
-- 当前默认下一优先级固定为 `capture 稳定性批次`；等 fresh capture 结论变化后，再做 post-capture truth refresh
+- 当前真实完成度约为 `99%`；`ENG-HIGH-103` 的启动诊断 + runtime 清理 + `pre-capture settle`、`READER-HIGH-124 / READER-LOW-261~263` 的 capture / freshness 收口、`READER-HIGH-125` 的 library-only 根因边界冻结、以及 `READER-HIGH-126` 的 library host-noise 修复均已完成并转为历史契约 / review artifact
+- latest live rerun 已把 current truth 固定回单一事实源：最新 `watch` 工件为 `healthy`（`2026-03-30T11:34:05.136Z`），最新 direct `agent:zotero:e2e` 为 `passed`（`2026-03-30T11:31:37.694Z`，`failedStage=null`，`errorCategory=null`）
+- 最新开发态 `agent:monitor` / `agent:gate` 已在 `2026-03-30T11:35:48.300Z` / `2026-03-30T11:35:48.379Z` 回到 `stable / ready`，并继续直接消费同一份 `2026-03-30T11:31:37.694Z` E2E 摘要；freshest-valid artifact 消费与 consumer 收口继续保持生效
+- `details.runtimeSanitization` 已稳定透传到 direct E2E / monitor / gate：本轮 direct E2E 记录了 `exclusiveProjectRuntime=true`，并在启动前终止了 project-managed `watch` `zotero` / `plugin-container`；旧的 startup/RDP bring-up timeout 口径继续只保留为已收口的诊断能力
+- 最新 library `pre-capture settle` 已稳定收敛到 `visibleBannerIDs=[mac-word-plugin-install-container]`；`sync-reminder-container`、`post-upgrade-container`、`file-renaming-banner-container`、`retracted-items-container` 与 `architecture-warning-container` 会在 capture 前被压平，library drift 已消失，`reader 视图继续对齐`，且 `library / reader` 几何一致 `2000x1200`
+- `READER-LOW-261` 已把 stage-scoped capture failure 结构化落进既有 E2E / validation 展示链；`READER-LOW-262` 已引入 `capture-command-failed` / `visualPrimaryBlockerKind=capture-command-failed` 并同步 consumer；`READER-LOW-263` 已在 live rerun 上证明 freshest-valid direct artifact 消费与 truth 对齐，`visual screenshot capture` 链已恢复到稳定基线
+- 最新 release live acceptance 已补齐 stable / beta 正式安装态 smoke：`release-matrix` 最新工件为 `attention`（`2026-03-30T13:58:47.934Z`），但 stable / beta profile 均已 `passed`；`release-install-smoke-stable` / `release-install-smoke-beta` 分别在 `2026-03-30T13:38:04.172Z` / `2026-03-30T13:58:21.077Z` 记录 `readinessMode=native`、`apiReady=true`，且剩余 `loading.svg` / `remote-settings.sys.mjs` 已归类为宿主噪声
+- 最新 `agent:monitor` / `agent:gate:release` 已在 `2026-03-30T13:59:05.792Z` / `2026-03-30T13:59:05.867Z` 消费最新 release artifacts；当前 `gatePassed=false` 的唯一原因是 `updateURL` 仍指向 `https://example.com/downloads/cleanroomtemplate/update.json` placeholder、远端自定义发布端未配置，而不是安装态 smoke 或插件运行时回归
+- 当前主阻断已清零；当前唯一 active 非阻断工程 gap 继续保持 `ENG-HIGH-104 / ENG-LOW-211~213`：只处理远端发布编排与远端 `updateURL` 闭环验证，不回头重开 Reader / startup / freshness 主线；`LEGAL_RISK_CHECKLIST.md` 的 Release Gate 继续保持 `release-only` 人工流程
 <!-- CURRENT-TRUTH-SUMMARY:END -->
 
 历史收口层面，以下结论仍然成立：
@@ -121,7 +122,7 @@ Assessment 对“当前完成度 / 当前主线 / 当前剩余项”的判断只
 
 结论：
 
-当前最真实的工作不再是追加新的 Reader 主线，而是诚实处理 fresh evidence 变化，并继续把 `ENG-HIGH-103` 的工程化收口与文档 truth 漂移守住。
+当前最真实的工作不再是继续扩任何已完成的 `READER-HIGH-*` 批次，而是守住当前单一事实源，并把下一轮默认高逻辑任务源切到 `ENG-HIGH-104 / ENG-LOW-211~213`：只处理远端发布编排、远端 `updateURL` 闭环验证，以及其现有 release consumer 对齐。
 
 ### 2.2 `P2` 上下文感知记忆/趋势深化已完成，本轮不再是主线缺口
 
@@ -161,7 +162,7 @@ Assessment 对“当前完成度 / 当前主线 / 当前剩余项”的判断只
 
 agent 现在已经能"利用历史经验、结合上下文优先推荐并展示多信号趋势"，后续要做的是继续扩信号域和长期经验颗粒度，而不是补 P2 的从 0 到 1。
 
-### 2.3 发布矩阵已完成 stable/beta 实跑并已在本地放行
+### 2.3 发布矩阵已完成 stable/beta 实跑，剩余缺口仅远端验证未配置
 
 当前已有：
 
@@ -180,7 +181,8 @@ agent 现在已经能"利用历史经验、结合上下文优先推荐并展示�
 - 安装态 runtime error 已完成分类与收口
   - 真实插件阻断 `menus[0]["l10nID"] must be string` 已定位并修复
   - `remote-settings.sys.mjs` 与 `loading.svg` 已归类为宿主噪声
-  - 当前 `release-matrix` 与 `agent:gate:release` 已本地通过
+  - 当前 stable / beta 两条 profile 已通过，安装态 smoke 不再是 release gate 阻断来源
+  - 当前整体 `release-matrix` 仍为 `attention`，`agent:gate:release` 仍会阻断，但唯一原因是 `updateURL` 仍指向 example.com placeholder、远端自定义发布端未配置
 - `release-install-smoke` 已在重新打包后同步刷新 `release-preflight`
   - 当前矩阵会直接暴露真实 smoke 失败原因，而不是先被旧 hash 阻断
 
@@ -191,7 +193,7 @@ agent 现在已经能"利用历史经验、结合上下文优先推荐并展示�
 
 结论：
 
-开发态很强，本地发布态也已经完成 stable/beta 真机闭环；当前串行 low-task 已收尾，且下一轮高逻辑主线已经固定为 `ENG-HIGH-103`（工程化长期增强第一批），不再保留“待重新定义 `P1 / Reader / 工程化` 批次”的开放口径。
+开发态很强，本地发布态也已经完成 stable/beta 真机闭环；当前剩余的不是安装态 smoke，而是远端自定义发布端 / `updateURL` 闭环验证。当前串行 low-task 已收尾，`READER-HIGH-126` 也已完成历史收口；后续不再保留“当前 active 是 library-only 回归修复”的开放口径，而是以上方自动同步摘要块中的单一事实源为准。
 
 ### 2.4 Reader 本轮 7 个更深事件点已落地
 
@@ -259,7 +261,7 @@ Reader 已不再是"只有轻量 demo"的状态；本轮 7 个更深事件点已
 
 ### 第一优先级
 
-- 先按 `docs/CURRENT_BACKLOG.md` 的单一事实源推进当前 `ENG-HIGH-103`（工程化长期增强第一批），而不是重新冻结第二套高逻辑主线
+- 先按 `docs/CURRENT_BACKLOG.md` 的“当前单一事实源”维持稳定口径，不再把已完成的 `READER-HIGH-126` 或更早批次重新写成 active 主线
 - 继续让补丁复验合同、sandbox、Reader 证据点与工程化长期增强建立在最新真实缺口上
 - 保持正式文档与 accepted review artifact、最新工件同步
 - 当前批次收口后的默认下一优先级不再在 Assessment 单独改写，统一以上方自动同步摘要块为准；这里仅保留“先减少 manifest / 正式文档 / docs consistency 漂移”的分析判断
@@ -317,4 +319,4 @@ Reader 已不再是"只有轻量 demo"的状态；本轮 7 个更深事件点已
 | 可否支持人工 + agent 协同开发 | ✅ 可以 |
 | 可否视为完整 autonomous framework | ❌ 还不能 |
 
-下一步最应该关注的，不是再证明"模板是否可用"，而是把已经选定的 `ENG-HIGH-103` 批次做实：统一 runtime 生命周期错误边界、共享脚本失败模型、lifecycle/perf 最小摘要与文档一致性守卫；远端 `updateURL` / 发布编排、Reader 更深事件点和 `P1` 扩面继续延后，直到 fresh evidence 重新打开新的批次。
+下一步最应该关注的，不是再证明"模板是否可用"，也不是把已完成的 `READER-HIGH-126` 重新写成 active；而是继续维持 fresh `watch -> e2e -> monitor -> gate` 证据链，并按 `ENG-HIGH-104 / ENG-LOW-211~213` 推进远端 `updateURL` / 发布编排这条非阻断后续，再把 Reader 更深事件点和 `P1` 扩面排到其后。

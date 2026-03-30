@@ -4,7 +4,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { execFile, spawn } from "node:child_process";
 import {
-  RdpClient,
+  connectRdpWithLaunchDiagnostics,
   acquireBuildLock,
   buildAddon,
   buildStartupArgs,
@@ -19,6 +19,7 @@ import {
 } from "./zotero-runner-lib.mjs";
 import {
   buildE2EMarkdown,
+  ensureLibraryVisualStageReady,
   evaluateCycle,
   summarizeLogs,
 } from "./agent-zotero-e2e-lib.mjs";
@@ -48,11 +49,15 @@ import {
   resolveCaptureWindowBounds,
 } from "./agent-zotero-capture-window-lib.mjs";
 import {
+  waitForVisualStageSettled,
+} from "./agent-zotero-visual-settle-lib.mjs";
+import {
   buildScriptFailureInfo,
   createScriptError,
   parseEnumOption,
   parseIntegerOption,
   resolvePathOption,
+  wrapScriptError,
   writeJSONArtifact,
 } from "./script-runtime-lib.mjs";
 import { resolveZoteroE2EArtifacts } from "./zotero-agent-artifacts.mjs";
@@ -64,6 +69,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const scriptStartedAt = Date.now();
+const zoteroArtifacts = resolveZoteroE2EArtifacts(projectRoot);
 const VISUAL_CAPTURE_WINDOW_GEOMETRY = Object.freeze({
   width: 1000,
   height: 600,
@@ -76,6 +82,24 @@ const VISUAL_CAPTURE_POLICY = Object.freeze({
   stageWarmupMs: Object.freeze({
     library: 550,
     reader: 780,
+  }),
+  preCaptureSettle: Object.freeze({
+    stableSamples: Object.freeze({
+      library: 2,
+      reader: 3,
+    }),
+    maxPolls: Object.freeze({
+      library: 6,
+      reader: 8,
+    }),
+    intervalMs: Object.freeze({
+      library: 120,
+      reader: 140,
+    }),
+    postReadyDelayMs: Object.freeze({
+      library: 120,
+      reader: 260,
+    }),
   }),
 });
 const ADDITIVE_E2E_SUMMARY_FIELDS = Object.freeze([
@@ -97,6 +121,12 @@ const ADDITIVE_E2E_SUMMARY_FIELDS = Object.freeze([
   "visualCaptureAllStagesStable",
   "visualCaptureStabilitySummary",
   "visualCaptureStabilityStages",
+  "visualPreCaptureSettleObserved",
+  "visualPreCaptureSettleStageCount",
+  "visualPreCaptureSettleSettledStageCount",
+  "visualPreCaptureSettleTimedOutStageCount",
+  "visualPreCaptureSettleSummary",
+  "visualPreCaptureSettleStages",
   "visualPrimaryBlockerKind",
   "visualPrimaryBlockerKindLabel",
   "visualGeometryMismatchCount",
@@ -222,7 +252,14 @@ async function execFileText(command, args, options = {}) {
       (error, stdout, stderr) => {
         if (error) {
           const details = stderr?.trim() || stdout?.trim() || error.message;
-          reject(new Error(details));
+          const wrapped = new Error(details);
+          wrapped.command = command;
+          wrapped.args = Array.isArray(args) ? [...args] : [];
+          wrapped.stdout = stdout || "";
+          wrapped.stderr = stderr || "";
+          wrapped.exitCode = typeof error.code === "number" ? error.code : null;
+          wrapped.signal = error.signal || null;
+          reject(wrapped);
           return;
         }
         resolve({
@@ -238,11 +275,193 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function normalizeMaybeString(value) {
+  const normalized = String(value || "").trim();
+  return normalized || null;
+}
+
+function normalizeCommandExitCode(value) {
+  return Number.isFinite(Number(value))
+    ? Number(value)
+    : null;
+}
+
+function normalizeVisualCaptureBounds(bounds) {
+  if (!bounds || typeof bounds !== "object") {
+    return null;
+  }
+  const x = Number(bounds.x);
+  const y = Number(bounds.y);
+  const width = Number(bounds.width);
+  const height = Number(bounds.height);
+  const hasDimensions = [x, y, width, height].every((item) => Number.isFinite(item));
+  return {
+    x: hasDimensions ? x : null,
+    y: hasDimensions ? y : null,
+    width: hasDimensions ? width : null,
+    height: hasDimensions ? height : null,
+    title: normalizeMaybeString(bounds.title),
+    source: normalizeMaybeString(bounds.source),
+  };
+}
+
+function normalizeVisualAttemptEntry(entry) {
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+  const bounds = normalizeVisualCaptureBounds(entry.bounds);
+  return {
+    index: Number.isInteger(entry.index) ? entry.index : null,
+    path: normalizeMaybeString(entry.path),
+    bounds,
+    width: Number(entry.analysis?.width || 0) || null,
+    height: Number(entry.analysis?.height || 0) || null,
+    sizeBytes: Number(entry.analysis?.sizeBytes || 0) || null,
+    sha256: normalizeMaybeString(entry.analysis?.sha256),
+  };
+}
+
+function attachVisualCaptureFailure(error, metadata = {}) {
+  const target = error instanceof Error
+    ? error
+    : new Error(normalizeMaybeString(error) || "Unknown visual capture failure");
+  target.visualCaptureFailure = {
+    failureKind: normalizeMaybeString(metadata.failureKind) || "capture-stage-failed",
+    failureCategory: normalizeMaybeString(metadata.failureCategory),
+    failureStage: normalizeMaybeString(metadata.failureStage),
+    failureMessage: normalizeMaybeString(metadata.failureMessage)
+      || normalizeMaybeString(target.message)
+      || "Unknown visual capture failure",
+    bounds: normalizeVisualCaptureBounds(metadata.bounds),
+    boundsSource: normalizeMaybeString(metadata.boundsSource)
+      || normalizeMaybeString(metadata.bounds?.source),
+    windowTitle: normalizeMaybeString(metadata.windowTitle)
+      || normalizeMaybeString(metadata.bounds?.title),
+    command: normalizeMaybeString(metadata.command),
+    commandExitCode: normalizeCommandExitCode(metadata.commandExitCode ?? target.exitCode),
+    stderr: normalizeMaybeString(metadata.stderr ?? target.stderr),
+    stdout: normalizeMaybeString(metadata.stdout ?? target.stdout),
+    rect: normalizeMaybeString(metadata.rect),
+  };
+  return target;
+}
+
+function inferVisualStageFailure(error, fallback = {}) {
+  const existing = error?.visualCaptureFailure && typeof error.visualCaptureFailure === "object"
+    ? error.visualCaptureFailure
+    : {};
+  const failureKind = normalizeMaybeString(existing.failureKind)
+    || normalizeMaybeString(fallback.failureKind)
+    || "capture-stage-failed";
+  const failureCategory = normalizeMaybeString(existing.failureCategory)
+    || normalizeMaybeString(fallback.failureCategory)
+    || null;
+  const failureStage = normalizeMaybeString(existing.failureStage)
+    || normalizeMaybeString(fallback.failureStage)
+    || null;
+  const bounds = normalizeVisualCaptureBounds(existing.bounds || fallback.bounds);
+  return {
+    failureKind,
+    failureCategory,
+    failureStage,
+    failureMessage: normalizeMaybeString(existing.failureMessage)
+      || normalizeMaybeString(fallback.failureMessage)
+      || normalizeMaybeString(error?.message)
+      || "Unknown visual capture failure",
+    bounds,
+    boundsSource: normalizeMaybeString(existing.boundsSource)
+      || normalizeMaybeString(fallback.boundsSource)
+      || normalizeMaybeString(bounds?.source),
+    windowTitle: normalizeMaybeString(existing.windowTitle)
+      || normalizeMaybeString(fallback.windowTitle)
+      || normalizeMaybeString(bounds?.title),
+    command: normalizeMaybeString(existing.command)
+      || normalizeMaybeString(fallback.command),
+    commandExitCode: normalizeCommandExitCode(existing.commandExitCode ?? fallback.commandExitCode ?? error?.exitCode),
+    stderr: normalizeMaybeString(existing.stderr ?? fallback.stderr ?? error?.stderr),
+    stdout: normalizeMaybeString(existing.stdout ?? fallback.stdout ?? error?.stdout),
+    rect: normalizeMaybeString(existing.rect ?? fallback.rect),
+  };
+}
+
+function buildFailedVisualStageResult({
+  stage,
+  warmupMs,
+  maxAttempts,
+  preCaptureSettle,
+  state,
+  attempts,
+  attemptCount,
+  error,
+  fallback = {},
+}) {
+  const failure = inferVisualStageFailure(error, fallback);
+  return {
+    capture: null,
+    stability: {
+      kind: stage,
+      stable: false,
+      warmupMs,
+      maxAttempts,
+      preCaptureSettle,
+      attemptCount: Math.max(
+        0,
+        Number(attemptCount || 0),
+        Array.isArray(attempts) ? attempts.length : 0,
+      ),
+      selectedAttempt: null,
+      selectedPath: null,
+      selectedHash: null,
+      selectionReason: null,
+      stabilityMetrics: null,
+      attempts: Array.isArray(attempts)
+        ? attempts.map((entry) => normalizeVisualAttemptEntry(entry)).filter(Boolean)
+        : [],
+      failureKind: failure.failureKind,
+      failureCategory: failure.failureCategory,
+      failureStage: failure.failureStage,
+      failureMessage: failure.failureMessage,
+      bounds: failure.bounds,
+      boundsSource: failure.boundsSource,
+      windowTitle: failure.windowTitle,
+      command: failure.command,
+      commandExitCode: failure.commandExitCode,
+      stderr: failure.stderr,
+      stdout: failure.stdout,
+      rect: failure.rect,
+      metadata: state || null,
+    },
+    warning: `${stage}: ${failure.failureMessage}`,
+  };
+}
+
 function getVisualStageWarmupMs(stage) {
   const configured = VISUAL_CAPTURE_POLICY.stageWarmupMs?.[stage];
   return Number.isFinite(configured) && configured > 0
     ? configured
     : 550;
+}
+
+function getVisualStageSettlePolicy(stage) {
+  const settings = VISUAL_CAPTURE_POLICY.preCaptureSettle || {};
+  const stableSampleTarget = Number(settings.stableSamples?.[stage]);
+  const maxPolls = Number(settings.maxPolls?.[stage]);
+  const intervalMs = Number(settings.intervalMs?.[stage]);
+  const postReadyDelayMs = Number(settings.postReadyDelayMs?.[stage]);
+  return {
+    stableSampleTarget: Number.isFinite(stableSampleTarget) && stableSampleTarget > 0
+      ? stableSampleTarget
+      : 2,
+    maxPolls: Number.isFinite(maxPolls) && maxPolls > 0
+      ? maxPolls
+      : 6,
+    intervalMs: Number.isFinite(intervalMs) && intervalMs >= 0
+      ? intervalMs
+      : 120,
+    postReadyDelayMs: Number.isFinite(postReadyDelayMs) && postReadyDelayMs >= 0
+      ? postReadyDelayMs
+      : 0,
+  };
 }
 
 function summarizeVisualCapturePolicy() {
@@ -254,6 +473,10 @@ function summarizeVisualCapturePolicy() {
     stageWarmupMs: {
       library: getVisualStageWarmupMs("library"),
       reader: getVisualStageWarmupMs("reader"),
+    },
+    preCaptureSettle: {
+      library: getVisualStageSettlePolicy("library"),
+      reader: getVisualStageSettlePolicy("reader"),
     },
     targetWindowGeometry: {
       width: Number(VISUAL_CAPTURE_WINDOW_GEOMETRY.width || 0),
@@ -654,6 +877,7 @@ ${xrefOffset}
 
 async function prepareVisualState({ rdp, config, stage }) {
   const payload = await rdp.evaluateInChrome(`(async () => {
+    const ensureLibraryVisualStageReady = ${ensureLibraryVisualStageReady.toString()};
     const STATE_KEY = "__CLEANROOM_AGENT_VISUAL_STATE__";
     const plugin = Zotero[${JSON.stringify(config.instanceKey)}];
     if (!plugin?.api) {
@@ -682,6 +906,42 @@ async function prepareVisualState({ rdp, config, stage }) {
       }
     };
 
+    const readSelectedItemIDs = () => {
+      if (typeof ZoteroPane?.getSelectedItems === "function") {
+        const directIDs = ZoteroPane.getSelectedItems(true);
+        if (Array.isArray(directIDs)) {
+          return directIDs.filter((id) => Number.isFinite(id));
+        }
+        const items = ZoteroPane.getSelectedItems();
+        if (Array.isArray(items)) {
+          return items
+            .map((item) => item?.id)
+            .filter((id) => Number.isFinite(id));
+        }
+      }
+      if (ZoteroPane?.itemsView && typeof ZoteroPane.itemsView.getSelectedItems === "function") {
+        const directIDs = ZoteroPane.itemsView.getSelectedItems(true);
+        if (Array.isArray(directIDs)) {
+          return directIDs.filter((id) => Number.isFinite(id));
+        }
+        const items = ZoteroPane.itemsView.getSelectedItems();
+        if (Array.isArray(items)) {
+          return items
+            .map((item) => item?.id)
+            .filter((id) => Number.isFinite(id));
+        }
+      }
+      return [];
+    };
+
+    const readSelectionSnapshot = () => {
+      const ids = readSelectedItemIDs();
+      return {
+        selectedIDs: ids,
+        selectedCount: ids.length,
+      };
+    };
+
     const waitFor = async (predicate, options = {}) => {
       const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : 3000;
       const intervalMs = Number.isFinite(options.intervalMs) ? options.intervalMs : 100;
@@ -695,6 +955,211 @@ async function prepareVisualState({ rdp, config, stage }) {
         await new Promise((resolve) => setTimeout(resolve, intervalMs));
       }
       return lastValue;
+    };
+
+    const waitForLibraryViews = async () => {
+      await waitFor(
+        () => Boolean(ZoteroPane.collectionsView && ZoteroPane.itemsView) ? true : null,
+        {
+          timeoutMs: 3000,
+          intervalMs: 100,
+        },
+      );
+      return true;
+    };
+
+    const selectLibraryRoot = async (libraryID) => {
+      if (!Number.isFinite(Number(libraryID))) {
+        return false;
+      }
+      if (!ZoteroPane.collectionsView || typeof ZoteroPane.collectionsView.selectLibrary !== "function") {
+        return false;
+      }
+      await ZoteroPane.collectionsView.selectLibrary(Number(libraryID));
+      return true;
+    };
+
+    const waitForItemsViewLoad = async () => {
+      if (ZoteroPane.itemsView && typeof ZoteroPane.itemsView.waitForLoad === "function") {
+        await ZoteroPane.itemsView.waitForLoad();
+        return true;
+      }
+      return false;
+    };
+
+    const waitForSingleSelection = async (itemID) => {
+      return await waitFor(() => {
+        const selection = readSelectionSnapshot();
+        return selection.selectedIDs.length === 1 && selection.selectedIDs[0] === itemID
+          ? selection
+          : null;
+      }, {
+        timeoutMs: 3000,
+        intervalMs: 100,
+      });
+    };
+
+    const waitForMainWindowPaint = async () => {
+      const targetWindow = Zotero.getMainWindow();
+      if (!targetWindow) {
+        return false;
+      }
+      const raf = typeof targetWindow.requestAnimationFrame === "function"
+        ? targetWindow.requestAnimationFrame.bind(targetWindow)
+        : (callback) => setTimeout(callback, 0);
+      await new Promise((resolve) => raf(() => raf(resolve)));
+      return true;
+    };
+
+    const allowVisibleBannerContainerIDs = new Set([
+      "mac-word-plugin-install-container",
+    ]);
+
+    const isBannerContainerVisible = (element) => {
+      if (!element || typeof element !== "object") {
+        return false;
+      }
+      if (element.hidden === true) {
+        return false;
+      }
+      const collapsed = String(element.getAttribute?.("collapsed") || "").trim().toLowerCase();
+      if (collapsed === "true") {
+        return false;
+      }
+      const targetWindow = element.ownerDocument?.defaultView || Zotero.getMainWindow();
+      const style = targetWindow && typeof targetWindow.getComputedStyle === "function"
+        ? targetWindow.getComputedStyle(element)
+        : null;
+      if (style) {
+        if (
+          style.display === "none"
+          || style.visibility === "collapse"
+          || style.visibility === "hidden"
+          || Number(style.opacity) === 0
+        ) {
+          return false;
+        }
+      }
+      const rect = typeof element.getBoundingClientRect === "function"
+        ? element.getBoundingClientRect()
+        : null;
+      return Number(rect?.height || 0) > 0;
+    };
+
+    const collapseBannerContainer = (element) => {
+      if (!element || typeof element !== "object") {
+        return;
+      }
+      try {
+        element.hidden = true;
+      } catch {}
+      try {
+        element.setAttribute("hidden", "true");
+      } catch {}
+      try {
+        element.collapsed = true;
+      } catch {}
+      try {
+        element.setAttribute("collapsed", "true");
+      } catch {}
+      if (element.style && typeof element.style.setProperty === "function") {
+        try {
+          element.style.setProperty("display", "none", "important");
+          element.style.setProperty("visibility", "collapse", "important");
+          element.style.setProperty("max-height", "0px", "important");
+          element.style.setProperty("overflow", "hidden", "important");
+        } catch {}
+      }
+      const innerBanner = typeof element.querySelector === "function"
+        ? element.querySelector(".banner, [id$='-banner']")
+        : null;
+      if (innerBanner?.style && typeof innerBanner.style.setProperty === "function") {
+        try {
+          innerBanner.style.setProperty("display", "none", "important");
+          innerBanner.style.setProperty("visibility", "collapse", "important");
+          innerBanner.style.setProperty("max-height", "0px", "important");
+          innerBanner.style.setProperty("overflow", "hidden", "important");
+        } catch {}
+      }
+    };
+
+    const stabilizeLibraryHostSurface = async () => {
+      const targetWindow = Zotero.getMainWindow();
+      const doc = targetWindow?.document;
+      if (!doc) {
+        return {
+          suppressedBannerIDs: [],
+          retainedBannerIDs: [],
+          visibleBannerIDs: [],
+        };
+      }
+
+      const bannerContainers = Array.from(doc.querySelectorAll(".banner-container"))
+        .filter((element) => typeof element?.id === "string" && element.id);
+      const suppressedBannerIDs = [];
+      const retainedBannerIDs = [];
+
+      for (const container of bannerContainers) {
+        if (allowVisibleBannerContainerIDs.has(container.id)) {
+          retainedBannerIDs.push(String(container.id));
+          continue;
+        }
+        collapseBannerContainer(container);
+        suppressedBannerIDs.push(String(container.id));
+      }
+
+      if (bannerContainers.length > 0) {
+        await waitForMainWindowPaint();
+      }
+
+      return {
+        suppressedBannerIDs: Array.from(new Set(suppressedBannerIDs)).sort((left, right) => left.localeCompare(right)),
+        retainedBannerIDs: Array.from(new Set(retainedBannerIDs)).sort((left, right) => left.localeCompare(right)),
+        visibleBannerIDs: bannerContainers
+          .filter((container) => isBannerContainerVisible(container))
+          .map((container) => String(container.id))
+          .sort((left, right) => left.localeCompare(right)),
+      };
+    };
+
+    const readSelectedTabID = () => {
+      const selectedID = Zotero.getMainWindow()?.Zotero_Tabs?.selectedID;
+      return typeof selectedID === "string" && selectedID
+        ? selectedID
+        : null;
+    };
+
+    const readMainWindowTitle = () => {
+      const title = Zotero.getMainWindow()?.document?.title;
+      return typeof title === "string" && title
+        ? title
+        : null;
+    };
+
+    const activateReaderTab = async (reader) => {
+      const tabID = typeof reader?.tabID === "string" ? reader.tabID : null;
+      const tabs = Zotero.getMainWindow()?.Zotero_Tabs;
+      if (!tabID || !tabs) {
+        return false;
+      }
+
+      try {
+        if (typeof tabs.select === "function") {
+          const result = tabs.select(tabID);
+          if (result && typeof result.then === "function") {
+            await result;
+          }
+        } else if ("selectedID" in tabs) {
+          tabs.selectedID = tabID;
+        } else {
+          return false;
+        }
+      } catch {
+        return false;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return true;
     };
 
     const settleReader = async (reader) => {
@@ -760,13 +1225,35 @@ async function prepareVisualState({ rdp, config, stage }) {
     }
 
     if (${JSON.stringify(stage)} === "library") {
-      await selectItem(state.itemID);
-      const summary = plugin.api.agent.inspectItem(state.itemID);
+      const item = Zotero.Items.get(state.itemID);
+      const libraryID = Number.isFinite(Number(item?.libraryID))
+        ? Number(item.libraryID)
+        : Number.isFinite(Number(Zotero?.Libraries?.userLibraryID))
+          ? Number(Zotero.Libraries.userLibraryID)
+          : null;
+      const prepared = await ensureLibraryVisualStageReady({
+        itemID: state.itemID,
+        libraryID,
+        waitForViews: waitForLibraryViews,
+        selectLibrary: selectLibraryRoot,
+        waitForItemsLoad: waitForItemsViewLoad,
+        selectItem,
+        waitForSelection: waitForSingleSelection,
+        waitForPaint: waitForMainWindowPaint,
+        stabilizeHostSurface: stabilizeLibraryHostSurface,
+        inspectItem: (itemID) => plugin.api.agent.inspectItem(itemID),
+        readSelectedTabID,
+        readWindowTitle: readMainWindowTitle,
+      });
       return {
         ok: true,
         stage: "library",
         itemID: state.itemID,
-        summaryJSON: JSON.stringify(summary),
+        libraryID,
+        summaryJSON: JSON.stringify(prepared.summary),
+        selectionJSON: JSON.stringify(prepared.selection),
+        preparationJSON: JSON.stringify(prepared.preparation),
+        settleSnapshotJSON: JSON.stringify(prepared.settleSnapshot),
       };
     }
 
@@ -802,6 +1289,7 @@ async function prepareVisualState({ rdp, config, stage }) {
         openInBackground: false,
       })
       : existingReader;
+    await activateReaderTab(reader);
     await settleReader(reader);
     const readyReaderSummary = await waitFor(resolveReadyReaderSummary, {
       timeoutMs: 3000,
@@ -809,12 +1297,49 @@ async function prepareVisualState({ rdp, config, stage }) {
     });
 
     const readerSummary = readyReaderSummary || plugin.api.agent.describeReader(state.attachmentID);
+    const readerSnapshot = typeof plugin.api.agent.inspectReader === "function"
+      ? plugin.api.agent.inspectReader(state.attachmentID)
+      : null;
+    const readyReaderSnapshot = readyReaderSummary && typeof plugin.api.agent.inspectReader === "function"
+      ? plugin.api.agent.inspectReader(state.attachmentID)
+      : null;
+    const uiState = readerSnapshot?.uiState && typeof readerSnapshot.uiState === "object"
+      ? readerSnapshot.uiState
+      : null;
+    const readyUIState = readyReaderSnapshot?.uiState && typeof readyReaderSnapshot.uiState === "object"
+      ? readyReaderSnapshot.uiState
+      : null;
     return {
       ok: true,
       stage: "reader",
       itemID: state.itemID,
       attachmentID: state.attachmentID,
       readerJSON: JSON.stringify(readerSummary),
+      readerSnapshotJSON: JSON.stringify(readerSnapshot),
+      ...(readyReaderSummary
+        ? {
+          settleSnapshotJSON: JSON.stringify({
+            stage: "reader",
+            itemID: readyReaderSummary?.itemID ?? state.attachmentID,
+            tabID: readyReaderSummary?.tabID ?? null,
+            type: readyReaderSummary?.type ?? null,
+            annotationCount: Number(readyReaderSummary?.annotationCount || 0),
+            active: readyReaderSnapshot?.active ?? null,
+            hasMatchingWindowState: readyReaderSnapshot?.hasMatchingWindowState ?? null,
+            matchingWindowStateCount: Number(readyReaderSnapshot?.matchingWindowStateCount || 0),
+            selectedAnnotationCount: Number(readyReaderSnapshot?.selectedAnnotationCount || 0),
+            annotationDetailCount: Number(readyReaderSnapshot?.annotationDetailCount || 0),
+            sidebarView: readyUIState?.sidebarView ?? null,
+            flowMode: readyUIState?.flowMode ?? null,
+            splitType: readyUIState?.splitType ?? null,
+            scrollMode: readyUIState?.scrollMode ?? null,
+            spreadMode: readyUIState?.spreadMode ?? null,
+            scale: readyUIState?.scale ?? null,
+            contextPaneOpen: readyUIState?.contextPaneOpen ?? null,
+            hasSecondViewState: readyUIState?.hasSecondViewState ?? null,
+          }),
+        }
+        : {}),
     };
   })()`);
 
@@ -829,7 +1354,67 @@ async function prepareVisualState({ rdp, config, stage }) {
     payload.reader = JSON.parse(payload.readerJSON);
     delete payload.readerJSON;
   }
+  if (typeof payload.readerSnapshotJSON === "string") {
+    payload.readerSnapshot = JSON.parse(payload.readerSnapshotJSON);
+    delete payload.readerSnapshotJSON;
+  }
+  if (typeof payload.selectionJSON === "string") {
+    payload.selection = JSON.parse(payload.selectionJSON);
+    delete payload.selectionJSON;
+  }
+  if (typeof payload.preparationJSON === "string") {
+    payload.preparation = JSON.parse(payload.preparationJSON);
+    delete payload.preparationJSON;
+  }
+  if (typeof payload.settleSnapshotJSON === "string") {
+    payload.settleSnapshot = JSON.parse(payload.settleSnapshotJSON);
+    delete payload.settleSnapshotJSON;
+  }
   return payload;
+}
+
+async function settleVisualStageAfterReady({
+  rdp,
+  config,
+  stage,
+  delayMs,
+}) {
+  const rawResult = await rdp.evaluateInChrome(`(async () => {
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const waitDoubleFrame = async (targetWindow) => {
+      const boundRAF = typeof targetWindow?.requestAnimationFrame === "function"
+        ? targetWindow.requestAnimationFrame.bind(targetWindow)
+        : ((callback) => setTimeout(callback, 0));
+      await new Promise((resolve) => boundRAF(() => boundRAF(resolve)));
+    };
+
+    if (${Number(delayMs || 0)} > 0) {
+      await wait(${Number(delayMs || 0)});
+    }
+
+    if (${JSON.stringify(stage)} === "reader") {
+      const STATE_KEY = "__CLEANROOM_AGENT_VISUAL_STATE__";
+      const state = globalThis[STATE_KEY];
+      const plugin = Zotero[${JSON.stringify(config.instanceKey)}];
+      const reader = typeof plugin?.api?.reader?.getByItemID === "function"
+        ? plugin.api.reader.getByItemID(state?.attachmentID)
+        : null;
+      const frameWindow = reader?._internalReader?._primaryView?._iframeWindow || reader?._iframeWindow || null;
+      await waitDoubleFrame(frameWindow || Zotero.getMainWindow());
+      return {
+        ok: true,
+        target: frameWindow ? "reader-frame" : "main-window",
+      };
+    }
+
+    await waitDoubleFrame(Zotero.getMainWindow());
+    return {
+      ok: true,
+      target: "main-window",
+    };
+  })()`);
+
+  return parseChromeEvalResult(rawResult);
 }
 
 async function cleanupVisualState({ rdp, config }) {
@@ -979,7 +1564,16 @@ async function ensureZoteroWindowReadyForCapture(options = {}) {
     : 0;
   const geometry = options.geometry || VISUAL_CAPTURE_WINDOW_GEOMETRY;
 
-  await activateZoteroWindowForCapture(activationDelayMs);
+  try {
+    await activateZoteroWindowForCapture(activationDelayMs);
+  }
+  catch (error) {
+    throw attachVisualCaptureFailure(error, {
+      failureKind: "window-activation-failed",
+      failureCategory: "capture-command-failed",
+      failureStage: "activate-window",
+    });
+  }
   const initialChromeBounds = await focusChromeCaptureWindow({
     rdp: options.rdp,
     geometry,
@@ -989,10 +1583,21 @@ async function ensureZoteroWindowReadyForCapture(options = {}) {
     rdp: options.rdp,
     geometry,
   }).catch(() => null);
-  const bounds = await resolveCaptureWindowBounds({
-    preferred: async () => refreshedChromeBounds || initialChromeBounds,
-    fallback: async () => fallbackBounds,
-  });
+  let bounds = null;
+  try {
+    bounds = await resolveCaptureWindowBounds({
+      preferred: async () => refreshedChromeBounds || initialChromeBounds,
+      fallback: async () => fallbackBounds,
+    });
+  }
+  catch (error) {
+    throw attachVisualCaptureFailure(error, {
+      failureKind: "window-bounds-unavailable",
+      failureCategory: "capture-command-failed",
+      failureStage: "resolve-window",
+      bounds: refreshedChromeBounds || initialChromeBounds || fallbackBounds || null,
+    });
+  }
   await sleep(settleDelayMs);
   return bounds;
 }
@@ -1012,9 +1617,33 @@ async function captureZoteroWindow(filePath, options = {}) {
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      const captureBounds = bounds || await setZoteroWindowGeometry(options.geometry || VISUAL_CAPTURE_WINDOW_GEOMETRY);
+      let captureBounds = bounds;
+      if (!captureBounds) {
+        try {
+          captureBounds = await setZoteroWindowGeometry(options.geometry || VISUAL_CAPTURE_WINDOW_GEOMETRY);
+        }
+        catch (error) {
+          throw attachVisualCaptureFailure(error, {
+            failureKind: "window-bounds-unavailable",
+            failureCategory: "capture-command-failed",
+            failureStage: "set-window-geometry",
+          });
+        }
+      }
       const rect = `${captureBounds.x},${captureBounds.y},${captureBounds.width},${captureBounds.height}`;
-      await execFileText("screencapture", ["-x", "-R", rect, filePath]);
+      try {
+        await execFileText("screencapture", ["-x", "-R", rect, filePath]);
+      }
+      catch (error) {
+        throw attachVisualCaptureFailure(error, {
+          failureKind: "capture-command-failed",
+          failureCategory: "capture-command-failed",
+          failureStage: "capture-command",
+          bounds: captureBounds,
+          rect,
+          command: "screencapture",
+        });
+      }
       return captureBounds;
     }
     catch (error) {
@@ -1110,33 +1739,87 @@ async function captureStableVisualStage({
 }) {
   const policy = summarizeVisualCapturePolicy();
   const warmupMs = getVisualStageWarmupMs(stage);
+  const settlePolicy = getVisualStageSettlePolicy(stage);
   const maxAttempts = Math.max(1, Number(policy.maxAttemptsPerStage || 1));
   const attempts = [];
   let state = null;
+  let preCaptureSettle = null;
+  let lastFailure = null;
+  let stageAttemptCount = 0;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    stageAttemptCount = attempt;
     // Re-assert the same visual stage before every attempt so retries do not
     // drift away from the intended library/reader surface while the UI settles.
-    state = await prepareVisualState({ rdp, config, stage });
-    const bounds = await ensureZoteroWindowReadyForCapture({
-      rdp,
-      geometry: policy.targetWindowGeometry,
-      activationDelayMs: policy.activationDelayMs,
-      settleDelayMs: attempt === 1 ? warmupMs : Number(policy.betweenAttemptsMs || 0),
-    });
-    const attemptPath = path.join(captureDir, `cycle-${cycle}-${stage}-attempt-${attempt}.png`);
-    await captureZoteroWindow(attemptPath, { bounds });
-    const analysis = await readPNGAnalysis(attemptPath);
-    attempts.push({
-      index: attempt,
-      path: attemptPath,
-      bounds,
-      analysis,
-    });
+    try {
+      preCaptureSettle = await waitForVisualStageSettled({
+        stage,
+        stableSampleTarget: settlePolicy.stableSampleTarget,
+        maxPolls: settlePolicy.maxPolls,
+        intervalMs: settlePolicy.intervalMs,
+        sleep,
+        sample: async () => await prepareVisualState({ rdp, config, stage }),
+        verify: async () => {
+          await settleVisualStageAfterReady({
+            rdp,
+            config,
+            stage,
+            delayMs: settlePolicy.postReadyDelayMs,
+          });
+          return await prepareVisualState({ rdp, config, stage });
+        },
+      });
+      state = preCaptureSettle?.state || await prepareVisualState({ rdp, config, stage });
+      const bounds = await ensureZoteroWindowReadyForCapture({
+        rdp,
+        geometry: policy.targetWindowGeometry,
+        activationDelayMs: policy.activationDelayMs,
+        settleDelayMs: attempt === 1 ? warmupMs : Number(policy.betweenAttemptsMs || 0),
+      });
+      const attemptPath = path.join(captureDir, `cycle-${cycle}-${stage}-attempt-${attempt}.png`);
+      await captureZoteroWindow(attemptPath, { bounds });
+      const analysis = await readPNGAnalysis(attemptPath);
+      attempts.push({
+        index: attempt,
+        path: attemptPath,
+        bounds,
+        analysis,
+      });
+      lastFailure = null;
 
-    if (attempts.length >= 2 && isStableVisualAttemptPair(attempts[attempts.length - 2], attempts[attempts.length - 1])) {
-      break;
+      if (attempts.length >= 2 && isStableVisualAttemptPair(attempts[attempts.length - 2], attempts[attempts.length - 1])) {
+        break;
+      }
     }
+    catch (error) {
+      lastFailure = error;
+      if (attempt < maxAttempts) {
+        await sleep(Math.max(0, Number(policy.betweenAttemptsMs || 0)));
+      }
+    }
+  }
+
+  const latestSuccessfulAttempt = attempts[attempts.length - 1] || null;
+  const finalAttemptFailed = Boolean(
+    lastFailure
+    && Number(stageAttemptCount || 0) > 0
+    && Number(latestSuccessfulAttempt?.index || 0) !== Number(stageAttemptCount || 0),
+  );
+  if (finalAttemptFailed || attempts.length === 0) {
+    return buildFailedVisualStageResult({
+      stage,
+      warmupMs,
+      maxAttempts,
+      preCaptureSettle,
+      state,
+      attempts,
+      attemptCount: stageAttemptCount,
+      error: lastFailure,
+      fallback: {
+        failureKind: "capture-stage-failed",
+        failureStage: "capture-stage",
+      },
+    });
   }
 
   if (attempts.length === 0) {
@@ -1182,6 +1865,7 @@ async function captureStableVisualStage({
       stable,
       warmupMs,
       maxAttempts,
+      preCaptureSettle,
       attemptCount: attempts.length,
       selectedAttempt: selected.index,
       selectedPath: finalPath,
@@ -1226,30 +1910,25 @@ async function captureCycleVisuals({
   await fs.mkdir(captureDir, { recursive: true });
 
   try {
-    const libraryCapture = await captureStableVisualStage({
-      rdp,
-      config,
-      stage: "library",
-      cycle,
-      captureDir,
-    });
-    visuals.captures.push(libraryCapture.capture);
-    visuals.captureStability.stages.push(libraryCapture.stability);
-
-    const readerCapture = await captureStableVisualStage({
-      rdp,
-      config,
-      stage: "reader",
-      cycle,
-      captureDir,
-    });
-    visuals.captures.push(readerCapture.capture);
-    visuals.captureStability.stages.push(readerCapture.stability);
-  }
-  catch (error) {
-    visuals.warnings.push(String(error?.message || error));
-  }
-  finally {
+    for (const stage of VISUAL_CAPTURE_POLICY.stageOrder || []) {
+      const stageCapture = await captureStableVisualStage({
+        rdp,
+        config,
+        stage,
+        cycle,
+        captureDir,
+      });
+      if (stageCapture.capture) {
+        visuals.captures.push(stageCapture.capture);
+      }
+      if (stageCapture.stability) {
+        visuals.captureStability.stages.push(stageCapture.stability);
+      }
+      if (stageCapture.warning) {
+        visuals.warnings.push(stageCapture.warning);
+      }
+    }
+  } finally {
     try {
       await cleanupVisualState({ rdp, config });
     }
@@ -1280,6 +1959,7 @@ async function captureCycleVisuals({
 async function createZoteroSession({
   runnerConfig,
   rdpPort,
+  runtimeSanitization = null,
 }) {
   const processLogs = [];
   function appendProcessLogs(source, chunk) {
@@ -1325,9 +2005,29 @@ async function createZoteroSession({
     });
   }
 
-  const rdp = new RdpClient();
-  await rdp.connect({ port: rdpPort });
-  return { child, rdp, processLogs };
+  let rdp = null;
+  try {
+    const connection = await connectRdpWithLaunchDiagnostics({
+      child,
+      rdpPort,
+      processLogs,
+    });
+    rdp = connection.rdp;
+    return { child, rdp, processLogs };
+  }
+  catch (error) {
+    if (rdp) {
+      rdp.disconnect();
+    }
+    await stopChildProcess(child).catch(() => {});
+    throw wrapScriptError(error, {
+      failedStage: "launch-session",
+      details: {
+        runtimeSanitization,
+        launchFailure: error?.launchFailure || null,
+      },
+    });
+  }
 }
 
 async function teardownSession(session) {
@@ -1344,14 +2044,14 @@ async function main() {
   const { config, buildPath } = await readAddonRuntimeInfo(projectRoot);
   const rdpPort = runnerConfig.rdpPort || await findFreePort();
   const buildLock = await acquireBuildLock({ owner: "agent-zotero-e2e.mjs" });
-  const zoteroArtifacts = resolveZoteroE2EArtifacts(projectRoot);
 
   try {
-    await prepareRuntime({
+    const runtimeSanitization = await prepareRuntime({
       projectRoot,
       profilePath: runnerConfig.profilePath,
       dataDir: runnerConfig.dataDir,
       fresh: options.fresh,
+      exclusiveProjectRuntime: true,
     });
     await installProxyAddon({
       profilePath: runnerConfig.profilePath,
@@ -1371,6 +2071,9 @@ async function main() {
       hints: [],
       diagnostics: [],
       primaryDiagnosis: null,
+      details: {
+        runtimeSanitization,
+      },
     };
 
     let session = null;
@@ -1390,6 +2093,7 @@ async function main() {
           session = await createZoteroSession({
             runnerConfig,
             rdpPort,
+            runtimeSanitization,
           });
         } else {
           await session.rdp.reloadAddonById(config.addonId);
@@ -1542,7 +2246,10 @@ async function main() {
             report.primaryDiagnosis?.summary || report.issues[0] || "Zotero E2E validation failed",
             { failedStage: "validation-summary" },
           ),
-          { durationMs: report.durationMs },
+          {
+            durationMs: report.durationMs,
+            details: report.details,
+          },
         ),
       );
     } else {

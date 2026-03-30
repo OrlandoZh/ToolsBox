@@ -32,6 +32,15 @@ const DEFAULT_WATCH_ROOTS = [
   "addon-static",
   "config",
 ];
+const STALE_RUNTIME_PROFILE_MARKERS = Object.freeze([
+  ".parentlock",
+  ".startup-incomplete",
+]);
+const RETRYABLE_RDP_ERROR_CODES = new Set([
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EPIPE",
+]);
 
 const DEFAULT_BINARY_CANDIDATES = [
   "/Applications/Zotero.app/Contents/MacOS/zotero",
@@ -229,18 +238,311 @@ function isManagedPath(projectRoot, targetPath) {
   return resolvedTarget === runtimeRoot || resolvedTarget.startsWith(`${runtimeRoot}${path.sep}`);
 }
 
+async function removeFileIfPresent(filePath) {
+  try {
+    await fsp.access(filePath, fs.constants.F_OK);
+  }
+  catch (error) {
+    if (error && error.code === "ENOENT") {
+      return false;
+    }
+    throw error;
+  }
+
+  await fsp.rm(filePath, { force: true });
+  return true;
+}
+
+function normalizeProcessLogTailEntry(entry) {
+  if (!entry || typeof entry !== "object") {
+    return {
+      at: null,
+      source: "unknown",
+      level: "info",
+      message: String(entry || ""),
+    };
+  }
+
+  return {
+    at: entry.at || null,
+    source: entry.source || "unknown",
+    level: entry.level || "info",
+    message: String(entry.message || ""),
+  };
+}
+
+function normalizeManagedRuntimeCommand(command) {
+  return String(command || "").trim();
+}
+
+function parseManagedRuntimeProcessLine(line) {
+  const text = String(line || "").trim();
+  if (!text) {
+    return null;
+  }
+  const match = text.match(/^(\d+)\s+(.+)$/u);
+  if (!match) {
+    return null;
+  }
+  return {
+    pid: Number(match[1]),
+    command: normalizeManagedRuntimeCommand(match[2]),
+  };
+}
+
+function looksLikeManagedZoteroProcess(command) {
+  const text = normalizeManagedRuntimeCommand(command);
+  return text.includes(" -profile ") || text.includes(" --dataDir ");
+}
+
+export function findManagedRuntimeProcesses({
+  projectRoot,
+  profilePath,
+  dataDir,
+  includeProjectRuntime = false,
+  currentPid = process.pid,
+  psOutput = null,
+}) {
+  const resolvedProfilePath = path.resolve(profilePath);
+  const resolvedDataDir = path.resolve(dataDir);
+  const runtimeRoot = path.resolve(getRuntimeRoot(projectRoot));
+  let output = psOutput;
+
+  if (output === null || output === undefined) {
+    try {
+      output = execFileSync("ps", ["-axww", "-o", "pid=,command="], {
+        encoding: "utf-8",
+      });
+    }
+    catch {
+      return [];
+    }
+  }
+
+  return String(output)
+    .split(/\r?\n/u)
+    .map((line) => parseManagedRuntimeProcessLine(line))
+    .filter((entry) => entry && Number.isInteger(entry.pid) && entry.pid !== Number(currentPid))
+    .map((entry) => {
+      const matchReasons = [];
+      if (entry.command.includes(resolvedProfilePath)) {
+        matchReasons.push("profile");
+      }
+      if (entry.command.includes(resolvedDataDir)) {
+        matchReasons.push("data");
+      }
+      if (includeProjectRuntime && entry.command.includes(runtimeRoot)) {
+        matchReasons.push("project-runtime");
+      }
+      return {
+        pid: entry.pid,
+        command: entry.command,
+        matchReasons,
+      };
+    })
+    .filter((entry) => entry.matchReasons.length > 0 && looksLikeManagedZoteroProcess(entry.command));
+}
+
+export async function stopManagedRuntimeProcesses({
+  projectRoot,
+  profilePath,
+  dataDir,
+  includeProjectRuntime = false,
+  currentPid = process.pid,
+  findProcesses = findManagedRuntimeProcesses,
+  killProcess = (pid, signal) => process.kill(pid, signal),
+  pollIntervalMs = 100,
+  termTimeoutMs = 4000,
+  killTimeoutMs = 1000,
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+}) {
+  const queryProcesses = () => findProcesses({
+    projectRoot,
+    profilePath,
+    dataDir,
+    includeProjectRuntime,
+    currentPid,
+  });
+  const observedProcesses = queryProcesses();
+  const tracked = new Map(observedProcesses.map((entry) => [
+    entry.pid,
+    {
+      pid: entry.pid,
+      command: entry.command,
+      matchReasons: Array.isArray(entry.matchReasons) ? entry.matchReasons.slice() : [],
+      forced: false,
+      signalsSent: [],
+    },
+  ]));
+  const terminationErrors = [];
+
+  const sendSignal = (pid, signal) => {
+    try {
+      killProcess(pid, signal);
+      const record = tracked.get(pid);
+      if (record) {
+        record.signalsSent.push(signal);
+        if (signal === "SIGKILL") {
+          record.forced = true;
+        }
+      }
+      return true;
+    }
+    catch (error) {
+      const code = String(error?.code || "").trim();
+      if (code === "ESRCH") {
+        return false;
+      }
+      terminationErrors.push({
+        pid,
+        signal,
+        code: code || null,
+        message: String(error?.message || error),
+      });
+      return false;
+    }
+  };
+
+  const waitUntilGone = async (timeoutMs) => {
+    const deadline = Date.now() + Math.max(0, Number(timeoutMs || 0));
+    while (true) {
+      const remaining = queryProcesses().filter((entry) => tracked.has(entry.pid));
+      if (remaining.length === 0) {
+        return [];
+      }
+      if (Date.now() >= deadline) {
+        return remaining;
+      }
+      await sleep(Math.max(0, Number(pollIntervalMs || 0)));
+    }
+  };
+
+  for (const entry of observedProcesses) {
+    sendSignal(entry.pid, "SIGTERM");
+  }
+
+  let remainingProcesses = observedProcesses.length > 0
+    ? await waitUntilGone(termTimeoutMs)
+    : [];
+
+  for (const entry of remainingProcesses) {
+    sendSignal(entry.pid, "SIGKILL");
+  }
+
+  if (remainingProcesses.length > 0) {
+    remainingProcesses = await waitUntilGone(killTimeoutMs);
+  }
+
+  const remainingPidSet = new Set(remainingProcesses.map((entry) => entry.pid));
+  const terminatedProcesses = Array.from(tracked.values())
+    .filter((entry) => !remainingPidSet.has(entry.pid));
+
+  return {
+    observedProcesses,
+    terminatedProcesses,
+    remainingProcesses,
+    terminationErrors,
+  };
+}
+
+function normalizeLaunchError(error) {
+  if (!error) {
+    return null;
+  }
+
+  const normalized = {
+    name: String(error.name || "Error"),
+    message: String(error.message || error),
+  };
+  for (const key of ["code", "errno", "address", "port", "syscall"]) {
+    if (error[key] !== undefined && error[key] !== null && error[key] !== "") {
+      normalized[key] = error[key];
+    }
+  }
+  return normalized;
+}
+
+function buildLaunchFailureMessage(kind, diagnostic) {
+  switch (kind) {
+    case "child-exit-before-rdp":
+      return `Zotero child exited before RDP became reachable on port ${diagnostic.rdpPort}.`;
+    case "rdp-connect-timeout":
+      return `Timed out waiting for Zotero RDP on port ${diagnostic.rdpPort}.`;
+    default:
+      return `Failed to connect to Zotero RDP on port ${diagnostic.rdpPort}.`;
+  }
+}
+
+function isRetryableRdpConnectError(error) {
+  return Boolean(error && RETRYABLE_RDP_ERROR_CODES.has(error.code));
+}
+
+export function formatProcessLogTail(processLogs, limit = 8) {
+  return (Array.isArray(processLogs) ? processLogs : [])
+    .slice(-Math.max(0, Number(limit) || 0))
+    .map((entry) => normalizeProcessLogTailEntry(entry));
+}
+
 export async function prepareRuntime({
   projectRoot,
   profilePath,
   dataDir,
   fresh = false,
   userPrefs = {},
+  exclusiveProjectRuntime = false,
+  stopManagedRuntimeProcessesImpl = stopManagedRuntimeProcesses,
 }) {
-  if (fresh && isManagedPath(projectRoot, profilePath)) {
-    await fsp.rm(profilePath, { recursive: true, force: true });
+  const managedProfile = isManagedPath(projectRoot, profilePath);
+  const managedDataDir = isManagedPath(projectRoot, dataDir);
+  const summary = {
+    managed: managedProfile || managedDataDir,
+    fresh: fresh === true,
+    profileReset: false,
+    dataReset: false,
+    removedMarkers: [],
+    exclusiveProjectRuntime: exclusiveProjectRuntime === true,
+    terminatedProcesses: [],
+    remainingProcesses: [],
+    terminationErrors: [],
+  };
+
+  if (summary.managed) {
+    const termination = await stopManagedRuntimeProcessesImpl({
+      projectRoot,
+      profilePath,
+      dataDir,
+      includeProjectRuntime: exclusiveProjectRuntime === true,
+    });
+    summary.terminatedProcesses = Array.isArray(termination?.terminatedProcesses)
+      ? termination.terminatedProcesses
+      : [];
+    summary.remainingProcesses = Array.isArray(termination?.remainingProcesses)
+      ? termination.remainingProcesses
+      : [];
+    summary.terminationErrors = Array.isArray(termination?.terminationErrors)
+      ? termination.terminationErrors
+      : [];
   }
-  if (fresh && isManagedPath(projectRoot, dataDir)) {
+
+  if (fresh && managedProfile) {
+    await fsp.rm(profilePath, { recursive: true, force: true });
+    summary.profileReset = true;
+  }
+  if (fresh && managedDataDir) {
     await fsp.rm(dataDir, { recursive: true, force: true });
+    summary.dataReset = true;
+  }
+
+  if (!fresh && managedProfile) {
+    for (const marker of STALE_RUNTIME_PROFILE_MARKERS) {
+      const markerPath = path.join(profilePath, marker);
+      if (await removeFileIfPresent(markerPath)) {
+        summary.removedMarkers.push({
+          marker,
+          path: markerPath,
+        });
+      }
+    }
   }
 
   await fsp.mkdir(profilePath, { recursive: true });
@@ -248,6 +550,7 @@ export async function prepareRuntime({
 
   const prefsContent = serializeUserPrefs(buildUserPrefs(userPrefs));
   await fsp.writeFile(path.join(profilePath, "user.js"), prefsContent, "utf-8");
+  return summary;
 }
 
 export async function installProxyAddon({
@@ -1064,6 +1367,97 @@ export class RdpClient {
 
     throw new Error(`Timed out waiting for add-on ${addonId}`);
   }
+}
+
+export async function connectRdpWithLaunchDiagnostics({
+  child,
+  rdpPort,
+  processLogs = [],
+  host = "127.0.0.1",
+  retries = 60,
+  retryDelayMs = 500,
+  processLogTailLimit = 8,
+  createClient = () => new RdpClient(),
+  now = () => Date.now(),
+}) {
+  const rdp = createClient();
+  const startedAt = now();
+  let attemptCount = 0;
+  let lastError = null;
+  let childExit = null;
+  let resolveChildExit;
+  const childExitPromise = new Promise((resolve) => {
+    resolveChildExit = resolve;
+  });
+  const onExit = (code, signal) => {
+    childExit = {
+      code: typeof code === "number" ? code : null,
+      signal: signal ? String(signal) : null,
+    };
+    resolveChildExit(childExit);
+  };
+  child?.on("exit", onExit);
+
+  try {
+    while (attemptCount < retries) {
+      if (childExit) {
+        break;
+      }
+
+      attemptCount += 1;
+      try {
+        await rdp.connect({
+          port: rdpPort,
+          host,
+          retries: 1,
+          retryDelayMs,
+        });
+        return {
+          rdp,
+          attemptCount,
+          connectDurationMs: Math.max(0, now() - startedAt),
+        };
+      }
+      catch (error) {
+        lastError = error;
+      }
+
+      if (childExit || !isRetryableRdpConnectError(lastError) || attemptCount >= retries) {
+        break;
+      }
+
+      await Promise.race([
+        childExitPromise,
+        new Promise((resolve) => setTimeout(resolve, retryDelayMs)),
+      ]);
+    }
+  }
+  finally {
+    child?.off("exit", onExit);
+  }
+
+  const kind = childExit
+    ? "child-exit-before-rdp"
+    : (isRetryableRdpConnectError(lastError) && attemptCount >= retries)
+      ? "rdp-connect-timeout"
+      : "rdp-connect-error";
+  const launchFailure = {
+    kind,
+    rdpPort,
+    connectDurationMs: Math.max(0, now() - startedAt),
+    attemptCount,
+    lastConnectError: normalizeLaunchError(lastError),
+    childExit,
+    processLogTail: formatProcessLogTail(processLogs, processLogTailLimit),
+  };
+  rdp.disconnect();
+
+  const launchError = lastError instanceof Error
+    ? lastError
+    : new Error(buildLaunchFailureMessage(kind, launchFailure));
+  launchError.message = buildLaunchFailureMessage(kind, launchFailure);
+  launchError.launchFailure = launchFailure;
+  throw launchError;
 }
 
 export async function stopChildProcess(child) {

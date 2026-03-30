@@ -447,6 +447,7 @@ function buildMarkdown(summary) {
     lines.push(`- 证据导航: ${firstVisualEvidenceItem ? `先看 Cycle ${firstVisualEvidenceItem.cycleIndex ?? "-"} / ${firstVisualEvidenceItem.bootMode || "-"} / ${firstVisualEvidenceItem.kind || "visual"} / ${firstVisualEvidenceItem.canonicalTarget || "-"}` : "-"}`);
     lines.push(`- 失败证据项: \`${e2e.visualEvidenceFailingItemCount ?? 0} / ${e2e.visualEvidenceItemCount ?? 0}\``, "");
     lines.push(`- 视觉采集稳定性: ${e2e.visualCaptureStabilitySummary || "-"}`, "");
+    lines.push(`- 预截图 settle: ${e2e.visualPreCaptureSettleSummary || "-"}`);
     lines.push(`- Attempt 诊断: ${e2e.visualCaptureAttemptDiagnosisSummary || "-"}`);
     lines.push(`- 用尽预算 stage：${buildVisualExhaustedStageSummary(e2e) || "-"}`);
     lines.push(`- 视觉主阻断: ${visualPrimaryBlockerSummary || "-"}`);
@@ -635,6 +636,24 @@ function buildMarkdown(summary) {
       });
     }
     lines.push("");
+
+    if (summary.releaseMatrix.remoteVerification && typeof summary.releaseMatrix.remoteVerification === "object") {
+      lines.push(
+        "### 远端发布验证",
+        "",
+        `- 状态: \`${summary.releaseMatrix.remoteVerification.statusLabel || summary.releaseMatrix.remoteVerification.status || "未知"}\``,
+        `- 摘要: ${summary.releaseMatrix.remoteVerification.summary || "-"}`,
+        `- update.json: \`${summary.releaseMatrix.remoteVerification.effectiveUpdateURL || "-"}\``,
+        `- 期望 update_link: \`${summary.releaseMatrix.remoteVerification.expectedUpdateLink || "-"}\``,
+        `- 观测 update_link: \`${summary.releaseMatrix.remoteVerification.observedUpdateLink || "-"}\``,
+        "",
+      );
+      if (Array.isArray(summary.releaseMatrix.remoteVerification.issues)
+        && summary.releaseMatrix.remoteVerification.issues.length > 0) {
+        summary.releaseMatrix.remoteVerification.issues.forEach((item) => lines.push(`- 远端验证问题: ${item}`));
+        lines.push("");
+      }
+    }
 
     if (Array.isArray(summary.releaseMatrix.blockingIssues) && summary.releaseMatrix.blockingIssues.length > 0) {
       lines.push("### 发布阻断项", "");

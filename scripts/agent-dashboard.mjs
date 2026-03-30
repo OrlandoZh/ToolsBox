@@ -498,6 +498,7 @@ function renderReaderEventBridge(e2e) {
         <div class="subtle">证据导航: ${escapeHTML(firstVisualEvidenceItem ? `先看 Cycle ${firstVisualEvidenceItem.cycleIndex ?? "-"} / ${firstVisualEvidenceItem.bootMode || "-"} / ${firstVisualEvidenceItem.kind || "visual"} / ${firstVisualEvidenceItem.canonicalTarget || "-"}` : "-")}</div>
         <div class="subtle">失败证据项: ${escapeHTML(`${e2e.visualEvidenceFailingItemCount ?? 0} / ${e2e.visualEvidenceItemCount ?? 0}`)}</div>
         <div class="subtle">视觉采集稳定性: ${escapeHTML(e2e.visualCaptureStabilitySummary || "-")}</div>
+        <div class="subtle">预截图 settle: ${escapeHTML(e2e.visualPreCaptureSettleSummary || "-")}</div>
         <div class="subtle">Attempt 诊断: ${escapeHTML(e2e.visualCaptureAttemptDiagnosisSummary || "-")}</div>
         <div class="subtle">用尽预算 stage：${escapeHTML(buildVisualExhaustedStageSummary(e2e) || "-")}</div>
         <div class="subtle">视觉主阻断: ${escapeHTML(visualPrimaryBlockerSummary || "-")}</div>
@@ -1095,6 +1096,9 @@ function renderReleaseMatrix(summary) {
   const hostNoiseText = Array.isArray(matrix.hostNoiseIssues) && matrix.hostNoiseIssues.length > 0
     ? matrix.hostNoiseIssues.slice(0, 3).join("；")
     : "-";
+  const remoteVerification = matrix.remoteVerification && typeof matrix.remoteVerification === "object"
+    ? matrix.remoteVerification
+    : null;
   const profileRows = Array.isArray(matrix.profiles) && matrix.profiles.length > 0
     ? matrix.profiles.map((profile) => `<tr>
         <td>${escapeHTML(profile.label || profile.id || "-")}</td>
@@ -1128,6 +1132,7 @@ function renderReleaseMatrix(summary) {
               <div><span class="label">XPI</span><span class="metric-value">${escapeHTML(matrix.artifacts?.xpiName || "-")}</span></div>
               <div><span class="label">SHA256</span><span class="metric-value">${escapeHTML(matrix.artifacts?.xpiSHA256Actual || "-")}</span></div>
               <div><span class="label">大小</span><span class="metric-value">${escapeHTML(`${matrix.artifacts?.xpiSizeBytesActual ?? 0} bytes`)}</span></div>
+              <div><span class="label">远端验证</span><span class="metric-value">${escapeHTML(remoteVerification?.statusLabel || "未记录")}</span></div>
             </div>
             <div class="subtle">${escapeHTML(matrix.summary || "暂无摘要")}</div>
             <div class="subtle">阻断项: ${escapeHTML(blockingText)}</div>
@@ -1135,6 +1140,9 @@ function renderReleaseMatrix(summary) {
             <div class="subtle">阻断错误画像: ${escapeHTML(matrix.blockingRuntimeErrorPortrait || "-")}</div>
             <div class="subtle">宿主噪声画像: ${escapeHTML(matrix.hostNoiseRuntimeErrorPortrait || "-")}</div>
             <div class="subtle">宿主噪声渠道: ${escapeHTML(hostNoiseText)}</div>
+            <div class="subtle">远端摘要: ${escapeHTML(remoteVerification?.summary || "-")}</div>
+            <div class="subtle">远端 update.json: ${escapeHTML(remoteVerification?.effectiveUpdateURL || "-")}</div>
+            <div class="subtle">远端 update_link: ${escapeHTML(remoteVerification?.observedUpdateLink || remoteVerification?.expectedUpdateLink || "-")}</div>
           </div>
           <div class="validation-card">
             <div class="validation-head">

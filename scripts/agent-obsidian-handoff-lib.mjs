@@ -2,6 +2,7 @@ import {
   buildVisualExhaustedStageSummary,
   buildPureVisualReaderFailureSummary,
   buildVisualPrimaryBlockerSummary,
+  summarizeE2EReport,
   pickVisualCaptureSelectionReasonLabel,
 } from "./agent-zotero-validation-lib.mjs";
 
@@ -103,21 +104,25 @@ function sanitizeDiagramText(value) {
     .replaceAll(")", "」");
 }
 
+function buildDefaultHumanEditableSection() {
+  return [
+    "## 人工编辑区（保留）",
+    "",
+    "状态: pending",
+    "模式: auto",
+    "下一步指令:",
+    "关注文件:",
+    "备注:",
+    "",
+    "补充记录:",
+    "- 如需人工接管，请修改上面的字段。",
+  ].join("\n");
+}
+
 function extractHumanEditableSection(existingContent) {
   const marker = "## 人工编辑区（保留）";
   if (typeof existingContent !== "string" || !existingContent.includes(marker)) {
-    return [
-      "## 人工编辑区（保留）",
-      "",
-      "状态: pending",
-      "模式: auto",
-      "下一步指令:",
-      "关注文件:",
-      "备注:",
-      "",
-      "补充记录:",
-      "- 如需人工接管，请修改上面的字段。",
-    ].join("\n");
+    return buildDefaultHumanEditableSection();
   }
   return existingContent.slice(existingContent.indexOf(marker)).trim();
 }
@@ -211,6 +216,171 @@ function chooseActionSource(sources) {
     return chooseFrontpageSource(runnableSources);
   }
   return chooseFrontpageSource(normalized);
+}
+
+function chooseFreshestE2ESummary(candidates) {
+  const normalized = (Array.isArray(candidates) ? candidates : [])
+    .filter((item) => item && typeof item === "object" && item.present !== false);
+  if (normalized.length === 0) {
+    return {};
+  }
+  return normalized
+    .map((item) => ({
+      summary: item,
+      generatedAtMs: parseGeneratedAtMs(item.generatedAt),
+      richnessScore: scoreE2ESummary(item),
+    }))
+    .slice()
+    .sort((left, right) => {
+      const leftDate = left.generatedAtMs === null ? -1 : Number(left.generatedAtMs || 0);
+      const rightDate = right.generatedAtMs === null ? -1 : Number(right.generatedAtMs || 0);
+      if (rightDate !== leftDate) {
+        return rightDate - leftDate;
+      }
+      return Number(right.richnessScore || 0) - Number(left.richnessScore || 0);
+    })[0]?.summary || {};
+}
+
+function normalizeSummaryText(value, placeholders = []) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const text = String(value).trim();
+  if (!text || text === "-") {
+    return null;
+  }
+  return placeholders.includes(text) ? null : text;
+}
+
+function isDefaultReaderHostStateNote(value) {
+  const text = String(value || "").trim();
+  return text === "当前报告未采集 Reader 深层宿主状态"
+    || text === "Reader interaction diagnostics 场景缺失，暂未读取深层宿主状态。";
+}
+
+function isDefaultVisualCanonicalCoverageSummary(value) {
+  const text = String(value || "").trim();
+  return text.includes("期望 0 项");
+}
+
+function hasMeaningfulList(value) {
+  return Array.isArray(value) && value.filter(Boolean).length > 0;
+}
+
+function hasMeaningfulPrimaryDiagnosis(summary) {
+  const diagnosis = summary?.primaryDiagnosis && typeof summary.primaryDiagnosis === "object"
+    ? summary.primaryDiagnosis
+    : null;
+  return Boolean(
+    diagnosis
+    && (
+      normalizeSummaryText(diagnosis.summary)
+      || normalizeSummaryText(diagnosis.issue)
+      || normalizeSummaryText(diagnosis.featureLabel)
+      || normalizeSummaryText(diagnosis.feature)
+      || hasMeaningfulList(diagnosis.candidateFiles)
+    )
+  );
+}
+
+function hasMeaningfulReaderHostState(summary) {
+  return Boolean(
+    summary?.readerHostStateObserved === true
+    || normalizeSummaryText(summary?.readerHostStateSummary, ["当前报告未采集 Reader 深层宿主状态"])
+    || (normalizeSummaryText(summary?.readerHostStateNote) && !isDefaultReaderHostStateNote(summary?.readerHostStateNote))
+  );
+}
+
+function hasMeaningfulReaderDeeperEvidence(summary) {
+  return Boolean(
+    normalizeSummaryText(summary?.readerDispatchSummary)
+    || normalizeSummaryText(summary?.contextMenuSummary)
+    || normalizeSummaryText(summary?.toolbarEvidenceSummary)
+  );
+}
+
+function hasMeaningfulVisualEvidence(summary) {
+  return Boolean(
+    summary?.visualEvidenceObserved === true
+    || hasMeaningfulList(summary?.visualEvidenceItems)
+    || normalizeSummaryText(summary?.visualEvidenceSummary)
+  );
+}
+
+function hasMeaningfulVisualCaptureAttemptDiagnosis(summary) {
+  return Boolean(
+    summary?.visualCaptureAttemptDiagnosisObserved === true
+    || hasMeaningfulList(summary?.visualCaptureAttemptDiagnosisItems)
+    || normalizeSummaryText(summary?.visualCaptureAttemptDiagnosisSummary)
+  );
+}
+
+function hasMeaningfulVisualCaptureStability(summary) {
+  return Boolean(
+    hasMeaningfulList(summary?.visualCaptureStabilityStages)
+    || normalizeSummaryText(summary?.visualCaptureStabilitySummary)
+  );
+}
+
+function hasMeaningfulVisualBlocker(summary) {
+  const canonicalSummary = normalizeSummaryText(summary?.visualCanonicalCoverageSummary);
+  return Boolean(
+    normalizeSummaryText(summary?.visualPrimaryBlockerKind, ["unknown"])
+    || normalizeSummaryText(summary?.visualPrimaryBlockerSummary)
+    || normalizeSummaryText(summary?.visualGeometrySummary)
+    || (canonicalSummary && !isDefaultVisualCanonicalCoverageSummary(canonicalSummary))
+    || hasMeaningfulList(summary?.visualCanonicalMismatchedTargets)
+  );
+}
+
+function scoreE2ESummary(summary) {
+  let score = 0;
+  if (parseGeneratedAtMs(summary?.generatedAt) !== null) {
+    score += 1000;
+  }
+  if (hasMeaningfulPrimaryDiagnosis(summary)) {
+    score += 100;
+  }
+  if (hasMeaningfulReaderHostState(summary)) {
+    score += 50;
+  }
+  if (hasMeaningfulReaderDeeperEvidence(summary)) {
+    score += 40;
+  }
+  if (hasMeaningfulVisualEvidence(summary)) {
+    score += 35;
+  }
+  if (hasMeaningfulVisualCaptureAttemptDiagnosis(summary)) {
+    score += 30;
+  }
+  if (hasMeaningfulVisualCaptureStability(summary)) {
+    score += 25;
+  }
+  if (hasMeaningfulVisualBlocker(summary)) {
+    score += 20;
+  }
+  if (hasMeaningfulList(summary?.candidateFiles)) {
+    score += 10;
+  }
+  return score;
+}
+
+function sortE2ESummaries(candidates) {
+  return (Array.isArray(candidates) ? candidates : [])
+    .filter((item) => item && typeof item === "object" && item.present !== false)
+    .slice()
+    .sort((left, right) => {
+      const leftDate = parseGeneratedAtMs(left?.generatedAt);
+      const rightDate = parseGeneratedAtMs(right?.generatedAt);
+      if (leftDate !== rightDate) {
+        return Number(rightDate === null ? -1 : rightDate) - Number(leftDate === null ? -1 : leftDate);
+      }
+      return scoreE2ESummary(right) - scoreE2ESummary(left);
+    });
+}
+
+function pickE2ESummaryBy(candidates, predicate) {
+  return sortE2ESummaries(candidates).find((item) => predicate(item)) || {};
 }
 
 function toMarkdownLink(filePath) {
@@ -351,16 +521,38 @@ function shouldPrioritizeVisualEvidence(summary) {
   if (nextAction === "npm run agent:obsidian") {
     return true;
   }
-  if (blockerKind === "capture-unstable" || blockerKind === "ui-regression-candidate") {
+  if (
+    blockerKind === "capture-command-failed"
+    || blockerKind === "capture-unstable"
+    || blockerKind === "ui-regression-candidate"
+  ) {
     return true;
   }
   return blockerKind === "baseline-geometry-mismatch" && coverageKind === "partial";
 }
 
 function isManualReaderVerdictStage(summary) {
+  if (isActualRegressionRepairStage(summary)) {
+    return false;
+  }
   return normalizeNextAction(summary?.nextAction) === "npm run agent:obsidian"
     && String(summary?.visualPrimaryBlockerKind || "").trim() === "ui-regression-candidate"
     && String(summary?.visualCanonicalCoverageKind || "").trim() === "complete";
+}
+
+function isActualRegressionRepairStage(summary) {
+  return summary?.manualVerdictResolved === true
+    || String(summary?.currentTruthActiveBatchId || "").trim() === "READER-HIGH-126";
+}
+
+function pickHumanStageLabel(summary) {
+  if (isManualReaderVerdictStage(summary)) {
+    return "等待人工 Reader verdict";
+  }
+  if (isActualRegressionRepairStage(summary)) {
+    return "已确认真实回归，按修复路径继续";
+  }
+  return "按自动路径继续";
 }
 
 function buildPatchActionDisplay(summary) {
@@ -370,6 +562,8 @@ function buildPatchActionDisplay(summary) {
   if (shouldPrioritizeVisualEvidence(summary)) {
     return normalizeNextAction(summary?.nextAction) === "npm run agent:zotero:e2e"
       ? "已降级，先复核稳定性并重跑 E2E"
+      : isActualRegressionRepairStage(summary)
+        ? "已确认真实回归，按 library-only 修复路径继续"
       : "已降级，先人工复核视觉证据";
   }
   return truncateList(patchSummary.draftOperations, 4).join("；") || "暂无";
@@ -379,11 +573,27 @@ function buildPatchPriorityNote(summary) {
   if (shouldPrioritizeVisualEvidence(summary)) {
     return normalizeNextAction(summary?.nextAction) === "npm run agent:zotero:e2e"
       ? "当前主路径先复核采集稳定性并重跑 E2E，不默认执行历史补丁动作。"
+      : isActualRegressionRepairStage(summary)
+        ? "当前正式分支已确认真实回归，按 library-only 修复路径继续，并清理旧人工 verdict 残留；不默认执行 baseline refresh、autofix 或 rerun E2E。"
       : isManualReaderVerdictStage(summary)
         ? "当前主路径等待人工 Reader verdict，不默认执行 baseline refresh、autofix 或 rerun E2E。"
         : "当前主路径先处理视觉证据，不默认执行历史补丁动作。";
   }
   return null;
+}
+
+function isStaleBaselineRefreshCarryover(parsed) {
+  const nextAction = normalizeNextAction(parsed?.nextActionOverride);
+  const note = String(parsed?.note || "").trim();
+  const focusFiles = Array.isArray(parsed?.focusFiles) ? parsed.focusFiles : [];
+  return nextAction === "npm run agent:zotero:e2e:update-baseline"
+    || /预期 UI 变化/u.test(note)
+    || /baseline refresh/u.test(note)
+    || (
+      parsed?.status === "ready"
+      && parsed?.mode === "force-next"
+      && focusFiles.some((item) => String(item || "").includes("visual-baselines/agent-zotero-e2e/"))
+    );
 }
 
 export function parseHumanInterventionWindow(content) {
@@ -424,6 +634,17 @@ export function parseHumanInterventionWindow(content) {
   return result;
 }
 
+function resolveHumanEditableSection(summary, existingContent = "") {
+  const preservedSection = extractHumanEditableSection(existingContent);
+  if (!isActualRegressionRepairStage(summary)) {
+    return preservedSection;
+  }
+  const parsed = parseHumanInterventionWindow(preservedSection);
+  return isStaleBaselineRefreshCarryover(parsed)
+    ? buildDefaultHumanEditableSection()
+    : preservedSection;
+}
+
 export function summarizeObsidianInterventionContext(reports = {}) {
   const loop = reports.loop && typeof reports.loop === "object" ? reports.loop : {};
   const gate = reports.gate && typeof reports.gate === "object" ? reports.gate : {};
@@ -448,9 +669,53 @@ export function summarizeObsidianInterventionContext(reports = {}) {
   const monitorE2E = monitor.zoteroValidation?.e2e && typeof monitor.zoteroValidation.e2e === "object"
     ? monitor.zoteroValidation.e2e
     : {};
-  const primaryDiagnosis = e2e.primaryDiagnosis && typeof e2e.primaryDiagnosis === "object"
-    ? e2e.primaryDiagnosis
+  const gateE2E = gate.zoteroValidation?.e2e && typeof gate.zoteroValidation.e2e === "object"
+    ? gate.zoteroValidation.e2e
     : {};
+  const directE2E = summarizeE2EReport(e2e);
+  const e2eCandidates = [
+    directE2E,
+    gateE2E,
+    monitorE2E,
+  ];
+  const freshestE2E = chooseFreshestE2ESummary(e2eCandidates);
+  const primaryDiagnosisSource = pickE2ESummaryBy(e2eCandidates, hasMeaningfulPrimaryDiagnosis);
+  const readerHostStateSource = pickE2ESummaryBy(e2eCandidates, hasMeaningfulReaderHostState);
+  const readerDeeperSource = pickE2ESummaryBy(e2eCandidates, hasMeaningfulReaderDeeperEvidence);
+  const visualEvidenceSource = pickE2ESummaryBy(e2eCandidates, hasMeaningfulVisualEvidence);
+  const visualCaptureAttemptSource = pickE2ESummaryBy(e2eCandidates, hasMeaningfulVisualCaptureAttemptDiagnosis);
+  const visualCaptureStabilitySource = pickE2ESummaryBy(e2eCandidates, hasMeaningfulVisualCaptureStability);
+  const visualBlockerSource = pickE2ESummaryBy(e2eCandidates, hasMeaningfulVisualBlocker);
+  const primaryDiagnosis = primaryDiagnosisSource.primaryDiagnosis && typeof primaryDiagnosisSource.primaryDiagnosis === "object"
+    ? primaryDiagnosisSource.primaryDiagnosis
+    : freshestE2E.primaryDiagnosis && typeof freshestE2E.primaryDiagnosis === "object"
+    ? freshestE2E.primaryDiagnosis
+    : {};
+  const visualEvidenceItems = normalizeVisualEvidenceItems(visualEvidenceSource.visualEvidenceItems, 8);
+  const visualEvidenceSummary = normalizeSummaryText(visualEvidenceSource.visualEvidenceSummary);
+  const visualCaptureAttemptDiagnosisItems = normalizeVisualCaptureAttemptDiagnosisItems(
+    visualCaptureAttemptSource.visualCaptureAttemptDiagnosisItems,
+    8,
+  );
+  const visualCaptureAttemptDiagnosisSummary = normalizeSummaryText(
+    visualCaptureAttemptSource.visualCaptureAttemptDiagnosisSummary,
+  );
+  const visualCaptureStabilityStages = Array.isArray(visualCaptureStabilitySource.visualCaptureStabilityStages)
+    ? visualCaptureStabilitySource.visualCaptureStabilityStages
+    : [];
+  const visualPrimaryBlockerSummary = hasMeaningfulVisualBlocker(visualBlockerSource)
+    ? (
+      buildPureVisualReaderFailureSummary(visualBlockerSource)
+      || buildVisualPrimaryBlockerSummary(visualBlockerSource)
+      || null
+    )
+    : (hasMeaningfulVisualBlocker(freshestE2E)
+      ? (
+        buildPureVisualReaderFailureSummary(freshestE2E)
+        || buildVisualPrimaryBlockerSummary(freshestE2E)
+        || null
+      )
+      : null);
 
   const frontpageSources = [
     {
@@ -563,32 +828,50 @@ export function summarizeObsidianInterventionContext(reports = {}) {
     commands,
     diagnosis: primaryDiagnosis.summary || primaryDiagnosis.issue || null,
     diagnosisLabel: primaryDiagnosis.featureLabel || primaryDiagnosis.feature || null,
-    readerHostStateSummary: monitorE2E.readerHostStateSummary || null,
-    readerHostStateNote: monitorE2E.readerHostStateNote || null,
-    toolbarEvidenceSummary: monitorE2E.toolbarEvidenceSummary || null,
-    visualEvidenceObserved: Boolean(monitorE2E.visualEvidenceObserved),
-    visualEvidenceItemCount: Number(monitorE2E.visualEvidenceItemCount || 0),
-    visualEvidenceFailingItemCount: Number(monitorE2E.visualEvidenceFailingItemCount || 0),
-    visualEvidenceSummary: monitorE2E.visualEvidenceSummary || null,
-    visualEvidenceItems: normalizeVisualEvidenceItems(monitorE2E.visualEvidenceItems, 8),
-    visualEvidenceFocusSummary: buildVisualEvidenceFocusSummary(monitorE2E.visualEvidenceItems),
-    visualCaptureAttemptDiagnosisObserved: Boolean(monitorE2E.visualCaptureAttemptDiagnosisObserved),
-    visualCaptureAttemptDiagnosisItemCount: Number(monitorE2E.visualCaptureAttemptDiagnosisItemCount || 0),
-    visualCaptureAttemptDiagnosisSummary: monitorE2E.visualCaptureAttemptDiagnosisSummary || null,
-    visualCaptureAttemptDiagnosisItems: normalizeVisualCaptureAttemptDiagnosisItems(monitorE2E.visualCaptureAttemptDiagnosisItems, 8),
-    visualPrimaryBlockerKind: monitorE2E.visualPrimaryBlockerKind || null,
-    visualCaptureStabilitySummary: monitorE2E.visualCaptureStabilitySummary || null,
-    visualCaptureStabilityStages: Array.isArray(monitorE2E.visualCaptureStabilityStages)
-      ? monitorE2E.visualCaptureStabilityStages
-      : [],
-    visualPrimaryBlockerSummary: buildPureVisualReaderFailureSummary(monitorE2E)
-      || buildVisualPrimaryBlockerSummary(monitorE2E),
-    visualGeometrySummary: monitorE2E.visualGeometrySummary || null,
-    visualCanonicalCoverageKind: monitorE2E.visualCanonicalCoverageKind || null,
-    visualCanonicalCoverageSummary: monitorE2E.visualCanonicalCoverageSummary || null,
-    visualCanonicalMismatchedTargets: truncateList(monitorE2E.visualCanonicalMismatchedTargets, 8),
-    readerDispatchSummary: monitorE2E.readerDispatchSummary || null,
-    contextMenuSummary: monitorE2E.contextMenuSummary || null,
+    readerHostStateSummary: normalizeSummaryText(
+      readerHostStateSource.readerHostStateSummary,
+      ["当前报告未采集 Reader 深层宿主状态"],
+    ),
+    readerHostStateNote: isDefaultReaderHostStateNote(readerHostStateSource.readerHostStateNote)
+      ? null
+      : normalizeSummaryText(readerHostStateSource.readerHostStateNote),
+    toolbarEvidenceSummary: normalizeSummaryText(readerDeeperSource.toolbarEvidenceSummary),
+    visualEvidenceObserved: Boolean(
+      visualEvidenceSource.visualEvidenceObserved === true
+      || visualEvidenceItems.length > 0
+      || visualEvidenceSummary
+    ),
+    visualEvidenceItemCount: visualEvidenceItems.length > 0
+      ? Number(visualEvidenceSource.visualEvidenceItemCount || visualEvidenceItems.length)
+      : 0,
+    visualEvidenceFailingItemCount: visualEvidenceItems.length > 0
+      ? Number(visualEvidenceSource.visualEvidenceFailingItemCount || visualEvidenceItems.length)
+      : 0,
+    visualEvidenceSummary,
+    visualEvidenceItems,
+    visualEvidenceFocusSummary: buildVisualEvidenceFocusSummary(visualEvidenceItems),
+    visualCaptureAttemptDiagnosisObserved: Boolean(
+      visualCaptureAttemptSource.visualCaptureAttemptDiagnosisObserved === true
+      || visualCaptureAttemptDiagnosisItems.length > 0
+      || visualCaptureAttemptDiagnosisSummary
+    ),
+    visualCaptureAttemptDiagnosisItemCount: visualCaptureAttemptDiagnosisItems.length > 0
+      ? Number(visualCaptureAttemptSource.visualCaptureAttemptDiagnosisItemCount || visualCaptureAttemptDiagnosisItems.length)
+      : 0,
+    visualCaptureAttemptDiagnosisSummary,
+    visualCaptureAttemptDiagnosisItems,
+    visualPrimaryBlockerKind: normalizeSummaryText(visualBlockerSource.visualPrimaryBlockerKind, ["unknown"]),
+    visualCaptureStabilitySummary: normalizeSummaryText(visualCaptureStabilitySource.visualCaptureStabilitySummary),
+    visualCaptureStabilityStages,
+    visualPrimaryBlockerSummary,
+    visualGeometrySummary: normalizeSummaryText(visualBlockerSource.visualGeometrySummary),
+    visualCanonicalCoverageKind: normalizeSummaryText(visualBlockerSource.visualCanonicalCoverageKind, ["unknown"]),
+    visualCanonicalCoverageSummary: isDefaultVisualCanonicalCoverageSummary(visualBlockerSource.visualCanonicalCoverageSummary)
+      ? null
+      : normalizeSummaryText(visualBlockerSource.visualCanonicalCoverageSummary),
+    visualCanonicalMismatchedTargets: truncateList(visualBlockerSource.visualCanonicalMismatchedTargets, 8),
+    readerDispatchSummary: normalizeSummaryText(readerDeeperSource.readerDispatchSummary),
+    contextMenuSummary: normalizeSummaryText(readerDeeperSource.contextMenuSummary),
     patchSummary: {
       planStatusLabel: monitorAutofix.patchPlanStatusLabel || monitorAutofix.patchPlanStatus || null,
       featureLabel: monitorAutofix.patchPlanFeature || null,
@@ -915,7 +1198,7 @@ export function buildObsidianInterventionMarkdown(summary) {
   const patchActionDisplay = buildPatchActionDisplay(summary);
   const patchPriorityNote = buildPatchPriorityNote(summary);
   const exhaustedStageSummary = buildVisualExhaustedStageSummary(summary);
-  const manualVerdictStage = isManualReaderVerdictStage(summary);
+  const humanStageLabel = pickHumanStageLabel(summary);
 
   const lines = [
     "---",
@@ -934,8 +1217,8 @@ export function buildObsidianInterventionMarkdown(summary) {
     "",
   ];
 
-  if (manualVerdictStage) {
-    lines.splice(lines.length - 1, 0, "> 当前阶段：等待人工 Reader verdict");
+  if (humanStageLabel !== "按自动路径继续") {
+    lines.splice(lines.length - 1, 0, `> 当前阶段：${humanStageLabel}`);
   }
 
   if (summary.diagnosisLabel || summary.diagnosis) {
@@ -1514,7 +1797,7 @@ export function buildObsidianInterventionCanvas(summary) {
 }
 
 export function buildHumanInterventionWindowMarkdown(summary, existingContent = "") {
-  const preservedHumanSection = extractHumanEditableSection(existingContent);
+  const preservedHumanSection = resolveHumanEditableSection(summary, existingContent);
   const patchSummary = summary.patchSummary && typeof summary.patchSummary === "object"
     ? summary.patchSummary
     : {};
@@ -1522,6 +1805,7 @@ export function buildHumanInterventionWindowMarkdown(summary, existingContent = 
   const patchPriorityNote = buildPatchPriorityNote(summary);
   const exhaustedStageSummary = buildVisualExhaustedStageSummary(summary);
   const manualVerdictStage = isManualReaderVerdictStage(summary);
+  const humanStageLabel = pickHumanStageLabel(summary);
 
   const lines = [
     "---",
@@ -1537,7 +1821,7 @@ export function buildHumanInterventionWindowMarkdown(summary, existingContent = 
     `- 当前状态：${summary.statusLabel || "待人工介入"}`,
     `- 自动结论：${summary.headline || "-"}`,
     `- 自动下一步：\`${summary.nextAction || "-"}\``,
-    `- 当前阶段：${manualVerdictStage ? "等待人工 Reader verdict" : "按自动路径继续"}`,
+    `- 当前阶段：${humanStageLabel}`,
     `- 视觉导航：${summary.visualEvidenceFocusSummary || "暂无"}`,
     `- Attempt 诊断：${summary.visualCaptureAttemptDiagnosisSummary || "暂无"}`,
     `- 视觉采集稳定性：${summary.visualCaptureStabilitySummary || "-"}`,

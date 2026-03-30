@@ -68,6 +68,45 @@ function createConsistentMatrixPayload() {
   };
 }
 
+function createPassedInstallSmokeReport() {
+  return {
+    runs: [
+      {
+        channel: "stable",
+        generatedAt: "2026-03-23T11:50:00.000Z",
+        passed: true,
+        status: "passed",
+        statusLabel: "通过",
+        durationMs: 1000,
+        readinessMode: "native",
+        installMethod: "addon-manager-file",
+        issues: [],
+        note: "稳定版安装态 smoke 通过。",
+        runtimeLogs: {
+          errorCount: 0,
+          recentErrors: [],
+        },
+      },
+      {
+        channel: "beta",
+        generatedAt: "2026-03-23T11:51:00.000Z",
+        passed: true,
+        status: "passed",
+        statusLabel: "通过",
+        durationMs: 980,
+        readinessMode: "native",
+        installMethod: "addon-manager-file",
+        issues: [],
+        note: "Beta 安装态 smoke 通过。",
+        runtimeLogs: {
+          errorCount: 0,
+          recentErrors: [],
+        },
+      },
+    ],
+  };
+}
+
 describe("Release Matrix Lib", () => {
   it("should classify known Zotero runtime noise as host-noise", () => {
     const summary = classifyReleaseInstallSmokeRuntimeErrors({
@@ -225,6 +264,69 @@ describe("Release Matrix Lib", () => {
     assert.equal(summary.failedProfileCount, 1);
     assert.ok(summary.blockingIssues.some((item) => String(item).includes("阻断型运行时错误")));
     assert.ok(String(summary.blockingRuntimeErrorPortrait).includes("插件运行时错误"));
+  });
+
+  it("should keep remote verification pending as release attention", () => {
+    const summary = buildReleaseMatrixSummary({
+      ...createConsistentMatrixPayload(),
+      installSmokeReport: createPassedInstallSmokeReport(),
+      remoteVerification: {
+        status: "pending",
+        statusLabel: "待远端验证",
+        summary: "远端 update.json 与 update_link 尚未验证；上传到自定义发布端后再执行远端验证。",
+        effectiveUpdateURL: "https://downloads.example.net/cleanroomtemplate/update.json",
+        expectedUpdateLink: "https://downloads.example.net/cleanroomtemplate/cleanroomtemplate-0.1.0.xpi",
+        checks: [
+          {
+            id: "remote-update-url-configured",
+            label: "远端 update.json URL 已配置",
+            passed: true,
+            detail: "update.json URL: https://downloads.example.net/cleanroomtemplate/update.json",
+          },
+        ],
+        issues: [
+          "尚未执行远端 update.json / update_link 验证。",
+        ],
+      },
+    });
+
+    const markdown = renderReleaseMatrixMarkdown(summary);
+
+    assert.equal(summary.status, "attention");
+    assert.ok(summary.attentionIssues.some((item) => String(item).includes("远端发布验证")));
+    assert.equal(summary.remoteVerification?.status, "pending");
+    assert.ok(markdown.includes("## 远端发布验证"));
+    assert.ok(markdown.includes("待远端验证"));
+  });
+
+  it("should keep remote verification failures as release blockers", () => {
+    const summary = buildReleaseMatrixSummary({
+      ...createConsistentMatrixPayload(),
+      installSmokeReport: createPassedInstallSmokeReport(),
+      remoteVerification: {
+        status: "failed",
+        statusLabel: "失败",
+        summary: "远端 update_link https://downloads.example.net/outdated.xpi / 本地 update_link https://downloads.example.net/cleanroomtemplate-0.1.0.xpi",
+        effectiveUpdateURL: "https://downloads.example.net/cleanroomtemplate/update.json",
+        expectedUpdateLink: "https://downloads.example.net/cleanroomtemplate/cleanroomtemplate-0.1.0.xpi",
+        observedUpdateLink: "https://downloads.example.net/outdated.xpi",
+        checks: [
+          {
+            id: "remote-update-link-match",
+            label: "远端 update_link 与本地一致",
+            passed: false,
+            detail: "远端 update_link https://downloads.example.net/outdated.xpi / 本地 update_link https://downloads.example.net/cleanroomtemplate-0.1.0.xpi",
+          },
+        ],
+        issues: [
+          "远端 update_link https://downloads.example.net/outdated.xpi / 本地 update_link https://downloads.example.net/cleanroomtemplate-0.1.0.xpi",
+        ],
+      },
+    });
+
+    assert.equal(summary.status, "failed");
+    assert.ok(summary.blockingIssues.some((item) => String(item).includes("远端发布验证")));
+    assert.equal(summary.remoteVerification?.status, "failed");
   });
 
   it("should include error fields in summary when config is missing", () => {

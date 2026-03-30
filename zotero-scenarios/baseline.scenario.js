@@ -23,7 +23,11 @@ registerZoteroScenario("real item selection diagnostics", async ({ assert, helpe
   const selection = await helpers.selectItem(item.id);
   const details = plugin.api.agent.inspectItem(item.id);
 
-  assert.includes(selection.selectedIDs, item.id);
+  assert.equal(selection.libraryID, item.libraryID);
+  assert.equal(selection.libraryRootSelected, true);
+  assert.equal(selection.itemsViewLoaded, true);
+  assert.equal(selection.selectionSingleItem, true);
+  assert.deepEqual(selection.selectedIDs, [item.id]);
   assert.equal(details.isRealItem, true);
   assert.includes(details.summary, "#");
   assert.includes(details.summary, "Agent Scenario Thesis");

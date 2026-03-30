@@ -20,6 +20,10 @@ import {
   summarizeObsidianInterventionContext,
 } from "./agent-obsidian-handoff-lib.mjs";
 import {
+  extractCurrentTruthActiveBatchId,
+  readCurrentTruthSummary,
+} from "./docs-current-truth-lib.mjs";
+import {
   buildScriptFailureInfo,
   writeJSONArtifact,
 } from "./script-runtime-lib.mjs";
@@ -40,6 +44,15 @@ async function readJSONIfExists(filePath) {
     });
 }
 
+function readCurrentTruthActiveBatchId(rootDir) {
+  try {
+    const summary = readCurrentTruthSummary(rootDir);
+    return extractCurrentTruthActiveBatchId(summary);
+  } catch {
+    return null;
+  }
+}
+
 async function main() {
   const workspace = resolveObsidianWorkspaceFiles(projectRoot, process.env);
   const visualsEnabled = resolveObsidianVisualsEnabled(process.env);
@@ -56,6 +69,13 @@ async function main() {
     monitor,
     e2e,
   });
+  const currentTruthActiveBatchId = readCurrentTruthActiveBatchId(projectRoot);
+  if (currentTruthActiveBatchId) {
+    summary.currentTruthActiveBatchId = currentTruthActiveBatchId;
+    if (currentTruthActiveBatchId === "READER-HIGH-126") {
+      summary.manualVerdictResolved = true;
+    }
+  }
   const visualViewModel = buildObsidianVisualViewModel(summary);
   const statusMarkdown = buildObsidianInterventionMarkdown(summary);
   const evidenceMarkdown = buildObsidianEvidenceMarkdown(summary);

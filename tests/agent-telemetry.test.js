@@ -286,6 +286,18 @@ describe("Agent Telemetry", () => {
                 attemptCount: 2,
                 selectedAttempt: 2,
                 selectionReason: "stable-hash-pair",
+                preCaptureSettle: {
+                  stage: "library",
+                  settled: true,
+                  timedOut: false,
+                  pollCount: 2,
+                  resetCount: 0,
+                  stableSampleTarget: 2,
+                  consecutiveStableSamples: 2,
+                  verificationMatched: true,
+                  snapshotSummary: "item#101 / selected 1 / Library Item",
+                  summary: "library 达成，2/2，轮询 2 次，最终复核一致",
+                },
               },
               {
                 kind: "reader",
@@ -293,6 +305,18 @@ describe("Agent Telemetry", () => {
                 attemptCount: 3,
                 selectedAttempt: 3,
                 selectionReason: "max-attempt-reached",
+                preCaptureSettle: {
+                  stage: "reader",
+                  settled: false,
+                  timedOut: true,
+                  pollCount: 7,
+                  resetCount: 2,
+                  stableSampleTarget: 3,
+                  consecutiveStableSamples: 1,
+                  verificationMatched: false,
+                  snapshotSummary: "item#202 / tab tab-2 / ann 1 / active true / window false / sidebar outline",
+                  summary: "reader 超时，1/3，轮询 7 次，重置 2 次，最终复核变更，快照 item#202 / tab tab-2 / ann 1 / active true / window false / sidebar outline",
+                },
               },
             ],
           },
@@ -570,6 +594,11 @@ describe("Agent Telemetry", () => {
     assert.equal(monitorJSON.zoteroValidation?.e2e?.visualCaptureUnstableStageCount, 1);
     assert.ok(monitorJSON.zoteroValidation?.e2e?.visualCaptureStabilitySummary?.includes("library 稳定"));
     assert.ok(monitorJSON.zoteroValidation?.e2e?.visualCaptureStabilitySummary?.includes("reader 待稳"));
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.visualPreCaptureSettleObserved, true);
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.visualPreCaptureSettleStageCount, 2);
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.visualPreCaptureSettleSettledStageCount, 1);
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.visualPreCaptureSettleTimedOutStageCount, 1);
+    assert.ok(String(monitorJSON.zoteroValidation?.e2e?.visualPreCaptureSettleSummary || "").includes("reader 超时"));
     assert.equal(monitorJSON.zoteroValidation?.autofix?.status, "clean");
     assert.equal(monitorJSON.zoteroValidation?.autofix?.failedAttempts, 1);
     assert.equal(monitorJSON.zoteroValidation?.autofix?.totalDurationMs, 2000);
@@ -642,6 +671,7 @@ describe("Agent Telemetry", () => {
     assert.ok(monitorMD.includes("Toolbar 证据"));
     assert.ok(monitorMD.includes("视觉证据"));
     assert.ok(monitorMD.includes("视觉采集稳定性"));
+    assert.ok(monitorMD.includes("预截图 settle"));
     assert.ok(monitorMD.includes("### 能力覆盖"));
     assert.ok(monitorMD.includes("基线注册"));
     assert.ok(monitorMD.includes("### 诊断建议动作"));
@@ -867,6 +897,94 @@ describe("Agent Telemetry", () => {
     assert.equal(monitorJSON.frontpageSummary?.nextAction, "npm run agent:zotero:e2e");
     assert.ok(monitorMD.includes("E2E 失败分类: `验证错误`"));
     assert.ok(monitorMD.includes("E2E 失败阶段: `validation-summary`"));
+  });
+
+  it("should propagate launch diagnostics details into monitor and gate e2e summaries", () => {
+    writeWatchStatus({
+      generatedAt: new Date().toISOString(),
+      latestStatus: "healthy",
+      latest: {
+        trigger: "startup",
+        passed: true,
+        issues: [],
+      },
+    });
+    writeE2EReport({
+      generatedAt: new Date().toISOString(),
+      strategy: "restart",
+      passed: false,
+      errorCategory: "execution",
+      failedStage: "launch-session",
+      errorMessage: "Zotero child exited before RDP became reachable on port 50343.",
+      issues: ["Zotero child exited before RDP became reachable on port 50343."],
+      cycles: [],
+      details: {
+        runtimeSanitization: {
+          managed: true,
+          fresh: true,
+          profileReset: true,
+          dataReset: true,
+          removedMarkers: [],
+        },
+        launchFailure: {
+          kind: "child-exit-before-rdp",
+          rdpPort: 50343,
+          connectDurationMs: 142,
+          attemptCount: 1,
+          childExit: {
+            code: 0,
+            signal: null,
+          },
+          lastConnectError: {
+            code: "ECONNREFUSED",
+            message: "connect ECONNREFUSED 127.0.0.1:50343",
+          },
+          processLogTail: [],
+        },
+      },
+    });
+    writeAutofixReport({
+      generatedAt: new Date(Date.now() - 60_000).toISOString(),
+      initialStrategy: "hot",
+      recovered: false,
+      outcomeLabel: "未恢复",
+      attempts: [],
+      recommendations: [],
+      patchPlanStatus: "not-needed",
+      patchPlanStatusLabel: "无需补丁",
+    });
+    writeWatchRecoveryReport({
+      generatedAt: new Date().toISOString(),
+      passed: true,
+      startupPassed: true,
+      latestTrigger: "session-restart-recovery",
+      latestPassed: true,
+      latestStatus: "healthy",
+      expectedTriggers: ["watch-change", "session-restart-recovery"],
+      observedTriggers: ["watch-change", "session-restart-recovery"],
+      summaryNote: "恢复回归通过",
+      entries: [],
+      issues: [],
+    });
+
+    execNode(["scripts/agent-monitor.mjs"]);
+    try {
+      execNode(["scripts/agent-gate.mjs", "--profile", "dev", "--min-pass-rate", "0", "--max-recent-failed", "999"]);
+    } catch {
+      // expected blocking gate
+    }
+
+    const monitorJSON = readArtifactJSON("agent-monitor.json");
+    const gateJSON = readArtifactJSON("agent-gate.json");
+
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.errorCategory, "execution");
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.failedStage, "launch-session");
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.details?.launchFailure?.kind, "child-exit-before-rdp");
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.details?.runtimeSanitization?.managed, true);
+    assert.equal(gateJSON.zoteroValidation?.e2e?.errorCategory, "execution");
+    assert.equal(gateJSON.zoteroValidation?.e2e?.failedStage, "launch-session");
+    assert.equal(gateJSON.zoteroValidation?.e2e?.details?.launchFailure?.rdpPort, 50343);
+    assert.equal(gateJSON.zoteroValidation?.e2e?.details?.runtimeSanitization?.profileReset, true);
   });
 
   it("should route pure visual reader failures to baseline refresh instead of autofix", () => {
@@ -1383,6 +1501,223 @@ describe("Agent Telemetry", () => {
     );
   });
 
+  it("should let gate recompute fresh capture-command-failed validation even when monitor summary is stale", () => {
+    writeWatchStatus({
+      generatedAt: new Date().toISOString(),
+      latestStatus: "healthy",
+      latest: {
+        trigger: "watch-change",
+        passed: true,
+        issues: [],
+        summaryNote: "热重载后健康检查通过",
+      },
+    });
+    writeE2EReport({
+      generatedAt: "2026-03-29T17:31:23.539Z",
+      strategy: "restart",
+      passed: false,
+      errorCategory: "validation",
+      errorCategoryLabel: "验证失败",
+      failedStage: "validation-summary",
+      errorMessage: "could not create image from rect",
+      issues: ["could not create image from rect"],
+      diagnostics: [{
+        fingerprint: "reader-ui:reader-visual-drift",
+        feature: "reader-ui",
+        featureLabel: "Reader 与视觉回归",
+        severity: "medium",
+        confidence: 0.88,
+        summary: "Reader 相关视觉基线发生漂移或缺失。",
+      }],
+      primaryDiagnosis: {
+        fingerprint: "reader-ui:reader-visual-drift",
+        feature: "reader-ui",
+        featureLabel: "Reader 与视觉回归",
+        severity: "medium",
+        confidence: 0.88,
+        summary: "Reader 相关视觉基线发生漂移或缺失。",
+      },
+      cycles: [{
+        index: 1,
+        bootMode: "restart",
+        passed: false,
+        summaryNote: "library 截图命令失败",
+        tests: { failed: 0 },
+        scenarios: {
+          failed: 0,
+          results: [
+            { name: "reader event hook diagnostics", status: "passed" },
+            { name: "reader fine-grained hook diagnostics", status: "passed" },
+          ],
+        },
+        logs: {
+          errorCount: 0,
+          warnCount: 1,
+          recentErrors: [],
+        },
+        visuals: {
+          captures: [
+            { kind: "reader", path: "/tmp/reader.png", analysis: { width: 2000, height: 1200 } },
+          ],
+          captureStability: {
+            stages: [
+              {
+                kind: "library",
+                stable: false,
+                attemptCount: 2,
+                selectedAttempt: 2,
+                selectionReason: "max-attempt-reached",
+                failureKind: "capture-command-failed",
+                failureCategory: "capture-command-failed",
+                failureStage: "capture-command",
+                failureMessage: "could not create image from rect",
+                boundsSource: "chrome-target",
+                windowTitle: "My Library",
+                command: "screencapture",
+                commandExitCode: 1,
+                stderr: "could not create image from rect",
+                rect: "100,80,1000,600",
+                attempts: [
+                  {
+                    index: 1,
+                    sha256: "lib-1",
+                    width: 2000,
+                    height: 1200,
+                    bounds: { x: 100, y: 80, width: 1000, height: 600 },
+                  },
+                  {
+                    index: 2,
+                    sha256: "lib-2",
+                    width: 2000,
+                    height: 1200,
+                    bounds: { x: 100, y: 80, width: 1000, height: 600 },
+                  },
+                ],
+              },
+              {
+                kind: "reader",
+                stable: true,
+                attemptCount: 2,
+                selectedAttempt: 2,
+                selectionReason: "stable-hash-pair",
+                attempts: [
+                  {
+                    index: 1,
+                    sha256: "reader-1",
+                    width: 2000,
+                    height: 1200,
+                    bounds: { x: 100, y: 80, width: 1000, height: 600 },
+                  },
+                  {
+                    index: 2,
+                    sha256: "reader-1",
+                    width: 2000,
+                    height: 1200,
+                    bounds: { x: 100, y: 80, width: 1000, height: 600 },
+                  },
+                ],
+              },
+            ],
+          },
+          analysis: {
+            baselines: [
+              {
+                kind: "library",
+                canonicalTarget: "restart-library.png",
+                path: "/tmp/restart-library.png",
+                status: "compared",
+                ok: false,
+                metrics: {
+                  sameDimensions: false,
+                  actualWidth: 2000,
+                  actualHeight: 1200,
+                  baselineWidth: 3388,
+                  baselineHeight: 2172,
+                },
+              },
+              {
+                kind: "reader",
+                canonicalTarget: "restart-reader.png",
+                path: "/tmp/restart-reader.png",
+                status: "compared",
+                ok: true,
+                metrics: {
+                  sameDimensions: true,
+                  changedRatio: 0,
+                  meanChannelDiff: 0,
+                },
+              },
+            ],
+            summary: {
+              baseline: {
+                comparedCount: 2,
+                missingCount: 0,
+                driftCount: 1,
+                errorCount: 0,
+              },
+            },
+          },
+        },
+      }],
+    });
+    writeAutofixReport({
+      generatedAt: "2026-03-29T17:30:00.000Z",
+      initialStrategy: "restart",
+      recovered: false,
+      outcomeLabel: "未恢复",
+      attempts: [],
+      recommendations: [],
+    });
+    writeWatchRecoveryReport({
+      generatedAt: "2026-03-29T17:30:30.000Z",
+      passed: true,
+      startupPassed: true,
+      latestTrigger: "session-restart-recovery",
+      latestPassed: true,
+      latestStatus: "healthy",
+      expectedTriggers: ["watch-change", "session-restart-recovery"],
+      observedTriggers: ["watch-change", "session-restart-recovery"],
+      summaryNote: "恢复回归通过",
+      entries: [],
+      issues: [],
+    });
+
+    execNode(["scripts/agent-monitor.mjs"]);
+    const staleMonitor = readArtifactJSON("agent-monitor.json");
+    staleMonitor.zoteroValidation.e2e.generatedAt = "2026-03-29T14:52:14.590Z";
+    staleMonitor.zoteroValidation.e2e.visualPrimaryBlockerKind = "ui-regression-candidate";
+    staleMonitor.zoteroValidation.e2e.visualPrimaryBlockerKindLabel = "疑似真实界面回归";
+    staleMonitor.zoteroValidation.e2e.visualCanonicalCoverageKind = "complete";
+    staleMonitor.frontpageSummary.nextAction = "npm run agent:obsidian";
+    fs.writeFileSync(artifactPath("agent-monitor.json"), `${JSON.stringify(staleMonitor, null, 2)}\n`, "utf-8");
+
+    assert.throws(() => {
+      execNode([
+        "scripts/agent-gate.mjs",
+        "--profile",
+        "dev",
+        "--min-pass-rate",
+        "0",
+        "--max-recent-failed",
+        "999",
+      ]);
+    });
+
+    const gateJSON = readArtifactJSON("agent-gate.json");
+    const gateMD = readArtifactText("agent-gate.md");
+    assert.equal(gateJSON.zoteroValidation?.e2e?.generatedAt, "2026-03-29T17:31:23.539Z");
+    assert.equal(gateJSON.zoteroValidation?.e2e?.visualPrimaryBlockerKind, "capture-command-failed");
+    assert.equal(gateJSON.frontpageSummary?.nextAction, "npm run agent:zotero:e2e");
+    assert.ok(
+      gateJSON.recommendations.some((item) => String(item).includes("截图调用失败")),
+    );
+    assert.ok(
+      gateJSON.recommendations.some((item) => String(item).includes("screencapture")),
+    );
+    assert.ok(gateMD.includes("截图调用失败"));
+    assert.ok(gateMD.includes("could not create image from rect"));
+  });
+
   it("should route partial canonical baseline coverage to obsidian instead of repeating refresh", () => {
     writeWatchStatus({
       generatedAt: new Date().toISOString(),
@@ -1812,12 +2147,16 @@ describe("Agent Telemetry", () => {
     assert.ok(String(gateJSON.frontpageSummary?.nextAction || "").includes("agent:obsidian"));
     assert.ok(gateJSON.recommendations.some((item) => String(item).includes("agent:obsidian")));
     assert.ok(statusOverviewMD.includes("当前阶段：等待人工 Reader verdict"));
+    assert.ok(evidenceIndexMD.includes("[cycle-1-library.png](/tmp/cycle-1-library.png)"));
+    assert.ok(evidenceIndexMD.includes("[hot-reload-library.png](/tmp/hot-reload-library.png)"));
     assert.ok(evidenceIndexMD.includes("[cycle-1-reader.png](/tmp/cycle-1-reader.png)"));
     assert.ok(evidenceIndexMD.includes("[hot-reload-reader.png](/tmp/hot-reload-reader.png)"));
     assert.ok(humanWindowMD.includes("当前阶段：等待人工 Reader verdict"));
     assert.ok(humanWindowMD.includes("视觉导航"));
     assert.ok(humanWindowMD.includes("低漂移收敛"));
     assert.ok(humanWindowMD.includes("当前主路径等待人工 Reader verdict，不默认执行 baseline refresh、autofix 或 rerun E2E。"));
+    assert.ok(humanWindowMD.includes("npm run agent:zotero:e2e:update-baseline"));
+    assert.equal(humanWindowMD.includes("已确认真实回归，按修复路径继续"), false);
     assert.equal(humanWindowMD.includes("刷新基线 x2"), false);
   });
 
@@ -4334,6 +4673,17 @@ describe("Agent Telemetry", () => {
         "稳定版: 本地元数据与 XPI 完整性已通过，但安装态 smoke 尚未执行。",
       ],
       hostNoiseIssues: [],
+      remoteVerification: {
+        status: "pending",
+        statusLabel: "待远端验证",
+        summary: "远端 update.json 与 update_link 尚未验证；上传到自定义发布端后再执行远端验证。",
+        effectiveUpdateURL: "https://downloads.example.net/cleanroomtemplate/update.json",
+        expectedUpdateLink: "https://downloads.example.net/cleanroomtemplate/cleanroomtemplate-0.1.0.xpi",
+        observedUpdateLink: null,
+        issues: [
+          "尚未执行远端 update.json / update_link 验证。",
+        ],
+      },
       profiles: [
         {
           id: "stable",
@@ -4380,9 +4730,11 @@ describe("Agent Telemetry", () => {
     assert.equal(monitorJSON.releaseMatrix?.status, "attention");
     assert.equal(monitorJSON.releaseMatrix?.profiles?.length, 2);
     assert.ok(monitorMD.includes("## 本地发布矩阵"));
+    assert.ok(monitorMD.includes("### 远端发布验证"));
     assert.ok(monitorMD.includes("阻断型错误"));
     assert.ok(monitorMD.includes("待补验证"));
     assert.ok(dashboardHTML.includes("本地发布矩阵"));
+    assert.ok(dashboardHTML.includes("远端摘要"));
     assert.ok(dashboardHTML.includes("阻断错误画像"));
     assert.ok(dashboardHTML.includes("渠道矩阵"));
   });
@@ -4562,6 +4914,106 @@ describe("Agent Telemetry", () => {
     assert.ok(gateJSON.issues.some((item) => String(item).includes("发布矩阵待补验证")));
     assert.ok(gateMD.includes("## 本地发布矩阵"));
     assert.ok(gateMD.includes("待补验证"));
+  });
+
+  it("should fail release gate when remote release verification is still pending", () => {
+    execNode(["scripts/agent-runner.mjs", "check", "--", "node", "-e", "process.exit(0)"]);
+    execNode(["scripts/agent-runner.mjs", "release-plan", "--", "node", "-e", "process.exit(0)"]);
+
+    writeReleaseMatrix({
+      generatedAt: "2026-03-23T10:15:00.000Z",
+      addonId: "cleanroom-template@example.com",
+      addonVersion: "0.1.0",
+      status: "attention",
+      statusLabel: "待补验证",
+      summary: "远端 update.json 与 update_link 尚未验证；上传到自定义发布端后再执行远端验证。",
+      passedProfileCount: 2,
+      failedProfileCount: 0,
+      attentionProfileCount: 0,
+      blockingRuntimeErrorCount: 0,
+      hostNoiseErrorCount: 0,
+      blockingRuntimeErrorPortrait: "-",
+      hostNoiseRuntimeErrorPortrait: "-",
+      artifacts: {
+        xpiName: "cleanroomtemplate-0.1.0.xpi",
+        xpiSHA256Actual: "abc123",
+        xpiSizeBytesActual: 12345,
+      },
+      blockingIssues: [],
+      attentionIssues: [
+        "远端发布验证: 远端 update.json 与 update_link 尚未验证；上传到自定义发布端后再执行远端验证。",
+      ],
+      hostNoiseIssues: [],
+      remoteVerification: {
+        status: "pending",
+        statusLabel: "待远端验证",
+        summary: "远端 update.json 与 update_link 尚未验证；上传到自定义发布端后再执行远端验证。",
+        effectiveUpdateURL: "https://downloads.example.net/cleanroomtemplate/update.json",
+        expectedUpdateLink: "https://downloads.example.net/cleanroomtemplate/cleanroomtemplate-0.1.0.xpi",
+        observedUpdateLink: null,
+        issues: [
+          "尚未执行远端 update.json / update_link 验证。",
+        ],
+      },
+      profiles: [
+        {
+          id: "stable",
+          label: "稳定版",
+          status: "passed",
+          statusLabel: "通过",
+          summary: "稳定版安装态 smoke 通过。",
+          metadataConsistent: true,
+          packageConsistent: true,
+          installSmokePresent: true,
+          installSmokePassed: true,
+          blockingRuntimeErrorPortrait: "-",
+          hostNoiseRuntimeErrorPortrait: "-",
+          installSmoke: {
+            readinessMode: "native",
+            durationMs: 1000,
+          },
+        },
+        {
+          id: "beta",
+          label: "Beta 版",
+          status: "passed",
+          statusLabel: "通过",
+          summary: "Beta 版安装态 smoke 通过。",
+          metadataConsistent: true,
+          packageConsistent: true,
+          installSmokePresent: true,
+          installSmokePassed: true,
+          blockingRuntimeErrorPortrait: "-",
+          hostNoiseRuntimeErrorPortrait: "-",
+          installSmoke: {
+            readinessMode: "native",
+            durationMs: 980,
+          },
+        },
+      ],
+    });
+
+    execNode(["scripts/agent-monitor.mjs"]);
+
+    assert.throws(() => {
+      execNode([
+        "scripts/agent-gate.mjs",
+        "--profile",
+        "release",
+        "--min-pass-rate",
+        "0",
+        "--max-recent-failed",
+        "999",
+      ]);
+    }, "release gate should fail when remote verification is pending");
+
+    const gateJSON = readArtifactJSON("agent-gate.json");
+    const gateMD = readArtifactText("agent-gate.md");
+    assert.equal(gateJSON.gatePassed, false);
+    assert.equal(gateJSON.releaseMatrix?.remoteVerification?.status, "pending");
+    assert.ok(gateJSON.issues.some((item) => String(item).includes("远端发布验证未通过")));
+    assert.ok(gateJSON.recommendations.some((item) => String(item).includes("release:preflight -- --verify-remote")));
+    assert.ok(gateMD.includes("远端验证"));
   });
 
   it("should display unsupported diagnosis blocker category in monitor and dashboard", () => {

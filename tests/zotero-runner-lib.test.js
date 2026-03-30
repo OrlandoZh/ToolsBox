@@ -4,16 +4,22 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { EventEmitter } from "node:events";
 import { describe, it, assert } from "./test-framework.js";
 import {
   buildStartupArgs,
   buildUserPrefs,
+  connectRdpWithLaunchDiagnostics,
   diffWatchSnapshots,
+  findManagedRuntimeProcesses,
+  formatProcessLogTail,
   getDefaultWatchRoots,
   installProxyAddon,
   parseDotEnv,
+  prepareRuntime,
   resolveRuntimePaths,
   serializeUserPrefs,
+  stopManagedRuntimeProcesses,
   unwrapRdpValue,
 } from "../scripts/zotero-runner-lib.mjs";
 import {
@@ -137,6 +143,294 @@ ZOTERO_PLUGIN_RDP_PORT=64719
     assert.notOk(fs.existsSync(path.join(profilePath, "extensions", `${addonId}.xpi`)));
 
     fs.rmSync(profilePath, { recursive: true, force: true });
+  });
+
+  it("should sanitize managed runtime markers without resetting directories on non-fresh runs", async () => {
+    const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cleanroom-runtime-"));
+    const profilePath = path.join(projectRoot, ".zotero-runtime", "watch", "profile");
+    const dataDir = path.join(projectRoot, ".zotero-runtime", "watch", "data");
+    fs.mkdirSync(profilePath, { recursive: true });
+    fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(path.join(profilePath, ".parentlock"), "lock", "utf-8");
+    fs.writeFileSync(path.join(profilePath, ".startup-incomplete"), "stale", "utf-8");
+    fs.writeFileSync(path.join(profilePath, "keep.txt"), "keep", "utf-8");
+
+    try {
+      const summary = await prepareRuntime({
+        projectRoot,
+        profilePath,
+        dataDir,
+        fresh: false,
+      });
+
+      assert.equal(summary.managed, true);
+      assert.equal(summary.fresh, false);
+      assert.equal(summary.profileReset, false);
+      assert.equal(summary.dataReset, false);
+      assert.equal(summary.removedMarkers.length, 2);
+      assert.notOk(fs.existsSync(path.join(profilePath, ".parentlock")));
+      assert.notOk(fs.existsSync(path.join(profilePath, ".startup-incomplete")));
+      assert.ok(fs.existsSync(path.join(profilePath, "keep.txt")));
+      assert.ok(fs.existsSync(path.join(profilePath, "user.js")));
+    } finally {
+      fs.rmSync(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("should find matching managed runtime processes for the current profile and project runtime root", () => {
+    const projectRoot = "/tmp/addon-template";
+    const profilePath = path.join(projectRoot, ".zotero-runtime", "agent", "profile");
+    const dataDir = path.join(projectRoot, ".zotero-runtime", "agent", "data");
+    const psOutput = [
+      `123 /Applications/Zotero.app/Contents/MacOS/zotero --purgecaches -no-remote -profile ${profilePath} --dataDir ${dataDir} -start-debugger-server 5000`,
+      `456 /Applications/Zotero.app/Contents/MacOS/zotero --purgecaches -no-remote -profile ${path.join(projectRoot, ".zotero-runtime", "watch", "profile")} --dataDir ${path.join(projectRoot, ".zotero-runtime", "watch", "data")} -start-debugger-server 5001`,
+      "789 /Applications/Zotero.app/Contents/MacOS/zotero --purgecaches -profile /tmp/other/profile --dataDir /tmp/other/data -start-debugger-server 5002",
+    ].join("\n");
+
+    const matchingOnly = findManagedRuntimeProcesses({
+      projectRoot,
+      profilePath,
+      dataDir,
+      psOutput,
+      currentPid: 999,
+    });
+    assert.equal(matchingOnly.length, 1);
+    assert.deepEqual(matchingOnly[0].matchReasons, ["profile", "data"]);
+
+    const exclusive = findManagedRuntimeProcesses({
+      projectRoot,
+      profilePath,
+      dataDir,
+      includeProjectRuntime: true,
+      psOutput,
+      currentPid: 999,
+    });
+    assert.equal(exclusive.length, 2);
+    assert.deepEqual(exclusive[0].matchReasons, ["profile", "data", "project-runtime"]);
+    assert.deepEqual(exclusive[1].matchReasons, ["project-runtime"]);
+  });
+
+  it("should stop managed runtime processes and escalate to SIGKILL when needed", async () => {
+    const projectRoot = "/tmp/addon-template";
+    const profilePath = path.join(projectRoot, ".zotero-runtime", "agent", "profile");
+    const dataDir = path.join(projectRoot, ".zotero-runtime", "agent", "data");
+    const processStates = new Map([
+      [123, { pid: 123, command: `zotero -profile ${profilePath} --dataDir ${dataDir}`, matchReasons: ["profile", "data"] }],
+      [456, { pid: 456, command: `zotero -profile ${path.join(projectRoot, ".zotero-runtime", "watch", "profile")} --dataDir ${path.join(projectRoot, ".zotero-runtime", "watch", "data")}`, matchReasons: ["project-runtime"] }],
+    ]);
+    const signals = [];
+
+    const summary = await stopManagedRuntimeProcesses({
+      projectRoot,
+      profilePath,
+      dataDir,
+      includeProjectRuntime: true,
+      findProcesses: () => Array.from(processStates.values()),
+      killProcess: (pid, signal) => {
+        signals.push(`${pid}:${signal}`);
+        if (pid === 123) {
+          processStates.delete(pid);
+          return;
+        }
+        if (pid === 456 && signal === "SIGKILL") {
+          processStates.delete(pid);
+        }
+      },
+      pollIntervalMs: 0,
+      termTimeoutMs: 0,
+      killTimeoutMs: 0,
+      sleep: async () => {},
+    });
+
+    assert.deepEqual(signals, [
+      "123:SIGTERM",
+      "456:SIGTERM",
+      "456:SIGKILL",
+    ]);
+    assert.equal(summary.observedProcesses.length, 2);
+    assert.equal(summary.remainingProcesses.length, 0);
+    assert.equal(summary.terminatedProcesses.length, 2);
+    assert.equal(summary.terminatedProcesses.find((entry) => entry.pid === 123)?.forced, false);
+    assert.equal(summary.terminatedProcesses.find((entry) => entry.pid === 456)?.forced, true);
+  });
+
+  it("should request exclusive project runtime cleanup for agent prepareRuntime runs", async () => {
+    const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cleanroom-runtime-"));
+    const profilePath = path.join(projectRoot, ".zotero-runtime", "agent", "profile");
+    const dataDir = path.join(projectRoot, ".zotero-runtime", "agent", "data");
+    let receivedOptions = null;
+
+    try {
+      const summary = await prepareRuntime({
+        projectRoot,
+        profilePath,
+        dataDir,
+        fresh: false,
+        exclusiveProjectRuntime: true,
+        stopManagedRuntimeProcessesImpl: async (options) => {
+          receivedOptions = options;
+          return {
+            observedProcesses: [
+              {
+                pid: 321,
+                command: `zotero -profile ${path.join(projectRoot, ".zotero-runtime", "watch", "profile")}`,
+                matchReasons: ["project-runtime"],
+              },
+            ],
+            terminatedProcesses: [
+              {
+                pid: 321,
+                command: `zotero -profile ${path.join(projectRoot, ".zotero-runtime", "watch", "profile")}`,
+                matchReasons: ["project-runtime"],
+                forced: false,
+                signalsSent: ["SIGTERM"],
+              },
+            ],
+            remainingProcesses: [],
+            terminationErrors: [],
+          };
+        },
+      });
+
+      assert.equal(receivedOptions.includeProjectRuntime, true);
+      assert.equal(summary.exclusiveProjectRuntime, true);
+      assert.equal(summary.terminatedProcesses.length, 1);
+      assert.equal(summary.terminatedProcesses[0].pid, 321);
+      assert.equal(summary.remainingProcesses.length, 0);
+    } finally {
+      fs.rmSync(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("should not sanitize unmanaged profile markers", async () => {
+    const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cleanroom-runtime-root-"));
+    const profilePath = fs.mkdtempSync(path.join(os.tmpdir(), "cleanroom-runtime-external-profile-"));
+    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "cleanroom-runtime-external-data-"));
+    fs.writeFileSync(path.join(profilePath, ".parentlock"), "lock", "utf-8");
+    fs.writeFileSync(path.join(profilePath, ".startup-incomplete"), "stale", "utf-8");
+
+    try {
+      const summary = await prepareRuntime({
+        projectRoot,
+        profilePath,
+        dataDir,
+        fresh: false,
+      });
+
+      assert.equal(summary.managed, false);
+      assert.equal(summary.removedMarkers.length, 0);
+      assert.ok(fs.existsSync(path.join(profilePath, ".parentlock")));
+      assert.ok(fs.existsSync(path.join(profilePath, ".startup-incomplete")));
+      assert.ok(fs.existsSync(path.join(profilePath, "user.js")));
+    } finally {
+      fs.rmSync(projectRoot, { recursive: true, force: true });
+      fs.rmSync(profilePath, { recursive: true, force: true });
+      fs.rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should classify child exit before RDP becomes reachable", async () => {
+    class FakeRdpClient {
+      async connect() {
+        const error = new Error("connect ECONNREFUSED 127.0.0.1:4000");
+        error.code = "ECONNREFUSED";
+        throw error;
+      }
+
+      disconnect() {}
+    }
+
+    const child = new EventEmitter();
+    child.exitCode = null;
+    const processLogs = [
+      { at: "2026-03-29T00:00:00.000Z", source: "zotero.stderr", level: "stderr", message: "startup begin" },
+      { at: "2026-03-29T00:00:01.000Z", source: "zotero.stderr", level: "stderr", message: "crashed" },
+    ];
+
+    let error = null;
+    const pending = connectRdpWithLaunchDiagnostics({
+      child,
+      rdpPort: 4000,
+      processLogs,
+      retries: 3,
+      retryDelayMs: 1,
+      createClient: () => new FakeRdpClient(),
+    });
+    setTimeout(() => {
+      child.exitCode = 11;
+      child.emit("exit", 11, "SIGSEGV");
+    }, 0);
+
+    try {
+      await pending;
+    } catch (caught) {
+      error = caught;
+    }
+
+    assert.ok(error);
+    assert.equal(error.launchFailure?.kind, "child-exit-before-rdp");
+    assert.equal(error.launchFailure?.childExit?.code, 11);
+    assert.equal(error.launchFailure?.childExit?.signal, "SIGSEGV");
+    assert.equal(error.launchFailure?.attemptCount, 1);
+    assert.equal(error.launchFailure?.processLogTail?.length, 2);
+  });
+
+  it("should classify repeated retryable RDP failures as timeout", async () => {
+    const attempts = [];
+    class FakeRdpClient {
+      async connect() {
+        attempts.push(Date.now());
+        const error = new Error("connect ECONNREFUSED 127.0.0.1:4555");
+        error.code = "ECONNREFUSED";
+        throw error;
+      }
+
+      disconnect() {}
+    }
+
+    const child = new EventEmitter();
+    child.exitCode = null;
+    let error = null;
+    try {
+      await connectRdpWithLaunchDiagnostics({
+        child,
+        rdpPort: 4555,
+        processLogs: [{ at: "2026-03-29T00:00:00.000Z", source: "zotero.stdout", level: "stdout", message: "wait" }],
+        retries: 3,
+        retryDelayMs: 1,
+        createClient: () => new FakeRdpClient(),
+      });
+    } catch (caught) {
+      error = caught;
+    }
+
+    assert.ok(error);
+    assert.equal(error.launchFailure?.kind, "rdp-connect-timeout");
+    assert.equal(error.launchFailure?.attemptCount, 3);
+    assert.equal(error.launchFailure?.lastConnectError?.code, "ECONNREFUSED");
+    assert.equal(attempts.length, 3);
+  });
+
+  it("should keep process log tails in a compact normalized shape", () => {
+    const tail = formatProcessLogTail([
+      "raw message",
+      { at: "2026-03-29T00:00:00.000Z", source: "zotero.stdout", level: "stdout", message: "ready" },
+    ], 2);
+
+    assert.deepEqual(tail, [
+      {
+        at: null,
+        source: "unknown",
+        level: "info",
+        message: "raw message",
+      },
+      {
+        at: "2026-03-29T00:00:00.000Z",
+        source: "zotero.stdout",
+        level: "stdout",
+        message: "ready",
+      },
+    ]);
   });
 
   it("should unwrap RDP preview objects into plain values", () => {

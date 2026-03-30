@@ -13,7 +13,7 @@ import {
 const projectRoot = path.resolve(".");
 
 describe("Agent Delegation", () => {
-  it("should load the rebaselined manifest with ENG-HIGH-103 as the active engineering batch while retaining historical contract sources", async () => {
+  it("should load the rebaselined manifest with ENG-HIGH-104 opened as the next release follow-up and READER-HIGH-126 preserved as history", async () => {
     const manifest = await loadDelegationManifest(projectRoot);
 
     assert.equal(manifest.schemaVersion, 1);
@@ -38,8 +38,12 @@ describe("Agent Delegation", () => {
     assert.ok(Boolean(manifest.taskMap["READER-HIGH-121"]));
     assert.ok(Boolean(manifest.taskMap["READER-HIGH-122"]));
     assert.ok(Boolean(manifest.taskMap["READER-HIGH-123"]));
+    assert.ok(Boolean(manifest.taskMap["READER-HIGH-124"]));
+    assert.ok(Boolean(manifest.taskMap["READER-HIGH-125"]));
+    assert.ok(Boolean(manifest.taskMap["READER-HIGH-126"]));
     assert.ok(Boolean(manifest.taskMap["ENG-HIGH-102"]));
     assert.ok(Boolean(manifest.taskMap["ENG-HIGH-103"]));
+    assert.ok(Boolean(manifest.taskMap["ENG-HIGH-104"]));
     assert.ok(Boolean(manifest.taskMap["ENG-LOW-204"]));
     assert.ok(Boolean(manifest.taskMap["ENG-LOW-205"]));
     assert.ok(Boolean(manifest.taskMap["ENG-LOW-206"]));
@@ -47,6 +51,9 @@ describe("Agent Delegation", () => {
     assert.ok(Boolean(manifest.taskMap["ENG-LOW-208"]));
     assert.ok(Boolean(manifest.taskMap["ENG-LOW-209"]));
     assert.ok(Boolean(manifest.taskMap["ENG-LOW-210"]));
+    assert.ok(Boolean(manifest.taskMap["ENG-LOW-211"]));
+    assert.ok(Boolean(manifest.taskMap["ENG-LOW-212"]));
+    assert.ok(Boolean(manifest.taskMap["ENG-LOW-213"]));
     assert.ok(Boolean(manifest.taskMap["READER-LOW-252"]));
     assert.ok(Boolean(manifest.taskMap["READER-LOW-253"]));
     assert.ok(Boolean(manifest.taskMap["READER-LOW-254"]));
@@ -56,6 +63,9 @@ describe("Agent Delegation", () => {
     assert.ok(Boolean(manifest.taskMap["READER-LOW-258"]));
     assert.ok(Boolean(manifest.taskMap["READER-LOW-259"]));
     assert.ok(Boolean(manifest.taskMap["READER-LOW-260"]));
+    assert.ok(Boolean(manifest.taskMap["READER-LOW-261"]));
+    assert.ok(Boolean(manifest.taskMap["READER-LOW-262"]));
+    assert.ok(Boolean(manifest.taskMap["READER-LOW-263"]));
     assert.ok(Boolean(manifest.taskMap["ENG-HIGH-001"]));
     assert.ok(Boolean(manifest.taskMap["ENG-HIGH-101"]));
     assert.ok(Boolean(manifest.taskMap["OBSIDIAN-HIGH-101"]));
@@ -140,8 +150,12 @@ describe("Agent Delegation", () => {
     assert.equal(manifest.taskMap["READER-HIGH-121"].lane, "codex-high-logic");
     assert.equal(manifest.taskMap["READER-HIGH-122"].lane, "codex-high-logic");
     assert.equal(manifest.taskMap["READER-HIGH-123"].lane, "codex-high-logic");
+    assert.equal(manifest.taskMap["READER-HIGH-124"].lane, "codex-high-logic");
+    assert.equal(manifest.taskMap["READER-HIGH-125"].lane, "codex-high-logic");
+    assert.equal(manifest.taskMap["READER-HIGH-126"].lane, "codex-high-logic");
     assert.equal(manifest.taskMap["ENG-HIGH-102"].lane, "codex-high-logic");
     assert.equal(manifest.taskMap["ENG-HIGH-103"].lane, "codex-high-logic");
+    assert.equal(manifest.taskMap["ENG-HIGH-104"].lane, "codex-high-logic");
     assert.equal(manifest.taskMap["ENG-LOW-204"].lane, "opencode-low-logic");
     assert.equal(manifest.taskMap["ENG-LOW-205"].lane, "opencode-low-logic");
     assert.equal(manifest.taskMap["ENG-LOW-206"].lane, "opencode-low-logic");
@@ -149,6 +163,9 @@ describe("Agent Delegation", () => {
     assert.equal(manifest.taskMap["ENG-LOW-208"].lane, "opencode-low-logic");
     assert.equal(manifest.taskMap["ENG-LOW-209"].lane, "opencode-low-logic");
     assert.equal(manifest.taskMap["ENG-LOW-210"].lane, "opencode-low-logic");
+    assert.equal(manifest.taskMap["ENG-LOW-211"].lane, "opencode-low-logic");
+    assert.equal(manifest.taskMap["ENG-LOW-212"].lane, "opencode-low-logic");
+    assert.equal(manifest.taskMap["ENG-LOW-213"].lane, "opencode-low-logic");
     assert.equal(manifest.taskMap["READER-LOW-252"].lane, "opencode-low-logic");
     assert.equal(manifest.taskMap["READER-LOW-253"].lane, "opencode-low-logic");
     assert.equal(manifest.taskMap["READER-LOW-254"].lane, "opencode-low-logic");
@@ -158,6 +175,9 @@ describe("Agent Delegation", () => {
     assert.equal(manifest.taskMap["READER-LOW-258"].lane, "opencode-low-logic");
     assert.equal(manifest.taskMap["READER-LOW-259"].lane, "opencode-low-logic");
     assert.equal(manifest.taskMap["READER-LOW-260"].lane, "opencode-low-logic");
+    assert.equal(manifest.taskMap["READER-LOW-261"].lane, "opencode-low-logic");
+    assert.equal(manifest.taskMap["READER-LOW-262"].lane, "opencode-low-logic");
+    assert.equal(manifest.taskMap["READER-LOW-263"].lane, "opencode-low-logic");
     assert.ok(manifest.taskMap["READER-HIGH-114"].title.includes("历史契约源"));
     assert.ok(manifest.taskMap["READER-HIGH-118"].title.includes("历史契约源"));
     assert.ok(manifest.taskMap["READER-HIGH-119"].title.includes("历史契约源"));
@@ -165,7 +185,13 @@ describe("Agent Delegation", () => {
     assert.ok(manifest.taskMap["READER-HIGH-121"].title.includes("历史契约源"));
     assert.ok(manifest.taskMap["READER-HIGH-122"].title.includes("历史契约源"));
     assert.ok(manifest.taskMap["READER-HIGH-123"].title.includes("历史契约源"));
-    assert.ok(manifest.taskMap["ENG-HIGH-103"].title.includes("工程化长期增强第一批"));
+    assert.ok(manifest.taskMap["READER-HIGH-124"].title.includes("历史契约源"));
+    assert.ok(manifest.taskMap["READER-HIGH-125"].title.includes("冻结 library-only 视觉漂移根因排查边界"));
+    assert.ok(manifest.taskMap["READER-HIGH-126"].title.includes("修复 library-only 真实界面回归并恢复 visual baseline 对齐"));
+    assert.ok(manifest.taskMap["READER-HIGH-126"].title.includes("历史契约源"));
+    assert.ok(manifest.taskMap["ENG-HIGH-103"].title.includes("历史契约源"));
+    assert.ok(manifest.taskMap["ENG-HIGH-104"].title.includes("远端发布编排"));
+    assert.ok(manifest.taskMap["ENG-HIGH-104"].title.includes("updateURL"));
     assert.deepEqual(manifest.taskMap["READER-LOW-252"].dependsOn, ["READER-HIGH-119"]);
     assert.deepEqual(manifest.taskMap["READER-LOW-253"].dependsOn, ["READER-HIGH-119", "READER-LOW-252"]);
     assert.deepEqual(manifest.taskMap["READER-LOW-254"].dependsOn, ["READER-HIGH-119", "READER-LOW-253"]);
@@ -182,16 +208,30 @@ describe("Agent Delegation", () => {
     assert.deepEqual(manifest.taskMap["ENG-HIGH-102"].dependsOn, ["READER-HIGH-122"]);
     assert.deepEqual(manifest.taskMap["READER-HIGH-123"].dependsOn, ["ENG-HIGH-102"]);
     assert.deepEqual(manifest.taskMap["ENG-HIGH-103"].dependsOn, ["READER-HIGH-123"]);
+    assert.deepEqual(manifest.taskMap["READER-HIGH-124"].dependsOn, ["ENG-HIGH-103"]);
+    assert.deepEqual(manifest.taskMap["READER-HIGH-125"].dependsOn, ["READER-HIGH-124"]);
+    assert.deepEqual(manifest.taskMap["READER-HIGH-126"].dependsOn, ["READER-HIGH-125"]);
+    assert.deepEqual(manifest.taskMap["ENG-HIGH-104"].dependsOn, ["READER-HIGH-126"]);
     assert.deepEqual(manifest.taskMap["ENG-LOW-207"].dependsOn, ["ENG-HIGH-103"]);
     assert.deepEqual(manifest.taskMap["ENG-LOW-208"].dependsOn, ["ENG-HIGH-103"]);
     assert.deepEqual(manifest.taskMap["ENG-LOW-209"].dependsOn, ["ENG-HIGH-103", "ENG-LOW-207", "ENG-LOW-208"]);
     assert.deepEqual(manifest.taskMap["ENG-LOW-210"].dependsOn, ["ENG-HIGH-103", "ENG-LOW-209"]);
+    assert.deepEqual(manifest.taskMap["ENG-LOW-211"].dependsOn, ["ENG-HIGH-104"]);
+    assert.deepEqual(manifest.taskMap["ENG-LOW-212"].dependsOn, ["ENG-HIGH-104", "ENG-LOW-211"]);
+    assert.deepEqual(manifest.taskMap["ENG-LOW-213"].dependsOn, ["ENG-HIGH-104", "ENG-LOW-211", "ENG-LOW-212"]);
+    assert.deepEqual(manifest.taskMap["READER-LOW-261"].dependsOn, ["READER-HIGH-124"]);
+    assert.deepEqual(manifest.taskMap["READER-LOW-262"].dependsOn, ["READER-HIGH-124", "READER-LOW-261"]);
+    assert.deepEqual(manifest.taskMap["READER-LOW-263"].dependsOn, ["READER-HIGH-124", "READER-LOW-261", "READER-LOW-262"]);
     assert.equal(manifest.taskMap["ENG-LOW-207"].gitClosure.milestone, "module-feature");
     assert.equal(manifest.taskMap["ENG-LOW-207"].gitClosure.commitMessage, "feat: 基本实现 runtime 生命周期边界与时序遥测");
     assert.equal(manifest.taskMap["ENG-LOW-208"].gitClosure.milestone, "module-framework");
     assert.equal(manifest.taskMap["ENG-LOW-208"].gitClosure.commitMessage, "feat: 完成共享失败模型脚本入口模块框架搭建");
     assert.equal(manifest.taskMap["ENG-LOW-209"].gitClosure.milestone, "module-feature");
     assert.equal(manifest.taskMap["ENG-LOW-210"].gitClosure.milestone, "batch-closure");
+    assert.equal(manifest.taskMap["ENG-LOW-211"].gitClosure.milestone, "module-feature");
+    assert.equal(manifest.taskMap["ENG-LOW-212"].gitClosure.milestone, "module-feature");
+    assert.equal(manifest.taskMap["ENG-LOW-213"].gitClosure.milestone, "batch-closure");
+    assert.equal(manifest.taskMap["ENG-LOW-213"].gitClosure.commitMessage, "chore: 收口 ENG-HIGH-104 manifest、文档与守卫测试");
     assert.equal(manifest.taskMap["OBSIDIAN-HIGH-101"].lane, "codex-high-logic");
     assert.equal(manifest.tasks.some((task) => task.lane === "opencode-low-logic"), true);
   });

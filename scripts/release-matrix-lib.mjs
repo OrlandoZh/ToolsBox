@@ -1,3 +1,5 @@
+import { normalizeRemoteReleaseVerification } from "./release-remote-verification-lib.mjs";
+
 function toISODate(dateLike) {
   if (!dateLike) {
     return null;
@@ -659,6 +661,7 @@ export function buildReleaseMatrixSummary({
   updateManifest = null,
   preflightReport = null,
   installSmokeReport = null,
+  remoteVerification = null,
   xpiName,
   xpiPath,
   xpiExists = false,
@@ -674,6 +677,13 @@ export function buildReleaseMatrixSummary({
   const generatedAt = toISODate(now) || new Date().toISOString();
   const installSmokeRuns = normalizeInstallSmokeRuns(installSmokeReport);
   const profiles = buildDefaultProfiles();
+  const normalizedRemoteVerification = remoteVerification
+    ? normalizeRemoteReleaseVerification(remoteVerification, {
+      config,
+      releaseManifest,
+      now,
+    })
+    : null;
   const artifactChecks = buildArtifactChecks({
     config,
     buildReport,
@@ -719,10 +729,21 @@ export function buildReleaseMatrixSummary({
     summary = pickFirstIssue(artifactChecks)
       || failedProfiles[0]?.summary
       || "本地发布矩阵未通过。";
+  } else if (normalizedRemoteVerification?.status === "failed") {
+    status = "failed";
+    statusLabel = "失败";
+    summary = normalizedRemoteVerification.summary || "远端发布验证未通过。";
   } else if (attentionProfiles.length > 0) {
     status = "attention";
     statusLabel = "待补验证";
     summary = "本地元数据与 XPI 完整性已通过，但仍缺少安装态 smoke。";
+  } else if (
+    normalizedRemoteVerification
+    && (normalizedRemoteVerification.status === "pending" || normalizedRemoteVerification.status === "unconfigured")
+  ) {
+    status = "attention";
+    statusLabel = "待补验证";
+    summary = normalizedRemoteVerification.summary || "远端发布验证尚未完成。";
   } else if (hostNoiseErrorCount > 0) {
     summary = `本地 stable/beta 发布矩阵已通过；共发现 ${hostNoiseErrorCount} 条宿主噪声，已归类为不阻断发布。`;
   }
@@ -738,9 +759,23 @@ export function buildReleaseMatrixSummary({
   failedProfiles.forEach((profile) => {
     blockingIssues.push(`${profile.label}: ${profile.summary}`);
   });
+  if (normalizedRemoteVerification?.status === "failed") {
+    blockingIssues.push(`远端发布验证: ${normalizedRemoteVerification.summary || normalizedRemoteVerification.statusLabel}`);
+    (Array.isArray(normalizedRemoteVerification.issues) ? normalizedRemoteVerification.issues : [])
+      .slice(0, 3)
+      .forEach((item) => {
+        blockingIssues.push(`远端发布验证: ${item}`);
+      });
+  }
   attentionProfiles.forEach((profile) => {
     attentionIssues.push(`${profile.label}: ${profile.summary}`);
   });
+  if (
+    normalizedRemoteVerification
+    && (normalizedRemoteVerification.status === "pending" || normalizedRemoteVerification.status === "unconfigured")
+  ) {
+    attentionIssues.push(`远端发布验证: ${normalizedRemoteVerification.summary || normalizedRemoteVerification.statusLabel}`);
+  }
   profileSummaries
     .filter((profile) => Number(profile.hostNoiseErrorCount || 0) > 0)
     .forEach((profile) => {
@@ -772,6 +807,7 @@ export function buildReleaseMatrixSummary({
     blockingIssues,
     attentionIssues,
     hostNoiseIssues,
+    remoteVerification: normalizedRemoteVerification,
     durationMs: Math.max(0, Number(durationMs || 0)),
     profiles: profileSummaries,
     artifacts: {
@@ -857,6 +893,34 @@ export function renderReleaseMatrixMarkdown(summary) {
     `- 资源错误数: \`${summary?.resourceRuntimeErrorCount ?? 0}\``,
     "",
   );
+
+  if (summary?.remoteVerification && typeof summary.remoteVerification === "object") {
+    const remoteChecks = Array.isArray(summary.remoteVerification.checks)
+      ? summary.remoteVerification.checks
+      : [];
+    lines.push(
+      "## 远端发布验证",
+      "",
+      `- 状态: \`${summary.remoteVerification.statusLabel || summary.remoteVerification.status || "未知"}\``,
+      `- 摘要: ${summary.remoteVerification.summary || "-"}`,
+      `- update.json: \`${summary.remoteVerification.effectiveUpdateURL || "-"}\``,
+      `- 期望 update_link: \`${summary.remoteVerification.expectedUpdateLink || "-"}\``,
+      `- 观测 update_link: \`${summary.remoteVerification.observedUpdateLink || "-"}\``,
+      `- update.json 状态码: \`${summary.remoteVerification.updateURLHTTPStatus ?? "-"}\``,
+      `- update_link 状态码: \`${summary.remoteVerification.updateLinkHTTPStatus ?? "-"}\``,
+      "",
+      "| 检查 | 结果 | 说明 |",
+      "|---|---|---|",
+    );
+    if (remoteChecks.length === 0) {
+      lines.push("| - | - | - |");
+    } else {
+      remoteChecks.forEach((item) => {
+        lines.push(`| ${item.label || item.id || "-"} | ${item.passed ? "通过" : "失败"} | ${item.detail || "-"} |`);
+      });
+    }
+    lines.push("");
+  }
 
   if (Array.isArray(summary?.blockingIssues) && summary.blockingIssues.length > 0) {
     lines.push("## 阻断项", "");
