@@ -219,9 +219,10 @@
 - `details.runtimeSanitization` 已稳定透传到 direct E2E / monitor / gate：本轮 direct E2E 记录了 `exclusiveProjectRuntime=true`，并在启动前终止了 project-managed `watch` `zotero` / `plugin-container`；旧的 startup/RDP bring-up timeout 口径继续只保留为已收口的诊断能力
 - 最新 library `pre-capture settle` 已稳定收敛到 `visibleBannerIDs=[mac-word-plugin-install-container]`；`sync-reminder-container`、`post-upgrade-container`、`file-renaming-banner-container`、`retracted-items-container` 与 `architecture-warning-container` 会在 capture 前被压平，library drift 已消失，`reader 视图继续对齐`，且 `library / reader` 几何一致 `2000x1200`
 - `READER-LOW-261` 已把 stage-scoped capture failure 结构化落进既有 E2E / validation 展示链；`READER-LOW-262` 已引入 `capture-command-failed` / `visualPrimaryBlockerKind=capture-command-failed` 并同步 consumer；`READER-LOW-263` 已在 live rerun 上证明 freshest-valid direct artifact 消费与 truth 对齐，`visual screenshot capture` 链已恢复到稳定基线
-- 最新 release live acceptance 已补齐 stable / beta 正式安装态 smoke：`release-matrix` 最新工件为 `attention`（`2026-03-30T13:58:47.934Z`），但 stable / beta profile 均已 `passed`；`release-install-smoke-stable` / `release-install-smoke-beta` 分别在 `2026-03-30T13:38:04.172Z` / `2026-03-30T13:58:21.077Z` 记录 `readinessMode=native`、`apiReady=true`，且剩余 `loading.svg` / `remote-settings.sys.mjs` 已归类为宿主噪声
-- 最新 `agent:monitor` / `agent:gate:release` 已在 `2026-03-30T13:59:05.792Z` / `2026-03-30T13:59:05.867Z` 消费最新 release artifacts；当前 `gatePassed=false` 的唯一原因是 `updateURL` 仍指向 `https://example.com/downloads/cleanroomtemplate/update.json` placeholder、远端自定义发布端未配置，而不是安装态 smoke 或插件运行时回归
-- 当前主阻断已清零；当前唯一 active 非阻断工程 gap 继续保持 `ENG-HIGH-104 / ENG-LOW-211~213`：只处理远端发布编排与远端 `updateURL` 闭环验证，不回头重开 Reader / startup / freshness 主线；`LEGAL_RISK_CHECKLIST.md` 的 Release Gate 继续保持 `release-only` 人工流程
+- 最新 release live acceptance 已按当前 Gitee `updateURL` 重新补齐 stable / beta 正式安装态 smoke：`release-matrix` 最新工件为 `failed`（`2026-03-30T16:19:38.678Z`），但 stable / beta profile 均已 `passed`；`release-install-smoke-stable` / `release-install-smoke-beta` 分别在 `2026-03-30T16:19:09.880Z` / `2026-03-30T16:18:42.172Z` 记录 `readinessMode=native`、`apiReady=true`，且剩余 `loading.svg` / `remote-settings.sys.mjs` 已归类为宿主噪声
+- 最新 `agent:monitor` / `agent:gate:release` 已在 `2026-03-30T16:19:52.692Z` / `2026-03-30T16:19:52.762Z` 消费最新 release artifacts；当前 `gatePassed=false` 的唯一原因是远端 `https://gitee.com/zouser/user/releases/download/1.1/update.json` 虽然 `updateURLHTTPStatus=200`，但未包含 `cleanroom-template@example.com` 首条更新记录，且未提供有效 `update_link`，而不是安装态 smoke 或插件运行时回归
+- 当前 Gitee `updateURL` 仅用于这个模板仓库自身的远端发布验收与测试，不作为基于本模板开发的其他插件默认发布地址；下游项目仍需在各自 `config/addon.config.json` 中替换自己的 `addonId` / `homepage` / `updateURL`
+- 当前主阻断已清零；当前唯一 active release-only 工程 gap 继续保持 `ENG-HIGH-104 / ENG-LOW-211~213`：修正远端发布编排与远端 `updateURL` 闭环验证，不回头重开 Reader / startup / freshness 主线；`LEGAL_RISK_CHECKLIST.md` 的 Release Gate 继续保持 `release-only` 人工流程
 <!-- CURRENT-TRUTH-SUMMARY:END -->
 
 ### 补充说明
@@ -389,15 +390,16 @@
   - 当前剩余 `remote-settings.sys.mjs` 与 `loading.svg` 已归类为宿主噪声，不再阻断 gate
 - 最新本地 release acceptance 已收敛到单一剩余缺口
   - 当前 `release-matrix` stable / beta profile 均已 `passed`
-  - 当前整体 `release-matrix` 仍为 `attention`，唯一原因是远端发布验证 `unconfigured`
-  - 当前 `agent:gate:release` 只会因 `updateURL` placeholder / 自定义发布端未配置而继续阻断
+  - 当前整体 `release-matrix` 仍为 `failed`，唯一原因是远端 `update.json` 缺少 `cleanroom-template@example.com` 更新记录
+  - 当前 `agent:gate:release` 只会因远端 `update.json` 缺少有效更新记录 / `update_link` 而继续阻断
 - `release-install-smoke` 现已在重新打包后同步刷新 `release-preflight`
   - 当前 `release-matrix` 不会再被过期 SHA / size 误伤，而会直接暴露真实 smoke 失败原因
 
 ### 还需要做
 
-- 把 `config.addon.config.json` 中的 `updateURL` 从 `https://example.com/downloads/cleanroomtemplate/update.json` placeholder 切到真实自定义发布端
-- 上传远端 `update.json` 与 `.xpi`，再执行 `npm run release:preflight -- --verify-remote`
+- 修正当前远端 `https://gitee.com/zouser/user/releases/download/1.1/update.json` 内容，使其包含 `cleanroom-template@example.com` 的首条更新记录
+- 让远端 `update.json` 提供有效 `update_link`，并确保它与 `https://gitee.com/zouser/user/releases/download/1.1/cleanroomtemplate-0.1.0.xpi` 一致且可访问
+- 修正远端内容后重新执行 `npm run release:preflight -- --verify-remote`
 - 远端产物上传与发布编排
 
 ### 当前明确延后
@@ -474,7 +476,7 @@
 
 ## 总结
 
-当前项目已经完成 `ENG-HIGH-103`、`READER-HIGH-124 / READER-LOW-261~263`、`READER-HIGH-125` 与 `READER-HIGH-126` 的本轮独立收口；开发态 gate 已回到 ready，而最新 release gate 只剩远端 `updateURL` / 自定义发布端未配置这一条阻断。下一步不再是重开 library-only 回归修复，而是维持稳定基线并转向非阻断后续：
+当前项目已经完成 `ENG-HIGH-103`、`READER-HIGH-124 / READER-LOW-261~263`、`READER-HIGH-125` 与 `READER-HIGH-126` 的本轮独立收口；开发态 gate 已回到 ready，而最新 release gate 已收敛为一条明确的远端内容阻断：当前 Gitee `update.json` 缺少 `cleanroom-template@example.com` 更新记录。下一步不再是重开 library-only 回归修复，而是维持稳定基线并转向非阻断后续：
 
 - `release / updateURL follow-up`
   - 继续推进远端发布编排与远端 `updateURL` 闭环验证，但不把它们回写成当前主阻断

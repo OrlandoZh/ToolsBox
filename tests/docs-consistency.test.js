@@ -13,9 +13,11 @@ function readDoc(file) {
 
 describe("Documentation Consistency", () => {
   it("should keep clean-room baseline documents non-placeholder and command wording aligned", () => {
+    const agents = readDoc("AGENTS.md");
     const spec = readDoc("SPEC.md");
     const legal = readDoc("LEGAL_RISK_CHECKLIST.md");
     const readme = readDoc("README.md");
+    const guide = readDoc("docs/GUIDE.md");
     const buildChecklist = readDoc("docs/BUILD_DETAILS_CHECKLIST.md");
     const architecture = readDoc("docs/ARCHITECTURE.md");
     const obsidian = readDoc("docs/OBSIDIAN_INTERVENTION.md");
@@ -27,6 +29,17 @@ describe("Documentation Consistency", () => {
     assert.equal(spec.includes("Plugin name:"), false);
     assert.equal(spec.includes("Use this file to define *what* the plugin should do"), false);
 
+    assert.ok(agents.includes("这个文件是给新接手仓库的开发 agent 的薄入口"));
+    assert.ok(agents.includes("当前“完成度 / 当前主线 / 当前剩余项”只认 [docs/CURRENT_BACKLOG.md](docs/CURRENT_BACKLOG.md) 的“当前单一事实源”"));
+    assert.ok(agents.includes("先运行 `npm run check`"));
+    assert.ok(agents.includes("运行 `npm run agent:monitor` 与 `npm run agent:gate`"));
+    assert.ok(agents.includes("远端发布仍是外部步骤"));
+    assert.ok(agents.includes("`npm run release:upload -- --provider <provider> --release-tag <tag> --target-base-url <url>`"));
+    assert.ok(agents.includes("只会校验本地产物并生成 `dist/release-upload-plan.json` / `md`"));
+    assert.ok(agents.includes("如果 `config/addon.config.json` 仍保留模板默认值"));
+    assert.ok(agents.includes("agent 必须先向用户确认并初始化这些基础信息"));
+    assert.ok(agents.includes("`addonName`、`addonId`、`addonRef`、`author`、`homepage`、`updateURL`"));
+    assert.ok(agents.includes("使用 `npm run export:project`"));
     assert.ok(legal.includes("## Development Gate"));
     assert.ok(legal.includes("## Release Gate"));
     assert.ok(legal.includes("Evidence:"));
@@ -36,6 +49,28 @@ describe("Documentation Consistency", () => {
     assert.ok(readme.includes("npm run docs:sync-current-truth"));
     assert.ok(readme.includes("node scripts/agent-delegation.mjs close <taskId>"));
     assert.ok(readme.includes("git-closure.json"));
+    assert.ok(readme.includes("只用于这个模板项目自身的远端发布验收与测试"));
+    assert.ok(readme.includes("已被 `.gitignore` 忽略"));
+    assert.ok(readme.includes("使用 `npm run export:project` 生成剔除运行时工件与 agent 附件的最小工程"));
+    assert.ok(readme.includes("npm run release:upload -- --provider gitee-release --release-tag 1.1 --target-base-url https://example.com/releases/1.1/"));
+    assert.ok(readme.includes("仅校验上传契约并生成 dist/release-upload-plan.json / md，不执行真实上传"));
+    assert.ok(readme.includes("## 新 Agent 接手顺序"));
+    assert.ok(readme.includes("先读 [当前剩余任务清单](docs/CURRENT_BACKLOG.md)"));
+    assert.ok(readme.includes("`npm run agent:monitor` 与 `npm run agent:gate`"));
+    assert.ok(readme.includes("如果 `config/addon.config.json` 仍是模板默认值"));
+    assert.ok(readme.includes("先暂停开发并询问用户初始化信息"));
+    assert.ok(guide.includes("仅用于这个模板项目自身的远端发布验收与测试"));
+    assert.ok(guide.includes("正常 `git push` 不会上传这些产物"));
+    assert.ok(guide.includes("`dist/update.json`"));
+    assert.ok(guide.includes("不要再手写第二份更新清单"));
+    assert.ok(guide.includes("`dist/release-upload-plan.json`"));
+    assert.ok(guide.includes("它不会执行真实上传"));
+    assert.ok(guide.includes("## Agent 接手流程"));
+    assert.ok(guide.includes("先读取 `docs/CURRENT_BACKLOG.md` 的“当前单一事实源”"));
+    assert.ok(guide.includes("执行 `npm run agent:monitor` 和 `npm run agent:gate`"));
+    assert.ok(guide.includes("如果 `config/addon.config.json` 仍是模板默认值"));
+    assert.ok(guide.includes("先暂停功能开发，并先向用户确认"));
+    assert.ok(guide.includes("`addon-static/locale/<locale>/main.ftl`"));
     assert.ok(buildChecklist.includes("npm run cleanroom:audit"));
     assert.ok(buildChecklist.includes("npm run cleanroom:sim"));
     assert.ok(architecture.includes("npm run cleanroom:audit"));
@@ -114,12 +149,17 @@ describe("Documentation Consistency", () => {
     assert.ok(summary.includes("`ENG-HIGH-103` 的启动诊断 + runtime 清理 + `pre-capture settle`"));
     assert.ok(summary.includes("`agent:gate:release`"));
     assert.ok(summary.includes("`gatePassed=false`"));
-    assert.ok(summary.includes("`release-matrix` 最新工件为 `attention`"));
+    assert.ok(summary.includes("`release-matrix` 最新工件为 `failed`"));
     assert.ok(summary.includes("`readinessMode=native`"));
     assert.ok(summary.includes("`apiReady=true`"));
-    assert.ok(summary.includes("`https://example.com/downloads/cleanroomtemplate/update.json`"));
-    assert.ok(summary.includes("`2026-03-30T13:58:47.934Z`"));
-    assert.ok(summary.includes("`2026-03-30T13:59:05.867Z`"));
+    assert.ok(summary.includes("`https://gitee.com/zouser/user/releases/download/1.1/update.json`"));
+    assert.ok(summary.includes("`updateURLHTTPStatus=200`"));
+    assert.ok(summary.includes("未包含 `cleanroom-template@example.com` 首条更新记录"));
+    assert.ok(summary.includes("未提供有效 `update_link`"));
+    assert.ok(summary.includes("仅用于这个模板仓库自身的远端发布验收与测试"));
+    assert.ok(summary.includes("下游项目仍需在各自 `config/addon.config.json` 中替换自己的 `addonId` / `homepage` / `updateURL`"));
+    assert.ok(summary.includes("`2026-03-30T16:19:38.678Z`"));
+    assert.ok(summary.includes("`2026-03-30T16:19:52.762Z`"));
     assert.equal(summary.includes("`startup / RDP bring-up timeout`"), false);
     assert.equal(summary.includes("`failedStage=launch-session`"), false);
     assert.equal(summary.includes("`agent:obsidian`"), false);

@@ -18,6 +18,7 @@
     "release:metadata": "node scripts/release-metadata.mjs",
     "release:preflight": "node scripts/release-preflight.mjs",
     "release:prepare": "node scripts/release-prepare.mjs",
+    "release:upload": "node scripts/release-upload.mjs",
     "release:matrix": "node scripts/release-matrix.mjs",
     "release:install-smoke": "node scripts/release-install-smoke.mjs --channel stable",
     "release:install-smoke:stable": "node scripts/release-install-smoke.mjs --channel stable",

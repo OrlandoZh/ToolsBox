@@ -137,12 +137,13 @@ function buildReleaseNotesMarkdown({ config, releaseManifest, preflight, warning
     "- Replace this section with user-facing changes.",
     "",
     "## Upload Steps",
-    "1. Upload `.xpi` and `update.json` to your release CDN or GitHub Release assets.",
-    "2. Verify uploaded `update.json` contains the same `update_link` as above.",
-    "3. Verify `update_link` points to the uploaded `.xpi` and is publicly reachable.",
-    "4. Run `npm run release:preflight -- --verify-remote` to record remote verification against the live release URLs.",
-    "5. Re-run `npm run release:prepare && npm run release:matrix` to refresh release-facing consumers.",
-    "6. Publish release notes with checksum.",
+    "1. Run `npm run release:upload -- --provider <provider> --release-tag <tag> --target-base-url <url>` to validate the upload contract and generate a plan-only checklist.",
+    "2. Manually upload `.xpi` and `update.json` to your release CDN or GitHub Release assets.",
+    "3. Verify uploaded `update.json` contains the same `update_link` as above.",
+    "4. Verify `update_link` points to the uploaded `.xpi` and is publicly reachable.",
+    "5. Run `npm run release:preflight -- --verify-remote` to record remote verification against the live release URLs.",
+    "6. Re-run `npm run release:prepare && npm run release:matrix` to refresh release-facing consumers.",
+    "7. Publish release notes with checksum.",
   ];
 
   if (Array.isArray(remoteVerification?.issues) && remoteVerification.issues.length > 0) {

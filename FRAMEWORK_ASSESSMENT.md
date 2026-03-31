@@ -108,9 +108,10 @@ Assessment 对“当前完成度 / 当前主线 / 当前剩余项”的判断只
 - `details.runtimeSanitization` 已稳定透传到 direct E2E / monitor / gate：本轮 direct E2E 记录了 `exclusiveProjectRuntime=true`，并在启动前终止了 project-managed `watch` `zotero` / `plugin-container`；旧的 startup/RDP bring-up timeout 口径继续只保留为已收口的诊断能力
 - 最新 library `pre-capture settle` 已稳定收敛到 `visibleBannerIDs=[mac-word-plugin-install-container]`；`sync-reminder-container`、`post-upgrade-container`、`file-renaming-banner-container`、`retracted-items-container` 与 `architecture-warning-container` 会在 capture 前被压平，library drift 已消失，`reader 视图继续对齐`，且 `library / reader` 几何一致 `2000x1200`
 - `READER-LOW-261` 已把 stage-scoped capture failure 结构化落进既有 E2E / validation 展示链；`READER-LOW-262` 已引入 `capture-command-failed` / `visualPrimaryBlockerKind=capture-command-failed` 并同步 consumer；`READER-LOW-263` 已在 live rerun 上证明 freshest-valid direct artifact 消费与 truth 对齐，`visual screenshot capture` 链已恢复到稳定基线
-- 最新 release live acceptance 已补齐 stable / beta 正式安装态 smoke：`release-matrix` 最新工件为 `attention`（`2026-03-30T13:58:47.934Z`），但 stable / beta profile 均已 `passed`；`release-install-smoke-stable` / `release-install-smoke-beta` 分别在 `2026-03-30T13:38:04.172Z` / `2026-03-30T13:58:21.077Z` 记录 `readinessMode=native`、`apiReady=true`，且剩余 `loading.svg` / `remote-settings.sys.mjs` 已归类为宿主噪声
-- 最新 `agent:monitor` / `agent:gate:release` 已在 `2026-03-30T13:59:05.792Z` / `2026-03-30T13:59:05.867Z` 消费最新 release artifacts；当前 `gatePassed=false` 的唯一原因是 `updateURL` 仍指向 `https://example.com/downloads/cleanroomtemplate/update.json` placeholder、远端自定义发布端未配置，而不是安装态 smoke 或插件运行时回归
-- 当前主阻断已清零；当前唯一 active 非阻断工程 gap 继续保持 `ENG-HIGH-104 / ENG-LOW-211~213`：只处理远端发布编排与远端 `updateURL` 闭环验证，不回头重开 Reader / startup / freshness 主线；`LEGAL_RISK_CHECKLIST.md` 的 Release Gate 继续保持 `release-only` 人工流程
+- 最新 release live acceptance 已按当前 Gitee `updateURL` 重新补齐 stable / beta 正式安装态 smoke：`release-matrix` 最新工件为 `failed`（`2026-03-30T16:19:38.678Z`），但 stable / beta profile 均已 `passed`；`release-install-smoke-stable` / `release-install-smoke-beta` 分别在 `2026-03-30T16:19:09.880Z` / `2026-03-30T16:18:42.172Z` 记录 `readinessMode=native`、`apiReady=true`，且剩余 `loading.svg` / `remote-settings.sys.mjs` 已归类为宿主噪声
+- 最新 `agent:monitor` / `agent:gate:release` 已在 `2026-03-30T16:19:52.692Z` / `2026-03-30T16:19:52.762Z` 消费最新 release artifacts；当前 `gatePassed=false` 的唯一原因是远端 `https://gitee.com/zouser/user/releases/download/1.1/update.json` 虽然 `updateURLHTTPStatus=200`，但未包含 `cleanroom-template@example.com` 首条更新记录，且未提供有效 `update_link`，而不是安装态 smoke 或插件运行时回归
+- 当前 Gitee `updateURL` 仅用于这个模板仓库自身的远端发布验收与测试，不作为基于本模板开发的其他插件默认发布地址；下游项目仍需在各自 `config/addon.config.json` 中替换自己的 `addonId` / `homepage` / `updateURL`
+- 当前主阻断已清零；当前唯一 active release-only 工程 gap 继续保持 `ENG-HIGH-104 / ENG-LOW-211~213`：修正远端发布编排与远端 `updateURL` 闭环验证，不回头重开 Reader / startup / freshness 主线；`LEGAL_RISK_CHECKLIST.md` 的 Release Gate 继续保持 `release-only` 人工流程
 <!-- CURRENT-TRUTH-SUMMARY:END -->
 
 历史收口层面，以下结论仍然成立：
@@ -162,7 +163,7 @@ Assessment 对“当前完成度 / 当前主线 / 当前剩余项”的判断只
 
 agent 现在已经能"利用历史经验、结合上下文优先推荐并展示多信号趋势"，后续要做的是继续扩信号域和长期经验颗粒度，而不是补 P2 的从 0 到 1。
 
-### 2.3 发布矩阵已完成 stable/beta 实跑，剩余缺口仅远端验证未配置
+### 2.3 发布矩阵已完成 stable/beta 实跑，剩余缺口仅远端 update.json 内容未达标
 
 当前已有：
 
@@ -182,7 +183,7 @@ agent 现在已经能"利用历史经验、结合上下文优先推荐并展示�
   - 真实插件阻断 `menus[0]["l10nID"] must be string` 已定位并修复
   - `remote-settings.sys.mjs` 与 `loading.svg` 已归类为宿主噪声
   - 当前 stable / beta 两条 profile 已通过，安装态 smoke 不再是 release gate 阻断来源
-  - 当前整体 `release-matrix` 仍为 `attention`，`agent:gate:release` 仍会阻断，但唯一原因是 `updateURL` 仍指向 example.com placeholder、远端自定义发布端未配置
+  - 当前整体 `release-matrix` 仍为 `failed`，`agent:gate:release` 仍会阻断，但唯一原因是当前 Gitee `update.json` 未包含 `cleanroom-template@example.com` 首条更新记录，且未提供有效 `update_link`
 - `release-install-smoke` 已在重新打包后同步刷新 `release-preflight`
   - 当前矩阵会直接暴露真实 smoke 失败原因，而不是先被旧 hash 阻断
 
@@ -193,7 +194,7 @@ agent 现在已经能"利用历史经验、结合上下文优先推荐并展示�
 
 结论：
 
-开发态很强，本地发布态也已经完成 stable/beta 真机闭环；当前剩余的不是安装态 smoke，而是远端自定义发布端 / `updateURL` 闭环验证。当前串行 low-task 已收尾，`READER-HIGH-126` 也已完成历史收口；后续不再保留“当前 active 是 library-only 回归修复”的开放口径，而是以上方自动同步摘要块中的单一事实源为准。
+开发态很强，本地发布态也已经完成 stable/beta 真机闭环；当前剩余的不是安装态 smoke，而是远端 Gitee `update.json` / `update_link` 内容修正。当前串行 low-task 已收尾，`READER-HIGH-126` 也已完成历史收口；后续不再保留“当前 active 是 library-only 回归修复”的开放口径，而是以上方自动同步摘要块中的单一事实源为准。
 
 ### 2.4 Reader 本轮 7 个更深事件点已落地
 

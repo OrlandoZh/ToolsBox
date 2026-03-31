@@ -25,7 +25,7 @@
 - 已在 `2026-03-23` 补齐 `Reader 事件桥` 的三类低风险受控补丁链：当前已可识别并修复 `reader-entry:declarative-reader-mapping-drift`、`reader-event:toolbar-bridge-registration-drift`、`reader-event:fine-grained-hook-declaration-drift`，legacy alias 仅保留输入兼容
 - 已在 `2026-03-30` 重新验证本地发布矩阵链：当前可生成 `release-matrix.json` / `release-matrix.md`，并把 stable/beta 渠道状态接入 `agent:monitor`、`agent:dashboard` 与 `agent:gate:release`
 - 已在 `2026-03-30` 跑通 stable / beta 正式安装态 smoke 真机回归：两个渠道都已确认正式安装成功、`readinessMode === native`、`apiReady === true`
-- 已在 `2026-03-30` 确认发布态剩余唯一缺口是远端 `updateURL` / 自定义发布端未配置：stable/beta 本地 smoke 已通过，但 `release-matrix` / `agent:gate:release` 仍会因 `https://example.com/downloads/cleanroomtemplate/update.json` placeholder 保持 `attention` / 阻断
+- 已在 `2026-03-30` 确认发布态剩余唯一缺口是远端 Gitee `update.json` 内容未达标：stable/beta 本地 smoke 已通过，但 `release-matrix` / `agent:gate:release` 仍会因远端 `update.json` 缺少 `cleanroom-template@example.com` 更新记录而阻断
 - 已在 `2026-03-23` 完成本地发布矩阵阻断收口：`remote-settings.sys.mjs` 与 `loading.svg` 已归类为宿主噪声不再阻断；真实插件阻断 `menus[0]["l10nID"] must be string` 已修复
 - 已在 `2026-03-23` 完成 `P2` 上下文感知记忆/趋势层深化：`agent:memory` 现已沉淀 `zoteroVersionBucket / latestBootMode / releaseMatrix` 信号，`preferredStrategy` 会按上下文优先推荐，`agent:monitor` / `agent:dashboard` 已显示 `contextMatchLevel` 与上下文成功率
 - 当前 `autofix` 白名单已额外覆盖一类偏好设置静态资源故障：当 `addon-static/content/preferences.xhtml` 缺失或日志明确指向其加载失败时，可生成受控恢复草案
@@ -67,6 +67,7 @@
 
 注意：
 
+- 当前仓库里的 Gitee `updateURL` 只用于这个模板项目自身的远端发布验收与测试；如果你是基于模板派生自己的插件，必须先替换 `addonId`、`homepage` 和 `updateURL`
 - 在 Zotero 8 验证中，直接把 `.xpi` 丢到 `profile/extensions/` 不会被视为可靠安装路径
 - 当前 clean-room runner 采用 `profile/extensions/<addonId>` proxy file 加载 `build/<addonRef>`，并在 native 生命周期与 `Zotero.Plugins.init()` 都未挂出实例时，通过 chrome debugger 补一次 bootstrap 兜底
 - 发布态 `.xpi` 已验证可通过 Zotero 正式安装入口自动启动；正式发布前仍建议对目标 Zotero 版本再跑一遍本地安装回归
@@ -74,7 +75,8 @@
 ## 仓库边界
 
 - 主仓默认跟踪源码、配置、测试、文档与模板静态资源
-- `build/`、`dist/`、`.zotero-runtime/`、`obsidian/agent-workbench/` 视为可再生工件，不作为源码事实来源
+- `build/`、`dist/`、`.zotero-runtime/`、`obsidian/agent-workbench/` 视为可再生工件，不作为源码事实来源；它们已被 `.gitignore` 忽略，不会在正常 `git add` / `git push` 中污染源码上传
+- 如果要交付纯源码或纯模板工程，不要直接压缩整个工作目录；使用 `npm run export:project` 生成剔除运行时工件与 agent 附件的最小工程
 - reference 材料仅作为可选本地研究输入，不进入主历史；如需本地复核，见 [本地 Reference 快照说明](docs/REFERENCE_SNAPSHOTS.md)
 
 ## 架构
@@ -173,6 +175,7 @@ npm run release:metadata # 生成 dist/update.json 与 release-manifest.json
 npm run release:preflight # 校验发布产物一致性 + 发布态 clean-room 门禁，并生成 release-preflight.json
 npm run release:local # 本地完整发布门禁（package + release:preflight）
 npm run release:prepare # 生成 dist/release-plan.json 与 dist/release-notes.md
+npm run release:upload -- --provider gitee-release --release-tag 1.1 --target-base-url https://example.com/releases/1.1/ # 仅校验上传契约并生成 dist/release-upload-plan.json / md，不执行真实上传
 npm run release:matrix # 生成 dist/release-matrix.json / md
 npm run release:install-smoke:stable # 运行稳定版正式安装态 smoke，并写入 release-install-smoke.json
 npm run release:install-smoke:beta # 运行 beta 正式安装态 smoke，并写入 release-install-smoke.json
@@ -213,6 +216,16 @@ npm run zotero:scenario # 在 Zotero 内执行 zotero-scenarios/*.scenario.js
 3. 运行 `npm run zotero:smoke`、`npm run zotero:watch` 或 `npm run zotero:console`
 
 更多说明见 [Zotero 测试与调试](docs/ZOTERO_TESTING.md)。
+
+## 新 Agent 接手顺序
+
+1. 先读 [当前剩余任务清单](docs/CURRENT_BACKLOG.md) 的“当前单一事实源”，不要直接根据旧 `dist/` 工件或 README 历史段落判断当前主线
+2. 先运行 `npm run check`，确认源码、配置、文档 truth 与 clean-room 门禁都处于一致状态
+3. 如果 `config/addon.config.json` 仍是模板默认值，例如 `cleanroom-template@example.com`、`Your Team`、模板仓库 `homepage` 或模板专用 `updateURL`，先暂停开发并询问用户初始化信息：`addonName`、`addonId`、`addonRef`、`author`、`homepage`、`updateURL`，同时确认是保留完整 agent 工程链还是导出纯项目
+4. 如果改动会影响宿主运行时、场景或 UI，优先执行 `npm run agent:zotero:e2e`；需要连续迭代热重载时再使用 `npm run zotero:watch`
+5. 每轮改动后重建 `npm run agent:monitor` 与 `npm run agent:gate`，以 monitor / gate 结论而不是单条命令输出来判断是否可以继续推进
+6. 只有在当前任务明确属于发布链时，才进入 `npm run release:plan -> npm run release:upload -- --provider <provider> --release-tag <tag> --target-base-url <url> -> 手动上传远端产物 -> npm run release:preflight -- --verify-remote -> npm run release:prepare -> npm run release:matrix -> npm run agent:gate:release`
+7. 如果目标是交付纯源码，而不是把本地工件一起带走，使用 `npm run export:project`
 
 ## Codex / Opencode 分工脚手架
 
@@ -324,9 +337,10 @@ node scripts/agent-delegation.mjs close <taskId> --message "feat: 基本实现 x
 - `details.runtimeSanitization` 已稳定透传到 direct E2E / monitor / gate：本轮 direct E2E 记录了 `exclusiveProjectRuntime=true`，并在启动前终止了 project-managed `watch` `zotero` / `plugin-container`；旧的 startup/RDP bring-up timeout 口径继续只保留为已收口的诊断能力
 - 最新 library `pre-capture settle` 已稳定收敛到 `visibleBannerIDs=[mac-word-plugin-install-container]`；`sync-reminder-container`、`post-upgrade-container`、`file-renaming-banner-container`、`retracted-items-container` 与 `architecture-warning-container` 会在 capture 前被压平，library drift 已消失，`reader 视图继续对齐`，且 `library / reader` 几何一致 `2000x1200`
 - `READER-LOW-261` 已把 stage-scoped capture failure 结构化落进既有 E2E / validation 展示链；`READER-LOW-262` 已引入 `capture-command-failed` / `visualPrimaryBlockerKind=capture-command-failed` 并同步 consumer；`READER-LOW-263` 已在 live rerun 上证明 freshest-valid direct artifact 消费与 truth 对齐，`visual screenshot capture` 链已恢复到稳定基线
-- 最新 release live acceptance 已补齐 stable / beta 正式安装态 smoke：`release-matrix` 最新工件为 `attention`（`2026-03-30T13:58:47.934Z`），但 stable / beta profile 均已 `passed`；`release-install-smoke-stable` / `release-install-smoke-beta` 分别在 `2026-03-30T13:38:04.172Z` / `2026-03-30T13:58:21.077Z` 记录 `readinessMode=native`、`apiReady=true`，且剩余 `loading.svg` / `remote-settings.sys.mjs` 已归类为宿主噪声
-- 最新 `agent:monitor` / `agent:gate:release` 已在 `2026-03-30T13:59:05.792Z` / `2026-03-30T13:59:05.867Z` 消费最新 release artifacts；当前 `gatePassed=false` 的唯一原因是 `updateURL` 仍指向 `https://example.com/downloads/cleanroomtemplate/update.json` placeholder、远端自定义发布端未配置，而不是安装态 smoke 或插件运行时回归
-- 当前主阻断已清零；当前唯一 active 非阻断工程 gap 继续保持 `ENG-HIGH-104 / ENG-LOW-211~213`：只处理远端发布编排与远端 `updateURL` 闭环验证，不回头重开 Reader / startup / freshness 主线；`LEGAL_RISK_CHECKLIST.md` 的 Release Gate 继续保持 `release-only` 人工流程
+- 最新 release live acceptance 已按当前 Gitee `updateURL` 重新补齐 stable / beta 正式安装态 smoke：`release-matrix` 最新工件为 `failed`（`2026-03-30T16:19:38.678Z`），但 stable / beta profile 均已 `passed`；`release-install-smoke-stable` / `release-install-smoke-beta` 分别在 `2026-03-30T16:19:09.880Z` / `2026-03-30T16:18:42.172Z` 记录 `readinessMode=native`、`apiReady=true`，且剩余 `loading.svg` / `remote-settings.sys.mjs` 已归类为宿主噪声
+- 最新 `agent:monitor` / `agent:gate:release` 已在 `2026-03-30T16:19:52.692Z` / `2026-03-30T16:19:52.762Z` 消费最新 release artifacts；当前 `gatePassed=false` 的唯一原因是远端 `https://gitee.com/zouser/user/releases/download/1.1/update.json` 虽然 `updateURLHTTPStatus=200`，但未包含 `cleanroom-template@example.com` 首条更新记录，且未提供有效 `update_link`，而不是安装态 smoke 或插件运行时回归
+- 当前 Gitee `updateURL` 仅用于这个模板仓库自身的远端发布验收与测试，不作为基于本模板开发的其他插件默认发布地址；下游项目仍需在各自 `config/addon.config.json` 中替换自己的 `addonId` / `homepage` / `updateURL`
+- 当前主阻断已清零；当前唯一 active release-only 工程 gap 继续保持 `ENG-HIGH-104 / ENG-LOW-211~213`：修正远端发布编排与远端 `updateURL` 闭环验证，不回头重开 Reader / startup / freshness 主线；`LEGAL_RISK_CHECKLIST.md` 的 Release Gate 继续保持 `release-only` 人工流程
 <!-- CURRENT-TRUTH-SUMMARY:END -->
 
 - `READER-HIGH-109 / READER-LOW-225~227` 的逐目标视觉证据导航已完成，并转入历史 review artifact；当前直接复用这些既有证据，不再把证据导航继续挂成 active 开发批次
@@ -339,7 +353,7 @@ node scripts/agent-delegation.mjs close <taskId> --message "feat: 基本实现 x
 
 - 数据采集：`agent:run` / `agent:check` / `agent:release` 记录到 `dist/agent-runs/*.json`
 - 数据汇总：`agent:monitor` 产出 `dist/agent-monitor.json` 与 `dist/agent-monitor.md`，并把 `zotero:watch` 的热重载状态、`agent:zotero:e2e` 的真机验证结果、服务健康摘要、Reader 事件桥摘要、`agent:zotero:autofix` 的恢复结果、步骤耗时、失败步骤分布、最小 `failure memory / fix outcome memory`，以及“工程化硬化信号”最小摘要一并纳入主报告；其中 `frontpageSummary` / `readinessSummary` 会提供轻量状态、摘要结论与下一步建议，便于 agent 先快速读状态，再按需下钻明细
-- 发布矩阵：`release:matrix` 会生成 stable/beta 本地发布矩阵，`agent:monitor` / `agent:dashboard` / `agent:gate:release` 会继续消费这份矩阵；当前已能区分“阻断型运行时错误”与“宿主噪声”，stable/beta 本地安装态 smoke 已实跑通过，最新 release gate 仅因远端发布验证未配置而继续阻断
+- 发布矩阵：`release:matrix` 会生成 stable/beta 本地发布矩阵，`agent:monitor` / `agent:dashboard` / `agent:gate:release` 会继续消费这份矩阵；当前已能区分“阻断型运行时错误”与“宿主噪声”，stable/beta 本地安装态 smoke 已实跑通过，最新 release gate 仅因远端 `update.json` 缺少当前模板的有效更新记录而继续阻断
 - 记忆层摘要：`agent:memory` 会单独生成 `dist/agent-memory.json` 与 `dist/agent-memory.md`；当前会沉淀故障指纹热度、历史最优恢复路径、当前故障是否见过、历史推荐、最近样本，以及最近多日趋势
 - 上下文感知记忆：当前 `agent:memory` / `agent:monitor` / `agent:dashboard` 已额外沉淀 `zoteroVersion`、`zoteroVersionBucket`、`latestBootMode`、`bootModes` 与 `preferredStrategy.contextMatchLevel`，并优先采用精确上下文的历史成功路径
 - 记忆层归档：`agent:memory` / `agent:monitor` 现在会同步维护 `dist/agent-memory/`；其中包含 `latest.{json,md}`、`snapshots/`、`history-index.json`、`fingerprints/index.json`、`fingerprints/*.json`、`reasons/index.json`、`reasons/*.json` 与 `signals/index.json`，便于 agent 和人工按时间、指纹、阻塞原因或运行信号回看历史
@@ -363,6 +377,7 @@ node scripts/agent-delegation.mjs close <taskId> --message "feat: 基本实现 x
 - Watch 恢复真机回归：`agent:zotero:watch-recovery` 会通过 clean-room 受控注入触发一次 build 失败和一次 runtime 恢复失败，验证 `session-restart-recovery` 是否能把 Zotero 拉回健康状态，并输出 `dist/zotero-watch-recovery-regression.json` 与 `dist/zotero-watch-recovery-regression.md`
 - 纯项目导出：`export:project` 会生成一个剔除 `reference/`、`docs/`、`tests/`、agent 编排脚本和运行时沙箱后的最小插件工程，输出到 `dist/<addonRef>-<version>-pure-project/` 与对应 zip，适合单独交付业务代码
   - 导出物会保留 `bootstrap.js`、`preferences.xhtml`、`main.css`、配置声明的 icons 与三套 locale `main.ftl`，并继续受 `verify` 护栏保护
+  - 如果目标是“给别人一份干净源码”而不是“带上本地运行产物”，优先使用这条导出链，而不是手工打包整个仓库目录
 - 可视化验收：`agent:zotero:e2e` 现会额外输出每轮 `库视图` 与 `Reader` 窗口截图到 `dist/agent-zotero-e2e-assets/`，并自动对照 `tests/visual-baselines/agent-zotero-e2e/` 做像素级漂移判定
 - 基线刷新：`agent:zotero:e2e:update-baseline` 会把当前 `restart/hot-reload` 两种模式下的 `library/reader` 截图写回视觉基线，用于 UI 变更后的受控更新
 - 场景化动作验证：`zotero-scenarios/*.scenario.js` 已覆盖“真实条目选择/摘要、真实 Notifier 更新、真实 PDF Reader 打开、Reader 交互与 UI 状态摘要、Reader 批注创建/更新/删除回环、设置治理、主窗口多开挂载、无阻塞命令”验证，`agent:zotero:e2e` 会自动执行这些 scenario 并把结果写入报告
@@ -384,6 +399,7 @@ node scripts/agent-delegation.mjs close <taskId> --message "feat: 基本实现 x
 
 ## 文档
 
+- [Agent 入口](AGENTS.md)
 - [API 参考](docs/API.md)
 - [架构说明](docs/ARCHITECTURE.md)
 - [使用指南](docs/GUIDE.md)

@@ -13,6 +13,11 @@ function readJSON(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf-8"));
 }
 
+function writeJSON(filePath, payload) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
+}
+
 function removeIfExists(filePath) {
   if (fs.existsSync(filePath)) {
     fs.rmSync(filePath, { force: true });
@@ -44,6 +49,119 @@ async function execNodeAsync(args, options = {}) {
       resolve();
     });
   });
+}
+
+async function execNodeResult(args, options = {}) {
+  const {
+    cwd = projectRoot,
+    env = process.env,
+  } = options;
+
+  return await new Promise((resolve) => {
+    execFile("node", args, {
+      cwd,
+      env,
+      encoding: "utf-8",
+      maxBuffer: 10 * 1024 * 1024,
+    }, (error, stdout = "", stderr = "") => {
+      resolve({
+        code: error?.code ?? 0,
+        stdout,
+        stderr,
+      });
+    });
+  });
+}
+
+function makeTempReleaseUploadProject(options = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "addontemplate-release-upload-"));
+  const config = {
+    addonId: "cleanroom-template@example.com",
+    addonRef: "cleanroomtemplate",
+    addonVersion: "1.1.0",
+    strictMinVersion: "7.0",
+    strictMaxVersion: "8.*",
+    updateURL: "https://example.com/releases/1.1.0/update.json",
+    homepage: "https://example.com/cleanroom-template",
+    ...(options.config || {}),
+  };
+  const distRoot = path.join(root, "dist");
+  const xpiName = `${config.addonRef}-${config.addonVersion}.xpi`;
+  const xpiPath = path.join(distRoot, xpiName);
+  const updateLink = new URL(xpiName, new URL(".", config.updateURL)).toString();
+  const releaseManifest = {
+    generatedAt: "2026-03-31T00:00:00.000Z",
+    status: "passed",
+    addonId: config.addonId,
+    addonRef: config.addonRef,
+    addonVersion: config.addonVersion,
+    xpiName,
+    xpiPath,
+    updateURL: config.updateURL,
+    updateLink,
+    durationMs: 12,
+    errorCategory: null,
+    errorCategoryLabel: null,
+    errorMessage: null,
+    failedStage: null,
+    ...(options.releaseManifest || {}),
+  };
+  const updateManifest = {
+    addons: {
+      [config.addonId]: {
+        updates: [
+          {
+            version: config.addonVersion,
+            update_link: releaseManifest.updateLink,
+            applications: {
+              zotero: {
+                strict_min_version: config.strictMinVersion,
+                strict_max_version: config.strictMaxVersion,
+              },
+            },
+          },
+        ],
+      },
+    },
+    ...(options.updateManifest || {}),
+  };
+  const preflight = {
+    generatedAt: "2026-03-31T00:00:01.000Z",
+    status: "passed",
+    addonId: config.addonId,
+    addonVersion: config.addonVersion,
+    xpiName,
+    xpiSizeBytes: 8,
+    xpiSHA256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    updateLink: releaseManifest.updateLink,
+    strictMinVersion: config.strictMinVersion,
+    strictMaxVersion: config.strictMaxVersion,
+    remoteVerification: {
+      status: "pending",
+      statusLabel: "待验证",
+      summary: "远端 update.json 与 update_link 尚未验证",
+    },
+    ...(options.preflight || {}),
+  };
+
+  writeJSON(path.join(root, "config", "addon.config.json"), config);
+  fs.mkdirSync(distRoot, { recursive: true });
+  fs.writeFileSync(xpiPath, "fake-xpi", "utf-8");
+  writeJSON(path.join(distRoot, "release-manifest.json"), releaseManifest);
+  writeJSON(path.join(distRoot, "release-preflight.json"), preflight);
+  writeJSON(path.join(distRoot, "update.json"), updateManifest);
+
+  return {
+    root,
+    config,
+    distRoot,
+    xpiName,
+    xpiPath,
+    releaseManifest,
+    preflight,
+    updateManifest,
+    targetBaseURL: new URL(".", releaseManifest.updateURL).toString(),
+  };
 }
 
 const EXPORTED_STATIC_RUNTIME_BASELINE = [
@@ -148,10 +266,142 @@ describe("Toolchain Scripts", () => {
     assert.equal(releasePlan.failedStage, null);
     assert.ok(Array.isArray(releasePlan.artifactFiles));
     assert.ok(releasePlan.artifactFiles.includes("release-notes.md"));
-    assert.equal(releasePlan.remoteVerification?.status, "unconfigured");
+    assert.equal(releasePlan.remoteVerification?.status, "pending");
     assert.ok(releaseNotes.includes("## Upload Steps"));
     assert.ok(releaseNotes.includes("## Remote Verification"));
     assert.ok(releaseNotes.includes("SHA256"));
+    assert.ok(releaseNotes.includes("npm run release:upload -- --provider <provider> --release-tag <tag> --target-base-url <url>"));
+  });
+
+  it("should fail release upload shell when required upload args are missing", async () => {
+    const fixture = makeTempReleaseUploadProject();
+
+    try {
+      const result = await execNodeResult([
+        "scripts/release-upload.mjs",
+        "--project-root",
+        fixture.root,
+      ]);
+
+      const uploadPlan = readJSON(path.join(fixture.distRoot, "release-upload-plan.json"));
+      const uploadPlanMD = fs.readFileSync(path.join(fixture.distRoot, "release-upload-plan.md"), "utf-8");
+
+      assert.equal(result.code, 1);
+      assert.equal(uploadPlan.status, "failed");
+      assert.equal(uploadPlan.executionMode, "plan-only");
+      assert.equal(uploadPlan.errorCategory, "args");
+      assert.equal(uploadPlan.failedStage, "parse-args");
+      assert.ok(uploadPlanMD.includes("模式: `plan-only`"));
+    } finally {
+      fs.rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it("should fail release upload shell when local release artifacts are missing", async () => {
+    const fixture = makeTempReleaseUploadProject();
+
+    try {
+      removeIfExists(path.join(fixture.distRoot, "update.json"));
+
+      const result = await execNodeResult([
+        "scripts/release-upload.mjs",
+        "--project-root",
+        fixture.root,
+        "--provider",
+        "gitee-release",
+        "--release-tag",
+        "1.1.0",
+        "--target-base-url",
+        fixture.targetBaseURL,
+      ]);
+
+      const uploadPlan = readJSON(path.join(fixture.distRoot, "release-upload-plan.json"));
+
+      assert.equal(result.code, 1);
+      assert.equal(uploadPlan.status, "failed");
+      assert.equal(uploadPlan.executionMode, "plan-only");
+      assert.equal(uploadPlan.errorCategory, "environment");
+      assert.equal(uploadPlan.failedStage, "read-release-inputs");
+      assert.ok(String(uploadPlan.errorMessage).includes("Missing JSON file"));
+    } finally {
+      fs.rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it("should generate a plan-only release upload artifact using release-manifest URLs", async () => {
+    const fixture = makeTempReleaseUploadProject();
+
+    try {
+      const result = await execNodeResult([
+        "scripts/release-upload.mjs",
+        "--project-root",
+        fixture.root,
+        "--provider",
+        "gitee-release",
+        "--release-tag",
+        "1.1.0",
+        "--target-base-url",
+        fixture.targetBaseURL,
+        "--dry-run",
+      ]);
+
+      const uploadPlan = readJSON(path.join(fixture.distRoot, "release-upload-plan.json"));
+      const uploadPlanMD = fs.readFileSync(path.join(fixture.distRoot, "release-upload-plan.md"), "utf-8");
+
+      assert.equal(result.code, 0);
+      assert.equal(uploadPlan.status, "passed");
+      assert.equal(uploadPlan.executionMode, "plan-only");
+      assert.equal(uploadPlan.networkActionsPerformed, false);
+      assert.equal(uploadPlan.provider, "gitee-release");
+      assert.equal(uploadPlan.releaseTag, "1.1.0");
+      assert.equal(uploadPlan.targetBaseURL, fixture.targetBaseURL);
+      assert.equal(uploadPlan.updateURL, fixture.releaseManifest.updateURL);
+      assert.equal(uploadPlan.updateLink, fixture.releaseManifest.updateLink);
+      assert.equal(uploadPlan.checks.releaseManifestPassed, true);
+      assert.equal(uploadPlan.checks.preflightPassed, true);
+      assert.equal(uploadPlan.checks.targetBaseURLMatchesManifest, true);
+      assert.equal(uploadPlan.checks.networkUploadImplemented, false);
+      assert.equal(uploadPlan.uploadActions[0].targetURL, fixture.releaseManifest.updateURL);
+      assert.equal(uploadPlan.uploadActions[1].targetURL, fixture.releaseManifest.updateLink);
+      assert.ok(uploadPlanMD.includes("This script is plan-only."));
+      assert.ok(uploadPlanMD.includes("Manually upload `update.json`"));
+    } finally {
+      fs.rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it("should accept release upload provider and dry-run from environment for all supported providers", async () => {
+    const providers = ["gitee-release", "github-release", "generic-http"];
+
+    for (const provider of providers) {
+      const fixture = makeTempReleaseUploadProject();
+
+      try {
+        const result = await execNodeResult([
+          "scripts/release-upload.mjs",
+          "--project-root",
+          fixture.root,
+        ], {
+          env: {
+            ...process.env,
+            RELEASE_UPLOAD_PROVIDER: provider,
+            RELEASE_UPLOAD_TAG: "v1.1.0",
+            RELEASE_UPLOAD_TARGET_BASE_URL: fixture.targetBaseURL,
+            RELEASE_UPLOAD_DRY_RUN: "true",
+          },
+        });
+
+        const uploadPlan = readJSON(path.join(fixture.distRoot, "release-upload-plan.json"));
+
+        assert.equal(result.code, 0);
+        assert.equal(uploadPlan.status, "passed");
+        assert.equal(uploadPlan.provider, provider);
+        assert.equal(uploadPlan.dryRunRequested, true);
+        assert.equal(uploadPlan.executionMode, "plan-only");
+      } finally {
+        fs.rmSync(fixture.root, { recursive: true, force: true });
+      }
+    }
   });
 
   it("should generate local release matrix artifacts", () => {
@@ -177,7 +427,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(releaseMatrix.profiles.every((item) => item.metadataConsistent === true), true);
     assert.equal(releaseMatrix.profiles.every((item) => item.packageConsistent === true), true);
     assert.equal(releaseMatrix.profiles.every((item) => item.installSmokePresent === false), true);
-    assert.equal(releaseMatrix.remoteVerification?.status, "unconfigured");
+    assert.equal(releaseMatrix.remoteVerification?.status, "pending");
     assert.ok(releaseMatrixMD.includes("## 渠道矩阵"));
     assert.ok(releaseMatrixMD.includes("## 远端发布验证"));
     assert.ok(releaseMatrixMD.includes("## 运行时错误画像"));
