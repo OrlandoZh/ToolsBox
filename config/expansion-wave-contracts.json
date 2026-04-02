@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "summary": "Generic expansion-wave scaffolding contract for downstream projects entering their next module expansion batch.",
+  "contracts": [
+    {
+      "id": "generic-expansion-wave-v1",
+      "version": 1,
+      "summary": "Use this contract when a downstream project leaves its current closed batch and enters the next module expansion wave.",
+      "moduleArchetypes": [
+        {
+          "id": "runtime-capability",
+          "summary": "Runtime/service/config capability work should default to functional closure and not inherit strict visual by default.",
+          "defaultValidationProfile": "functional-first"
+        },
+        {
+          "id": "host-integration",
+          "summary": "Host integration work should default to host guard + e2e + gate first, then upgrade to visual only when it reaches a real visible surface.",
+          "defaultValidationProfile": "host-first"
+        },
+        {
+          "id": "visible-surface",
+          "summary": "Real user-visible surfaces require visual acceptance as part of the wave exit criteria.",
+          "defaultValidationProfile": "visual-required"
+        },
+        {
+          "id": "workspace-integration",
+          "summary": "Workspace and handoff integrations should verify artifacts, paths, and data flow before any optional visual review.",
+          "defaultValidationProfile": "artifact-first"
+        }
+      ],
+      "defaultValidationProfile": "archetype-driven",
+      "requiredPlanningArtifacts": [
+        "docs/CURRENT_BACKLOG.md 中声明当前扩展 wave 与默认验收主线",
+        "config/project-expansion-wave.json 中声明当前 wave、scope、archetype 与 acceptanceTrack"
+      ],
+      "requiredGateSignals": [
+        "validationDecision",
+        "agent:monitor",
+        "agent:gate"
+      ],
+      "nonGoals": [
+        "AIAssistant 的 Phase D strict visual 结论",
+        "embeddings / connector / outline / obsidian 等产品模块命名",
+        "任何产品特定 UI 语义、阶段命名或发布节奏"
+      ]
+    }
+  ]
+}

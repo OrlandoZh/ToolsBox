@@ -120,6 +120,47 @@ function createScenarioHelpers(baseContext) {
     }
   }
 
+  function cloneValue(value) {
+    return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+  }
+
+  function normalizeSurfaceEvidenceTargets(value) {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+    return value
+      .filter((entry) => entry && typeof entry === "object")
+      .map((entry) => cloneValue(entry));
+  }
+
+  function toSurfaceSmokeResult(result) {
+    const normalized = result && typeof result === "object"
+      ? cloneValue(result)
+      : {};
+    return {
+      ok: Boolean(normalized?.ok),
+      actionId: typeof normalized?.actionId === "string" ? normalized.actionId : null,
+      readiness: normalized?.readiness && typeof normalized.readiness === "object"
+        ? normalized.readiness
+        : {
+          ok: false,
+          total: 0,
+          passed: 0,
+          failed: 0,
+          checks: [],
+        },
+      observedState: normalized?.observedState && typeof normalized.observedState === "object"
+        ? normalized.observedState
+        : {},
+      surfaceEvidenceTargets: normalizeSurfaceEvidenceTargets(
+        normalized?.surfaceTarget ? [normalized.surfaceTarget] : [],
+      ),
+      failureKind: typeof normalized?.failureKind === "string"
+        ? normalized.failureKind
+        : null,
+    };
+  }
+
   async function cleanup() {
     const errors = [];
     while (cleanupTasks.length > 0) {
@@ -643,6 +684,19 @@ function createScenarioHelpers(baseContext) {
       writeTempFile,
       createPDF,
       openReader,
+      listHostActions() {
+        return typeof plugin?.api?.agent?.listHostActions === "function"
+          ? cloneValue(plugin.api.agent.listHostActions())
+          : [];
+      },
+      async runHostAction(actionId, payload = {}) {
+        if (typeof plugin?.api?.agent?.runHostAction !== "function") {
+          throw new Error("plugin.api.agent.runHostAction() is unavailable");
+        }
+        return await plugin.api.agent.runHostAction(actionId, payload);
+      },
+      toSurfaceSmokeResult,
+      normalizeSurfaceEvidenceTargets,
       getReaderFrameWindow,
       dispatchReaderCustomEvent,
       openMainWindow,

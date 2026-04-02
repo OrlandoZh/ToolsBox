@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
+import fsSync from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -26,6 +27,29 @@ function toISO(value) {
   return new Date(value).toISOString();
 }
 
+function resolveCanonicalPathSync(targetPath) {
+  const normalized = String(targetPath || "").trim();
+  if (!normalized) {
+    return null;
+  }
+  const absolute = path.resolve(normalized);
+  try {
+    return fsSync.realpathSync(absolute);
+  } catch {
+    return absolute;
+  }
+}
+
+function isWithinRoot(candidatePath, rootPath) {
+  const candidate = String(candidatePath || "").trim();
+  const root = String(rootPath || "").trim();
+  if (!candidate || !root) {
+    return false;
+  }
+  const relative = path.relative(root, candidate);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
 export async function ensureAgentRunsDir() {
   const dir = getAgentRunsDir();
   await fs.mkdir(dir, { recursive: true });
@@ -40,12 +64,23 @@ export function createRunRecord({
   cwd = process.cwd(),
 }) {
   const startedAt = Date.now();
+  const projectRootCanonical = resolveCanonicalPathSync(projectRoot) || path.resolve(projectRoot);
+  const executionCwdCanonical = resolveCanonicalPathSync(cwd);
+  const inProject = executionCwdCanonical
+    ? isWithinRoot(executionCwdCanonical, projectRootCanonical)
+    : null;
   return {
     id: randomUUID(),
     runName: sanitizeName(runName),
     command,
     args,
     cwd,
+    projectRoot: path.resolve(projectRoot),
+    projectRootCanonical,
+    executionCwd: path.resolve(cwd),
+    executionCwdCanonical,
+    inProject,
+    provenanceStatus: inProject === null ? "unknown" : (inProject ? "within-project" : "cross-project"),
     status: "running",
     startedAt,
     startedAtISO: toISO(startedAt),

@@ -1,0 +1,703 @@
+{
+  "schemaVersion": 1,
+  "governanceGoal": "在 clean-room 前提下冻结 Zotero 插件宿主的字段、枚举、事件与 host-visible surface 语义，避免 agent 仅凭位置描述或运行时症状发明接口名词。",
+  "domains": [
+    {
+      "id": "menu-manager",
+      "version": 1,
+      "summary": "冻结 MenuManager 的 target、menuType、MenuData 字段面与 host-visible menu item 语义。",
+      "hostNamespace": "Zotero.MenuManager",
+      "ownerFiles": [
+        "src/features/menu-manager.js"
+      ],
+      "referenceSources": [
+        {
+          "file": "chrome/content/zotero/xpcom/pluginAPI/menuManager.js",
+          "requiredSnippets": [
+            "const VALID_TARGETS = [",
+            "const VALID_MENU_TYPES = [",
+            "@typedef MenuData",
+            "@typedef MenuOptions",
+            "registerMenu(options) {"
+          ]
+        }
+      ],
+      "canonicalTerms": [
+        {
+          "term": "menu item",
+          "preferredChinese": "菜单项",
+          "useFor": [
+            "描述 Zotero 菜单注入结果与 host-visible menu surface。"
+          ],
+          "avoid": [
+            "menu entry"
+          ]
+        },
+        {
+          "term": "target",
+          "preferredChinese": "菜单目标",
+          "useFor": [
+            "描述 MenuManager 注册落点，如 main/library/item、reader/menubar/view。"
+          ],
+          "avoid": []
+        }
+      ],
+      "enums": [
+        {
+          "name": "VALID_TARGETS",
+          "values": [
+            "main/menubar/file",
+            "main/library/item",
+            "main/library/collection",
+            "reader/menubar/view",
+            "itemPane/info/row",
+            "notesPane/addItemNote",
+            "sidenav/locate"
+          ],
+          "notes": "仅列出模板当前最常触达的 authoritative target 样本；完整 authoritative source 仍以 reference anchor 为准。"
+        },
+        {
+          "name": "VALID_MENU_TYPES",
+          "values": [
+            "menuitem",
+            "separator",
+            "submenu"
+          ],
+          "notes": "MenuData.menuType 只认 Zotero 官方枚举。"
+        },
+        {
+          "name": "enableForTabTypes",
+          "values": [
+            "library",
+            "reader/*",
+            "reader/pdf",
+            "reader/epub",
+            "reader/snapshot"
+          ],
+          "extensible": true,
+          "notes": "Zotero 允许 custom tab types，但模板治理必须先对齐宿主已知类型。"
+        }
+      ],
+      "optionSchemas": [
+        {
+          "name": "MenuOptions",
+          "requiredFields": [
+            "menuID",
+            "pluginID",
+            "target",
+            "menus"
+          ],
+          "optionalFields": [],
+          "notes": "target 必须命中宿主 VALID_TARGETS。"
+        },
+        {
+          "name": "MenuData",
+          "requiredFields": [
+            "menuType"
+          ],
+          "optionalFields": [
+            "l10nID",
+            "l10nArgs",
+            "icon",
+            "darkIcon",
+            "enableForTabTypes",
+            "onShowing",
+            "onShown",
+            "onHiding",
+            "onHidden",
+            "onCommand",
+            "menus"
+          ],
+          "notes": "submenu 需要 menus；menuType 不允许自造值。"
+        }
+      ],
+      "surfaceSemantics": [
+        {
+          "id": "menu-item",
+          "kind": "menu-item",
+          "hostEvents": [],
+          "surfaceTerms": [
+            "menu item",
+            "target",
+            "menuType"
+          ],
+          "notes": [
+            "判断菜单 surface 时，先证明 live host menu 中可见，再谈整窗视觉。"
+          ]
+        }
+      ],
+      "requiredTypes": [
+        {
+          "file": "types/features.d.ts",
+          "snippets": [
+            "readonly MENU_TARGETS: typeof MENU_TARGETS;",
+            "readonly MENU_TYPES: typeof MENU_TYPES;",
+            "registerReaderMenuItem(",
+            "isOfficialAPIAvailable(): boolean;"
+          ]
+        }
+      ],
+      "requiredTests": [
+        "zotero-host-semantic-index-lib.test.js",
+        "zotero-host-semantic-index.test.js",
+        "toolchain.test.js"
+      ],
+      "nonGoals": [
+        "产品自己的菜单文案、顺序和业务动作",
+        "宿主 DOM 注入 fallback 的产品策略",
+        "agent 诊断 fingerprint 命名"
+      ]
+    },
+    {
+      "id": "preference-panes",
+      "version": 1,
+      "summary": "冻结 PreferencePanes.register() 的 pane 字段面、URI 解析语义与 preference pane surface 命名。",
+      "hostNamespace": "Zotero.PreferencePanes",
+      "ownerFiles": [
+        "src/features/preference-panes.js"
+      ],
+      "referenceSources": [
+        {
+          "file": "chrome/content/zotero/xpcom/preferencePanes.js",
+          "requiredSnippets": [
+            "Register a pane to be displayed in the preferences.",
+            "if (!options.pluginID || !options.src)",
+            "rawLabel: options.label || (await Zotero.Plugins.getName(options.pluginID))",
+            "src: await Zotero.Plugins.resolveURI(options.pluginID, options.src)",
+            "unregister: function (id) {"
+          ]
+        }
+      ],
+      "canonicalTerms": [
+        {
+          "term": "PreferencePanes",
+          "preferredChinese": "偏好设置面板 API",
+          "useFor": [
+            "指代 Zotero.PreferencePanes 宿主注册接口。"
+          ],
+          "avoid": []
+        },
+        {
+          "term": "preference pane",
+          "preferredChinese": "偏好设置面板",
+          "useFor": [
+            "指代可从 preferences sidebar 打开的宿主 pane surface。"
+          ],
+          "avoid": [
+            "偏好页"
+          ]
+        }
+      ],
+      "enums": [
+        {
+          "name": "builtInPanes sample IDs",
+          "values": [
+            "zotero-prefpane-general",
+            "zotero-prefpane-sync",
+            "zotero-prefpane-export",
+            "zotero-prefpane-cite",
+            "zotero-prefpane-advanced"
+          ],
+          "notes": "用于说明 pane / subpane 语义，不要求下游复用这些 built-in ID。"
+        }
+      ],
+      "optionSchemas": [
+        {
+          "name": "PreferencePaneOptions",
+          "requiredFields": [
+            "pluginID",
+            "src"
+          ],
+          "optionalFields": [
+            "id",
+            "parent",
+            "label",
+            "image",
+            "scripts",
+            "stylesheets",
+            "helpURL"
+          ],
+          "notes": "label 缺失时回退插件名；URI 字段按 plugin root 解析。"
+        }
+      ],
+      "surfaceSemantics": [
+        {
+          "id": "preference-pane",
+          "kind": "preference-pane",
+          "hostEvents": [],
+          "surfaceTerms": [
+            "PreferencePanes",
+            "preference pane",
+            "preferences sidebar"
+          ],
+          "notes": [
+            "验证 preference pane 时，需证明 pane 已从侧边栏可打开且核心控件已渲染。"
+          ]
+        }
+      ],
+      "requiredTypes": [
+        {
+          "file": "types/features.d.ts",
+          "snippets": [
+            "registerPane(options: PreferencePaneOptions): Promise<string | null>;",
+            "resolveURI(uri: string): string;",
+            "label?: string;"
+          ]
+        }
+      ],
+      "requiredTests": [
+        "zotero-host-semantic-index-lib.test.js",
+        "zotero-host-semantic-index.test.js",
+        "toolchain.test.js"
+      ],
+      "nonGoals": [
+        "具体偏好设置表单内容和产品 copy",
+        "偏好设置面板视觉样式",
+        "产品帮助链接策略"
+      ]
+    },
+    {
+      "id": "item-pane",
+      "version": 1,
+      "summary": "冻结 ItemPane section/info row 的 hook 面、l10nID 约束与 Item Pane 命名。",
+      "hostNamespace": "Zotero.ItemPaneManager",
+      "ownerFiles": [
+        "src/features/item-pane.js"
+      ],
+      "referenceSources": [
+        {
+          "file": "chrome/content/zotero/xpcom/pluginAPI/itemPaneManager.js",
+          "requiredSnippets": [
+            "Zotero.ItemPaneManager.registerSection({",
+            "@param {SectionRenderHook} options.onRender",
+            "@param {SectionAsyncRenderHook} [options.onAsyncRender]",
+            "Zotero.ItemPaneManager.registerInfoRow({",
+            "@param {InfoRowGetDataHook} options.onGetData"
+          ]
+        }
+      ],
+      "canonicalTerms": [
+        {
+          "term": "Item Pane",
+          "preferredChinese": "条目窗格",
+          "useFor": [
+            "指代右侧条目详情宿主窗格与 ItemPaneManager API。"
+          ],
+          "avoid": [
+            "条目面板"
+          ]
+        },
+        {
+          "term": "section",
+          "preferredChinese": "section",
+          "useFor": [
+            "指代 registerSection 注册的宿主 section。"
+          ],
+          "avoid": []
+        },
+        {
+          "term": "info row",
+          "preferredChinese": "信息行",
+          "useFor": [
+            "指代 registerInfoRow 注册的宿主 info row。"
+          ],
+          "avoid": []
+        }
+      ],
+      "enums": [],
+      "optionSchemas": [
+        {
+          "name": "SectionOptions",
+          "requiredFields": [
+            "paneID",
+            "pluginID",
+            "header",
+            "sidenav",
+            "onRender"
+          ],
+          "optionalFields": [
+            "onInit",
+            "onDestroy",
+            "onItemChange",
+            "onAsyncRender",
+            "onToggle",
+            "sectionButtons"
+          ],
+          "notes": "header.l10nID 与 sidenav.l10nID 对应 FTL key 必须已注入。"
+        },
+        {
+          "name": "InfoRowOptions",
+          "requiredFields": [
+            "rowID",
+            "pluginID",
+            "label",
+            "onGetData"
+          ],
+          "optionalFields": [
+            "position",
+            "multiline",
+            "nowrap",
+            "editable",
+            "onSetData",
+            "onItemChange"
+          ],
+          "notes": "onSetData / onItemChange 不应承担重新渲染职责。"
+        }
+      ],
+      "surfaceSemantics": [
+        {
+          "id": "item-pane-section",
+          "kind": "host-wrapper",
+          "hostEvents": [],
+          "surfaceTerms": [
+            "Item Pane",
+            "section",
+            "info row",
+            "header.l10nID",
+            "sidenav.l10nID"
+          ],
+          "notes": [
+            "Item Pane 是宿主接口包装层，不因文件名命中就默认转成 visual-required。"
+          ]
+        },
+        {
+          "id": "item-pane-sidenav",
+          "kind": "host-visible-surface",
+          "hostEvents": [],
+          "surfaceTerms": [
+            "Item Pane",
+            "sidenav",
+            "data-pane",
+            "scrollToPane"
+          ],
+          "notes": [
+            "当验证 Item Pane sidenav 时，先证明目标 pane 已被切换并 visible，再补局部视觉证据。"
+          ]
+        }
+      ],
+      "requiredTypes": [
+        {
+          "file": "types/features.d.ts",
+          "snippets": [
+            "registerSection(options: SectionOptions): string | null;",
+            "registerInfoRow(options: InfoRowOptions): string | null;",
+            "headerL10nID: string;",
+            "labelL10nID: string;"
+          ]
+        }
+      ],
+      "requiredTests": [
+        "zotero-host-semantic-index-lib.test.js",
+        "zotero-host-semantic-index.test.js",
+        "toolchain.test.js"
+      ],
+      "nonGoals": [
+        "具体 section/info row 的业务数据和视觉布局",
+        "产品 FTL 文案内容",
+        "Reader 视觉基线逻辑"
+      ]
+    },
+    {
+      "id": "item-tree",
+      "version": 1,
+      "summary": "冻结 ItemTree custom column 的 dataKey、enabledTreeIDs 与 namespaced 返回值语义。",
+      "hostNamespace": "Zotero.ItemTreeManager",
+      "ownerFiles": [
+        "src/features/item-tree.js"
+      ],
+      "referenceSources": [
+        {
+          "file": "chrome/content/zotero/xpcom/pluginAPI/itemTreeManager.js",
+          "requiredSnippets": [
+            "@param {string} option.dataKey",
+            "@param {string[]} [option.enabledTreeIDs=[]]",
+            "This is because the `dataKey` is prefixed with the `pluginID`",
+            "registerColumn(option) {",
+            "unregisterColumn(dataKey) {"
+          ]
+        }
+      ],
+      "canonicalTerms": [
+        {
+          "term": "Item Tree",
+          "preferredChinese": "条目列表",
+          "useFor": [
+            "指代主列表与 ItemTreeManager custom column API。"
+          ],
+          "avoid": [
+            "条目树控件"
+          ]
+        },
+        {
+          "term": "dataKey",
+          "preferredChinese": "列键",
+          "useFor": [
+            "指代 column 的 authoritative key 与 namespaced 返回值语义。"
+          ],
+          "avoid": []
+        }
+      ],
+      "enums": [
+        {
+          "name": "enabledTreeIDs sample values",
+          "values": [
+            "main",
+            "*"
+          ],
+          "notes": "若包含 *，宿主会归一成仅 *。"
+        }
+      ],
+      "optionSchemas": [
+        {
+          "name": "ColumnOptions",
+          "requiredFields": [
+            "dataKey",
+            "label",
+            "pluginID"
+          ],
+          "optionalFields": [
+            "enabledTreeIDs",
+            "sortReverse",
+            "flex",
+            "width",
+            "fixedWidth",
+            "staticWidth",
+            "noPadding",
+            "minWidth",
+            "iconLabel",
+            "iconPath",
+            "htmlLabel",
+            "showInColumnPicker",
+            "columnPickerSubMenu",
+            "primary",
+            "dataProvider",
+            "renderCell",
+            "zoteroPersist"
+          ],
+          "notes": "defaultIn/disabledIn 属于兼容历史面，不应作为模板推荐字段。"
+        }
+      ],
+      "surfaceSemantics": [
+        {
+          "id": "item-tree-column",
+          "kind": "host-wrapper",
+          "hostEvents": [],
+          "surfaceTerms": [
+            "Item Tree",
+            "dataKey",
+            "enabledTreeIDs"
+          ],
+          "notes": [
+            "registerColumn 返回值可能被宿主加 pluginID namespace，验证时不要把输入 dataKey 当成唯一真相。"
+          ]
+        }
+      ],
+      "requiredTypes": [
+        {
+          "file": "types/features.d.ts",
+          "snippets": [
+            "registerColumn(options: ColumnOptions): string | null;",
+            "enabledTreeIDs?: string[];",
+            "createConditionalCellRenderer("
+          ]
+        }
+      ],
+      "requiredTests": [
+        "zotero-host-semantic-index-lib.test.js",
+        "zotero-host-semantic-index.test.js",
+        "toolchain.test.js"
+      ],
+      "nonGoals": [
+        "具体列内容与产品字段设计",
+        "agent 诊断如何解释 Item Tree 回归",
+        "宿主内部列表渲染实现"
+      ]
+    },
+    {
+      "id": "reader-events",
+      "version": 1,
+      "summary": "冻结 Reader.registerEventListener 的 event type、event payload 与 host-visible reader surface 语义。",
+      "hostNamespace": "Zotero.Reader",
+      "ownerFiles": [
+        "src/features/reader.js"
+      ],
+      "referenceSources": [
+        {
+          "file": "chrome/content/zotero/xpcom/reader.js",
+          "requiredSnippets": [
+            "@typedef {\"renderTextSelectionPopup\" | \"renderSidebarAnnotationHeader\" | \"renderToolbar\" |",
+            "\"createColorContextMenu\" | \"createViewContextMenu\" | \"createAnnotationContextMenu\" |",
+            "\"createThumbnailContextMenu\" | \"createSelectorContextMenu\"} ReaderEventType",
+            "@typedef {Object} ReaderEvent",
+            "registerEventListener(type, handler, pluginID = undefined) {"
+          ]
+        }
+      ],
+      "canonicalTerms": [
+        {
+          "term": "renderToolbar",
+          "preferredChinese": "renderToolbar 工具栏注入",
+          "useFor": [
+            "描述 Reader 官方工具栏注入事件类型。"
+          ],
+          "avoid": [
+            "toolbar entry"
+          ]
+        },
+        {
+          "term": "annotation context menu",
+          "preferredChinese": "批注上下文菜单",
+          "useFor": [
+            "描述 createAnnotationContextMenu 对应的 live host menu surface。"
+          ],
+          "avoid": []
+        },
+        {
+          "term": "selector context menu",
+          "preferredChinese": "选择器上下文菜单",
+          "useFor": [
+            "描述 createSelectorContextMenu 对应的宿主菜单 surface。"
+          ],
+          "avoid": []
+        },
+        {
+          "term": "context pane",
+          "preferredChinese": "上下文窗格",
+          "useFor": [
+            "描述 Reader 侧由宿主控制的 context pane 语义。"
+          ],
+          "avoid": [
+            "Reader 右侧栏按钮"
+          ]
+        }
+      ],
+      "enums": [
+        {
+          "name": "ReaderEventType",
+          "values": [
+            "renderTextSelectionPopup",
+            "renderSidebarAnnotationHeader",
+            "renderToolbar",
+            "createColorContextMenu",
+            "createViewContextMenu",
+            "createAnnotationContextMenu",
+            "createThumbnailContextMenu",
+            "createSelectorContextMenu"
+          ],
+          "notes": "v1 固定对齐 reference 当前 authoritative 枚举。"
+        }
+      ],
+      "optionSchemas": [
+        {
+          "name": "ReaderEvent",
+          "requiredFields": [
+            "reader",
+            "doc",
+            "params",
+            "append"
+          ],
+          "optionalFields": [],
+          "notes": "append 用于注入 DOM 节点或 menu items；不要把自定义 UI 状态字段混入宿主 event payload。"
+        }
+      ],
+      "surfaceSemantics": [
+        {
+          "id": "render-toolbar",
+          "kind": "render-surface",
+          "hostEvents": [
+            "renderToolbar"
+          ],
+          "surfaceTerms": [
+            "renderToolbar",
+            "ReaderEvent",
+            "append"
+          ],
+          "notes": [
+            "renderToolbar 属于 host-visible 注入点，先证明注入 UI 可见，再谈视觉证据。"
+          ]
+        },
+        {
+          "id": "annotation-context-menu",
+          "kind": "context-menu",
+          "hostEvents": [
+            "createAnnotationContextMenu"
+          ],
+          "surfaceTerms": [
+            "annotation context menu",
+            "menu item",
+            "append"
+          ],
+          "notes": [
+            "监听器注册不等于菜单真的可见；必须验证 live reader 场景。"
+          ]
+        },
+        {
+          "id": "selector-context-menu",
+          "kind": "context-menu",
+          "hostEvents": [
+            "createSelectorContextMenu"
+          ],
+          "surfaceTerms": [
+            "selector context menu",
+            "append"
+          ],
+          "notes": [
+            "若使用 selector surface，命名必须沿用 Zotero ReaderEventType，而不是自造按钮名。"
+          ]
+        },
+        {
+          "id": "context-pane",
+          "kind": "context-pane",
+          "hostEvents": [
+            "renderToolbar"
+          ],
+          "surfaceTerms": [
+            "context pane",
+            "Sidebar"
+          ],
+          "notes": [
+            "位置描述可以作为补充，但不能反向替代 context pane 这一宿主术语。"
+          ]
+        },
+        {
+          "id": "reader-sidebar-view",
+          "kind": "host-visible-surface",
+          "hostEvents": [],
+          "surfaceTerms": [
+            "sidebarView",
+            "Reader sidebar",
+            "annotations"
+          ],
+          "notes": [
+            "Reader sidebar view 必须沿用宿主 view id 语义，不要把按钮文案或视觉位置当成稳定接口名。"
+          ]
+        }
+      ],
+      "requiredTypes": [
+        {
+          "file": "types/features.d.ts",
+          "snippets": [
+            "export const READER_EVENT_TYPES: {",
+            "readonly READER_EVENT_TYPES: typeof READER_EVENT_TYPES;",
+            "waitForReaderReady(target: unknown, options?: { timeoutMs?: number; intervalMs?: number }): Promise<unknown | null>;",
+            "setContextPaneOpen(target: unknown, open: boolean, options?: { timeoutMs?: number; intervalMs?: number }): Promise<Record<string, unknown> | null>;",
+            "selectSidebarView(target: unknown, view: string, options?: { timeoutMs?: number; intervalMs?: number }): Promise<{",
+            "registerEventListener(type: string, handler: (event: ReaderEvent) => void, options?: { pluginID?: string }): (() => void) | null;",
+            "dispatchSyntheticEvent(target: unknown, options?: {",
+            "getReaderFrameWindow(target: unknown, options?: { view?: \"primary\" | \"secondary\" }): Window | null;"
+          ]
+        }
+      ],
+      "requiredTests": [
+        "zotero-host-semantic-index-lib.test.js",
+        "zotero-host-semantic-index.test.js",
+        "toolchain.test.js"
+      ],
+      "nonGoals": [
+        "产品自己的 reader panel copy 或布局",
+        "strict visual / baseline refresh / autofix 的产品语义",
+        "agent 诊断字段或 patch plan 的产品命名"
+      ]
+    }
+  ]
+}

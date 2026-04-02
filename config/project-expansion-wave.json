@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "status": "active",
+  "currentContractId": "generic-expansion-wave-v1",
+  "currentWaveName": "ZOTERO-HOST-WAVE-001",
+  "summary": "Inventory the checked-in Zotero host source mirror, promote stable non-destructive entrypoints into reusable Host Actions, and upgrade validation to surface smoke plus surface-local evidence.",
+  "inScopeModules": [
+    "zotero-host-inventory",
+    "host-action-runner",
+    "surface-smoke-scenarios",
+    "surface-local-visual-evidence"
+  ],
+  "outOfScopeModules": [
+    "release-remote-distribution",
+    "destructive-modal-host-actions"
+  ],
+  "moduleArchetypes": [
+    {
+      "module": "zotero-host-inventory",
+      "archetype": "host-integration"
+    },
+    {
+      "module": "host-action-runner",
+      "archetype": "host-integration"
+    },
+    {
+      "module": "surface-smoke-scenarios",
+      "archetype": "visible-surface"
+    },
+    {
+      "module": "surface-local-visual-evidence",
+      "archetype": "visible-surface"
+    }
+  ],
+  "acceptanceTrack": "host-first -> surface smoke -> surface-local visual evidence",
+  "explicitVisualUpgradeModules": [
+    "surface-smoke-scenarios",
+    "surface-local-visual-evidence"
+  ]
+}

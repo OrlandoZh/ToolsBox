@@ -20,6 +20,14 @@ import {
   summarizeWatchRecoveryReport,
 } from "./agent-zotero-validation-lib.mjs";
 import {
+  evaluateObsidianWorkspaceGuard,
+} from "./agent-obsidian-guard-lib.mjs";
+import {
+  buildValidationDecision,
+  collectValidationContext,
+} from "./agent-validation-decision-lib.mjs";
+import { evaluateArtifactProvenance } from "./agent-provenance-lib.mjs";
+import {
   assertScript,
   buildScriptFailureInfo,
   createScriptError,
@@ -358,7 +366,7 @@ function findCapabilityStatus(e2e, capabilityId) {
   return statuses.find((item) => String(item?.id || "") === String(capabilityId)) || null;
 }
 
-function evaluateZoteroValidation(validationSummary, policy) {
+function evaluateZoteroValidation(validationSummary, policy, validationDecision = null) {
   if (!policy.zoteroValidationEnabled) {
     return {
       enabled: false,
@@ -413,9 +421,23 @@ function evaluateZoteroValidation(validationSummary, policy) {
     autofixRelation = "same";
   }
 
+  const visualLevel = String(validationDecision?.level || "").trim() || "visual-recommended";
+  const visualRequired = visualLevel === "visual-required";
+  const visualRecommended = visualLevel === "visual-recommended";
+
+  if (visualRequired && validationDecision?.blocking && validationDecision?.issue) {
+    issues.push(validationDecision.issue);
+    if (validationDecision.recommendation) {
+      recommendations.push(validationDecision.recommendation);
+    }
+  } else if (visualRecommended && validationDecision?.deferredEvidenceAction) {
+    recommendations.push(validationDecision.deferredEvidenceAction);
+  }
+
   if (!e2e?.present) {
     recommendations.push("建议运行 `npm run agent:zotero:e2e`，把最近的 Zotero 真机验证结果纳入质量闸门。");
   } else {
+    const recoverableMissingKeyService = Boolean(e2e.serviceRecoverableMissingKey);
     const readerEvent = e2e?.readerEventReport && typeof e2e.readerEventReport === "object"
       ? e2e.readerEventReport
       : null;
@@ -462,23 +484,33 @@ function evaluateZoteroValidation(validationSummary, policy) {
       }
     }
     if (e2e.serviceObserved && (e2e.serviceHealthOK === false || Number(e2e.serviceUnhealthyCount || 0) > 0)) {
-      issues.push(`Zotero 服务健康异常：共 ${Number(e2e.serviceTotal || 0)} 个服务，异常 ${Number(e2e.serviceUnhealthyCount || 0)} 个，当前状态 ${e2e.serviceStatus || "unknown"}。`);
-      recommendations.push("优先检查 service registry 与各服务的 start/stop/healthCheck 实现，确认异常服务是否已被正确暴露到 selfCheck。");
-      if (Array.isArray(e2e.serviceIssues) && e2e.serviceIssues.length > 0) {
-        e2e.serviceIssues.slice(0, 3).forEach((item) => {
-          recommendations.push(`服务问题：${item}`);
-        });
+      if (recoverableMissingKeyService) {
+        recommendations.push("AI runtime 当前仅因缺少非本地 provider 的 API key 而降级；若本轮不验证远端 AI 能力，可继续主线开发。");
+        recommendations.push("需要验证 AI provider 闭环时，补充对应 API key 后重新执行 `npm run agent:zotero:e2e`。");
+      } else {
+        issues.push(`Zotero 服务健康异常：共 ${Number(e2e.serviceTotal || 0)} 个服务，异常 ${Number(e2e.serviceUnhealthyCount || 0)} 个，当前状态 ${e2e.serviceStatus || "unknown"}。`);
+        recommendations.push("优先检查 service registry 与各服务的 start/stop/healthCheck 实现，确认异常服务是否已被正确暴露到 selfCheck。");
+        if (Array.isArray(e2e.serviceIssues) && e2e.serviceIssues.length > 0) {
+          e2e.serviceIssues.slice(0, 3).forEach((item) => {
+            recommendations.push(`服务问题：${item}`);
+          });
+        }
       }
     }
     if (e2e.status !== "passed") {
-      if (pureVisualReaderFailure && visualPrimaryBlockerSummary) {
+      const treatAsBlockingVisual = pureVisualReaderFailure && visualRequired;
+      if (treatAsBlockingVisual && visualPrimaryBlockerSummary) {
         issues.push(visualPrimaryBlockerSummary);
       }
-      issues.push(`最近 Zotero E2E 未通过：${e2e.statusLabel || e2e.status || "unknown"}。`);
+      if (!pureVisualReaderFailure || visualRequired) {
+        issues.push(`最近 Zotero E2E 未通过：${e2e.statusLabel || e2e.status || "unknown"}。`);
+      }
       if (primaryDiagnosis) {
-        issues.push(
-          `主诊断：${primaryDiagnosis.featureLabel || primaryDiagnosis.feature || "未知功能"} / ${primaryDiagnosis.fingerprint || "unknown"}（${primaryDiagnosis.severity || "unknown"}，置信度 ${formatConfidence(primaryDiagnosis.confidence)}）。`,
-        );
+        if (!pureVisualReaderFailure || visualRequired) {
+          issues.push(
+            `主诊断：${primaryDiagnosis.featureLabel || primaryDiagnosis.feature || "未知功能"} / ${primaryDiagnosis.fingerprint || "unknown"}（${primaryDiagnosis.severity || "unknown"}，置信度 ${formatConfidence(primaryDiagnosis.confidence)}）。`,
+          );
+        }
       }
       if (Number(e2e.testFailed || 0) > 0) {
         issues.push(`Zotero E2E 中仍有 ${e2e.testFailed} 条集成测试失败。`);
@@ -486,7 +518,7 @@ function evaluateZoteroValidation(validationSummary, policy) {
       if (Number(e2e.scenarioFailed || 0) > 0) {
         issues.push(`Zotero E2E 中仍有 ${e2e.scenarioFailed} 条场景验证失败。`);
       }
-      if (Number(e2e.visualDriftCount || 0) > 0) {
+      if (Number(e2e.visualDriftCount || 0) > 0 && visualRequired) {
         issues.push(`Zotero E2E 检测到 ${e2e.visualDriftCount} 处视觉漂移。`);
       }
       if (!pureVisualReaderFailure && !autofix?.present) {
@@ -511,7 +543,7 @@ function evaluateZoteroValidation(validationSummary, policy) {
           recommendations.push(`诊断建议：${item}`);
         });
       }
-      if (pureVisualReaderFailure) {
+      if (pureVisualReaderFailure && visualRequired) {
         switch (String(e2e.visualPrimaryBlockerKind || "").trim()) {
           case "capture-command-failed":
             {
@@ -543,6 +575,10 @@ function evaluateZoteroValidation(validationSummary, policy) {
             recommendations.push("当前主阻断仍落在 Reader 视觉链路，优先重新执行 `npm run agent:zotero:e2e` 并复核视觉证据。");
             break;
         }
+      } else if (pureVisualReaderFailure && visualRecommended) {
+        recommendations.push("当前视觉问题按推荐级处理：先保持功能闭环推进，并在下一次合并前补一轮视觉验证。");
+      } else if (pureVisualReaderFailure) {
+        recommendations.push("当前改动域默认不做视觉阻断，视觉异常已降级为参考信号。");
       } else {
         recommendations.push("优先重新执行 `npm run agent:zotero:e2e`，确认真实 Zotero 动作、测试与视觉基线是否全部通过。");
       }
@@ -705,7 +741,7 @@ function evaluateReleaseMatrix(releaseMatrix, policy) {
   };
 }
 
-function evaluateGate(summary, policy, watchStatus = null) {
+function evaluateGate(summary, policy, watchStatus = null, obsidianGuard = null) {
   const allRuns = Array.isArray(summary.runs) ? summary.runs : [];
   const effectiveRuns = allRuns.filter((run) => !isDiagnosticRunName(run.runName));
   const effectivePassed = effectiveRuns.filter((run) => run.success === true).length;
@@ -731,7 +767,15 @@ function evaluateGate(summary, policy, watchStatus = null) {
     };
   });
   const watchStatusCheck = evaluateWatchStatus(watchStatus, policy);
-  const zoteroValidationCheck = evaluateZoteroValidation(summary.zoteroValidation, policy);
+  const validationDecision = buildValidationDecision({
+    projectRoot,
+    validationContext: summary.validationContext || null,
+    changedPaths: summary.validationContext?.changedPaths || [],
+    runNames: allRuns.map((run) => run?.runName).filter(Boolean),
+    e2e: summary.zoteroValidation?.e2e || null,
+    env: process.env,
+  });
+  const zoteroValidationCheck = evaluateZoteroValidation(summary.zoteroValidation, policy, validationDecision);
   const releaseMatrixCheck = evaluateReleaseMatrix(summary.releaseMatrix, policy);
 
   const issues = [];
@@ -756,6 +800,12 @@ function evaluateGate(summary, policy, watchStatus = null) {
   issues.push(...watchStatusCheck.issues);
   issues.push(...zoteroValidationCheck.issues);
   issues.push(...releaseMatrixCheck.issues);
+  if (summary.provenance?.violation) {
+    issues.push(summary.provenance.issue || summary.provenance.message || "检测到跨仓库工件来源。");
+  }
+  if (obsidianGuard?.violation) {
+    issues.push(obsidianGuard.issue || obsidianGuard.message || "Obsidian workspace guard violation");
+  }
 
   const recommendations = [];
   if (issues.length > 0) {
@@ -770,6 +820,12 @@ function evaluateGate(summary, policy, watchStatus = null) {
   recommendations.push(...watchStatusCheck.recommendations);
   recommendations.push(...zoteroValidationCheck.recommendations);
   recommendations.push(...releaseMatrixCheck.recommendations);
+  if (Array.isArray(summary.provenance?.recommendations) && summary.provenance.recommendations.length > 0) {
+    recommendations.push(...summary.provenance.recommendations);
+  }
+  if (obsidianGuard?.violation && obsidianGuard.recommendation) {
+    recommendations.push(obsidianGuard.recommendation);
+  }
   const filteredRecommendations = filterConflictingRecommendationsForWatchStatus(
     recommendations,
     watchStatusCheck.status,
@@ -781,7 +837,9 @@ function evaluateGate(summary, policy, watchStatus = null) {
     issues,
     recommendations: filteredRecommendations,
     watchStatus: watchStatusCheck,
+    obsidianGuard,
     zoteroValidation: zoteroValidationCheck,
+    validationDecision,
   });
 
   return {
@@ -798,13 +856,24 @@ function evaluateGate(summary, policy, watchStatus = null) {
       effectivePassed,
       effectiveFailed: effectiveRuns.length - effectivePassed,
       effectivePassRate,
+      qualityTotal: Number(summary.qualityTotal || effectiveRuns.length),
+      qualityPassed: Number(summary.qualityPassed || effectivePassed),
+      qualityFailed: Number(summary.qualityFailed || (effectiveRuns.length - effectivePassed)),
+      qualityPassRate: Number(summary.qualityPassRate || effectivePassRate),
+      diagnosticTotal: Number(summary.diagnosticTotal || (allRuns.length - effectiveRuns.length)),
+      diagnosticPassed: Number(summary.diagnosticPassed ?? Math.max(0, Number(summary.passed || 0) - effectivePassed)),
+      diagnosticFailed: Number(summary.diagnosticFailed ?? Math.max(0, Number(summary.failed || 0) - (effectiveRuns.length - effectivePassed))),
+      diagnosticPassRate: Number(summary.diagnosticPassRate || 0),
       averageDurationMs: Number(summary.averageDurationMs || 0),
       recentFailed,
     },
     requiredChecks,
     watchStatus: watchStatusCheck,
+    obsidianGuard,
     zoteroValidation: zoteroValidationCheck,
     releaseMatrix: releaseMatrixCheck,
+    validationDecision,
+    provenance: summary.provenance || null,
     readinessSummary: frontpageSummary,
     frontpageSummary,
     issues,
@@ -874,6 +943,45 @@ function buildMarkdown(report) {
     lines.push(`- 状态时间: \`${report.watchStatus.generatedAt || "-"}\`${report.watchStatus.generatedAt ? ` (${formatDateTime(report.watchStatus.generatedAt)})` : ""}`);
     lines.push(`- 状态新鲜度: \`${report.watchStatus.ageText || "-"}\``);
     lines.push(`- 过期阈值: \`${report.watchStatus.staleAfterMinutes || DEFAULT_WATCH_STALE_AFTER_MINUTES} 分钟\``);
+  }
+
+  lines.push("", "## Obsidian Workspace Guard", "");
+  if (!report.obsidianGuard) {
+    lines.push("- 未执行 Obsidian 路径归属校验。");
+  } else {
+    lines.push(`- 校验模式: \`${report.obsidianGuard.strict ? "strict" : "warn"}\``);
+    lines.push(`- 校验状态: \`${report.obsidianGuard.status || "unknown"}\``);
+    lines.push(`- 当前仓库根目录: \`${report.obsidianGuard.projectRootCanonical || report.obsidianGuard.projectRoot || "-"}\``);
+    lines.push(`- handoff 工件: \`${report.obsidianGuard.artifactPath || "-"}\``);
+    lines.push(`- workspaceDir: \`${report.obsidianGuard.workspaceDirCanonical || report.obsidianGuard.workspaceDir || "-"}\``);
+    lines.push(`- 结果说明: ${report.obsidianGuard.message || "-"}`);
+  }
+
+  lines.push("", "## 验证策略判定", "");
+  if (!report.validationDecision) {
+    lines.push("- 当前未生成验证策略判定。");
+  } else {
+    lines.push(`- 判定等级: \`${report.validationDecision.level || "unknown"}\` (${report.validationDecision.levelLabel || "未知"})`);
+    lines.push(`- 判定来源: \`${report.validationDecision.decisionSource || report.validationDecision.source || "unknown"}\``);
+    lines.push(`- 命中验证域: ${(report.validationDecision.matchedDomain || []).join("、") || "-"}`);
+    lines.push(`- 命中项目覆盖: ${(report.validationDecision.matchedProjectOverride || []).join("、") || "-"}`);
+    lines.push(`- 运行时升级: \`${report.validationDecision.escalatedByRuntimeSignals ? "是" : "否"}\``);
+    lines.push(`- 是否阻断: \`${report.validationDecision.blocking ? "是" : "否"}\``);
+    lines.push(`- 判定依据: ${(report.validationDecision.reasons || []).join("；") || "-"}`);
+    lines.push(`- 所需检查: ${(report.validationDecision.requiredChecks || []).join("；") || "-"}`);
+    lines.push(`- 所需证据: ${(report.validationDecision.requiredEvidence || []).join("；") || "-"}`);
+    lines.push(`- 补证动作: ${report.validationDecision.deferredEvidenceAction || "-"}`);
+  }
+
+  lines.push("", "## 工件来源可信度", "");
+  if (!report.provenance) {
+    lines.push("- 当前未执行工件来源校验。");
+  } else {
+    lines.push(`- 校验状态: \`${report.provenance.status || "unknown"}\``);
+    lines.push(`- 是否越界: \`${report.provenance.violation ? "是" : "否"}\``);
+    lines.push(`- 结果说明: ${report.provenance.message || "-"}`);
+    lines.push(`- run 归属: in-project ${report.provenance.runRecords?.inProjectCount ?? 0} / out-of-project ${report.provenance.runRecords?.outOfProjectCount ?? 0} / unknown ${report.provenance.runRecords?.unknownCount ?? 0}`);
+    lines.push(`- delegation 归属: cwd 越界 ${report.provenance.delegation?.outOfProjectCwdCount ?? 0} / artifact-base 越界 ${report.provenance.delegation?.outOfProjectArtifactBaseCount ?? 0}`);
   }
 
   lines.push("", "## 恢复韧性摘要", "");
@@ -1088,6 +1196,10 @@ async function main() {
   const summary = JSON.parse(source);
   assert(summary && typeof summary === "object", "Invalid monitor summary");
   summary.zoteroValidation = await loadZoteroValidationSummary();
+  summary.validationContext = summary.validationContext || await collectValidationContext(projectRoot);
+  summary.provenance = await evaluateArtifactProvenance(projectRoot, summary.runs || [], {
+    env: process.env,
+  });
   const watchStatus = await fs.readFile(watchStatusPath, "utf-8")
     .then((content) => JSON.parse(content))
     .catch((error) => {
@@ -1096,8 +1208,13 @@ async function main() {
       }
       throw error;
     });
+  const obsidianGuard = await evaluateObsidianWorkspaceGuard(projectRoot, {
+    strict: true,
+    scope: "path",
+    env: process.env,
+  });
 
-  const report = evaluateGate(summary, policy, watchStatus);
+  const report = evaluateGate(summary, policy, watchStatus, obsidianGuard);
   report.durationMs = Math.max(0, Date.now() - scriptStartedAt);
   if (!report.gatePassed) {
     Object.assign(

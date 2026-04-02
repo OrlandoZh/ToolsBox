@@ -24,6 +24,7 @@ async function readTypeFile(relativePath) {
 async function main() {
   const featuresTypes = await readTypeFile("types/features.d.ts");
   const platformTypes = await readTypeFile("types/platform.d.ts");
+  const agentTypes = await readTypeFile("types/agent.d.ts");
 
   const itemPane = createItemPane({
     pluginID: "cleanroom-template@example.com",
@@ -107,16 +108,42 @@ async function main() {
   assert(typeof preferencePanes.registerPane === "function", "PreferencePanes runtime is missing registerPane()");
   assert(typeof preferencePanes.resolveURI === "function", "PreferencePanes runtime is missing resolveURI()");
   assert(typeof host.insertFTLIfNeeded === "function", "ZoteroHost runtime is missing insertFTLIfNeeded()");
+  assert(typeof host.buildSurfaceTarget === "function", "ZoteroHost runtime is missing buildSurfaceTarget()");
 
   assert(featuresTypes.includes("headerL10nID: string;"), "types/features.d.ts is missing ItemPane headerL10nID declaration");
   assert(featuresTypes.includes("sidenavL10nID?: string;"), "types/features.d.ts is missing ItemPane sidenavL10nID declaration");
   assert(featuresTypes.includes("labelL10nID: string;"), "types/features.d.ts is missing ItemPane labelL10nID declaration");
+  assert(featuresTypes.includes("getMenuRegistrationSnapshot(menuId?: string | null): MenuRegistrationSnapshot[] | MenuRegistrationSnapshot | null;"), "types/features.d.ts is missing getMenuRegistrationSnapshot()");
+  assert(featuresTypes.includes("getLiveMenuState(menuId: string, menuPath?: string | null): LiveMenuState | null;"), "types/features.d.ts is missing getLiveMenuState()");
   assert(featuresTypes.includes("export interface ReaderSummary"), "types/features.d.ts is missing ReaderSummary declaration");
+  assert(featuresTypes.includes("export const READER_EVENT_TYPES: {"), "types/features.d.ts is missing READER_EVENT_TYPES declaration");
   assert(featuresTypes.includes("getReaderSummary(target?: unknown): ReaderSummary | null;"), "types/features.d.ts is missing getReaderSummary()");
   assert(featuresTypes.includes("getActiveSummary(): ReaderSummary | null;"), "types/features.d.ts is missing getActiveSummary()");
+  assert(featuresTypes.includes("waitForReaderReady(target: unknown, options?: { timeoutMs?: number; intervalMs?: number }): Promise<unknown | null>;"), "types/features.d.ts is missing waitForReaderReady()");
+  assert(featuresTypes.includes("setContextPaneOpen(target: unknown, open: boolean, options?: { timeoutMs?: number; intervalMs?: number }): Promise<Record<string, unknown> | null>;"), "types/features.d.ts is missing setContextPaneOpen()");
+  assert(featuresTypes.includes("selectSidebarView(target: unknown, view: string, options?: { timeoutMs?: number; intervalMs?: number }): Promise<{"), "types/features.d.ts is missing selectSidebarView()");
+  assert(featuresTypes.includes("findToolbarElement(target: unknown, options?: { selector?: string; view?: \"primary\" | \"secondary\" }): Element | null;"), "types/features.d.ts is missing findToolbarElement()");
+  assert(featuresTypes.includes("findSidebarViewElements(target: unknown, view: string, options?: { view?: \"primary\" | \"secondary\" }): {"), "types/features.d.ts is missing findSidebarViewElements()");
+  assert(featuresTypes.includes("readonly READER_EVENT_TYPES: typeof READER_EVENT_TYPES;"), "types/features.d.ts is missing Reader READER_EVENT_TYPES declaration");
+  assert(featuresTypes.includes("isEventAPIAvailable(): boolean;"), "types/features.d.ts is missing isEventAPIAvailable()");
+  assert(featuresTypes.includes("registerEventListener(type: string, handler: (event: ReaderEvent) => void, options?: { pluginID?: string }): (() => void) | null;"), "types/features.d.ts is missing registerEventListener()");
+  assert(featuresTypes.includes("getKnownEventTypes(): string[];"), "types/features.d.ts is missing getKnownEventTypes()");
+  assert(featuresTypes.includes("getProbeCompatibleEventTypes(): string[];"), "types/features.d.ts is missing getProbeCompatibleEventTypes()");
+  assert(featuresTypes.includes("getEventAPIReport(): ReaderEventAPIReport;"), "types/features.d.ts is missing getEventAPIReport()");
+  assert(featuresTypes.includes("dispatchSyntheticEvent(target: unknown, options?: {"), "types/features.d.ts is missing dispatchSyntheticEvent()");
+  assert(featuresTypes.includes("getReaderFrameWindow(target: unknown, options?: { view?: \"primary\" | \"secondary\" }): Window | null;"), "types/features.d.ts is missing getReaderFrameWindow()");
   assert(featuresTypes.includes("registerPane(options: PreferencePaneOptions): Promise<string | null>;"), "types/features.d.ts is missing PreferencePanes registerPane()");
   assert(featuresTypes.includes("resolveURI(uri: string): string;"), "types/features.d.ts is missing PreferencePanes resolveURI()");
+  assert(featuresTypes.includes("label?: string;"), "types/features.d.ts is missing optional PreferencePane label declaration");
   assert(platformTypes.includes("insertFTLIfNeeded(window: Window, resourceId: string): boolean;"), "types/platform.d.ts is missing insertFTLIfNeeded()");
+  assert(platformTypes.includes("buildSurfaceTarget(options: {"), "types/platform.d.ts is missing buildSurfaceTarget()");
+  assert(platformTypes.includes("preparePreferencePane(options?: {"), "types/platform.d.ts is missing preparePreferencePane()");
+  assert(platformTypes.includes("setContextPaneOpen(open: boolean, options?: { window?: Window | null; timeoutMs?: number }): Promise<Record<string, unknown>>;"), "types/platform.d.ts is missing host setContextPaneOpen()");
+  assert(platformTypes.includes("export interface SurfaceEvidenceTarget"), "types/platform.d.ts is missing SurfaceEvidenceTarget declaration");
+  assert(agentTypes.includes("export interface HostActionDescriptor"), "types/agent.d.ts is missing HostActionDescriptor declaration");
+  assert(agentTypes.includes("\"preferences.openPane\":"), "types/agent.d.ts is missing HostActionPayloadMap preference action");
+  assert(agentTypes.includes("export interface HostActionResult"), "types/agent.d.ts is missing HostActionResult declaration");
+  assert(agentTypes.includes("export interface SurfaceSmokeResult"), "types/agent.d.ts is missing SurfaceSmokeResult declaration");
 
   console.log("Typecheck complete: declaration drift checks passed");
 }

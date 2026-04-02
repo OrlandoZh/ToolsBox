@@ -35,7 +35,7 @@ export const MENU_TARGETS = {
   READER_MENU_GO: "reader/menubar/go",
   READER_MENU_WINDOW: "reader/menubar/window",
 
-  // 条目面板上下文菜单
+  // 条目窗格上下文菜单
   ITEM_PANE_INFO_ROW: "itemPane/info/row",
 
   // 笔记面板按钮
@@ -84,6 +84,7 @@ export function createMenuManager(options) {
 
   // 注册追踪
   const registeredMenus = new Map();
+  const liveMenuStates = new Map();
   let menuCounter = 0;
 
   /**
@@ -111,28 +112,104 @@ export function createMenuManager(options) {
     return Zotero && Zotero.MenuManager && typeof Zotero.MenuManager.registerMenu === "function";
   }
 
-  /**
-   * 构建菜单数据结构
-   * @param {Object} menuItem - 菜单项配置
-   * @returns {Object} 符合官方 API 的菜单数据
-   */
-  function buildMenuData(menuItem) {
+  function clonePlainValue(value) {
+    if (value === undefined) {
+      return undefined;
+    }
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function readContextProperty(context, key) {
+    if (!context || typeof context !== "object") {
+      return null;
+    }
+    try {
+      return context[key];
+    }
+    catch {
+      return null;
+    }
+  }
+
+  function cloneLiveMenuContext(context) {
+    const menuElem = readContextProperty(context, "menuElem");
+    const items = readContextProperty(context, "items");
+    const collectionTreeRow = readContextProperty(context, "collectionTreeRow");
+    return {
+      menuElem: menuElem || null,
+      popupElem: menuElem?.parentNode || null,
+      itemCount: Array.isArray(items) ? items.length : null,
+      tabID: typeof readContextProperty(context, "tabID") === "string"
+        ? readContextProperty(context, "tabID")
+        : null,
+      tabType: typeof readContextProperty(context, "tabType") === "string"
+        ? readContextProperty(context, "tabType")
+        : null,
+      tabSubType: typeof readContextProperty(context, "tabSubType") === "string"
+        ? readContextProperty(context, "tabSubType")
+        : null,
+      editable: typeof readContextProperty(context, "editable") === "boolean"
+        ? readContextProperty(context, "editable")
+        : null,
+      fieldName: typeof readContextProperty(context, "fieldName") === "string"
+        ? readContextProperty(context, "fieldName")
+        : null,
+      collectionTreeRowID: collectionTreeRow && typeof collectionTreeRow === "object"
+        ? clonePlainValue(collectionTreeRow.id ?? collectionTreeRow.ref ?? null)
+        : null,
+      collectionTreeRowType: collectionTreeRow && typeof collectionTreeRow === "object"
+        ? clonePlainValue(collectionTreeRow.type ?? null)
+        : null,
+    };
+  }
+
+  function makeLiveMenuStateKey(menuId, menuPath) {
+    return `${menuId}::${menuPath}`;
+  }
+
+  function recordLiveMenuState(menuId, menuPath, context, phase) {
+    const key = makeLiveMenuStateKey(menuId, menuPath);
+    const current = liveMenuStates.get(key) || {
+      menuId,
+      menuPath,
+    };
+    const clonedContext = cloneLiveMenuContext(context);
+    liveMenuStates.set(key, {
+      ...current,
+      ...clonedContext,
+      phase,
+      observedAt: new Date().toISOString(),
+    });
+  }
+
+  function pickMenuPath(menuId, menuPath = null) {
+    const registration = registeredMenus.get(menuId);
+    if (!registration) {
+      return null;
+    }
+    if (typeof menuPath === "string" && menuPath.trim()) {
+      return menuPath.trim();
+    }
+    return Array.isArray(registration.menuPaths) && registration.menuPaths.length > 0
+      ? registration.menuPaths[0]
+      : null;
+  }
+
+  function wrapMenuData(menuId, menuItem, path = "0", menuPaths = []) {
     const data = {
       menuType: menuItem.menuType || MENU_TYPES.MENUITEM,
     };
 
-    // 标签：支持 l10nID 或直接 label
     if (menuItem.l10nID) {
       data.l10nID = menuItem.l10nID;
       if (menuItem.l10nArgs) {
         data.l10nArgs = menuItem.l10nArgs;
       }
-    } else if (menuItem.label) {
-      // 如果没有 l10nID，退回纯文本 label，避免向官方 API 传入 null 型 l10nID。
+    }
+    else if (menuItem.label) {
       data.label = menuItem.label;
     }
 
-    // 图标
     if (menuItem.icon) {
       data.icon = menuItem.icon;
       if (menuItem.darkIcon) {
@@ -140,31 +217,37 @@ export function createMenuManager(options) {
       }
     }
 
-    // 标签页类型过滤（仅用于菜单栏菜单）
     if (menuItem.enableForTabTypes) {
       data.enableForTabTypes = menuItem.enableForTabTypes;
     }
 
-    // 生命周期钩子
-    if (typeof menuItem.onShowing === "function") {
-      data.onShowing = menuItem.onShowing;
-    }
+    const wrapHook = (hookName, original) => (event, context) => {
+      recordLiveMenuState(menuId, path, context, hookName);
+      if (typeof original === "function") {
+        return original(event, context);
+      }
+      return undefined;
+    };
+
+    data.onShowing = wrapHook("onShowing", menuItem.onShowing);
     if (typeof menuItem.onShown === "function") {
-      data.onShown = menuItem.onShown;
+      data.onShown = wrapHook("onShown", menuItem.onShown);
     }
     if (typeof menuItem.onHiding === "function") {
-      data.onHiding = menuItem.onHiding;
+      data.onHiding = wrapHook("onHiding", menuItem.onHiding);
     }
     if (typeof menuItem.onHidden === "function") {
-      data.onHidden = menuItem.onHidden;
+      data.onHidden = wrapHook("onHidden", menuItem.onHidden);
     }
     if (typeof menuItem.onCommand === "function") {
-      data.onCommand = menuItem.onCommand;
+      data.onCommand = wrapHook("onCommand", menuItem.onCommand);
     }
 
-    // 子菜单
     if (menuItem.menuType === MENU_TYPES.SUBMENU && menuItem.menus) {
-      data.menus = menuItem.menus.map(m => buildMenuData(m));
+      data.menus = menuItem.menus.map((child, index) => wrapMenuData(menuId, child, `${path}.${index}`, menuPaths));
+    }
+    else {
+      menuPaths.push(path);
     }
 
     return data;
@@ -213,7 +296,8 @@ export function createMenuManager(options) {
     // 使用官方 API
     if (hasOfficialAPI()) {
       try {
-        const menuData = menus.map(m => buildMenuData(m));
+        const menuPaths = [];
+        const menuData = menus.map((menuItem, index) => wrapMenuData(menuId, menuItem, `${index}`, menuPaths));
 
         const options = {
           menuID: menuId,
@@ -231,7 +315,14 @@ export function createMenuManager(options) {
             }
           };
 
-          registeredMenus.set(menuId, { target, cleanup, useOfficialAPI: true });
+          registeredMenus.set(menuId, {
+            id: menuId,
+            target,
+            cleanup,
+            useOfficialAPI: true,
+            menuPaths,
+            menus: clonePlainValue(menus),
+          });
           debug("menuManager.register.created", { menuId, target });
           return menuId;
         }
@@ -248,10 +339,13 @@ export function createMenuManager(options) {
     debug("menuManager.register.fallback", { menuId, target });
 
     registeredMenus.set(menuId, {
+      id: menuId,
       target,
       config,
       cleanup: () => {},
       useOfficialAPI: false,
+      menuPaths: [],
+      menus: clonePlainValue(menus),
     });
 
     return menuId;
@@ -409,6 +503,11 @@ export function createMenuManager(options) {
       if (typeof registration.cleanup === "function") {
         registration.cleanup();
       }
+      for (const key of liveMenuStates.keys()) {
+        if (key.startsWith(`${menuId}::`)) {
+          liveMenuStates.delete(key);
+        }
+      }
       registeredMenus.delete(menuId);
 
       debug("menuManager.unregister.removed", { menuId });
@@ -458,6 +557,36 @@ export function createMenuManager(options) {
     return Array.from(registeredMenus.keys());
   }
 
+  function getMenuRegistrationSnapshot(menuId = null) {
+    if (menuId) {
+      const registration = registeredMenus.get(menuId);
+      return registration
+        ? clonePlainValue({
+          id: registration.id,
+          target: registration.target,
+          useOfficialAPI: registration.useOfficialAPI,
+          menuPaths: registration.menuPaths || [],
+          menus: registration.menus || [],
+        })
+        : null;
+    }
+    return Array.from(registeredMenus.values()).map((registration) => clonePlainValue({
+      id: registration.id,
+      target: registration.target,
+      useOfficialAPI: registration.useOfficialAPI,
+      menuPaths: registration.menuPaths || [],
+      menus: registration.menus || [],
+    }));
+  }
+
+  function getLiveMenuState(menuId, menuPath = null) {
+    const resolvedPath = pickMenuPath(menuId, menuPath);
+    if (!resolvedPath) {
+      return null;
+    }
+    return liveMenuStates.get(makeLiveMenuStateKey(menuId, resolvedPath)) || null;
+  }
+
   /**
    * 检查官方 API 是否可用
    * @returns {boolean}
@@ -496,6 +625,8 @@ export function createMenuManager(options) {
     getMenuCount,
     hasMenu,
     getRegisteredMenuIds,
+    getMenuRegistrationSnapshot,
+    getLiveMenuState,
     isOfficialAPIAvailable,
   };
 }

@@ -34,6 +34,28 @@
 - Platform 层：平台适配
 - App 层：组合与编排
 
+### 4. 宿主接口契约优先
+
+**目标**：避免 `src/features/*` 的 Zotero 插件 API 包装层脱离宿主源码自行漂移
+
+**方法**：
+- 以 `config/zotero-host-semantic-index.json` 作为字段级宿主语义事实源
+- 以 `config/zotero-host-interface-contracts.json` 作为包装层 contract registry
+- 以 [Zotero Host Semantic Index](ZOTERO_HOST_SEMANTIC_INDEX.md) 作为字段、枚举、事件和 surface 语义镜像
+- 以 [Zotero Host Interface Contracts](ZOTERO_HOST_INTERFACE_CONTRACTS.md) 作为人类可读镜像
+- 触达 `menu-manager`、`item-pane`、`item-tree`、`preference-panes`、`reader` 包装层时，先对齐本地 `reference/zotero-main`
+- 先更新 semantic index / contract / doc / tests，再修改实现；不要只靠运行时症状反推宿主接口
+- 日常开发运行 `npm run agent:host:guard` 与 `npm run agent:host:semantic:guard`，推进 gate / release 前由 strict guard 严格兜底
+
+### 5. 条件视觉验证，不覆盖独立硬阻断
+
+**目标**：避免通用 validation pipeline 建议压过更具体的恢复动作，导致开发流程被错误地重新拉回视觉审查或泛化闭环。
+
+**方法**：
+- `validationDecision` 只决定“是否需要视觉证据”，不覆盖 `watch`、`watch-recovery`、workspace/host/provenance guard 的独立阻断语义
+- 一旦存在更具体的恢复动作，frontpage / gate / monitor 优先给出该恢复动作
+- 只有真实可见面或视觉运行时信号触发时，才把当前批次升级为视觉主路径
+
 ---
 
 ## 模块分层
@@ -390,6 +412,12 @@ describe("Plugin Startup", () => {
   });
 });
 ```
+
+### 工具链与发布测试约束
+
+- `build/`、`dist/` 与 release JSON/Markdown 都属于可再生工件，不能被当作稳定测试前置状态
+- 任何断言 `release:preflight`、`release:prepare`、`release:matrix`、`release:upload` 输出的测试，都应在测试内部先清理旧工件并准备 fresh 本地输入
+- 如果某类断言不需要真实本地产物，优先使用临时 fixture，而不是读取仓库当前残留的发布文件
 
 ---
 

@@ -33,6 +33,20 @@ const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const scriptStartedAt = Date.now();
 
+function parseArgs(argv) {
+  const options = {
+    bootstrapShell: false,
+  };
+  for (const arg of argv) {
+    if (arg === "--bootstrap-shell") {
+      options.bootstrapShell = true;
+      continue;
+    }
+    throw new Error(`Unknown option: ${arg}`);
+  }
+  return options;
+}
+
 async function readJSONIfExists(filePath) {
   return await fs.readFile(filePath, "utf-8")
     .then((content) => JSON.parse(content))
@@ -53,29 +67,41 @@ function readCurrentTruthActiveBatchId(rootDir) {
   }
 }
 
+async function readProjectJSONIfExists(relativePath) {
+  return await readJSONIfExists(path.join(projectRoot, relativePath));
+}
+
 async function main() {
+  const options = parseArgs(process.argv.slice(2));
   const workspace = resolveObsidianWorkspaceFiles(projectRoot, process.env);
   const visualsEnabled = resolveObsidianVisualsEnabled(process.env);
-  const [loop, gate, monitor, e2e] = await Promise.all([
+  const [loop, gate, monitor, e2e, projectExpansionWave, projectValidationOverrides] = await Promise.all([
     readJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-zotero-loop.json")),
     readJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-gate.json")),
     readJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-monitor.json")),
     readJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-zotero-e2e.json")),
+    readProjectJSONIfExists(path.join("config", "project-expansion-wave.json")),
+    readProjectJSONIfExists(path.join("config", "project-validation-overrides.json")),
   ]);
+  const currentTruthSummary = (() => {
+    try {
+      return readCurrentTruthSummary(projectRoot);
+    } catch {
+      return null;
+    }
+  })();
 
   const summary = summarizeObsidianInterventionContext({
     loop,
     gate,
     monitor,
     e2e,
+    currentTruthSummary,
+    currentTruthActiveBatchId: readCurrentTruthActiveBatchId(projectRoot),
+    projectExpansionWave,
+    projectValidationOverrides,
+    bootstrapShell: options.bootstrapShell,
   });
-  const currentTruthActiveBatchId = readCurrentTruthActiveBatchId(projectRoot);
-  if (currentTruthActiveBatchId) {
-    summary.currentTruthActiveBatchId = currentTruthActiveBatchId;
-    if (currentTruthActiveBatchId === "READER-HIGH-126") {
-      summary.manualVerdictResolved = true;
-    }
-  }
   const visualViewModel = buildObsidianVisualViewModel(summary);
   const statusMarkdown = buildObsidianInterventionMarkdown(summary);
   const evidenceMarkdown = buildObsidianEvidenceMarkdown(summary);
@@ -107,14 +133,26 @@ async function main() {
   await fs.mkdir(path.dirname(artifactJSONPath), { recursive: true });
   const handoffSummary = {
     generatedAt: new Date().toISOString(),
+    generationId: summary.generationId,
     success: true,
     workspaceDir: workspace.dir,
     visualsEnabled,
     statusNote: workspace.statusNote,
     evidenceNote: workspace.evidenceNote,
     humanWindowNote: workspace.humanWindowNote,
+    architectureCanvas: workspace.architectureCanvas,
     visualFlowNote: visualsEnabled ? workspace.visualFlowNote : null,
     visualVerdictExcalidrawNote: visualsEnabled ? workspace.visualVerdictExcalidrawNote : null,
+    summarySource: summary.summarySource || null,
+    summaryStatusLabel: summary.summaryStatusLabel || null,
+    summaryHeadline: summary.summaryHeadline || null,
+    summaryNextAction: summary.summaryNextAction || null,
+    runnableNextCommand: summary.runnableNextCommand || null,
+    sourceGateGeneratedAt: summary.sourceGateGeneratedAt || null,
+    sourceMonitorGeneratedAt: summary.sourceMonitorGeneratedAt || null,
+    sourceLoopGeneratedAt: summary.sourceLoopGeneratedAt || null,
+    bootstrapShell: summary.bootstrapShell === true,
+    projectContext: summary.projectContext || null,
     durationMs: Math.max(0, Date.now() - scriptStartedAt),
     errorCategory: null,
     errorCategoryLabel: null,
@@ -129,6 +167,12 @@ async function main() {
       "",
       "- 状态: 成功",
       `- 工作台目录: \`${workspace.dir}\``,
+      `- 摘要来源: \`${handoffSummary.summarySource || "-"}\``,
+      `- 摘要状态: \`${handoffSummary.summaryStatusLabel || "-"}\``,
+      `- 摘要结论: ${handoffSummary.summaryHeadline || "-"}`,
+      `- 摘要下一步: ${handoffSummary.summaryNextAction || "-"}`,
+      `- 可执行命令: \`${handoffSummary.runnableNextCommand || "-"}\``,
+      `- Bootstrap Shell: \`${handoffSummary.bootstrapShell ? "是" : "否"}\``,
       `- 视觉配套: \`${visualsEnabled ? "启用" : "关闭"}\``,
       `- 耗时: \`${handoffSummary.durationMs}ms\``,
       "",

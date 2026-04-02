@@ -56,6 +56,31 @@ export interface MenuManagerOptions {
   zotero?: unknown;
 }
 
+export interface MenuRegistrationSnapshot {
+  id: string;
+  target: string;
+  useOfficialAPI: boolean;
+  menuPaths: string[];
+  menus: MenuData[];
+}
+
+export interface LiveMenuState {
+  menuId: string;
+  menuPath: string;
+  menuElem: Element | null;
+  popupElem: Element | null;
+  itemCount: number | null;
+  tabID: string | null;
+  tabType: string | null;
+  tabSubType: string | null;
+  editable: boolean | null;
+  fieldName: string | null;
+  collectionTreeRowID: unknown;
+  collectionTreeRowType: unknown;
+  phase: string | null;
+  observedAt: string | null;
+}
+
 /**
  * 菜单目标类型（与 Zotero 官方 VALID_TARGETS 对齐）
  */
@@ -81,7 +106,7 @@ export const MENU_TARGETS: {
   READER_MENU_VIEW: "reader/menubar/view";
   READER_MENU_GO: "reader/menubar/go";
   READER_MENU_WINDOW: "reader/menubar/window";
-  // 条目面板上下文菜单
+  // 条目窗格上下文菜单
   ITEM_PANE_INFO_ROW: "itemPane/info/row";
   // 笔记面板按钮
   NOTES_PANE_ITEM_NOTE: "notesPane/addItemNote";
@@ -196,6 +221,8 @@ export interface MenuManager {
   getMenuCount(): number;
   hasMenu(menuId: string): boolean;
   getRegisteredMenuIds(): string[];
+  getMenuRegistrationSnapshot(menuId?: string | null): MenuRegistrationSnapshot[] | MenuRegistrationSnapshot | null;
+  getLiveMenuState(menuId: string, menuPath?: string | null): LiveMenuState | null;
   isOfficialAPIAvailable(): boolean;
 }
 
@@ -409,7 +436,9 @@ export function createCommandPalette(options: CommandPaletteOptions): CommandPal
 
 export interface ReaderOptions {
   logger?: Logger;
+  lifecycle?: LifecycleManager;
   zotero?: unknown;
+  pluginID?: string;
 }
 
 export const READER_TYPES: {
@@ -424,6 +453,17 @@ export const ANNOTATION_TYPES: {
   IMAGE: "image";
   INK: "ink";
   TEXT: "text";
+};
+
+export const READER_EVENT_TYPES: {
+  RENDER_TEXT_SELECTION_POPUP: "renderTextSelectionPopup";
+  RENDER_SIDEBAR_ANNOTATION_HEADER: "renderSidebarAnnotationHeader";
+  RENDER_TOOLBAR: "renderToolbar";
+  CREATE_COLOR_CONTEXT_MENU: "createColorContextMenu";
+  CREATE_VIEW_CONTEXT_MENU: "createViewContextMenu";
+  CREATE_ANNOTATION_CONTEXT_MENU: "createAnnotationContextMenu";
+  CREATE_THUMBNAIL_CONTEXT_MENU: "createThumbnailContextMenu";
+  CREATE_SELECTOR_CONTEXT_MENU: "createSelectorContextMenu";
 };
 
 export interface AnnotationData {
@@ -444,10 +484,44 @@ export interface ReaderSummary {
   annotationCount: number;
 }
 
+export interface ReaderEvent {
+  type?: string;
+  doc?: Document | null;
+  reader?: unknown;
+  [key: string]: unknown;
+}
+
+export interface RegisteredReaderEventListener {
+  type: string;
+  handler: (event: ReaderEvent) => void;
+  wrappedHandler?: (event: ReaderEvent) => void;
+  pluginID?: string | null;
+}
+
+export interface ReaderEventDispatchResult {
+  type?: string;
+  dispatched: number;
+  failed: number;
+  usedDoc: boolean;
+  supported: boolean;
+}
+
+export interface ReaderEventAPIReport {
+  available: boolean;
+  registeredCount: number;
+  registeredTypes: string[];
+  registeredListeners: RegisteredReaderEventListener[];
+  knownTypes: string[];
+  probeCompatibleTypes: string[];
+  probeDispatchModes: string[];
+  syntheticFallbackAvailable: boolean;
+}
+
 export interface Reader {
   // 常量
   readonly READER_TYPES: typeof READER_TYPES;
   readonly ANNOTATION_TYPES: typeof ANNOTATION_TYPES;
+  readonly READER_EVENT_TYPES: typeof READER_EVENT_TYPES;
 
   // 阅读器 API
   isAvailable(): boolean;
@@ -469,7 +543,40 @@ export interface Reader {
   closeByItemID(itemID: number): boolean;
   getAnnotationIDs(identifier: string | number): number[];
   getReaderSummary(target?: unknown): ReaderSummary | null;
+  getReaderUIStateSnapshot(target?: unknown): Record<string, unknown> | null;
+  getReaderInteractionSnapshot(target?: unknown): Record<string, unknown> | null;
   getActiveSummary(): ReaderSummary | null;
+  waitForReaderReady(target: unknown, options?: { timeoutMs?: number; intervalMs?: number }): Promise<unknown | null>;
+  setContextPaneOpen(target: unknown, open: boolean, options?: { timeoutMs?: number; intervalMs?: number }): Promise<Record<string, unknown> | null>;
+  selectSidebarView(target: unknown, view: string, options?: { timeoutMs?: number; intervalMs?: number }): Promise<{
+    view: string;
+    uiState: Record<string, unknown> | null;
+    button: Element | null;
+    panel: Element | null;
+    doc: Document | null;
+  } | null>;
+  findToolbarElement(target: unknown, options?: { selector?: string; view?: "primary" | "secondary" }): Element | null;
+  findSidebarViewElements(target: unknown, view: string, options?: { view?: "primary" | "secondary" }): {
+    button: Element | null;
+    panel: Element | null;
+    doc: Document | null;
+  };
+  isEventAPIAvailable(): boolean;
+  registerEventListener(type: string, handler: (event: ReaderEvent) => void, options?: { pluginID?: string }): (() => void) | null;
+  unregisterEventListener(type: string, handler: (event: ReaderEvent) => void): number;
+  unregisterAllEventListeners(): number;
+  getRegisteredEventListeners(): RegisteredReaderEventListener[];
+  getEventListenerCount(): number;
+  getKnownEventTypes(): string[];
+  getProbeCompatibleEventTypes(): string[];
+  getEventAPIReport(): ReaderEventAPIReport;
+  dispatchSyntheticEvent(target: unknown, options?: {
+    type?: string;
+    detail?: unknown;
+    doc?: Document | null;
+    view?: "primary" | "secondary";
+  }): ReaderEventDispatchResult;
+  getReaderFrameWindow(target: unknown, options?: { view?: "primary" | "secondary" }): Window | null;
 
   // 注解 API
   isAnnotationsAvailable(): boolean;
@@ -499,7 +606,7 @@ export interface PreferencePaneOptions {
   id?: string;
   src: string;
   parent?: string;
-  label: string;
+  label?: string;
   image?: string;
   scripts?: string[];
   stylesheets?: string[];

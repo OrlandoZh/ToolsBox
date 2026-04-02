@@ -323,7 +323,7 @@ describe("Agent Zotero Validation Lib", () => {
     assert.deepEqual(summary.readerEventReport.missingProbeCompatibleTypes, []);
     assert.ok(summary.readerEventReport.dispatchModes.includes("synthetic-fallback"));
     assert.ok(summary.readerEventReport.observedScenarioNames.includes("reader fine-grained hook diagnostics"));
-    assert.ok(summary.toolbarEvidenceSummary?.includes("Toolbar 宿主点已观测"));
+    assert.ok(summary.toolbarEvidenceSummary?.includes("renderToolbar 宿主点已观测"));
     assert.ok(summary.toolbarEvidenceSummary?.includes("分发 customEvent"));
     assert.equal(summary.visualCaptureStabilityObserved, true);
     assert.equal(summary.visualCaptureStageCount, 2);
@@ -388,6 +388,47 @@ describe("Agent Zotero Validation Lib", () => {
     assert.equal(summary.details.launchFailure?.rdpPort, 50343);
     assert.equal(summary.details.runtimeSanitization?.managed, true);
     assert.equal(summary.details.runtimeSanitization?.profileReset, true);
+  });
+
+  it("should mark ai runtime missing-key degradation as recoverable", () => {
+    const summary = summarizeE2EReport({
+      generatedAt: "2026-03-19T00:00:00.000Z",
+      passed: true,
+      strategy: "hot",
+      cycles: [{
+        index: 1,
+        passed: true,
+        checks: {
+          serviceTotal: 3,
+          serviceHealthyCount: 2,
+          serviceUnhealthyCount: 1,
+          serviceHealthOK: false,
+          serviceStatus: "degraded",
+          services: [
+            {
+              id: "aiassistant.ai-runtime",
+              status: "degraded",
+              health: {
+                ok: false,
+                details: {
+                  configValid: false,
+                  errors: ["API key is required for non-local providers"],
+                  readerChatInitialized: true,
+                  annotationAIInitialized: true,
+                },
+              },
+            },
+          ],
+        },
+        tests: { failed: 0 },
+        scenarios: { failed: 0 },
+        logs: { errorCount: 0, warnCount: 0 },
+      }],
+    });
+
+    assert.equal(summary.serviceObserved, true);
+    assert.equal(summary.serviceHealthOK, false);
+    assert.equal(summary.serviceRecoverableMissingKey, true);
   });
 
   it("should prioritize capture-command-failed above unstable and geometry mismatch", () => {
@@ -2256,7 +2297,7 @@ describe("Agent Zotero Validation Lib", () => {
     assert.equal(summary.readerEventReport.status, "failed");
     assert.equal(summary.readerEventReport.toolbarHookObserved, true);
     assert.equal(summary.readerEventReport.toolbarDispatchMode, null);
-    assert.ok(summary.toolbarEvidenceSummary?.includes("Toolbar 宿主点已观测"));
+    assert.ok(summary.toolbarEvidenceSummary?.includes("renderToolbar 宿主点已观测"));
     assert.ok(summary.toolbarEvidenceSummary?.includes("Hook 通过"));
     assert.ok(summary.toolbarEvidenceSummary?.includes("细粒度 异常"));
     assert.ok(summary.toolbarEvidenceSummary?.includes("分发待补证"));
@@ -2645,7 +2686,7 @@ describe("Agent Zotero Validation Lib", () => {
         featureLabel: "Reader 事件桥",
         severity: "high",
         confidence: 0.93,
-        summary: "Reader Toolbar / 官方 listener 桥接存在漂移。",
+        summary: "Reader renderToolbar / 官方 listener 桥接存在漂移。",
         candidateFiles: ["src/features/reader.js"],
       },
       diagnostics: [

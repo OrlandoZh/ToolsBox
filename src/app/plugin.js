@@ -23,6 +23,7 @@ import { createPluginAPI } from "./plugin-api.js";
 import { createPluginAgent } from "./plugin-agent.js";
 import { createFeatureComposer } from "./feature-composer.js";
 import { createRuntimeCapabilityState } from "./runtime-capabilities.js";
+import { createHostActionRunner } from "./host-actions.js";
 
 function normalizeLogLevel(input, fallback = "info") {
   const candidate = String(input || "").trim().toLowerCase();
@@ -450,6 +451,13 @@ export function createPlugin({ globalScope, config }) {
     return true;
   }
 
+  const hostActions = createHostActionRunner({
+    config,
+    host,
+    reader,
+    menuManager,
+  });
+
   const agent = createPluginAgent({
     config,
     host,
@@ -470,6 +478,8 @@ export function createPlugin({ globalScope, config }) {
     getItemSummary,
     getColumnValue,
     getItemTitle,
+    listHostActions: hostActions.listHostActions,
+    runHostAction: hostActions.runHostAction,
     runAgentAction,
     updateDemoNotifierState,
     zotero,
@@ -569,6 +579,8 @@ export function createPlugin({ globalScope, config }) {
     listAgentCapabilities: agent.listCapabilities,
     getAgentCapability: agent.getCapability,
     inspectItemPresentation: agent.inspectItemPresentation,
+    listHostActions: hostActions.listHostActions,
+    runHostAction: hostActions.runHostAction,
   });
 
   return {

@@ -557,7 +557,7 @@ export function deriveFixHints({ issues = [], logSummary = null }) {
   if (issueText.includes("reader 官方事件监听注册异常")) {
     hints.push("优先核对 `src/features/reader.js` 中 `registerEventListener()` / `unregisterEventListener()` 是否仍把官方 listener 正确桥接到 Zotero.Reader。");
   }
-  if (issueText.includes("reader toolbar 宿主桥接未恢复") || issueText.includes("reader toolbar 宿主点未观测")) {
+  if (issueText.includes("reader renderToolbar 宿主桥接未恢复") || issueText.includes("reader renderToolbar 宿主点未观测")) {
     hints.push("优先核对 `src/features/reader.js` 中 `registerEventListener()`、`supportsSyntheticFallback()` 与 `dispatchSyntheticEvent()` 是否仍覆盖 `renderToolbar` 的宿主桥接链。");
   }
   if (issueText.includes("reader 事件桥缺少 synthetic-fallback 映射")) {
@@ -826,7 +826,7 @@ export function evaluateCycle(cycle) {
     && toolbarObservationObserved
     && toolbarHookObserved === false
   ) {
-    issues.push(toolbarHookObserved ? "Reader Toolbar 宿主桥接未恢复。" : "Reader Toolbar 宿主点未观测。");
+    issues.push(toolbarHookObserved ? "Reader renderToolbar 宿主桥接未恢复。" : "Reader renderToolbar 宿主点未观测。");
   }
   if (
     checks.pluginMounted

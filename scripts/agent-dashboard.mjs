@@ -482,7 +482,7 @@ function renderReaderEventBridge(e2e) {
           <div><span class="label">synthetic fallback</span><span class="metric-value">${escapeHTML(formatBooleanLabel(report.syntheticFallbackAvailable))}</span></div>
           <div><span class="label">Hook 场景</span><span class="metric-value">${escapeHTML(report.hookScenarioStatusLabel || "缺失")}</span></div>
           <div><span class="label">细粒度 Hook</span><span class="metric-value">${escapeHTML(report.fineGrainedScenarioStatusLabel || "缺失")}</span></div>
-          <div><span class="label">Toolbar 宿主点</span><span class="metric-value">${escapeHTML(report.toolbarHookObserved ? "已观测" : "未观测")}</span></div>
+          <div><span class="label">renderToolbar 宿主点</span><span class="metric-value">${escapeHTML(report.toolbarHookObserved ? "已观测" : "未观测")}</span></div>
         </div>
         <div class="subtle">${escapeHTML(report.note || "当前没有 Reader 事件桥摘要")}</div>
         <div class="subtle">最近观测场景: ${escapeHTML(scenarioText)}</div>
@@ -493,7 +493,7 @@ function renderReaderEventBridge(e2e) {
         <div class="subtle">缺少 probe-compatible 类型: ${escapeHTML(missingProbeTypesText)}</div>
         <div class="subtle">未观测 probe 类型: ${escapeHTML(unobservedProbeTypesText)}</div>
         <div class="subtle">分发模式: ${escapeHTML(dispatchModesText)}</div>
-        <div class="subtle">Toolbar 证据: ${escapeHTML(e2e.toolbarEvidenceSummary || "-")}</div>
+        <div class="subtle">renderToolbar 证据: ${escapeHTML(e2e.toolbarEvidenceSummary || "-")}</div>
         <div class="subtle">视觉证据: ${escapeHTML(e2e.visualEvidenceSummary || "-")}</div>
         <div class="subtle">证据导航: ${escapeHTML(firstVisualEvidenceItem ? `先看 Cycle ${firstVisualEvidenceItem.cycleIndex ?? "-"} / ${firstVisualEvidenceItem.bootMode || "-"} / ${firstVisualEvidenceItem.kind || "visual"} / ${firstVisualEvidenceItem.canonicalTarget || "-"}` : "-")}</div>
         <div class="subtle">失败证据项: ${escapeHTML(`${e2e.visualEvidenceFailingItemCount ?? 0} / ${e2e.visualEvidenceItemCount ?? 0}`)}</div>

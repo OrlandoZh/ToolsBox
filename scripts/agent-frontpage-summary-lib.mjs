@@ -50,6 +50,22 @@ function normalizeRunnableAction(value) {
   return commandMatch || null;
 }
 
+function isVisualFocusedAction(text) {
+  return /agent:obsidian|agent:zotero:e2e:update-baseline/u.test(String(text || ""));
+}
+
+function buildValidationPipelineAction(level, deferredEvidenceAction = null) {
+  if (level === "visual-not-needed") {
+    return "当前批次默认无需视觉阻断；先执行 `npm run check` -> `npm run agent:zotero:e2e` -> `npm run agent:monitor` / `npm run agent:gate` 完成功能闭环。";
+  }
+  if (level === "visual-recommended") {
+    return deferredEvidenceAction
+      ? `当前批次建议先执行 \`npm run check\` -> \`npm run agent:zotero:e2e\` -> \`npm run agent:monitor\` / \`npm run agent:gate\` 完成功能闭环；${deferredEvidenceAction}`
+      : "当前批次建议先执行 `npm run check` -> `npm run agent:zotero:e2e` -> `npm run agent:monitor` / `npm run agent:gate` 完成功能闭环，再补一轮视觉证据归档。";
+  }
+  return null;
+}
+
 function isReaderEventRelevant(e2e) {
   const readerEvent = e2e?.readerEventReport && typeof e2e.readerEventReport === "object"
     ? e2e.readerEventReport
@@ -97,7 +113,8 @@ export function selectAgentNextAction(recommendations, context = {}) {
       ) {
         preferencePatterns.push(/agent:obsidian/u);
       } else if (context.visualPrimaryBlockerKind === "baseline-geometry-mismatch") {
-        preferencePatterns.push(/agent:zotero:e2e:update-baseline|agent:zotero:e2e/u);
+        preferencePatterns.push(/agent:zotero:e2e:update-baseline/u);
+        preferencePatterns.push(/agent:zotero:e2e/u);
       } else {
         preferencePatterns.push(/agent:zotero:e2e/u);
       }
@@ -142,6 +159,7 @@ export function buildGateFrontpageSummary({
   recommendations,
   watchStatus,
   zoteroValidation,
+  validationDecision = null,
 }) {
   const normalizedIssues = Array.isArray(issues) ? issues.filter(Boolean) : [];
   const normalizedRecommendations = Array.isArray(recommendations) ? recommendations.filter(Boolean) : [];
@@ -153,7 +171,10 @@ export function buildGateFrontpageSummary({
   const readerEvent = getReaderEventSlice(e2e);
   const pureVisualReaderFailure = isPureVisualReaderFailure(e2e);
   const pureVisualReaderSummary = buildPureVisualReaderFailureSummary(e2e);
-  const selectedNextAction = selectAgentNextAction(normalizedRecommendations, {
+  const actionCandidates = validationDecision?.level && validationDecision.level !== "visual-required"
+    ? normalizedRecommendations.filter((item) => !isVisualFocusedAction(item))
+    : normalizedRecommendations;
+  const selectedNextAction = selectAgentNextAction(actionCandidates, {
     watchStatus: watch.status,
     e2eStatus: e2e.status,
     watchRecoveryStatus: recovery.status,
@@ -162,6 +183,11 @@ export function buildGateFrontpageSummary({
     visualPrimaryBlockerKind: e2e.visualPrimaryBlockerKind || null,
     visualCanonicalCoverageKind: e2e.visualCanonicalCoverageKind || null,
   });
+  const normalizedSelectedNextAction = normalizeRunnableAction(selectedNextAction) || selectedNextAction;
+  const validationPipelineAction = (!gatePassed && watch.status === "healthy" && validationDecision?.level !== "visual-required")
+    ? buildValidationPipelineAction(validationDecision?.level, validationDecision?.deferredEvidenceAction)
+    : null;
+  const preferConcreteRecoveryAction = recovery.status === "failed" || watch.status !== "healthy";
 
   let headline = "当前已满足 agent 质量闸门，可继续推进后续开发或发布流程。";
   if (!gatePassed) {
@@ -179,7 +205,28 @@ export function buildGateFrontpageSummary({
     blockerCount: normalizedIssues.length,
     recommendationCount: normalizedRecommendations.length,
     primaryBlockers: normalizedIssues.slice(0, 5),
-    nextAction: normalizeRunnableAction(selectedNextAction) || selectedNextAction,
+    nextAction: (preferConcreteRecoveryAction ? normalizedSelectedNextAction : null)
+      || validationPipelineAction
+      || normalizedSelectedNextAction
+      || "npm run agent:check",
+    validationDecision: validationDecision
+      ? {
+        level: validationDecision.level,
+        levelLabel: validationDecision.levelLabel,
+        decisionSource: validationDecision.decisionSource || validationDecision.source || "unknown",
+        reasons: Array.isArray(validationDecision.reasons) ? validationDecision.reasons : [],
+        matchedDomain: Array.isArray(validationDecision.matchedDomain) ? validationDecision.matchedDomain : [],
+        matchedProjectOverride: Array.isArray(validationDecision.matchedProjectOverride)
+          ? validationDecision.matchedProjectOverride
+          : [],
+        requiredChecks: Array.isArray(validationDecision.requiredChecks)
+          ? validationDecision.requiredChecks
+          : [],
+        requiredEvidence: Array.isArray(validationDecision.requiredEvidence) ? validationDecision.requiredEvidence : [],
+        escalatedByRuntimeSignals: validationDecision.escalatedByRuntimeSignals === true,
+        deferredEvidenceAction: validationDecision.deferredEvidenceAction || null,
+      }
+      : null,
     watch: normalizeStatusSlice(watch),
     e2e: normalizeStatusSlice(e2e, {
       strategy: e2e.strategy || null,
@@ -224,6 +271,9 @@ export function buildMonitorFrontpageSummary(summary) {
   const readerEvent = getReaderEventSlice(e2e);
   const readerEventRelevant = isReaderEventRelevant(e2e);
   const pureVisualReaderFailure = isPureVisualReaderFailure(e2e);
+  const validationDecision = summary.validationDecision && typeof summary.validationDecision === "object"
+    ? summary.validationDecision
+    : null;
   const visualPrimaryBlockerSummary = buildPureVisualReaderFailureSummary(e2e)
     || buildVisualPrimaryBlockerSummary(e2e);
   const pureVisualNextAction = pureVisualReaderFailure
@@ -323,8 +373,27 @@ export function buildMonitorFrontpageSummary(summary) {
       readerEvent,
       readerEventRelevant,
       pureVisualReaderFailure,
+      validationDecision,
       stable,
     }),
+    validationDecision: validationDecision
+      ? {
+        level: validationDecision.level,
+        levelLabel: validationDecision.levelLabel,
+        decisionSource: validationDecision.decisionSource || validationDecision.source || "unknown",
+        reasons: Array.isArray(validationDecision.reasons) ? validationDecision.reasons : [],
+        matchedDomain: Array.isArray(validationDecision.matchedDomain) ? validationDecision.matchedDomain : [],
+        matchedProjectOverride: Array.isArray(validationDecision.matchedProjectOverride)
+          ? validationDecision.matchedProjectOverride
+          : [],
+        requiredChecks: Array.isArray(validationDecision.requiredChecks)
+          ? validationDecision.requiredChecks
+          : [],
+        requiredEvidence: Array.isArray(validationDecision.requiredEvidence) ? validationDecision.requiredEvidence : [],
+        escalatedByRuntimeSignals: validationDecision.escalatedByRuntimeSignals === true,
+        deferredEvidenceAction: validationDecision.deferredEvidenceAction || null,
+      }
+      : null,
     memoryRecommendation,
     watch: normalizeStatusSlice(watch),
     e2e: normalizeStatusSlice(e2e, {
@@ -370,12 +439,19 @@ function pickMonitorNextAction({
   readerEvent,
   readerEventRelevant,
   pureVisualReaderFailure,
+  validationDecision,
   stable,
 }) {
   if (!watch.present || watch.status !== "healthy") {
     return "npm run zotero:watch";
   }
   if (!e2e.present || e2e.status !== "passed") {
+    if (validationDecision?.level === "visual-not-needed") {
+      return buildValidationPipelineAction("visual-not-needed");
+    }
+    if (validationDecision?.level === "visual-recommended") {
+      return buildValidationPipelineAction("visual-recommended", validationDecision?.deferredEvidenceAction);
+    }
     if (pureVisualReaderFailure) {
       return pickPureVisualReaderNextAction(e2e) || "npm run agent:zotero:e2e";
     }

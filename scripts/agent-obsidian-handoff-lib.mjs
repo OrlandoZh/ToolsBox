@@ -154,19 +154,155 @@ function dedupeList(list, max = 8) {
   return unique.slice(0, max);
 }
 
+function hasMeaningfulFrontpage(frontpage) {
+  return Boolean(
+    frontpage
+      && typeof frontpage === "object"
+      && (
+        String(frontpage?.statusLabel || "").trim()
+        || String(frontpage?.headline || "").trim()
+        || String(frontpage?.nextAction || "").trim()
+      ),
+  );
+}
+
+function buildCurrentTruthExcerpt(summaryText, max = 3) {
+  return String(summaryText || "")
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("- "))
+    .map((line) => line.slice(2).trim())
+    .filter(Boolean)
+    .slice(0, max);
+}
+
+function summarizeValidationOverrides(record) {
+  const payload = record && typeof record === "object" ? record : null;
+  const overrides = Array.isArray(payload?.overrides) ? payload.overrides : [];
+  const countsByLevel = {
+    "visual-required": 0,
+    "visual-recommended": 0,
+    "visual-not-needed": 0,
+  };
+  const focusModules = [];
+  overrides.forEach((item) => {
+    const level = String(item?.decision || item?.level || "").trim();
+    if (countsByLevel[level] !== undefined) {
+      countsByLevel[level] += 1;
+    }
+    const matchers = Array.isArray(item?.matchers) ? item.matchers : [];
+    matchers.forEach((matcher) => {
+      const value = String(matcher || "").trim();
+      if (value) {
+        focusModules.push(value);
+      }
+    });
+  });
+  const summaryParts = [
+    `required=${countsByLevel["visual-required"]}`,
+    `recommended=${countsByLevel["visual-recommended"]}`,
+    `not-needed=${countsByLevel["visual-not-needed"]}`,
+  ];
+  return {
+    present: Boolean(payload),
+    missing: !payload,
+    overrideCount: overrides.length,
+    countsByLevel,
+    focusModules: dedupeList(focusModules, 8),
+    summary: overrides.length > 0
+      ? `项目覆盖 ${overrides.length} 条：${summaryParts.join(" / ")}`
+      : payload
+        ? "当前未声明项目级 validation override。"
+        : "缺少 project-validation-overrides mirror。",
+  };
+}
+
+function summarizeExpansionWave(record) {
+  const payload = record && typeof record === "object" ? record : null;
+  const inScopeModules = dedupeList(payload?.inScopeModules, 8);
+  const outOfScopeModules = dedupeList(payload?.outOfScopeModules, 8);
+  const explicitVisualUpgradeModules = dedupeList(payload?.explicitVisualUpgradeModules, 8);
+  const moduleArchetypes = Array.isArray(payload?.moduleArchetypes)
+    ? payload.moduleArchetypes
+        .map((item) => {
+          const moduleName = String(item?.module || item?.path || "").trim();
+          const archetype = String(item?.archetype || "").trim();
+          return moduleName && archetype ? `${moduleName} -> ${archetype}` : "";
+        })
+        .filter(Boolean)
+        .slice(0, 8)
+    : [];
+  const currentWaveName = String(payload?.currentWaveName || "").trim();
+  const acceptanceTrack = String(payload?.acceptanceTrack || "").trim();
+  const active = Boolean(currentWaveName || acceptanceTrack || inScopeModules.length > 0);
+  return {
+    present: Boolean(payload),
+    missing: !payload,
+    status: String(payload?.status || (active ? "declared" : "missing")).trim() || "missing",
+    currentWaveName: currentWaveName || null,
+    acceptanceTrack: acceptanceTrack || null,
+    inScopeModules,
+    outOfScopeModules,
+    explicitVisualUpgradeModules,
+    moduleArchetypes,
+    summary: active
+      ? `${currentWaveName || "未命名 wave"} / ${acceptanceTrack || "未声明 acceptance track"}`
+      : payload
+        ? "当前尚未声明项目 expansion wave。"
+        : "缺少 project-expansion-wave mirror。",
+  };
+}
+
+function summarizeValidationDecision(decision) {
+  const record = decision && typeof decision === "object" ? decision : {};
+  return {
+    level: String(record.level || "").trim() || null,
+    levelLabel: String(record.levelLabel || "").trim() || null,
+    decisionSource: String(record.decisionSource || record.source || "").trim() || null,
+    matchedDomain: dedupeList(record.matchedDomain, 6),
+    matchedProjectOverride: dedupeList(record.matchedProjectOverride, 6),
+    requiredChecks: dedupeList(record.requiredChecks, 6),
+    requiredEvidence: dedupeList(record.requiredEvidence, 6),
+    escalatedByRuntimeSignals: record.escalatedByRuntimeSignals === true,
+    deferredEvidenceAction: String(record.deferredEvidenceAction || "").trim() || null,
+  };
+}
+
+function buildProjectContext({
+  currentTruthSummary = null,
+  currentTruthActiveBatchId = null,
+  projectExpansionWave = null,
+  projectValidationOverrides = null,
+  validationDecision = null,
+} = {}) {
+  const truthExcerpt = buildCurrentTruthExcerpt(currentTruthSummary, 3);
+  const expansionWave = summarizeExpansionWave(projectExpansionWave);
+  const validationOverrides = summarizeValidationOverrides(projectValidationOverrides);
+  const validation = summarizeValidationDecision(validationDecision);
+  return {
+    currentTruth: {
+      present: Boolean(currentTruthSummary),
+      activeBatchId: String(currentTruthActiveBatchId || "").trim() || null,
+      excerpt: truthExcerpt,
+      summary: truthExcerpt.length > 0
+        ? truthExcerpt.join("；")
+        : currentTruthSummary
+          ? "当前 truth 已存在，但未提取到可展示摘要。"
+          : "缺少 CURRENT_BACKLOG 当前摘要。",
+    },
+    expansionWave,
+    validationOverrides,
+    validationDecision: validation,
+  };
+}
+
 function chooseFrontpageSource(sources) {
   const normalized = (Array.isArray(sources) ? sources : [])
     .filter((item) => item && typeof item === "object" && item.frontpage && typeof item.frontpage === "object");
   if (normalized.length === 0) {
     return null;
   }
-  const dated = normalized.filter((item) => item.generatedAtMs !== null);
-  if (dated.length === 0) {
-    return normalized[0] || null;
-  }
-  return dated
-    .slice()
-    .sort((left, right) => Number(right.generatedAtMs || 0) - Number(left.generatedAtMs || 0))[0] || null;
+  return normalized.find((item) => hasMeaningfulFrontpage(item.frontpage)) || normalized[0] || null;
 }
 
 function looksLikeCommand(text) {
@@ -211,11 +347,12 @@ function chooseActionSource(sources) {
   if (normalized.length === 0) {
     return null;
   }
-  const runnableSources = normalized.filter((item) => extractRunnableAction(item.nextAction));
-  if (runnableSources.length > 0) {
-    return chooseFrontpageSource(runnableSources);
+  for (const item of normalized) {
+    if (extractRunnableAction(item.nextAction)) {
+      return item;
+    }
   }
-  return chooseFrontpageSource(normalized);
+  return normalized[0] || null;
 }
 
 function chooseFreshestE2ESummary(candidates) {
@@ -650,6 +787,7 @@ export function summarizeObsidianInterventionContext(reports = {}) {
   const gate = reports.gate && typeof reports.gate === "object" ? reports.gate : {};
   const monitor = reports.monitor && typeof reports.monitor === "object" ? reports.monitor : {};
   const e2e = reports.e2e && typeof reports.e2e === "object" ? reports.e2e : {};
+  const bootstrapShell = reports.bootstrapShell === true;
 
   const loopState = loop.finalState && typeof loop.finalState === "object"
     ? loop.finalState
@@ -719,12 +857,6 @@ export function summarizeObsidianInterventionContext(reports = {}) {
 
   const frontpageSources = [
     {
-      label: "loop",
-      frontpage: loopFrontpage,
-      generatedAtMs: parseGeneratedAtMs(loop.generatedAt),
-      nextAction: loop.nextAction || loopFrontpage.nextAction || "",
-    },
-    {
       label: "gate",
       frontpage: gateFrontpage,
       generatedAtMs: parseGeneratedAtMs(gate.generatedAt),
@@ -736,47 +868,62 @@ export function summarizeObsidianInterventionContext(reports = {}) {
       generatedAtMs: parseGeneratedAtMs(monitor.generatedAt),
       nextAction: monitorFrontpage.nextAction || "",
     },
+    {
+      label: "loop",
+      frontpage: loopFrontpage,
+      generatedAtMs: parseGeneratedAtMs(loop.generatedAt),
+      nextAction: loop.nextAction || loopFrontpage.nextAction || "",
+    },
   ];
   const currentFrontpageSource = chooseFrontpageSource(frontpageSources);
   const currentActionSource = chooseActionSource(frontpageSources);
   const gatePrimaryBlockers = Array.isArray(gateFrontpage.primaryBlockers) ? gateFrontpage.primaryBlockers : [];
   const monitorPrimarySignals = Array.isArray(monitorFrontpage.primarySignals) ? monitorFrontpage.primarySignals : [];
-
-  const statusLabel = currentFrontpageSource?.frontpage?.statusLabel
-    || loopFrontpage.statusLabel
-    || gateFrontpage.statusLabel
-    || monitorFrontpage.statusLabel
-    || "待人工介入";
-  const headline = currentFrontpageSource?.frontpage?.headline
-    || loopFrontpage.headline
-    || gateFrontpage.headline
-    || monitorFrontpage.headline
-    || "当前缺少足够的自动化结论，请人工查看工件。";
-  const nextActionCandidates = dedupeList([
-    currentActionSource?.nextAction,
-    loop.nextAction,
-    loopFrontpage.nextAction,
-    gateFrontpage.nextAction,
-    monitorFrontpage.nextAction,
-  ], 8);
-  const nextAction = nextActionCandidates
-    .map((item) => extractRunnableAction(item))
-    .find(Boolean)
-    || normalizeNextAction(currentActionSource?.nextAction || nextActionCandidates[0])
-    || "先查看 gate / monitor / e2e 报告。";
-
-  const blockers = dedupeList([
-    ...((currentFrontpageSource?.label === "loop" || !currentFrontpageSource)
-      ? [
-        ...(Array.isArray(loopState.issues) ? loopState.issues : []),
-        ...(Array.isArray(loopFrontpage.primarySignals) ? loopFrontpage.primarySignals : []),
-      ]
-      : []),
-    ...gatePrimaryBlockers,
-    ...((currentFrontpageSource?.label === "monitor" && gatePrimaryBlockers.length === 0)
-      ? monitorPrimarySignals
-      : []),
-  ], 8);
+  const currentValidationDecision = gateFrontpage.validationDecision
+    || monitorFrontpage.validationDecision
+    || null;
+  const projectContext = buildProjectContext({
+    currentTruthSummary: reports.currentTruthSummary || null,
+    currentTruthActiveBatchId: reports.currentTruthActiveBatchId || null,
+    projectExpansionWave: reports.projectExpansionWave || null,
+    projectValidationOverrides: reports.projectValidationOverrides || null,
+    validationDecision: currentValidationDecision,
+  });
+  const summarySource = bootstrapShell
+    ? "bootstrap-shell"
+    : currentFrontpageSource?.label || null;
+  const summaryStatusLabel = bootstrapShell
+    ? "初始化占位"
+    : currentFrontpageSource?.frontpage?.statusLabel
+      || "待人工介入";
+  const summaryHeadline = bootstrapShell
+    ? "当前工作台仍是初始化占位，不代表当前项目结论。"
+    : currentFrontpageSource?.frontpage?.headline
+      || "当前缺少足够的自动化结论，请人工查看工件。";
+  const summaryNextAction = bootstrapShell
+    ? "请先执行 `npm run agent:sync` 刷新当前项目态工作台。"
+    : String(currentFrontpageSource?.frontpage?.nextAction || currentActionSource?.nextAction || "").trim()
+      || "先查看 gate / monitor / e2e 报告。";
+  const runnableNextCommand = bootstrapShell
+    ? "npm run agent:sync"
+    : extractRunnableAction(currentActionSource?.nextAction || summaryNextAction)
+      || "";
+  const nextAction = runnableNextCommand || summaryNextAction;
+  const blockers = bootstrapShell
+    ? dedupeList([
+      "当前 Obsidian 工作台仍是初始化占位；尚未刷新为当前项目结论。",
+      "请先执行 `npm run agent:sync`，再根据 gate / monitor 的 fresh 结论继续推进。",
+    ], 8)
+    : dedupeList([
+      ...gatePrimaryBlockers,
+      ...(gatePrimaryBlockers.length === 0 ? monitorPrimarySignals : []),
+      ...((currentFrontpageSource?.label === "loop" || !currentFrontpageSource)
+        ? [
+          ...(Array.isArray(loopState.issues) ? loopState.issues : []),
+          ...(Array.isArray(loopFrontpage.primarySignals) ? loopFrontpage.primarySignals : []),
+        ]
+        : []),
+    ], 8);
 
   const candidateFiles = dedupeList([
     ...(Array.isArray(primaryDiagnosis.candidateFiles) ? primaryDiagnosis.candidateFiles : []),
@@ -788,7 +935,8 @@ export function summarizeObsidianInterventionContext(reports = {}) {
   ], 8);
 
   const commands = dedupeList([
-    looksLikeCommand(nextAction) ? nextAction : "",
+    runnableNextCommand,
+    bootstrapShell ? "npm run check" : "",
     "npm run agent:zotero:loop --dry-run",
     "npm run agent:zotero:loop:human",
     "npm run agent:gate",
@@ -820,12 +968,51 @@ export function summarizeObsidianInterventionContext(reports = {}) {
 
   return {
     generatedAt: new Date().toISOString(),
-    statusLabel,
-    headline,
+    generationId: `obsidian-${Date.now()}`,
+    summarySource,
+    summaryStatusLabel,
+    summaryHeadline,
+    summaryNextAction,
+    runnableNextCommand,
+    sourceGateGeneratedAt: gate.generatedAt || null,
+    sourceMonitorGeneratedAt: monitor.generatedAt || null,
+    sourceLoopGeneratedAt: loop.generatedAt || null,
+    bootstrapShell,
+    statusLabel: summaryStatusLabel,
+    headline: summaryHeadline,
     nextAction,
     blockers,
     candidateFiles,
     commands,
+    projectContext,
+    currentTruthActiveBatchId: projectContext.currentTruth.activeBatchId,
+    manualVerdictResolved: String(projectContext.currentTruth.activeBatchId || "").trim() === "READER-HIGH-126",
+    autoChain: {
+      gate: {
+        present: hasMeaningfulFrontpage(gateFrontpage),
+        generatedAt: gate.generatedAt || null,
+        statusLabel: gateFrontpage.statusLabel || null,
+        headline: gateFrontpage.headline || null,
+        nextAction: gateFrontpage.nextAction || null,
+      },
+      monitor: {
+        present: hasMeaningfulFrontpage(monitorFrontpage),
+        generatedAt: monitor.generatedAt || null,
+        statusLabel: monitorFrontpage.statusLabel || null,
+        headline: monitorFrontpage.headline || null,
+        nextAction: monitorFrontpage.nextAction || null,
+      },
+      watch: monitorFrontpage.watch && typeof monitorFrontpage.watch === "object"
+        ? monitorFrontpage.watch
+        : null,
+      e2e: monitorFrontpage.e2e && typeof monitorFrontpage.e2e === "object"
+        ? monitorFrontpage.e2e
+        : null,
+      watchRecovery: monitorFrontpage.watchRecovery && typeof monitorFrontpage.watchRecovery === "object"
+        ? monitorFrontpage.watchRecovery
+        : null,
+      validationDecision: summarizeValidationDecision(currentValidationDecision),
+    },
     diagnosis: primaryDiagnosis.summary || primaryDiagnosis.issue || null,
     diagnosisLabel: primaryDiagnosis.featureLabel || primaryDiagnosis.feature || null,
     readerHostStateSummary: normalizeSummaryText(
@@ -1192,6 +1379,24 @@ export function buildObsidianInterventionMarkdown(summary) {
   const commands = truncateList(summary.commands, 8);
   const visualEvidenceItems = normalizeVisualEvidenceItems(summary.visualEvidenceItems, 3);
   const visualAttemptDiagnosisItems = normalizeVisualCaptureAttemptDiagnosisItems(summary.visualCaptureAttemptDiagnosisItems, 3);
+  const projectContext = summary.projectContext && typeof summary.projectContext === "object"
+    ? summary.projectContext
+    : {};
+  const currentTruth = projectContext.currentTruth && typeof projectContext.currentTruth === "object"
+    ? projectContext.currentTruth
+    : {};
+  const expansionWave = projectContext.expansionWave && typeof projectContext.expansionWave === "object"
+    ? projectContext.expansionWave
+    : {};
+  const validationOverrides = projectContext.validationOverrides && typeof projectContext.validationOverrides === "object"
+    ? projectContext.validationOverrides
+    : {};
+  const validationDecision = projectContext.validationDecision && typeof projectContext.validationDecision === "object"
+    ? projectContext.validationDecision
+    : {};
+  const autoChain = summary.autoChain && typeof summary.autoChain === "object"
+    ? summary.autoChain
+    : {};
   const patchSummary = summary.patchSummary && typeof summary.patchSummary === "object"
     ? summary.patchSummary
     : {};
@@ -1203,8 +1408,14 @@ export function buildObsidianInterventionMarkdown(summary) {
   const lines = [
     "---",
     `generated_at: ${summary.generatedAt}`,
+    `handoff_generation_id: ${summary.generationId || "-"}`,
     `status_label: ${summary.statusLabel || "待人工介入"}`,
-    `next_action: "${String(summary.nextAction || "-").replaceAll('"', "'")}"`,
+    `summary_source: ${summary.summarySource || "unknown"}`,
+    `bootstrap_shell: ${summary.bootstrapShell === true ? "true" : "false"}`,
+    `current_wave_name: "${String(expansionWave.currentWaveName || "").replaceAll('"', "'")}"`,
+    `current_truth_active_batch: "${String(currentTruth.activeBatchId || "").replaceAll('"', "'")}"`,
+    `validation_level: ${validationDecision.level || "unknown"}`,
+    `next_action: "${String(summary.summaryNextAction || summary.nextAction || "-").replaceAll('"', "'")}"`,
     "type: zotero-agent-status",
     "---",
     "",
@@ -1213,13 +1424,57 @@ export function buildObsidianInterventionMarkdown(summary) {
     "> [!summary] 自动化当前判断",
     `> 状态：${summary.statusLabel || "待人工介入"}`,
     `> 结论：${summary.headline || "-"}`,
-    `> 下一步：\`${summary.nextAction || "-"}\``,
+    `> 摘要下一步：${summary.summaryNextAction || "-"}`,
+    `> 可执行命令：\`${summary.runnableNextCommand || "-"}\``,
     "",
   ];
+
+  if (summary.bootstrapShell === true) {
+    lines.push(
+      "> [!warning] 初始化占位工作台",
+      "> 当前 Obsidian 工作台仅用于初始化占位，不代表 fresh gate / monitor 结论。",
+      "> 下一步必须先执行 `npm run agent:sync`，再把白板刷新成当前项目态。",
+      "",
+    );
+  }
 
   if (humanStageLabel !== "按自动路径继续") {
     lines.splice(lines.length - 1, 0, `> 当前阶段：${humanStageLabel}`);
   }
+
+  lines.push("## 当前项目语义", "");
+  lines.push(`- 当前 truth active batch：${currentTruth.activeBatchId || "-"}`);
+  lines.push(`- 当前 truth 摘要：${currentTruth.summary || "-"}`);
+  if (Array.isArray(currentTruth.excerpt) && currentTruth.excerpt.length > 0) {
+    currentTruth.excerpt.forEach((item) => lines.push(`- truth 要点：${item}`));
+  }
+  lines.push(`- 当前 wave：${expansionWave.currentWaveName || "-"}`);
+  lines.push(`- 验收主线：${expansionWave.acceptanceTrack || expansionWave.summary || "-"}`);
+  lines.push(`- Wave 状态：${expansionWave.status || "-"}`);
+  lines.push(`- In scope：${truncateList(expansionWave.inScopeModules, 6).join("、") || (expansionWave.present ? "未声明" : "缺少 project-expansion-wave mirror")}`);
+  lines.push(`- Out of scope：${truncateList(expansionWave.outOfScopeModules, 6).join("、") || (expansionWave.present ? "未声明" : "缺少 project-expansion-wave mirror")}`);
+  lines.push(`- Module archetypes：${truncateList(expansionWave.moduleArchetypes, 4).join("；") || "-"}`);
+  lines.push(`- 显式视觉升级模块：${truncateList(expansionWave.explicitVisualUpgradeModules, 6).join("、") || "-"}`);
+  lines.push(`- Validation mirror：${validationOverrides.summary || "-"}`);
+  lines.push(`- Validation level：${validationDecision.levelLabel || validationDecision.level || "-"}`);
+  lines.push(`- 命中验证域：${truncateList(validationDecision.matchedDomain, 4).join("、") || "-"}`);
+  lines.push(`- 命中项目覆盖：${truncateList(validationDecision.matchedProjectOverride, 4).join("、") || "-"}`);
+  lines.push("");
+
+  lines.push("## 当前自动链状态", "");
+  lines.push(`- 摘要来源：${summary.summarySource || "-"}`);
+  lines.push(`- Gate：${autoChain.gate?.statusLabel || "-"} / ${autoChain.gate?.generatedAt || "-"}`);
+  lines.push(`- Monitor：${autoChain.monitor?.statusLabel || "-"} / ${autoChain.monitor?.generatedAt || "-"}`);
+  lines.push(`- Watch：${autoChain.watch?.statusLabel || "-"} / ${autoChain.watch?.ageText || "-"}`);
+  lines.push(`- E2E：${autoChain.e2e?.statusLabel || "-"} / ${autoChain.e2e?.ageText || "-"}`);
+  lines.push(`- Watch Recovery：${autoChain.watchRecovery?.statusLabel || "-"} / ${autoChain.watchRecovery?.ageText || "-"}`);
+  lines.push(`- Gate 结论：${autoChain.gate?.headline || "-"}`);
+  lines.push(`- Monitor 结论：${autoChain.monitor?.headline || "-"}`);
+  lines.push(`- Required checks：${truncateList(validationDecision.requiredChecks, 4).join("；") || "-"}`);
+  lines.push(`- Required evidence：${truncateList(validationDecision.requiredEvidence, 4).join("；") || "-"}`);
+  lines.push(`- 补证动作：${validationDecision.deferredEvidenceAction || "-"}`);
+  lines.push(`- 运行时升级：${validationDecision.escalatedByRuntimeSignals ? "是" : "否"}`);
+  lines.push("");
 
   if (summary.diagnosisLabel || summary.diagnosis) {
     lines.push("> [!note] 主诊断");
@@ -1249,7 +1504,7 @@ export function buildObsidianInterventionMarkdown(summary) {
     || summary.contextMenuSummary
   ) {
     lines.push("## Reader 事件点分发", "");
-    lines.push(`- Toolbar 证据：${summary.toolbarEvidenceSummary || "-"}`);
+    lines.push(`- renderToolbar 证据：${summary.toolbarEvidenceSummary || "-"}`);
     lines.push(`- 视觉证据：${summary.visualEvidenceSummary || "-"}`);
     lines.push(`- 证据导航：${summary.visualEvidenceFocusSummary || "-"}`);
     lines.push(`- Attempt 诊断：${summary.visualCaptureAttemptDiagnosisSummary || "-"}`);
@@ -1671,123 +1926,180 @@ export function buildHumanAdvancedGuideMarkdown() {
 
 export function buildObsidianInterventionCanvas(summary) {
   const visualModel = buildObsidianVisualViewModel(summary);
-  const blockerText = truncateList(visualModel.blockers, 4);
-  const fileText = truncateList(visualModel.candidateFiles, 5);
-  const commandText = truncateList(visualModel.commands, 5);
-  const patchSummary = visualModel.patchSummary && typeof visualModel.patchSummary === "object"
-    ? visualModel.patchSummary
+  const projectContext = summary.projectContext && typeof summary.projectContext === "object"
+    ? summary.projectContext
     : {};
-  const patchText = [
-    `计划：${patchSummary.planStatusLabel || "-"}`,
-    `功能：${patchSummary.featureLabel || "-"}`,
-    `动作：${buildPatchActionDisplay(visualModel)}`,
-    `应用：${patchSummary.applicationStatusLabel || "-"}`,
-    `白名单阻塞：${patchSummary.unsupportedCategoryLabel || "-"}`,
-    `阻塞说明：${buildPatchPriorityNote(visualModel) || patchSummary.unsupportedReason || "-"}`,
-    `复验：${patchSummary.verificationOverview || "-"}`,
-    `必需失败：${patchSummary.failedRequiredChecks || "-"}`,
-    `观察失败：${patchSummary.failedOptionalChecks || "-"}`,
-    `类型画像：${patchSummary.failedCheckKinds || "-"}`,
-    `阻塞：${truncateList(patchSummary.blockers, 2).join("；") || "-"}`,
+  const currentTruth = projectContext.currentTruth && typeof projectContext.currentTruth === "object"
+    ? projectContext.currentTruth
+    : {};
+  const expansionWave = projectContext.expansionWave && typeof projectContext.expansionWave === "object"
+    ? projectContext.expansionWave
+    : {};
+  const validationOverrides = projectContext.validationOverrides && typeof projectContext.validationOverrides === "object"
+    ? projectContext.validationOverrides
+    : {};
+  const validationDecision = projectContext.validationDecision && typeof projectContext.validationDecision === "object"
+    ? projectContext.validationDecision
+    : {};
+  const autoChain = summary.autoChain && typeof summary.autoChain === "object"
+    ? summary.autoChain
+    : {};
+  const blockerText = truncateList(visualModel.blockers, 5);
+  const fileText = truncateList(visualModel.candidateFiles, 6);
+  const commandText = truncateList(visualModel.commands, 5);
+  const truthText = Array.isArray(currentTruth.excerpt) && currentTruth.excerpt.length > 0
+    ? currentTruth.excerpt.map((item) => `- ${item}`).join("\n")
+    : `- ${currentTruth.summary || "缺少 CURRENT_BACKLOG 当前摘要。"}`;
+  const waveText = [
+    `Wave：${expansionWave.currentWaveName || "-"}`,
+    `状态：${expansionWave.status || "-"}`,
+    `验收：${expansionWave.acceptanceTrack || expansionWave.summary || "-"}`,
+    `In scope：${truncateList(expansionWave.inScopeModules, 5).join("、") || (expansionWave.present ? "未声明" : "缺少 mirror")}`,
+    `Out of scope：${truncateList(expansionWave.outOfScopeModules, 5).join("、") || (expansionWave.present ? "未声明" : "缺少 mirror")}`,
   ];
+  const validationText = [
+    `Level：${validationDecision.levelLabel || validationDecision.level || "-"}`,
+    `Mirror：${validationOverrides.summary || "-"}`,
+    `域：${truncateList(validationDecision.matchedDomain, 4).join("、") || "-"}`,
+    `覆盖：${truncateList(validationDecision.matchedProjectOverride, 4).join("、") || "-"}`,
+    `显式视觉升级：${truncateList(expansionWave.explicitVisualUpgradeModules, 4).join("、") || "-"}`,
+  ];
+  const autoChainText = [
+    `Gate：${autoChain.gate?.statusLabel || "-"} / ${autoChain.gate?.generatedAt || "-"}`,
+    `Monitor：${autoChain.monitor?.statusLabel || "-"} / ${autoChain.monitor?.generatedAt || "-"}`,
+    `Watch：${autoChain.watch?.statusLabel || "-"} / ${autoChain.watch?.ageText || "-"}`,
+    `E2E：${autoChain.e2e?.statusLabel || "-"} / ${autoChain.e2e?.ageText || "-"}`,
+    `Recovery：${autoChain.watchRecovery?.statusLabel || "-"} / ${autoChain.watchRecovery?.ageText || "-"}`,
+  ];
+  const nextStepText = [
+    `摘要下一步：${summary.summaryNextAction || "-"}`,
+    `可执行：${summary.runnableNextCommand || "-"}`,
+    ...commandText.map((item) => `- ${item}`),
+  ];
+  const evidenceText = [
+    `导航：${visualModel.visualEvidenceFocusSummary || "暂无视觉导航摘要"}`,
+    `候选文件：${fileText.length > 0 ? "" : "暂无"}`,
+    ...fileText.map((item) => `- ${item}`),
+  ].filter(Boolean);
+  const helperText = summary.bootstrapShell === true
+    ? [
+      "初始化占位 shell",
+      "",
+      "当前白板不代表真实 gate / monitor 结论。",
+      "下一步必须先执行：",
+      "- npm run agent:sync",
+    ]
+    : [
+      "人工入口与辅助说明",
+      "",
+      "10-Zotero-Agent-人工指令窗口.md",
+      "03-Zotero-Agent-人工快速上手.md",
+      "04-Zotero-Agent-高级介入规范.md",
+    ];
 
   const nodes = [
     makeNode(
       "root0001",
       0,
       0,
-      360,
-      180,
-      `项目架构与闭环\n\n状态：${visualModel.statusLabel || "待人工介入"}\n结论：${visualModel.headline || "-"}`,
-      "2",
+      420,
+      210,
+      `当前项目态白板\n\n状态：${visualModel.statusLabel || "待人工介入"}\n来源：${summary.summarySource || "-"}\n结论：${visualModel.headline || "-"}\n${summary.bootstrapShell === true ? "说明：初始化占位，不代表当前结论" : `可执行：${summary.runnableNextCommand || "-"}`}`,
+      summary.bootstrapShell === true ? "1" : "2",
     ),
     makeNode(
-      "plugin002",
-      -40,
-      260,
-      320,
-      180,
-      "插件本体\n\nsrc/\naddon-static/\nconfig/\ntypes/",
+      "meta0002",
+      0,
+      -220,
+      420,
+      170,
+      `工作台元数据\n\ngeneration_id=${summary.generationId || "-"}\nsummary_source=${summary.summarySource || "-"}\nbootstrap_shell=${summary.bootstrapShell === true ? "true" : "false"}\nstatus_note=01-Zotero-Agent-当前状态总览.md`,
       "5",
     ),
     makeNode(
-      "agent003",
-      380,
-      250,
-      320,
-      220,
-      "Agent 自动构建链\n\nbuild -> watch/e2e -> autofix -> monitor -> gate -> loop",
-      "4",
-    ),
-    makeNode(
-      "human004",
-      780,
-      0,
-      340,
+      "truth0003",
+      -40,
+      280,
+      360,
       240,
-      "人工介入窗口\n\n10-Zotero-Agent-人工指令窗口.md\n\n如果人工不介入，agent 按自动路径继续。\n如果人工填写下一步指令，agent 以人工指令修正本轮路径。",
-      "3",
-    ),
-    makeNode(
-      "guide008",
-      780,
-      -280,
-      340,
-      220,
-      "人工指南双笔记\n\n03-Zotero-Agent-人工快速上手.md\n04-Zotero-Agent-高级介入规范.md\n\n先看快速上手，再按需要阅读高级规范。",
+      `当前批次 / 当前 truth\n\nActive batch：${currentTruth.activeBatchId || "-"}\n${truthText}`,
       "4",
     ),
     makeNode(
-      "evidence05",
-      790,
-      290,
-      340,
-      220,
-      `证据与候选文件\n\n${visualModel.visualEvidenceFocusSummary || "暂无视觉导航摘要"}\n\n${fileText.length === 0 ? "暂无候选文件" : fileText.map((item) => `- ${item}`).join("\n")}`,
+      "wave0004",
+      380,
+      280,
+      360,
+      240,
+      `当前 wave\n\n${waveText.join("\n")}`,
+      "4",
+    ),
+    makeNode(
+      "validation0005",
+      760,
+      280,
+      360,
+      240,
+      `Validation Profile\n\n${validationText.join("\n")}`,
       "6",
     ),
     makeNode(
-      "path0006",
-      1180,
+      "chain0006",
+      380,
       0,
-      320,
+      360,
       220,
-      `下一步路径\n\n${visualModel.nextAction || "-"}\n\n${commandText.map((item) => `- ${item}`).join("\n")}`,
-      "4",
+      `当前自动链状态\n\n${autoChainText.join("\n")}\n\nGate 结论：${autoChain.gate?.headline || "-"}\nMonitor 结论：${autoChain.monitor?.headline || "-"}`,
+      "3",
     ),
     makeNode(
-      "block007",
-      1180,
-      270,
-      340,
+      "next0007",
+      760,
+      0,
+      360,
+      220,
+      `下一步动作\n\n${nextStepText.join("\n")}`,
+      "2",
+    ),
+    makeNode(
+      "evidence0008",
+      1140,
+      0,
+      360,
+      240,
+      `证据与候选文件\n\n${evidenceText.join("\n")}`,
+      "5",
+    ),
+    makeNode(
+      "block0009",
+      1140,
+      290,
+      360,
       220,
       `当前阻塞\n\n${blockerText.length === 0 ? "暂无明确阻塞项" : blockerText.map((item) => `- ${item}`).join("\n")}`,
       "1",
     ),
     makeNode(
-      "patch009",
-      380,
-      520,
-      360,
+      "helper0010",
+      1520,
+      0,
+      340,
       220,
-      `补丁摘要\n\n${patchText.join("\n")}`,
-      "6",
+      helperText.join("\n"),
+      "4",
     ),
   ];
 
   const edges = [
-    makeEdge("edge0001", "plugin002", "agent003", "构建"),
-    makeEdge("edge0002", "agent003", "human004", "人工窗口"),
-    makeEdge("edge0003", "human004", "path0006", "修改路径"),
-    makeEdge("edge0004", "agent003", "path0006", "自动继续"),
-    makeEdge("edge0005", "agent003", "evidence05", "产出证据"),
-    makeEdge("edge0006", "evidence05", "block007", "定位问题"),
-    makeEdge("edge0007", "root0001", "plugin002", "项目层"),
-    makeEdge("edge0008", "root0001", "agent003", "自动链"),
-    makeEdge("edge0009", "guide008", "human004", "先读再改"),
-    makeEdge("edge0010", "root0001", "guide008", "人工说明"),
-    makeEdge("edge0011", "agent003", "patch009", "补丁计划"),
-    makeEdge("edge0012", "patch009", "block007", "阻塞细化"),
+    makeEdge("edge0001", "root0001", "truth0003", "当前 truth"),
+    makeEdge("edge0002", "root0001", "chain0006", "自动结论"),
+    makeEdge("edge0003", "truth0003", "wave0004", "当前波次"),
+    makeEdge("edge0004", "wave0004", "validation0005", "验证分层"),
+    makeEdge("edge0005", "chain0006", "next0007", "默认动作"),
+    makeEdge("edge0006", "chain0006", "evidence0008", "证据出口"),
+    makeEdge("edge0007", "evidence0008", "block0009", "阻塞与候选"),
+    makeEdge("edge0008", "next0007", "helper0010", summary.bootstrapShell === true ? "先 sync" : "人工辅助"),
+    makeEdge("edge0009", "meta0002", "root0001", "同轮生成"),
   ];
 
   return {

@@ -6,6 +6,7 @@ import {
   archiveAgentSignalHistory,
   buildAgentMemoryMarkdown,
   summarizeAgentMemory,
+  writeAgentMemoryArtifacts,
 } from "../scripts/agent-memory-lib.mjs";
 
 describe("Agent Memory Lib", () => {
@@ -1506,5 +1507,45 @@ describe("Agent Memory Lib", () => {
     assert.ok(markdown.includes("Watch 热重载"));
     assert.ok(markdown.includes("本地发布矩阵"));
     assert.ok(markdown.includes("bootstrap:plugin-not-mounted"));
+  });
+
+  it("should cap long reason archive filenames to avoid ENAMETOOLONG", async () => {
+    const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "agent-memory-long-reason-"));
+    const longReason = "issue " + "reader stage restart ".repeat(80);
+    try {
+      await writeAgentMemoryArtifacts(projectRoot, {
+        generatedAt: "2026-03-21T10:30:00.000Z",
+        present: true,
+        reasonTrends: {
+          topReasons: [
+            {
+              reason: longReason,
+              label: "超长原因",
+              count: 1,
+              successRate: 0,
+              successCount: 0,
+              failureCount: 1,
+              lastSeenAt: "2026-03-21T10:00:00.000Z",
+              uniqueFingerprintCount: 1,
+              trend: {
+                direction: "baseline",
+                directionLabel: "基线",
+              },
+              recentHistory: [],
+            },
+          ],
+        },
+      });
+
+      const reasonIndexPath = path.join(projectRoot, "dist", "agent-memory", "reasons", "index.json");
+      const reasonIndex = JSON.parse(fs.readFileSync(reasonIndexPath, "utf-8"));
+      const firstEntry = Array.isArray(reasonIndex.entries) ? reasonIndex.entries[0] : null;
+      assert.ok(firstEntry);
+      const baseName = path.basename(String(firstEntry.path || ""));
+      assert.ok(baseName.length <= 110, `expected capped filename, got ${baseName.length}: ${baseName}`);
+      assert.ok(fs.existsSync(path.join(projectRoot, "dist", firstEntry.path)));
+    } finally {
+      fs.rmSync(projectRoot, { recursive: true, force: true });
+    }
   });
 });

@@ -5,6 +5,10 @@ import { listRunRecords } from "./agent-telemetry-lib.mjs";
 import { resolveAgentArtifactPath, resolveAgentArtifactsDir } from "./agent-artifacts.mjs";
 import { buildMonitorFrontpageSummary } from "./agent-frontpage-summary-lib.mjs";
 import {
+  buildValidationDecision,
+  collectValidationContext,
+} from "./agent-validation-decision-lib.mjs";
+import {
   archiveAgentSignalHistory,
   loadAutofixHistoryEntries,
   renderAgentMemoryMarkdown,
@@ -29,11 +33,24 @@ import {
   summarizeZoteroWatchStatus,
 } from "./zotero-watch-status-lib.mjs";
 import { resolveZoteroAutofixArtifacts } from "./zotero-agent-artifacts.mjs";
+import { evaluateArtifactProvenance } from "./agent-provenance-lib.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const scriptStartedAt = Date.now();
+const DIAGNOSTIC_RUN_NAMES = new Set([
+  "telemetry-test",
+  "telemetry-fail-test",
+]);
+
+function isDiagnosticRunName(runName) {
+  const normalized = String(runName || "");
+  if (DIAGNOSTIC_RUN_NAMES.has(normalized)) {
+    return true;
+  }
+  return /^gate-.*-case$/u.test(normalized);
+}
 
 function pickFailureReason(run) {
   const spawnError = run.metadata?.spawnError;
@@ -123,12 +140,33 @@ function summarizeRuns(runs) {
       runs.reduce((sum, run) => sum + Number(run.durationMs || 0), 0) / total,
     );
 
+  const qualityRuns = runs.filter((run) => !isDiagnosticRunName(run.runName));
+  const qualityPassed = qualityRuns.filter((run) => run.success === true).length;
+  const qualityFailed = qualityRuns.filter((run) => run.success === false).length;
+  const qualityPassRate = qualityRuns.length === 0
+    ? 0
+    : Number(((qualityPassed / qualityRuns.length) * 100).toFixed(2));
+  const diagnosticRuns = runs.filter((run) => isDiagnosticRunName(run.runName));
+  const diagnosticPassed = diagnosticRuns.filter((run) => run.success === true).length;
+  const diagnosticFailed = diagnosticRuns.filter((run) => run.success === false).length;
+  const diagnosticPassRate = diagnosticRuns.length === 0
+    ? 0
+    : Number(((diagnosticPassed / diagnosticRuns.length) * 100).toFixed(2));
+
   return {
     generatedAt: new Date().toISOString(),
     total,
     passed,
     failed,
     passRate,
+    qualityTotal: qualityRuns.length,
+    qualityPassed,
+    qualityFailed,
+    qualityPassRate,
+    diagnosticTotal: diagnosticRuns.length,
+    diagnosticPassed,
+    diagnosticFailed,
+    diagnosticPassRate,
     averageDurationMs,
     latest: runs[0] || null,
     byRunName: summarizeByRunName(runs),
@@ -273,6 +311,8 @@ function buildMarkdown(summary) {
     `- 成功: \`${summary.passed}\``,
     `- 失败: \`${summary.failed}\``,
     `- 成功率: \`${summary.passRate}%\``,
+    `- 质量任务成功率: \`${summary.qualityPassRate ?? 0}%\` (${summary.qualityPassed ?? 0}/${summary.qualityTotal ?? 0})`,
+    `- 诊断任务成功率: \`${summary.diagnosticPassRate ?? 0}%\` (${summary.diagnosticPassed ?? 0}/${summary.diagnosticTotal ?? 0})`,
     `- 平均耗时: \`${summary.averageDurationMs}ms\``,
     "",
     "## 首页摘要",
@@ -284,6 +324,27 @@ function buildMarkdown(summary) {
     `- 真机验证: \`${summary.frontpageSummary?.e2e?.statusLabel || "缺失"}\` / ${summary.frontpageSummary?.e2e?.ageText || "-"}`,
     `- 自动修复: \`${summary.frontpageSummary?.autofix?.statusLabel || "缺失"}\` / ${summary.frontpageSummary?.autofix?.ageText || "-"}`,
     `- 恢复回归: \`${summary.frontpageSummary?.watchRecovery?.statusLabel || "缺失"}\` / ${summary.frontpageSummary?.watchRecovery?.ageText || "-"}`,
+    "",
+    "## 验证策略判定",
+    "",
+    `- 判定等级: \`${summary.validationDecision?.level || "unknown"}\` (${summary.validationDecision?.levelLabel || "未知"})`,
+    `- 判定来源: \`${summary.validationDecision?.decisionSource || summary.validationDecision?.source || "unknown"}\``,
+    `- 命中验证域: ${(summary.validationDecision?.matchedDomain || []).join("、") || "-"}`,
+    `- 命中项目覆盖: ${(summary.validationDecision?.matchedProjectOverride || []).join("、") || "-"}`,
+    `- 运行时升级: \`${summary.validationDecision?.escalatedByRuntimeSignals ? "是" : "否"}\``,
+    `- 是否阻断: \`${summary.validationDecision?.blocking ? "是" : "否"}\``,
+    `- 判定依据: ${(summary.validationDecision?.reasons || []).join("；") || "-"}`,
+    `- 所需检查: ${(summary.validationDecision?.requiredChecks || []).join("；") || "-"}`,
+    `- 所需证据: ${(summary.validationDecision?.requiredEvidence || []).join("；") || "-"}`,
+    `- 补证动作: ${summary.validationDecision?.deferredEvidenceAction || "-"}`,
+    "",
+    "## 工件来源可信度",
+    "",
+    `- 校验状态: \`${summary.provenance?.status || "unknown"}\``,
+    `- 是否越界: \`${summary.provenance?.violation ? "是" : "否"}\``,
+    `- 结果说明: ${summary.provenance?.message || "-"}`,
+    `- run 归属: in-project ${summary.provenance?.runRecords?.inProjectCount ?? 0} / out-of-project ${summary.provenance?.runRecords?.outOfProjectCount ?? 0} / unknown ${summary.provenance?.runRecords?.unknownCount ?? 0}`,
+    `- delegation 归属: cwd 越界 ${summary.provenance?.delegation?.outOfProjectCwdCount ?? 0} / artifact-base 越界 ${summary.provenance?.delegation?.outOfProjectArtifactBaseCount ?? 0}`,
     "",
     "## Zotero 热重载状态",
     "",
@@ -432,7 +493,7 @@ function buildMarkdown(summary) {
     lines.push(`- synthetic fallback: \`${readerEvent.syntheticFallbackAvailable === null ? "-" : (readerEvent.syntheticFallbackAvailable ? "可用" : "不可用")}\``);
     lines.push(`- Hook 场景: \`${readerEvent.hookScenarioStatusLabel || "缺失"}\``);
     lines.push(`- 细粒度 Hook: \`${readerEvent.fineGrainedScenarioStatusLabel || "缺失"}\``);
-    lines.push(`- Toolbar 宿主点: \`${readerEvent.toolbarHookObserved ? "已观测" : "未观测"}\``);
+    lines.push(`- renderToolbar 宿主点: \`${readerEvent.toolbarHookObserved ? "已观测" : "未观测"}\``);
     lines.push(`- 最近观测场景: ${(readerEvent.observedScenarioNames || []).join("、") || "-"}`);
     lines.push(`- 注册类型: ${(readerEvent.registeredTypes || []).join("、") || "-"}`);
     lines.push(`- 探针类型: ${(readerEvent.probeObservedTypes || []).join("、") || "-"}`);
@@ -442,7 +503,7 @@ function buildMarkdown(summary) {
     lines.push(`- 未观测 probe 类型: ${(readerEvent.unobservedProbeTypes || []).join("、") || "-"}`);
     lines.push(`- 分发模式: ${(readerEvent.dispatchModes || []).join("、") || "-"}`);
     lines.push(`- 摘要: ${readerEvent.note || "-"}`);
-    lines.push(`- Toolbar 证据: ${e2e.toolbarEvidenceSummary || "-"}`);
+    lines.push(`- renderToolbar 证据: ${e2e.toolbarEvidenceSummary || "-"}`);
     lines.push(`- 视觉证据: ${e2e.visualEvidenceSummary || "-"}`);
     lines.push(`- 证据导航: ${firstVisualEvidenceItem ? `先看 Cycle ${firstVisualEvidenceItem.cycleIndex ?? "-"} / ${firstVisualEvidenceItem.bootMode || "-"} / ${firstVisualEvidenceItem.kind || "visual"} / ${firstVisualEvidenceItem.canonicalTarget || "-"}` : "-"}`);
     lines.push(`- 失败证据项: \`${e2e.visualEvidenceFailingItemCount ?? 0} / ${e2e.visualEvidenceItemCount ?? 0}\``, "");
@@ -733,11 +794,13 @@ function buildMarkdown(summary) {
 async function main() {
   const runs = await listRunRecords();
   const summary = summarizeRuns(runs);
-  const [watchStatus, zoteroValidation, gateReport, releaseMatrix] = await Promise.all([
+  const [watchStatus, zoteroValidation, gateReport, releaseMatrix, validationContext, provenance] = await Promise.all([
     loadWatchStatusSummary(),
     loadZoteroValidationSummary(),
     loadJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-gate.json")),
     loadReleaseMatrixSummary(),
+    collectValidationContext(projectRoot),
+    evaluateArtifactProvenance(projectRoot, runs, { env: process.env }),
   ]);
   const signalTrends = await archiveAgentSignalHistory(projectRoot, {
     watch: watchStatus,
@@ -750,6 +813,16 @@ async function main() {
   const agentMemory = await loadAgentMemorySummary(signalTrends);
   summary.watchStatus = watchStatus;
   summary.zoteroValidation = zoteroValidation;
+  summary.validationContext = validationContext;
+  summary.validationDecision = buildValidationDecision({
+    projectRoot,
+    validationContext,
+    changedPaths: validationContext?.changedPaths || [],
+    runNames: runs.map((item) => item?.runName).filter(Boolean),
+    e2e: zoteroValidation.e2e,
+    env: process.env,
+  });
+  summary.provenance = provenance;
   summary.engineeringHardening = summarizeEngineeringHardening({
     e2e: zoteroValidation.e2e,
     autofix: zoteroValidation.autofix,

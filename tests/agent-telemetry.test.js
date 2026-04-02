@@ -584,7 +584,7 @@ describe("Agent Telemetry", () => {
     assert.equal(monitorJSON.zoteroValidation?.e2e?.readerEventReport?.probeObservedTypeCount, 8);
     assert.equal(monitorJSON.zoteroValidation?.e2e?.readerEventReport?.syntheticFallbackAvailable, true);
     assert.ok(monitorJSON.zoteroValidation?.e2e?.readerEventReport?.observedScenarioNames?.includes("reader event hook diagnostics"));
-    assert.ok(monitorJSON.zoteroValidation?.e2e?.toolbarEvidenceSummary?.includes("Toolbar 宿主点已观测"));
+    assert.ok(monitorJSON.zoteroValidation?.e2e?.toolbarEvidenceSummary?.includes("renderToolbar 宿主点已观测"));
     assert.ok(monitorJSON.zoteroValidation?.e2e?.toolbarEvidenceSummary?.includes("分发 customEvent"));
     assert.ok(monitorJSON.zoteroValidation?.e2e?.visualEvidenceSummary?.includes("library 已对齐"));
     assert.ok(monitorJSON.zoteroValidation?.e2e?.visualEvidenceSummary?.includes("reader 已对齐"));
@@ -668,7 +668,7 @@ describe("Agent Telemetry", () => {
     assert.ok(monitorMD.includes("### Reader 事件桥"));
     assert.ok(monitorMD.includes("synthetic fallback"));
     assert.ok(monitorMD.includes("renderTextSelectionPopup"));
-    assert.ok(monitorMD.includes("Toolbar 证据"));
+    assert.ok(monitorMD.includes("renderToolbar 证据"));
     assert.ok(monitorMD.includes("视觉证据"));
     assert.ok(monitorMD.includes("视觉采集稳定性"));
     assert.ok(monitorMD.includes("预截图 settle"));
@@ -819,26 +819,26 @@ describe("Agent Telemetry", () => {
       passed: false,
       errorCategory: "validation",
       errorCategoryLabel: "验证错误",
-      errorMessage: "Reader Toolbar / 官方 listener 桥接存在漂移。",
+      errorMessage: "Reader renderToolbar / 官方 listener 桥接存在漂移。",
       failedStage: "validation-summary",
-      issues: ["Reader Toolbar / 官方 listener 桥接存在漂移。"],
+      issues: ["Reader renderToolbar / 官方 listener 桥接存在漂移。"],
       hints: [],
       diagnostics: [{
         fingerprint: "reader-event:toolbar-bridge-registration-drift",
-        summary: "Reader Toolbar / 官方 listener 桥接存在漂移。",
+        summary: "Reader renderToolbar / 官方 listener 桥接存在漂移。",
         severity: "high",
         candidateFiles: ["src/features/reader.js"],
       }],
       primaryDiagnosis: {
         fingerprint: "reader-event:toolbar-bridge-registration-drift",
-        summary: "Reader Toolbar / 官方 listener 桥接存在漂移。",
+        summary: "Reader renderToolbar / 官方 listener 桥接存在漂移。",
         severity: "high",
         candidateFiles: ["src/features/reader.js"],
       },
       cycles: [{
         index: 1,
         passed: false,
-        summaryNote: "Reader Toolbar 宿主点未观测。",
+        summaryNote: "Reader renderToolbar 宿主点未观测。",
         logs: { errorCount: 0, warnCount: 1 },
         tests: { failed: 0 },
         scenarios: { failed: 1 },
@@ -892,7 +892,7 @@ describe("Agent Telemetry", () => {
     assert.equal(monitorJSON.zoteroValidation?.e2e?.errorCategory, "validation");
     assert.equal(monitorJSON.zoteroValidation?.e2e?.errorCategoryLabel, "验证错误");
     assert.equal(monitorJSON.zoteroValidation?.e2e?.failedStage, "validation-summary");
-    assert.ok(String(monitorJSON.zoteroValidation?.e2e?.errorMessage || "").includes("Reader Toolbar / 官方 listener 桥接存在漂移"));
+    assert.ok(String(monitorJSON.zoteroValidation?.e2e?.errorMessage || "").includes("Reader renderToolbar / 官方 listener 桥接存在漂移"));
     assert.ok(String(monitorJSON.frontpageSummary?.headline || "").length > 0);
     assert.equal(monitorJSON.frontpageSummary?.nextAction, "npm run agent:zotero:e2e");
     assert.ok(monitorMD.includes("E2E 失败分类: `验证错误`"));
@@ -3521,11 +3521,22 @@ describe("Agent Telemetry", () => {
         tests: { failed: 0 },
         scenarios: { failed: 0 },
         visuals: {
+          captureStability: {
+            stages: [
+              { kind: "library", stable: true, attemptCount: 2, selectionReason: "stable-hash-pair" },
+              { kind: "reader", stable: true, attemptCount: 2, selectionReason: "stable-hash-pair" },
+            ],
+          },
           analysis: {
+            baselines: [
+              { kind: "library", status: "compared", ok: true },
+              { kind: "reader", status: "compared", ok: true },
+            ],
             summary: {
               baseline: {
                 driftCount: 0,
                 missingCount: 0,
+                comparedCount: 2,
               },
             },
           },
@@ -3706,11 +3717,22 @@ describe("Agent Telemetry", () => {
         tests: { failed: 0 },
         scenarios: { failed: 0 },
         visuals: {
+          captureStability: {
+            stages: [
+              { kind: "library", stable: true, attemptCount: 2, selectionReason: "stable-hash-pair" },
+              { kind: "reader", stable: true, attemptCount: 2, selectionReason: "stable-hash-pair" },
+            ],
+          },
           analysis: {
+            baselines: [
+              { kind: "library", status: "compared", ok: true },
+              { kind: "reader", status: "compared", ok: true },
+            ],
             summary: {
               baseline: {
                 driftCount: 0,
                 missingCount: 0,
+                comparedCount: 2,
               },
             },
           },
@@ -4139,6 +4161,128 @@ describe("Agent Telemetry", () => {
     assert.ok(gateMD.includes("服务状态"));
     assert.ok(gateMD.includes("异常服务"));
     assert.ok(gateMD.includes("服务健康问题"));
+  });
+
+  it("should not fail dev gate when degraded service is recoverable missing-key ai runtime", () => {
+    const previousVisualPolicyOverride = process.env.AGENT_VISUAL_POLICY_OVERRIDE;
+    process.env.AGENT_VISUAL_POLICY_OVERRIDE = "not-needed";
+
+    try {
+      writeWatchStatus({
+        generatedAt: new Date().toISOString(),
+        latestStatus: "healthy",
+        latest: {
+          trigger: "watch-change",
+          passed: true,
+          issues: [],
+        },
+      });
+      writeE2EReport({
+        generatedAt: new Date().toISOString(),
+        strategy: "hot",
+        passed: true,
+        issues: [],
+        hints: [],
+        cycles: [{
+          index: 1,
+          passed: true,
+          summaryNote: "AI runtime 缺少 API key，服务降级但其余能力可用",
+          checks: {
+            serviceTotal: 3,
+            serviceHealthyCount: 2,
+            serviceUnhealthyCount: 1,
+            serviceHealthOK: false,
+            serviceStatus: "degraded",
+            services: [
+              {
+                id: "aiassistant.ai-runtime",
+                status: "degraded",
+                health: {
+                  ok: false,
+                  details: {
+                    configValid: false,
+                    errors: ["API key is required for non-local providers"],
+                    readerChatInitialized: true,
+                    annotationAIInitialized: true,
+                  },
+                },
+              },
+            ],
+          },
+          logs: { errorCount: 0, warnCount: 0 },
+          tests: { failed: 0 },
+          scenarios: { failed: 0 },
+          visuals: {
+            analysis: {
+              summary: {
+                baseline: {
+                  driftCount: 0,
+                  missingCount: 0,
+                },
+              },
+            },
+          },
+        }],
+      });
+      writeAutofixReport({
+        generatedAt: new Date().toISOString(),
+        initialStrategy: "hot",
+        recovered: true,
+        outcomeLabel: "无需恢复",
+        attempts: [{
+          index: 1,
+          ok: true,
+          note: "仅观测到可恢复的 AI runtime 缺 key 降级",
+        }],
+        recommendations: [],
+      });
+      writeWatchRecoveryReport({
+        generatedAt: new Date().toISOString(),
+        passed: true,
+        startupPassed: true,
+        latestTrigger: "session-restart-recovery",
+        latestPassed: true,
+        latestStatus: "healthy",
+        expectedTriggers: [
+          "watch-change",
+          "runtime-recovery",
+          "session-restart-recovery",
+        ],
+        observedTriggers: [
+          "watch-change",
+          "runtime-recovery",
+          "session-restart-recovery",
+        ],
+        summaryNote: "恢复回归通过",
+        entries: [],
+        issues: [],
+      });
+
+      execNode(["scripts/agent-runner.mjs", "check", "--", "node", "-e", "process.exit(0)"]);
+      execNode(["scripts/agent-monitor.mjs"]);
+      execNode([
+        "scripts/agent-gate.mjs",
+        "--profile",
+        "dev",
+        "--min-pass-rate",
+        "0",
+        "--max-recent-failed",
+        "999",
+      ]);
+
+      const gateJSON = readArtifactJSON("agent-gate.json");
+
+      assert.equal(gateJSON.gatePassed, true);
+      assert.equal(gateJSON.zoteroValidation?.e2e?.serviceRecoverableMissingKey, true);
+      assert.equal(gateJSON.issues.some((item) => String(item).includes("Zotero 服务健康异常")), false);
+      assert.ok(gateJSON.recommendations.some((item) => String(item).includes("API key")));
+    } finally {
+      if (previousVisualPolicyOverride === undefined) {
+        delete process.env.AGENT_VISUAL_POLICY_OVERRIDE;
+      } else {
+        process.env.AGENT_VISUAL_POLICY_OVERRIDE = previousVisualPolicyOverride;
+      }
+    }
   });
 
   it("should fail dev gate when zotero e2e report is stale", () => {
@@ -5603,19 +5747,19 @@ describe("Agent Telemetry", () => {
     assert.ok(monitorJSON.zoteroValidation?.e2e?.contextMenuSummary?.includes("已观测 3 类"));
     assert.ok(monitorJSON.zoteroValidation?.e2e?.contextMenuSummary?.includes("synthetic-fallback 3 类"));
     assert.ok(monitorJSON.zoteroValidation?.e2e?.visualCaptureStabilitySummary?.includes("library 稳定"));
-    assert.ok(monitorMD.includes("Toolbar 证据"));
+    assert.ok(monitorMD.includes("renderToolbar 证据"));
     assert.ok(monitorMD.includes("视觉证据"));
     assert.ok(monitorMD.includes("视觉采集稳定性"));
-    assert.ok(monitorMD.includes("Toolbar 宿主点已观测"));
+    assert.ok(monitorMD.includes("renderToolbar 宿主点已观测"));
     assert.ok(monitorMD.includes("library 已对齐"));
     assert.ok(monitorMD.includes("library 稳定"));
     assert.ok(monitorMD.includes("文本浮层"));
     assert.ok(monitorMD.includes("侧栏批注头"));
     assert.ok(monitorMD.includes("已观测 3 类"));
-    assert.ok(dashboardHTML.includes("Toolbar 证据"));
+    assert.ok(dashboardHTML.includes("renderToolbar 证据"));
     assert.ok(dashboardHTML.includes("视觉证据"));
     assert.ok(dashboardHTML.includes("视觉采集稳定性"));
-    assert.ok(dashboardHTML.includes("Toolbar 宿主点已观测"));
+    assert.ok(dashboardHTML.includes("renderToolbar 宿主点已观测"));
     assert.ok(dashboardHTML.includes("library 已对齐"));
     assert.ok(dashboardHTML.includes("library 稳定"));
     assert.ok(dashboardHTML.includes("文本浮层"));
@@ -5747,7 +5891,27 @@ describe("Agent Telemetry", () => {
         logs: { errorCount: 0, warnCount: 0 },
         tests: { failed: 0 },
         scenarios: { failed: 0 },
-        visuals: { analysis: { summary: { baseline: { driftCount: 0, missingCount: 0 } } } },
+        visuals: {
+          captureStability: {
+            stages: [
+              { kind: "library", stable: true, attemptCount: 2, selectionReason: "stable-hash-pair" },
+              { kind: "reader", stable: true, attemptCount: 2, selectionReason: "stable-hash-pair" },
+            ],
+          },
+          analysis: {
+            baselines: [
+              { kind: "library", status: "compared", ok: true },
+              { kind: "reader", status: "compared", ok: true },
+            ],
+            summary: {
+              baseline: {
+                driftCount: 0,
+                missingCount: 0,
+                comparedCount: 2,
+              },
+            },
+          },
+        },
       }],
     });
     writeAutofixReport({
@@ -5856,7 +6020,27 @@ describe("Agent Telemetry", () => {
         logs: { errorCount: 0, warnCount: 0 },
         tests: { failed: 0 },
         scenarios: { failed: 0 },
-        visuals: { analysis: { summary: { baseline: { driftCount: 0, missingCount: 0 } } } },
+        visuals: {
+          captureStability: {
+            stages: [
+              { kind: "library", stable: true, attemptCount: 2, selectionReason: "stable-hash-pair" },
+              { kind: "reader", stable: true, attemptCount: 2, selectionReason: "stable-hash-pair" },
+            ],
+          },
+          analysis: {
+            baselines: [
+              { kind: "library", status: "compared", ok: true },
+              { kind: "reader", status: "compared", ok: true },
+            ],
+            summary: {
+              baseline: {
+                driftCount: 0,
+                missingCount: 0,
+                comparedCount: 2,
+              },
+            },
+          },
+        },
       }],
     });
     writeAutofixReport({

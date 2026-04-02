@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "summary": "Template-level validation domain contract for deciding whether visual validation is required, recommended, or not needed.",
+  "domains": [
+    {
+      "id": "visible-surface",
+      "version": 1,
+      "summary": "Real user-visible preference, reader, annotation, baseline, or UI scenario surfaces.",
+      "pathMatchers": [
+        "^src/features/reader-chat(?:/|\\.|$)",
+        "^src/features/annotation-ai(?:/|\\.|$)",
+        "^src/features/reader-ui-surface(?:/|\\.|$)",
+        "^addon-static/content/(?:.*preferences|.*xhtml|.*css|.*icon)",
+        "^tests/visual-baselines(?:/|$)",
+        "^zotero-scenarios/(?:baseline|reader|annotation|ui)"
+      ],
+      "defaultDecision": "visual-required",
+      "requiredChecks": [
+        "最近一轮 `agent:zotero:e2e` 结果存在且状态为 `passed`。",
+        "视觉证据已采集，且 failing 证据项为 0。"
+      ],
+      "escalationSignals": [
+        "pure-visual-reader-failure",
+        "visual-drift",
+        "visual-missing"
+      ],
+      "nonGoals": [
+        "运行时配置与 settings/schema 调整",
+        "纯治理脚本或文档口径改动"
+      ]
+    },
+    {
+      "id": "runtime-config",
+      "version": 1,
+      "summary": "Runtime services, settings, schema, and other non-visible functional configuration surfaces.",
+      "pathMatchers": [
+        "^src/services/(?:|.*)",
+        "^src/settings/(?:|.*)",
+        "^src/app/product-runtime(?:/|\\.|$)",
+        "^src/app/capability-manifest(?:/|\\.|$)",
+        "^types/(?!features\\.d\\.ts$)(?:|.*)"
+      ],
+      "defaultDecision": "visual-not-needed",
+      "requiredChecks": [
+        "继续以 `npm run check` -> `npm run agent:zotero:e2e` -> `npm run agent:monitor` / `npm run agent:gate` 完成功能闭环。"
+      ],
+      "escalationSignals": [
+        "pure-visual-reader-failure",
+        "visual-drift",
+        "visual-missing"
+      ],
+      "nonGoals": [
+        "偏好设置面板、Reader renderToolbar、annotation context menu 等真实可见面"
+      ]
+    },
+    {
+      "id": "host-wrapper",
+      "version": 1,
+      "summary": "Host interface wrappers and integration surfaces that may affect UI indirectly but are not visible surfaces by default.",
+      "pathMatchers": [
+        "^src/features/menu-manager(?:/|\\.|$)",
+        "^src/features/item-pane(?:/|\\.|$)",
+        "^src/features/item-tree(?:/|\\.|$)",
+        "^src/features/preference-panes(?:/|\\.|$)",
+        "^src/features/reader(?:/|\\.|$)",
+        "^src/app/feature-composer(?:/|\\.|$)",
+        "^types/features\\.d\\.ts$"
+      ],
+      "defaultDecision": "visual-recommended",
+      "requiredChecks": [
+        "先完成 `npm run check` -> `npm run agent:zotero:e2e` -> `npm run agent:monitor` / `npm run agent:gate`。",
+        "若变更最终触达真实可见面，再补一轮视觉证据归档。"
+      ],
+      "escalationSignals": [
+        "pure-visual-reader-failure",
+        "visual-drift",
+        "visual-missing"
+      ],
+      "nonGoals": [
+        "只因文件名包含 reader/menu/preference 就默认升级为视觉主阻断"
+      ]
+    },
+    {
+      "id": "governance-docs",
+      "version": 1,
+      "summary": "Governance scripts, docs, manifests, package wiring, and reporting assets.",
+      "pathMatchers": [
+        "^docs/(?:|.*)",
+        "^config/(?:|.*)",
+        "^scripts/(?:|.*)",
+        "^tests/(?:agent-|toolchain|docs-|run-all|cleanroom|zotero-watch)",
+        "^README\\.md$",
+        "^AGENTS\\.md$",
+        "^FRAMEWORK_(?:CHECKLIST|ASSESSMENT)\\.md$",
+        "^package\\.json$"
+      ],
+      "defaultDecision": "visual-not-needed",
+      "requiredChecks": [
+        "继续以 `npm run check` -> `npm run agent:zotero:e2e` -> `npm run agent:monitor` / `npm run agent:gate` 完成功能闭环。"
+      ],
+      "escalationSignals": [
+        "pure-visual-reader-failure",
+        "visual-drift",
+        "visual-missing"
+      ],
+      "nonGoals": [
+        "Reader strict visual、baseline refresh、visual autofix 等产品路径"
+      ]
+    }
+  ]
+}

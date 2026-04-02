@@ -23,7 +23,7 @@
 - runner 通过 `consoleActor.evaluateJSAsync + Promise.resolve(...) + Services.tm.spinEventLoopUntil(...)` 在 Zotero chrome 侧同步等待异步表达式完成，避免 RDP 返回 `Promise<pending>` 干扰 agent 判定
 - 已额外在干净 profile 中验证：打包产物 `dist/cleanroomtemplate-0.1.0.xpi` 通过 Zotero “Install Add-on From File” 安装后，会自动进入原生 bootstrap 生命周期，并挂出 `Zotero.CleanroomTemplate.api`
 - `npm run zotero:test` 当前会验证 3 条真机断言：插件实例挂载、baseline API 暴露、默认 `ItemPane / ItemTree / Reader 菜单` demo 已进入 Zotero 原生管理器或注册表
-- `npm run zotero:scenario` 当前会验证 11 条真机场景：baseline 注册、真实条目选择、真实条目修改触发 Notifier、真实 PDF Reader 打开、Reader 交互摘要、Reader 批注回环、Reader toolbar 事件桥、Reader 细粒度浮层/上下文菜单探针、settings schema 与偏好面板诊断、多窗口挂载、无阻塞 agent 动作
+- `npm run zotero:scenario` 当前会验证 11 条真机场景：baseline 注册、真实条目选择、真实条目修改触发 Notifier、真实 PDF Reader 打开、Reader 交互摘要、Reader 批注回环、Reader renderToolbar 事件桥、Reader 细粒度浮层/上下文菜单探针、settings schema 与偏好设置面板诊断、多窗口挂载、无阻塞 agent 动作
 - `npm run zotero:watch` 当前已验证：启动健康检查通过；一次真实热重载后会刷新 `dist/zotero-watch-status.json` 与 `dist/zotero-watch-status.md`；一次受控构建失败后会先进入 `runtime-recovery`，并已在强制注入 runtime 恢复失败的情况下实测通过 `session-restart-recovery`
 - `npm run agent:zotero:watch-recovery` 当前已验证：可在真机中自动完成“启动 watch -> 注入一次性 build 失败 -> 注入一次性 runtime 恢复失败 -> 观测 session-restart-recovery 成功”的受控回归，并输出独立恢复报告
 - `agent:monitor` / `agent:dashboard` / `agent:gate` 已接入 `dist/zotero-watch-status.json`：agent 主报告会展示热重载状态、状态时间与简单问题摘要；开发档位门禁会额外识别“健康但已过期”或“时间超前”的旧状态，避免误把陈旧/异常结果当成当前可用结论

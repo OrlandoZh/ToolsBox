@@ -396,6 +396,8 @@ describe("Plugin", () => {
     assert.typeOf(plugin.api.agent.runScenario, "function");
     assert.typeOf(plugin.api.agent.listCapabilities, "function");
     assert.typeOf(plugin.api.agent.getCapability, "function");
+    assert.typeOf(plugin.api.agent.listHostActions, "function");
+    assert.typeOf(plugin.api.agent.runHostAction, "function");
     assert.deepEqual(plugin.api.agent.listScenarios(), [
       "baseline-registration",
       "capability-manifest",
@@ -405,9 +407,12 @@ describe("Plugin", () => {
       "reader-current",
       "window-snapshot",
       "command-no-ui",
+      "host-actions",
     ]);
-    assert.ok(plugin.api.agent.listCapabilities().length >= 11);
+    assert.ok(plugin.api.agent.listCapabilities().length >= 12);
+    assert.ok(plugin.api.agent.listHostActions().length >= 9);
     assert.equal(plugin.api.agent.getCapability("multi-window-mount").agentScenario, "window-snapshot");
+    assert.equal(plugin.api.agent.getCapability("host-actions").agentScenario, "host-actions");
     assert.includes(
       plugin.api.agent.getCapability("reader-annotation-roundtrip").zoteroScenarios,
       "reader annotation roundtrip",
@@ -423,6 +428,10 @@ describe("Plugin", () => {
     assert.includes(
       plugin.api.agent.getCapability("reader-event-hooks").zoteroScenarios,
       "reader fine-grained hook diagnostics",
+    );
+    assert.includes(
+      plugin.api.agent.getCapability("host-actions").zoteroScenarios,
+      "live menu surface smoke",
     );
 
     const eventHandler = () => {};
@@ -489,6 +498,10 @@ describe("Plugin", () => {
 
     const windowSnapshot = plugin.api.agent.runScenario("window-snapshot");
     assert.ok(windowSnapshot.mainWindowCount >= 1);
+
+    const hostActionSnapshot = plugin.api.agent.runScenario("host-actions");
+    assert.ok(hostActionSnapshot.total >= 9);
+    assert.ok(hostActionSnapshot.actions.some((entry) => entry.id === "preferences.openPane"));
 
     await plugin.shutdown();
 

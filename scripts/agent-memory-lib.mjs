@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { resolveAgentMemoryArtifacts } from "./agent-artifacts.mjs";
 import { normalizeDiagnosisFingerprint } from "./agent-zotero-diagnosis-lib.mjs";
@@ -318,7 +319,7 @@ function classifyE2EDiagnosisFingerprint(fingerprint) {
     case "reader-entry:declarative-reader-mapping-drift":
       return createSignalReasonDescriptor("reader-entry-drift", "Reader 声明式入口映射缺口");
     case "reader-event:toolbar-bridge-registration-drift":
-      return createSignalReasonDescriptor("reader-toolbar-bridge-drift", "Reader Toolbar 桥接漂移");
+      return createSignalReasonDescriptor("reader-toolbar-bridge-drift", "Reader renderToolbar 桥接漂移");
     case "reader-event:fine-grained-hook-declaration-drift":
       return createSignalReasonDescriptor("reader-hook-declaration-drift", "Reader 细粒度 Hook 声明漂移");
     case "localization:item-pane-info-row-l10n-id-drift":
@@ -592,7 +593,7 @@ const SIGNAL_METRIC_DEFINITIONS = {
     { id: "contextActionMenuMissingCycles", label: "上下文菜单缺失轮次", better: "lower", highlightPriority: 3 },
     { id: "readerSummaryCommandMissingCycles", label: "Reader 命令缺失轮次", better: "lower", highlightPriority: 3 },
     { id: "readerSummaryMenuMissingCycles", label: "Reader 菜单缺失轮次", better: "lower", highlightPriority: 3 },
-    { id: "preferencePaneMissingCycles", label: "偏好面板缺失轮次", better: "lower", highlightPriority: 3 },
+    { id: "preferencePaneMissingCycles", label: "偏好设置面板缺失轮次", better: "lower", highlightPriority: 3 },
     { id: "capabilityFailedCount", label: "失败能力", better: "lower", highlightPriority: 4 },
     { id: "capabilityUncoveredCount", label: "未覆盖能力", better: "lower", highlightPriority: 5 },
     { id: "staticRuntimeMissingCount", label: "静态运行时缺失", better: "lower", highlightPriority: 5 },
@@ -1292,7 +1293,18 @@ function sanitizeFingerprintSegment(value, fallback = "memory-item") {
     .toLowerCase()
     .replace(/[^a-z0-9]+/gu, "-")
     .replace(/^-+|-+$/gu, "");
-  return sanitized || fallback;
+  const segment = sanitized || fallback;
+  const maxLength = 96;
+  if (segment.length <= maxLength) {
+    return segment;
+  }
+  const digest = createHash("sha1")
+    .update(segment)
+    .digest("hex")
+    .slice(0, 10);
+  const headLength = Math.max(24, maxLength - digest.length - 1);
+  const head = segment.slice(0, headLength).replace(/-+$/u, "");
+  return `${head || fallback}-${digest}`;
 }
 
 async function readJSONIfExists(filePath) {

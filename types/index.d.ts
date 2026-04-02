@@ -11,3 +11,5 @@ export * from "./features";
 export * from "./utils";
 // Platform 模块类型
 export * from "./platform";
+// Agent 模块类型
+export * from "./agent";

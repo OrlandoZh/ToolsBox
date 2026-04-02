@@ -29,6 +29,8 @@ export function createPluginAgent({
   getItemSummary,
   getColumnValue,
   getItemTitle,
+  listHostActions,
+  runHostAction,
   runAgentAction,
   updateDemoNotifierState,
   zotero,
@@ -246,6 +248,9 @@ export function createPluginAgent({
       httpSlowThresholdMs: Number(httpDiagnostics.slowThresholdMs || 0),
       httpLastRequest: httpDiagnostics.lastRequest || null,
       httpLastError: httpDiagnostics.lastError || null,
+      hostActionCount: typeof listHostActions === "function"
+        ? listHostActions().length
+        : 0,
       hostReadyDurationMs: Number(lifecycleTelemetry?.hostReadyDurationMs || 0),
       startupDurationMs: Number(lifecycleTelemetry?.startupDurationMs || 0),
       shutdownDurationMs: Number(lifecycleTelemetry?.shutdownDurationMs || 0),
@@ -349,6 +354,9 @@ export function createPluginAgent({
       menuIDs: menuManager.getRegisteredMenuIds(),
       commandIDs: commandPalette.getAllCommands().map((item) => item.id),
       paneIDs: preferencePanes.getAllPanes(),
+      hostActions: typeof listHostActions === "function"
+        ? listHostActions()
+        : [],
       httpDiagnostics: http && typeof http.getDiagnostics === "function"
         ? http.getDiagnostics()
         : null,
@@ -365,6 +373,7 @@ export function createPluginAgent({
       "reader-current",
       "window-snapshot",
       "command-no-ui",
+      "host-actions",
     ];
   }
 
@@ -455,6 +464,15 @@ export function createPluginAgent({
         return {
           ok: runAgentAction(),
         };
+      case "host-actions":
+        return {
+          total: typeof listHostActions === "function"
+            ? listHostActions().length
+            : 0,
+          actions: typeof listHostActions === "function"
+            ? listHostActions()
+            : [],
+        };
       default:
         throw new Error(`Unknown agent scenario: ${name}`);
     }
@@ -468,5 +486,16 @@ export function createPluginAgent({
     listCapabilities,
     getCapability,
     runAgentScenario,
+    listHostActions() {
+      return typeof listHostActions === "function"
+        ? listHostActions()
+        : [];
+    },
+    async runHostAction(actionId, payload = {}) {
+      if (typeof runHostAction !== "function") {
+        throw new Error("Host Action runner is unavailable");
+      }
+      return await runHostAction(actionId, payload);
+    },
   };
 }

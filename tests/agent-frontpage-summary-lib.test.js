@@ -132,6 +132,164 @@ describe("Agent Frontpage Summary Lib", () => {
     assert.equal(nextAction, "当前主阻断已排除采集稳定性、几何漂移与 canonical coverage 缺口；先执行 `npm run agent:obsidian` 固化 Reader UI / scenario 的人工复核结论。");
   });
 
+  it("should point monitor next action to functional closure for visual-not-needed batches", () => {
+    const frontpage = buildMonitorFrontpageSummary({
+      watchStatus: {
+        present: true,
+        status: "healthy",
+        statusLabel: "健康",
+        ageText: "1 分钟",
+        latestTrigger: "startup",
+      },
+      zoteroValidation: {
+        e2e: {
+          present: false,
+          status: "missing",
+          statusLabel: "缺失",
+          ageText: "-",
+        },
+        autofix: {
+          present: false,
+          status: "missing",
+          statusLabel: "缺失",
+          ageText: "-",
+        },
+        watchRecovery: {
+          present: true,
+          status: "passed",
+          statusLabel: "通过",
+          ageText: "1 分钟",
+          latestTrigger: "session-restart-recovery",
+        },
+      },
+      validationDecision: {
+        level: "visual-not-needed",
+        levelLabel: "无需视觉验证",
+        decisionSource: "validation-domain",
+        reasons: ["当前变更域集中在 runtime-config。"],
+        matchedDomain: ["runtime-config"],
+        matchedProjectOverride: [],
+        requiredChecks: [
+          "继续以 `npm run check` -> `npm run agent:zotero:e2e` -> `npm run agent:monitor` / `npm run agent:gate` 完成功能闭环。",
+        ],
+        requiredEvidence: [
+          "继续以 `npm run check` -> `npm run agent:zotero:e2e` -> `npm run agent:monitor` / `npm run agent:gate` 完成功能闭环。",
+        ],
+        escalatedByRuntimeSignals: false,
+        deferredEvidenceAction: null,
+      },
+    });
+
+    assert.ok(String(frontpage.nextAction || "").includes("npm run check"));
+    assert.equal(String(frontpage.nextAction || "").includes("agent:obsidian"), false);
+  });
+
+  it("should keep gate next action on functional closure for non-visual batches instead of visual review", () => {
+    const frontpage = buildGateFrontpageSummary({
+      gatePassed: false,
+      profile: "dev",
+      issues: [
+        "最近 Zotero E2E 未通过：失败。",
+      ],
+      recommendations: [
+        "先运行 `npm run agent:check` 修复基础质量问题。",
+        "建议在下一次合并前执行 `npm run agent:zotero:e2e` 补齐视觉证据（非阻断）。",
+        "当前主阻断已排除采集稳定性、几何漂移与 canonical coverage 缺口；先执行 `npm run agent:obsidian` 固化 Reader UI / scenario 的人工复核结论。",
+      ],
+      watchStatus: {
+        status: "healthy",
+        statusLabel: "健康",
+        ageText: "1 分钟",
+      },
+      zoteroValidation: {
+        e2e: {
+          present: false,
+          status: "missing",
+          statusLabel: "缺失",
+          ageText: "-",
+        },
+        watchRecovery: {
+          present: true,
+          status: "passed",
+          statusLabel: "通过",
+          ageText: "1 分钟",
+        },
+      },
+      validationDecision: {
+        level: "visual-recommended",
+        levelLabel: "建议视觉验证",
+        decisionSource: "validation-domain",
+        reasons: ["当前变更域命中 host-wrapper。"],
+        matchedDomain: ["host-wrapper"],
+        matchedProjectOverride: [],
+        requiredChecks: [
+          "先完成 `npm run check` -> `npm run agent:zotero:e2e` -> `npm run agent:monitor` / `npm run agent:gate`。",
+        ],
+        requiredEvidence: [
+          "先完成 `npm run check` -> `npm run agent:zotero:e2e` -> `npm run agent:monitor` / `npm run agent:gate`。",
+        ],
+        escalatedByRuntimeSignals: false,
+        deferredEvidenceAction: "建议在下一次合并前执行 `npm run agent:zotero:e2e` 补齐视觉证据（非阻断）。",
+      },
+    });
+
+    assert.ok(String(frontpage.nextAction || "").includes("npm run check"));
+    assert.equal(String(frontpage.nextAction || "").includes("agent:obsidian"), false);
+  });
+
+  it("should prefer concrete watch recovery action over generic validation pipeline guidance", () => {
+    const frontpage = buildGateFrontpageSummary({
+      gatePassed: false,
+      profile: "dev",
+      issues: [
+        "最近 watch 恢复回归未通过，说明受控故障下的恢复链路仍不稳定。",
+      ],
+      recommendations: [
+        "先运行 `npm run agent:check` 修复基础质量问题。",
+        "重新执行 `npm run agent:zotero:watch-recovery`，确认恢复链已重新闭环。",
+        "建议在下一次合并前执行 `npm run agent:zotero:e2e` 补齐视觉证据（非阻断）。",
+      ],
+      watchStatus: {
+        status: "healthy",
+        statusLabel: "健康",
+        ageText: "1 分钟",
+      },
+      zoteroValidation: {
+        e2e: {
+          present: false,
+          status: "missing",
+          statusLabel: "缺失",
+          ageText: "-",
+        },
+        watchRecovery: {
+          present: true,
+          status: "failed",
+          statusLabel: "失败",
+          ageText: "1 分钟",
+          latestTrigger: "runtime-recovery",
+        },
+      },
+      validationDecision: {
+        level: "visual-recommended",
+        levelLabel: "建议视觉验证",
+        decisionSource: "validation-domain",
+        reasons: ["当前变更域命中 host-wrapper。"],
+        matchedDomain: ["host-wrapper"],
+        matchedProjectOverride: [],
+        requiredChecks: [
+          "先完成 `npm run check` -> `npm run agent:zotero:e2e` -> `npm run agent:monitor` / `npm run agent:gate`。",
+        ],
+        requiredEvidence: [
+          "先完成 `npm run check` -> `npm run agent:zotero:e2e` -> `npm run agent:monitor` / `npm run agent:gate`。",
+        ],
+        escalatedByRuntimeSignals: false,
+        deferredEvidenceAction: "建议在下一次合并前执行 `npm run agent:zotero:e2e` 补齐视觉证据（非阻断）。",
+      },
+    });
+
+    assert.equal(frontpage.nextAction, "npm run agent:zotero:watch-recovery");
+  });
+
   it("should build stable monitor frontpage summary when all zotero signals are healthy", () => {
     const frontpage = buildMonitorFrontpageSummary({
       latest: {
@@ -607,7 +765,7 @@ describe("Agent Frontpage Summary Lib", () => {
           status: "failed",
           statusLabel: "失败",
           ageText: "2 分钟",
-          note: "Reader Toolbar / 官方 listener 桥接存在漂移。",
+          note: "Reader renderToolbar / 官方 listener 桥接存在漂移。",
           readerEventReport: {
             present: true,
             status: "failed",

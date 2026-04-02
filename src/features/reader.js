@@ -73,6 +73,10 @@ export const READER_EVENT_SYNTHETIC_FALLBACK_TYPES = Object.freeze([
 const READER_EVENT_KNOWN_TYPE_SET = new Set(READER_EVENT_KNOWN_TYPES);
 const READER_EVENT_SYNTHETIC_FALLBACK_TYPE_SET = new Set(READER_EVENT_SYNTHETIC_FALLBACK_TYPES);
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * 创建 Reader 工具实例
  * @param {Object} options - 配置选项
@@ -904,6 +908,248 @@ export function createReader(options = {}) {
       || null;
   }
 
+  async function waitForReaderReady(target, options = {}) {
+    const resolvedReader = resolveReader(target);
+    if (!resolvedReader) {
+      return null;
+    }
+
+    const timeoutMs = Number.isFinite(Number(options.timeoutMs)) ? Number(options.timeoutMs) : 8000;
+    const intervalMs = Number.isFinite(Number(options.intervalMs)) ? Number(options.intervalMs) : 50;
+    const deadline = Date.now() + timeoutMs;
+
+    const initPromise = readReaderProperty(resolvedReader, "_initPromise");
+    if (initPromise && typeof initPromise.then === "function") {
+      await initPromise;
+    }
+
+    while (Date.now() < deadline) {
+      const primaryFrameWindow = getReaderFrameWindow(resolvedReader, { view: "primary" });
+      if (primaryFrameWindow?.document) {
+        return resolvedReader;
+      }
+      const primaryViewPromise = readReaderProperty(
+        readReaderProperty(readReaderProperty(resolvedReader, "_internalReader"), "_primaryView"),
+        "initializedPromise",
+      );
+      if (primaryViewPromise && typeof primaryViewPromise.then === "function") {
+        await primaryViewPromise;
+      }
+      await sleep(intervalMs);
+    }
+
+    return resolvedReader;
+  }
+
+  function queryFirst(doc, selectors = []) {
+    for (const selector of selectors) {
+      if (!selector) {
+        continue;
+      }
+      try {
+        const matched = doc?.querySelector?.(selector);
+        if (matched) {
+          return matched;
+        }
+      }
+      catch {}
+    }
+    return null;
+  }
+
+  function collectSidebarViewSelectors(view) {
+    const token = String(view || "").trim().toLowerCase();
+    if (!token) {
+      return [];
+    }
+    return [
+      `[data-sidebar-view="${token}"]`,
+      `[data-view="${token}"]`,
+      `[data-tab="${token}"]`,
+      `[data-id="${token}"]`,
+      `[data-panel="${token}"]`,
+      `[aria-controls*="${token}"]`,
+      `[id*="${token}"][role="tab"]`,
+      `button[value="${token}"]`,
+      `button[data-l10n-id*="${token}"]`,
+      `toolbarbutton[data-l10n-id*="${token}"]`,
+      `[role="tab"][data-l10n-id*="${token}"]`,
+    ];
+  }
+
+  function findToolbarElement(target, options = {}) {
+    const frameWindow = getReaderFrameWindow(target, options);
+    const doc = frameWindow?.document;
+    if (!doc) {
+      return null;
+    }
+
+    const explicitSelector = typeof options.selector === "string" && options.selector.trim()
+      ? options.selector.trim()
+      : null;
+    const selectors = explicitSelector
+      ? [explicitSelector]
+      : [
+        "[data-cleanroom-reader-toolbar-marker]",
+        ".cleanroom-reader-toolbar-marker",
+        "#cleanroom-reader-toolbar-marker",
+        "[role='toolbar'] [data-cleanroom-surface]",
+        ".toolbar .cleanroom-surface",
+        "[role='toolbar']",
+        ".reader-toolbar",
+      ];
+    return queryFirst(doc, selectors);
+  }
+
+  function findSidebarViewElements(target, view, options = {}) {
+    const resolvedReader = resolveReader(target);
+    const frameWindow = getReaderFrameWindow(resolvedReader, options);
+    const doc = frameWindow?.document;
+    if (!doc) {
+      return {
+        button: null,
+        panel: null,
+        doc: null,
+      };
+    }
+
+    const selectors = collectSidebarViewSelectors(view);
+    const button = queryFirst(doc, selectors);
+    const panel = queryFirst(doc, [
+      `[data-sidebar-panel="${String(view || "").trim().toLowerCase()}"]`,
+      `[data-panel="${String(view || "").trim().toLowerCase()}"]`,
+      `[id*="${String(view || "").trim().toLowerCase()}"][role='tabpanel']`,
+      `[role='tabpanel'][data-view="${String(view || "").trim().toLowerCase()}"]`,
+    ]);
+
+    return {
+      button,
+      panel,
+      doc,
+    };
+  }
+
+  async function setContextPaneOpen(target, open, options = {}) {
+    const resolvedReader = resolveReader(target);
+    if (!resolvedReader) {
+      return null;
+    }
+
+    await waitForReaderReady(resolvedReader, options);
+
+    if (typeof resolvedReader.setContextPaneOpen === "function") {
+      await resolvedReader.setContextPaneOpen(open);
+    }
+
+    const timeoutMs = Number.isFinite(Number(options.timeoutMs)) ? Number(options.timeoutMs) : 5000;
+    const intervalMs = Number.isFinite(Number(options.intervalMs)) ? Number(options.intervalMs) : 50;
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      const snapshot = getReaderUIStateSnapshot(resolvedReader);
+      if (!snapshot || snapshot.contextPaneOpen === null || snapshot.contextPaneOpen === Boolean(open)) {
+        return snapshot;
+      }
+      await sleep(intervalMs);
+    }
+
+    return getReaderUIStateSnapshot(resolvedReader);
+  }
+
+  async function selectSidebarView(target, view, options = {}) {
+    const resolvedReader = resolveReader(target);
+    const normalizedView = String(view || "").trim();
+    if (!resolvedReader || !normalizedView) {
+      return null;
+    }
+
+    await waitForReaderReady(resolvedReader, options);
+
+    const initialState = getReaderUIStateSnapshot(resolvedReader);
+    if (initialState?.sidebarOpen === false && typeof resolvedReader.toggleSidebar === "function") {
+      try {
+        resolvedReader.toggleSidebar(true);
+      }
+      catch {
+        try {
+          resolvedReader.toggleSidebar();
+        }
+        catch {}
+      }
+    }
+
+    let activated = false;
+
+    if (typeof resolvedReader.setSidebarView === "function") {
+      try {
+        await resolvedReader.setSidebarView(normalizedView);
+        activated = true;
+      }
+      catch {}
+    }
+
+    if (!activated && typeof resolvedReader.changeSidebarView === "function") {
+      try {
+        await resolvedReader.changeSidebarView(normalizedView);
+        activated = true;
+      }
+      catch {}
+    }
+
+    const { button } = findSidebarViewElements(resolvedReader, normalizedView, options);
+    if (!activated && button && typeof button.click === "function") {
+      try {
+        button.click();
+        activated = true;
+      }
+      catch {}
+    }
+
+    if (!activated && button && typeof button.dispatchEvent === "function") {
+      try {
+        const ownerWindow = button.ownerGlobal || button.ownerDocument?.defaultView || null;
+        const MouseEventCtor = ownerWindow?.MouseEvent || globalThis.MouseEvent;
+        if (MouseEventCtor) {
+          button.dispatchEvent(new MouseEventCtor("click", {
+            bubbles: true,
+            cancelable: true,
+          }));
+          activated = true;
+        }
+      }
+      catch {}
+    }
+
+    if (Zotero?.Prefs && typeof Zotero.Prefs.set === "function") {
+      try {
+        Zotero.Prefs.set("reader.lastSidebarTab", normalizedView);
+      }
+      catch {}
+    }
+
+    const timeoutMs = Number.isFinite(Number(options.timeoutMs)) ? Number(options.timeoutMs) : 5000;
+    const intervalMs = Number.isFinite(Number(options.intervalMs)) ? Number(options.intervalMs) : 50;
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      const snapshot = getReaderUIStateSnapshot(resolvedReader);
+      if (snapshot?.sidebarView === normalizedView) {
+        return {
+          view: normalizedView,
+          uiState: snapshot,
+          ...findSidebarViewElements(resolvedReader, normalizedView, options),
+        };
+      }
+      await sleep(intervalMs);
+    }
+
+    return {
+      view: normalizedView,
+      uiState: getReaderUIStateSnapshot(resolvedReader),
+      ...findSidebarViewElements(resolvedReader, normalizedView, options),
+    };
+  }
+
   function dispatchSyntheticEvent(target, options = {}) {
     const eventType = String(options.type || "").trim();
     if (!eventType) {
@@ -1341,6 +1587,11 @@ export function createReader(options = {}) {
     getEventAPIReport,
     dispatchSyntheticEvent,
     getReaderFrameWindow,
+    waitForReaderReady,
+    setContextPaneOpen,
+    selectSidebarView,
+    findToolbarElement,
+    findSidebarViewElements,
 
     // 注解 API
     isAnnotationsAvailable,

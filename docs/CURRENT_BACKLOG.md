@@ -1,6 +1,6 @@
 # 当前剩余任务清单
 
-**更新时间**: `2026-03-30`
+**更新时间**: `2026-04-02`
 
 本文档只回答一个问题：
 
@@ -35,7 +35,12 @@
 1. 非阻断后续：远端发布编排与远端 `updateURL` 闭环验证
    - 默认下一轮高逻辑任务源切到 `ENG-HIGH-104 / ENG-LOW-211~213`
 2. 非阻断后续：Reader 更深事件点补强与 `P1` 白名单扩面
-3. 维护项：保持 `watch -> e2e -> monitor -> gate` 的 fresh 证据链可重放，并继续以“当前单一事实源”同步文档 / manifest / 守卫
+3. 当前 active expansion wave：`ZOTERO-HOST-WAVE-001`
+   - 范围：`Zotero host inventory + reusable host actions + surface smoke + surface-local evidence`
+   - 当前验收主线：`host-first -> surface smoke -> surface-local visual evidence`
+   - 这波 authoritative source 固定为 `reference/zotero-main`
+4. 维护项：保持 `watch -> e2e -> monitor -> gate` 的 fresh 证据链可重放，并继续以“当前单一事实源”同步文档 / manifest / 守卫
+5. 治理项：后续若进入下一波模块扩展，先在 `docs/CURRENT_BACKLOG.md` 与 `config/project-expansion-wave.json` 声明 wave / scope / archetype / 验收主线，不直接继承上一阶段的 strict visual 或产品阶段结论
 
 说明：
 
@@ -163,7 +168,7 @@
 - icon 基线恢复已接入独立 canonical source 守卫
   - 当前 `scripts/baselines/icons/*.png` 会作为受控 copy 补丁来源
   - 当前测试会强制 `scripts/baselines/icons/*.png` 与 `addon-static/content/icons/*.png` 保持同步，避免恢复源漂移
-- 偏好面板 / 主窗口样式资源缺失诊断已不再强依赖日志
+- 偏好设置面板 / 主窗口样式资源缺失诊断已不再强依赖日志
   - 即使日志不足，只要 Node 侧静态体检发现 `preferences.xhtml` / `main.css` 缺失，仍可落到对应资源缺失诊断并接入现有白名单补丁链
 - 结构化诊断已可识别 `config.icons` 指向的 icon 资源缺失
   - 当前会把这类问题收敛到 `assets:icon-resource-missing`
@@ -176,7 +181,7 @@
 ### 后续如继续推进
 
 - `P1-HIGH-001` 边界已冻结，当前继续支持与继续 unsupported 的集合不再扩面
-  - 当前继续支持的白名单边界固定为：bootstrap / preferences / `main.css` / icon 的缺失与 drift、baseline registration / menu entry / preference pane / reader-entry 声明式入口、reader-event toolbar bridge / fine-grained declarations / probe-compatible declarations、localization 引用 / key / value / 文件恢复，以及 Reader 视觉基线刷新
+  - 当前继续支持的白名单边界固定为：bootstrap / preferences / `main.css` / icon 的缺失与 drift、baseline registration / menu item / preference pane / reader-entry 声明式入口、reader-event renderToolbar bridge / fine-grained declarations / probe-compatible declarations、localization 引用 / key / value / 文件恢复，以及 Reader 视觉基线刷新
   - 当前继续保持 unsupported blocker 的集合固定为：`bootstrap:plugin-not-mounted`、`menu-action:primary-action-failed`、`agent-action:agent-action-failed`、`tests:tests-failed`、`scenarios:scenarios-failed`、`runtime-logs:error-logs-present`
   - 下一批新增 whitelist 只允许来自新的稳定 diagnosis fingerprint，且 patch surface 必须是单文件或少文件、能从 clean-room baseline 完整重放，继续只允许 `copy / replace / replace-block / create / append`
 - `P1-HIGH-101` 已冻结 Reader canonical fingerprint 策略
@@ -208,7 +213,7 @@
 
 ## 当前单一事实源
 
-以下口径以 `2026-03-30` 的 live rerun 工件事实为准；当前 direct E2E、monitor、gate 已重新收敛为同一条 fresh 证据链，README、Checklist、Assessment、Roadmap 统一镜像这里的“当前单一事实源”，不再保留双层 competing truth。
+以下口径以 `2026-04-02` 的项目态为准；当前 direct E2E、monitor、gate 仍继续消费 `2026-03-30` 的稳定 rerun 证据链，README、Checklist、Assessment、Roadmap 统一镜像这里的“当前单一事实源”，不再保留双层 competing truth。
 
 以下摘要块会同步到 README、Checklist、Assessment、Roadmap；对外复述“当前 truth”时只改这里。
 
@@ -216,6 +221,8 @@
 - 当前真实完成度约为 `99%`；`ENG-HIGH-103` 的启动诊断 + runtime 清理 + `pre-capture settle`、`READER-HIGH-124 / READER-LOW-261~263` 的 capture / freshness 收口、`READER-HIGH-125` 的 library-only 根因边界冻结、以及 `READER-HIGH-126` 的 library host-noise 修复均已完成并转为历史契约 / review artifact
 - latest live rerun 已把 current truth 固定回单一事实源：最新 `watch` 工件为 `healthy`（`2026-03-30T11:34:05.136Z`），最新 direct `agent:zotero:e2e` 为 `passed`（`2026-03-30T11:31:37.694Z`，`failedStage=null`，`errorCategory=null`）
 - 最新开发态 `agent:monitor` / `agent:gate` 已在 `2026-03-30T11:35:48.300Z` / `2026-03-30T11:35:48.379Z` 回到 `stable / ready`，并继续直接消费同一份 `2026-03-30T11:31:37.694Z` E2E 摘要；freshest-valid artifact 消费与 consumer 收口继续保持生效
+- 当前已显式进入 `ZOTERO-HOST-WAVE-001`：以 `reference/zotero-main` 为唯一宿主真相，收口 `Zotero host inventory + reusable host actions + surface smoke + surface-local visual evidence`；本 wave 默认采用“surface smoke 先成立，再采局部 surface 证据，整窗截图只作补充”的验证路径
+- 本 wave 当前 in-scope surfaces 已写入 `config/project-validation-surfaces.json`：覆盖 `preference pane`、`context pane`、`item pane sidenav`、`reader renderToolbar`、`reader sidebar view` 与 `menu item`，不再把 project mirror 保持为空壳
 - `details.runtimeSanitization` 已稳定透传到 direct E2E / monitor / gate：本轮 direct E2E 记录了 `exclusiveProjectRuntime=true`，并在启动前终止了 project-managed `watch` `zotero` / `plugin-container`；旧的 startup/RDP bring-up timeout 口径继续只保留为已收口的诊断能力
 - 最新 library `pre-capture settle` 已稳定收敛到 `visibleBannerIDs=[mac-word-plugin-install-container]`；`sync-reminder-container`、`post-upgrade-container`、`file-renaming-banner-container`、`retracted-items-container` 与 `architecture-warning-container` 会在 capture 前被压平，library drift 已消失，`reader 视图继续对齐`，且 `library / reader` 几何一致 `2000x1200`
 - `READER-LOW-261` 已把 stage-scoped capture failure 结构化落进既有 E2E / validation 展示链；`READER-LOW-262` 已引入 `capture-command-failed` / `visualPrimaryBlockerKind=capture-command-failed` 并同步 consumer；`READER-LOW-263` 已在 live rerun 上证明 freshest-valid direct artifact 消费与 truth 对齐，`visual screenshot capture` 链已恢复到稳定基线

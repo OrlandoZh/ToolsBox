@@ -670,10 +670,11 @@ async function analyzeVisualCaptures(visuals) {
       capture.analysis = png;
       analysis.summary.verifiedCaptures += 1;
 
-      if (png.width < 400 || png.height < 300) {
+      const surfaceLocal = capture?.scope === "surface-local";
+      if (!surfaceLocal && (png.width < 400 || png.height < 300)) {
         analysis.issues.push(`${capture.kind} 截图尺寸过小：${png.width}x${png.height}`);
       }
-      if (png.sizeBytes < 50_000) {
+      if (!surfaceLocal && png.sizeBytes < 50_000) {
         analysis.issues.push(`${capture.kind} 截图文件过小：${png.sizeBytes} bytes`);
       }
     }
@@ -768,6 +769,8 @@ async function applyVisualBaselineAnalysis({
     const thresholds = getVisualBaselineThreshold(capture.kind);
     const entry = {
       kind: capture.kind,
+      scope: capture.scope || "window-stage",
+      surfaceId: capture.surfaceId || null,
       bootMode,
       canonicalTarget,
       path: baselinePath,
@@ -1422,6 +1425,14 @@ async function cleanupVisualState({ rdp, config }) {
     const STATE_KEY = "__CLEANROOM_AGENT_VISUAL_STATE__";
     const state = globalThis[STATE_KEY];
     const plugin = Zotero[${JSON.stringify(config.instanceKey)}];
+    const toolbarCapture = globalThis.__CLEANROOM_AGENT_READER_TOOLBAR_CAPTURE__;
+    if (toolbarCapture?.unregister) {
+      try {
+        toolbarCapture.unregister();
+      }
+      catch {}
+    }
+    delete globalThis.__CLEANROOM_AGENT_READER_TOOLBAR_CAPTURE__;
     if (!state) {
       return true;
     }
@@ -1653,6 +1664,286 @@ async function captureZoteroWindow(filePath, options = {}) {
   }
 
   throw lastError || new Error("Unable to capture Zotero window");
+}
+
+function resolveSurfaceCaptureBounds(surfaceTarget) {
+  const rect = normalizeCaptureWindowBounds(surfaceTarget?.rect || null);
+  if (rect) {
+    return rect;
+  }
+  return normalizeCaptureWindowBounds(surfaceTarget?.windowBounds || null);
+}
+
+async function captureScreenRect(filePath, bounds) {
+  if (process.platform !== "darwin") {
+    throw new Error("Surface-local UI capture is currently implemented for macOS only");
+  }
+  const captureBounds = normalizeCaptureWindowBounds(bounds);
+  if (!captureBounds) {
+    throw new Error("Surface capture bounds are unavailable");
+  }
+  const rect = `${captureBounds.x},${captureBounds.y},${captureBounds.width},${captureBounds.height}`;
+  await execFileText("screencapture", ["-x", "-R", rect, filePath]);
+  return captureBounds;
+}
+
+async function runHostActionInChrome({
+  rdp,
+  config,
+  actionId,
+  payload = {},
+}) {
+  const rawResult = await rdp.evaluateInChrome(`(async () => {
+    const plugin = Zotero[${JSON.stringify(config.instanceKey)}];
+    if (!plugin?.api?.agent?.runHostAction) {
+      return JSON.stringify({
+        actionId: ${JSON.stringify(actionId)},
+        ok: false,
+        failureKind: "plugin-api-missing",
+        preconditions: [],
+        observedState: {},
+        readiness: {
+          ok: false,
+          total: 0,
+          passed: 0,
+          failed: 0,
+          checks: [],
+        },
+        surfaceTarget: null,
+      });
+    }
+    const result = await plugin.api.agent.runHostAction(
+      ${JSON.stringify(actionId)},
+      ${JSON.stringify(payload)},
+    );
+    return JSON.stringify(result);
+  })()`);
+  return parseChromeEvalResult(rawResult);
+}
+
+async function registerReaderToolbarCaptureMarker({ rdp, config }) {
+  const rawResult = await rdp.evaluateInChrome(`(() => {
+    const key = "__CLEANROOM_AGENT_READER_TOOLBAR_CAPTURE__";
+    if (globalThis[key]) {
+      return true;
+    }
+    const plugin = Zotero[${JSON.stringify(config.instanceKey)}];
+    if (!plugin?.api?.reader?.registerEventListener) {
+      return false;
+    }
+    const unregister = plugin.api.reader.registerEventListener(
+      plugin.api.reader.READER_EVENT_TYPES.RENDER_TOOLBAR,
+      (event) => {
+        const doc = event?.doc;
+        if (!doc || typeof doc.createElement !== "function" || typeof event?.append !== "function") {
+          return;
+        }
+        if (doc.querySelector("[data-cleanroom-reader-toolbar-marker]")) {
+          return;
+        }
+        const marker = doc.createElement("div");
+        marker.dataset.cleanroomReaderToolbarMarker = "true";
+        marker.dataset.cleanroomSurface = "reader-toolbar";
+        marker.className = "cleanroom-reader-toolbar-marker";
+        marker.textContent = "Cleanroom Reader Toolbar Capture";
+        event.append(marker);
+      },
+    );
+    globalThis[key] = { unregister };
+    return true;
+  })()`);
+  return parseChromeEvalResult(rawResult) === true;
+}
+
+async function resolveReaderToolbarSurfaceTarget({ rdp, config }) {
+  const rawResult = await rdp.evaluateInChrome(`(() => {
+    const state = globalThis.__CLEANROOM_AGENT_VISUAL_STATE__ || {};
+    const plugin = Zotero[${JSON.stringify(config.instanceKey)}];
+    const attachmentID = Number(state?.attachmentID || 0);
+    if (!attachmentID || !plugin?.api?.reader || !plugin?.api?.host) {
+      return JSON.stringify(null);
+    }
+    const element = plugin.api.reader.findToolbarElement(attachmentID);
+    if (!element) {
+      return JSON.stringify(null);
+    }
+    const target = plugin.api.host.buildSurfaceTarget({
+      surfaceId: "render-toolbar",
+      captureKind: "surface-reader-toolbar",
+      label: "Reader Toolbar",
+      element,
+      window: element.ownerGlobal || element.ownerDocument?.defaultView || null,
+      details: {
+        itemID: attachmentID,
+      },
+    });
+    return JSON.stringify(target);
+  })()`);
+  return parseChromeEvalResult(rawResult);
+}
+
+async function captureSurfaceEvidenceTarget({
+  cycle,
+  captureDir,
+  surfaceTarget,
+  actionId = null,
+}) {
+  const bounds = resolveSurfaceCaptureBounds(surfaceTarget);
+  if (!bounds) {
+    return {
+      capture: null,
+      warning: `${surfaceTarget?.captureKind || actionId || "surface"} 缺少可截图的 rect/windowBounds`,
+    };
+  }
+
+  await activateZoteroWindowForCapture(120);
+  const kind = String(surfaceTarget?.captureKind || actionId || "surface").trim() || "surface";
+  const filePath = path.join(captureDir, `cycle-${cycle}-${kind}.png`);
+  await captureScreenRect(filePath, bounds);
+  const analysis = await readPNGAnalysis(filePath);
+  return {
+    capture: {
+      kind,
+      path: filePath,
+      bounds,
+      analysis,
+      scope: surfaceTarget?.scope || "surface-local",
+      surfaceId: surfaceTarget?.surfaceId || null,
+      label: surfaceTarget?.label || null,
+      details: surfaceTarget?.details || {},
+      metadata: {
+        actionId,
+        surfaceTarget,
+      },
+    },
+    warning: null,
+  };
+}
+
+async function captureSurfaceLocalVisuals({
+  rdp,
+  config,
+  cycle,
+  captureDir,
+}) {
+  const result = {
+    captures: [],
+    warnings: [],
+  };
+
+  const pushCaptureFromResult = async (actionResult, actionId) => {
+    if (!actionResult?.surfaceTarget) {
+      result.warnings.push(`${actionId} 未返回 surface target`);
+      return;
+    }
+    try {
+      const captured = await captureSurfaceEvidenceTarget({
+        cycle,
+        captureDir,
+        surfaceTarget: actionResult.surfaceTarget,
+        actionId,
+      });
+      if (captured.capture) {
+        result.captures.push(captured.capture);
+      }
+      if (captured.warning) {
+        result.warnings.push(captured.warning);
+      }
+    }
+    catch (error) {
+      result.warnings.push(`${actionId} 局部截图失败：${String(error?.message || error)}`);
+    }
+  };
+
+  await prepareVisualState({ rdp, config, stage: "library" });
+  await pushCaptureFromResult(
+    await runHostActionInChrome({
+      rdp,
+      config,
+      actionId: "preferences.openPane",
+      payload: {
+        paneID: `${config.addonRef}-preferences`,
+      },
+    }),
+    "preferences.openPane",
+  );
+  await pushCaptureFromResult(
+    await runHostActionInChrome({
+      rdp,
+      config,
+      actionId: "itemPane.selectPane",
+      payload: {
+        paneID: `${config.addonRef}-details`,
+        behavior: "instant",
+      },
+    }),
+    "itemPane.selectPane",
+  );
+
+  await registerReaderToolbarCaptureMarker({ rdp, config });
+  const readerState = await prepareVisualState({ rdp, config, stage: "reader" });
+  await pushCaptureFromResult(
+    await runHostActionInChrome({
+      rdp,
+      config,
+      actionId: "contextPane.selectPane",
+      payload: {
+        paneID: "info",
+        behavior: "instant",
+      },
+    }),
+    "contextPane.selectPane",
+  );
+  await pushCaptureFromResult(
+    await runHostActionInChrome({
+      rdp,
+      config,
+      actionId: "reader.sidebar.selectView",
+      payload: {
+        itemID: readerState.attachmentID,
+        view: "annotations",
+      },
+    }),
+    "reader.sidebar.selectView",
+  );
+
+  const toolbarTarget = await resolveReaderToolbarSurfaceTarget({ rdp, config });
+  if (toolbarTarget) {
+    try {
+      const captured = await captureSurfaceEvidenceTarget({
+        cycle,
+        captureDir,
+        surfaceTarget: toolbarTarget,
+        actionId: "render-toolbar",
+      });
+      if (captured.capture) {
+        result.captures.push(captured.capture);
+      }
+      if (captured.warning) {
+        result.warnings.push(captured.warning);
+      }
+    }
+    catch (error) {
+      result.warnings.push(`render-toolbar 局部截图失败：${String(error?.message || error)}`);
+    }
+  } else {
+    result.warnings.push("render-toolbar 未返回局部截图目标");
+  }
+
+  await pushCaptureFromResult(
+    await runHostActionInChrome({
+      rdp,
+      config,
+      actionId: "menu.show",
+      payload: {
+        menuID: `${config.addonRef}-reader-summary`,
+        target: "reader/menubar/view",
+      },
+    }),
+    "menu.show",
+  );
+
+  return result;
 }
 
 function isStableVisualAttemptPair(previousAttempt, currentAttempt) {
@@ -1927,6 +2218,19 @@ async function captureCycleVisuals({
       if (stageCapture.warning) {
         visuals.warnings.push(stageCapture.warning);
       }
+    }
+
+    const surfaceLocal = await captureSurfaceLocalVisuals({
+      rdp,
+      config,
+      cycle,
+      captureDir,
+    });
+    if (Array.isArray(surfaceLocal?.captures) && surfaceLocal.captures.length > 0) {
+      visuals.captures.push(...surfaceLocal.captures);
+    }
+    if (Array.isArray(surfaceLocal?.warnings) && surfaceLocal.warnings.length > 0) {
+      visuals.warnings.push(...surfaceLocal.warnings);
     }
   } finally {
     try {

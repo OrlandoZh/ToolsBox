@@ -96,9 +96,18 @@ export function readCurrentTruthSummary(rootDir = process.cwd()) {
 
 export function extractCurrentTruthActiveBatchId(summaryText) {
   const text = String(summaryText || "");
-  const directMatch = text.match(/当前 active 高逻辑已切到 `([^`]+)`/u);
-  if (directMatch?.[1]) {
-    return String(directMatch[1]).trim() || null;
+  const patterns = [
+    /当前 active 高逻辑已切到 `([^`]+)`/u,
+    /当前唯一主线批次已固定为 `([^`]+)`/u,
+    /当前主线固定为 `([^`]+)`/u,
+    /当前主线为 `([^`]+)`/u,
+    /当前活跃批次(?:已)?(?:固定)?为 `([^`]+)`/u,
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) {
+      return String(match[1]).trim() || null;
+    }
   }
   const fallbackMatch = text.match(/active `([^`]+)` 只允许/u);
   if (fallbackMatch?.[1]) {

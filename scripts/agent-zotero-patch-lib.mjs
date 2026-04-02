@@ -703,8 +703,8 @@ function buildReaderToolbarBridgeRegistrationContext(input = {}) {
   let repairSyntheticDispatchBridge = (
     latestChecks.readerEventFineGrainedScenarioPassed === false
     || latestChecks.readerEventToolbarHookObserved === false
-    || stringIncludes(issue, "Reader Toolbar 宿主桥接未恢复")
-    || stringIncludes(issue, "Reader Toolbar 宿主点未观测")
+    || stringIncludes(issue, "Reader renderToolbar 宿主桥接未恢复")
+    || stringIncludes(issue, "Reader renderToolbar 宿主点未观测")
   );
 
   if (!repairRegisterEventListener && !repairSyntheticDispatchBridge) {
@@ -1312,7 +1312,7 @@ const PATCH_WHITELIST_RULES = [
     featureLabel: "Reader 事件桥",
     mode: "review-only",
     maxTouchedFiles: 1,
-    description: "允许恢复 Reader Toolbar / 官方 listener 桥接块，但仅限 `src/features/reader.js` 中的 listener 注册与 synthetic dispatch clean-room baseline 代码块。",
+    description: "允许恢复 Reader renderToolbar / 官方 listener 桥接块，但仅限 `src/features/reader.js` 中的 listener 注册与 synthetic dispatch clean-room baseline 代码块。",
     allowedTargets: [
       "src/features/reader.js",
     ],
@@ -1323,10 +1323,10 @@ const PATCH_WHITELIST_RULES = [
     ],
     proposedEdits: [
       "核对 `registerEventListener()` 是否仍把 listener 正确桥接到 `Zotero.Reader` 并写回本地注册表。",
-      "若 Toolbar 宿主点未观测，再核对 `supportsSyntheticFallback()` 与 `dispatchSyntheticEvent()` 是否仍能回放 `renderToolbar` 等细粒度 probe。",
+      "若 renderToolbar 宿主点未观测，再核对 `supportsSyntheticFallback()` 与 `dispatchSyntheticEvent()` 是否仍能回放 `renderToolbar` 等细粒度 probe。",
     ],
     verificationContract: {
-      summary: "补丁后必须确认 Reader Toolbar / 官方 listener 桥接恢复，宿主 Toolbar 观测与 Hook 场景同时回到模板基线。",
+      summary: "补丁后必须确认 Reader renderToolbar / 官方 listener 桥接恢复，宿主 Toolbar 观测与 Hook 场景同时回到模板基线。",
       checks: [
         {
           id: "reader-event-api-available",
@@ -1357,7 +1357,7 @@ const PATCH_WHITELIST_RULES = [
         },
         {
           id: "reader-event-toolbar-hook-observed",
-          label: "Reader Toolbar 宿主点已观测",
+          label: "Reader renderToolbar 宿主点已观测",
           kind: "all-cycle-check",
           field: "readerEventToolbarHookObserved",
           operator: "equals",
@@ -1374,7 +1374,7 @@ const PATCH_WHITELIST_RULES = [
     resolveDrafts(input) {
       return buildReaderToolbarBridgeRegistrationDrafts(
         input?.ruleContext || buildReaderToolbarBridgeRegistrationContext(input),
-        "恢复 Reader Toolbar / 官方 listener 桥接的 clean-room 基线代码块。",
+        "恢复 Reader renderToolbar / 官方 listener 桥接的 clean-room 基线代码块。",
       );
     },
   },
@@ -1451,7 +1451,7 @@ const PATCH_WHITELIST_RULES = [
         },
         {
           id: "reader-event-toolbar-hook-observed",
-          label: "Reader Toolbar 宿主点已观测",
+          label: "Reader renderToolbar 宿主点已观测",
           kind: "all-cycle-check",
           field: "readerEventToolbarHookObserved",
           operator: "equals",

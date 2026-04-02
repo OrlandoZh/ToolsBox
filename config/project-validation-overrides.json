@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "summary": "Project-local validation overrides for ZOTERO-HOST-WAVE-001. This wave upgrades reusable host actions, host-visible surface smoke, and surface-local evidence to visual-required.",
+  "overrides": [
+    {
+      "id": "zotero-host-wave-001",
+      "summary": "Reusable host actions plus host-visible surface smoke and local surface evidence are visual-required in the active Zotero host wave.",
+      "pathMatchers": [
+        "^src/app/host-action-(?:catalog|actions)\\.js$",
+        "^src/app/plugin-(?:agent|api)\\.js$",
+        "^src/app/plugin\\.js$",
+        "^src/platform/zotero-host(?:/|\\.|$)",
+        "^src/features/(?:menu-manager|preference-panes|item-pane|reader)(?:/|\\.|$)",
+        "^types/(?:features|platform|agent)\\.d\\.ts$",
+        "^scripts/zotero-scenario-runtime\\.js$",
+        "^zotero-scenarios/.*surface-smoke.*\\.scenario\\.js$",
+        "^scripts/agent-zotero-(?:e2e|visual-lib)\\.mjs$",
+        "^config/project-validation-surfaces\\.json$",
+        "^config/project-expansion-wave\\.json$",
+        "^config/validation-surfaces\\.json$",
+        "^config/zotero-host-(?:semantic-index|interface-contracts)\\.json$"
+      ],
+      "decision": "visual-required",
+      "requiredChecks": [
+        "完成 in-scope Host Actions 的 surface smoke，并输出逐项 readiness 结果。",
+        "为成功的 host-visible surface 采集 surface-local evidence；整窗截图仅作为补充。",
+        "继续通过 `npm run check`、`agent:host:guard`、`agent:host:semantic:guard` 与 `agent:gate`。"
+      ],
+      "nonGoals": [
+        "modal / destructive / 需要人工确认的入口自动化",
+        "只凭整窗截图判断 surface 正常"
+      ]
+    }
+  ]
+}

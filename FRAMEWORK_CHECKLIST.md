@@ -17,6 +17,8 @@
 - 当前真实完成度约为 `99%`；`ENG-HIGH-103` 的启动诊断 + runtime 清理 + `pre-capture settle`、`READER-HIGH-124 / READER-LOW-261~263` 的 capture / freshness 收口、`READER-HIGH-125` 的 library-only 根因边界冻结、以及 `READER-HIGH-126` 的 library host-noise 修复均已完成并转为历史契约 / review artifact
 - latest live rerun 已把 current truth 固定回单一事实源：最新 `watch` 工件为 `healthy`（`2026-03-30T11:34:05.136Z`），最新 direct `agent:zotero:e2e` 为 `passed`（`2026-03-30T11:31:37.694Z`，`failedStage=null`，`errorCategory=null`）
 - 最新开发态 `agent:monitor` / `agent:gate` 已在 `2026-03-30T11:35:48.300Z` / `2026-03-30T11:35:48.379Z` 回到 `stable / ready`，并继续直接消费同一份 `2026-03-30T11:31:37.694Z` E2E 摘要；freshest-valid artifact 消费与 consumer 收口继续保持生效
+- 当前已显式进入 `ZOTERO-HOST-WAVE-001`：以 `reference/zotero-main` 为唯一宿主真相，收口 `Zotero host inventory + reusable host actions + surface smoke + surface-local visual evidence`；本 wave 默认采用“surface smoke 先成立，再采局部 surface 证据，整窗截图只作补充”的验证路径
+- 本 wave 当前 in-scope surfaces 已写入 `config/project-validation-surfaces.json`：覆盖 `preference pane`、`context pane`、`item pane sidenav`、`reader renderToolbar`、`reader sidebar view` 与 `menu item`，不再把 project mirror 保持为空壳
 - `details.runtimeSanitization` 已稳定透传到 direct E2E / monitor / gate：本轮 direct E2E 记录了 `exclusiveProjectRuntime=true`，并在启动前终止了 project-managed `watch` `zotero` / `plugin-container`；旧的 startup/RDP bring-up timeout 口径继续只保留为已收口的诊断能力
 - 最新 library `pre-capture settle` 已稳定收敛到 `visibleBannerIDs=[mac-word-plugin-install-container]`；`sync-reminder-container`、`post-upgrade-container`、`file-renaming-banner-container`、`retracted-items-container` 与 `architecture-warning-container` 会在 capture 前被压平，library drift 已消失，`reader 视图继续对齐`，且 `library / reader` 几何一致 `2000x1200`
 - `READER-LOW-261` 已把 stage-scoped capture failure 结构化落进既有 E2E / validation 展示链；`READER-LOW-262` 已引入 `capture-command-failed` / `visualPrimaryBlockerKind=capture-command-failed` 并同步 consumer；`READER-LOW-263` 已在 live rerun 上证明 freshest-valid direct artifact 消费与 truth 对齐，`visual screenshot capture` 链已恢复到稳定基线
@@ -112,6 +114,12 @@
 | `npm run release:install-smoke:stable` | ✅ | 运行稳定版正式安装态 smoke |
 | `npm run release:install-smoke:beta` | ✅ | 运行 beta 正式安装态 smoke |
 | `npm run export:project` | ✅ | 纯项目导出 |
+
+### 模板维护检查项
+
+- release / toolchain 测试不得依赖仓库当前 `build/`、`dist/` 或已有 release JSON/Markdown 的残留状态。
+- 触达 `release:preflight`、`release:prepare`、`release:matrix`、`release:upload` 的测试时，必须在测试内部先重置旧工件并准备 fresh 本地输入，或显式改用临时 fixture。
+- 如果回灌只补了脚本和文档、没有同步补齐测试隔离，这类改动应视为“半回灌”，不能算模板治理真正收口。
 
 ### Zotero 真机链
 

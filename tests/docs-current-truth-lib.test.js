@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   applyCurrentTruthSyncPlan,
   buildCurrentTruthSyncPlan,
+  extractCurrentTruthActiveBatchId,
 } from "../scripts/docs-current-truth-lib.mjs";
 import { describe, it, assert } from "./test-framework.js";
 
@@ -125,5 +126,27 @@ describe("Current Truth Sync", () => {
         stdio: "pipe",
       });
     });
+  });
+
+  it("should extract active batch id from multiple current truth phrasings", () => {
+    assert.equal(
+      extractCurrentTruthActiveBatchId("- 当前 active 高逻辑已切到 `ENG-HIGH-104`"),
+      "ENG-HIGH-104",
+    );
+    assert.equal(
+      extractCurrentTruthActiveBatchId("- 当前唯一主线批次已固定为 `ENG-HIGH-103`"),
+      "ENG-HIGH-103",
+    );
+    assert.equal(
+      extractCurrentTruthActiveBatchId("- 当前主线固定为 `AIAssistant 本地闭环收口`：后续再分批推进扩展 wave"),
+      "AIAssistant 本地闭环收口",
+    );
+  });
+
+  it("should not treat next-step plan as current active batch", () => {
+    assert.equal(
+      extractCurrentTruthActiveBatchId("- 下一步切到 `embeddings`"),
+      null,
+    );
   });
 });

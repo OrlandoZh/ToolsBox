@@ -19,7 +19,7 @@
 | `reader-ui-state` | Reader UI 状态 | `plugin.api.reader.getReaderUIStateSnapshot(...)`、`plugin.api.agent.inspectReader(itemID)` | `reader interaction diagnostics` | `src/features/reader.js`、`zotero-scenarios/reader-interaction.scenario.js` |
 | `reader-event-hooks` | Reader 事件桥 | `plugin.api.reader.registerEventListener(...)`、`unregisterAllEventListeners()`、`plugin.api.agent.runScenario("reader-current")` | `reader event hook diagnostics`、`reader fine-grained hook diagnostics` | `src/features/reader.js`、`src/app/plugin-agent.js`、`zotero-scenarios/reader-event-hooks.scenario.js`、`zotero-scenarios/reader-fine-grained-hooks.scenario.js` |
 | `command-nonblocking` | 无阻塞动作执行 | `plugin.api.runAgentAction()` | `agent action runs without blocking UI` | `src/features/menu-command.js` |
-| `settings-governance` | 设置治理 | `plugin.api.settings.listDefinitions()` | `settings schema and preference pane diagnostics` | `src/settings/schema.js`、`src/settings/store.js` |
+| `settings-governance` | 设置治理 | `plugin.api.settings.listDefinitions()` | `settings schema and preference pane diagnostics` | `src/settings/schema.js`、`src/settings/store.js`、`src/features/preference-panes.js` |
 | `multi-window-mount` | 多窗口挂载 | `plugin.api.host.listMainWindows()` | `multi-window mount diagnostics` | `src/platform/zotero-host.js`、`src/features/window-manager.js` |
 | `runtime-bridge-report` | 运行时桥接报告 | `plugin.api.runtime.getCapabilitySummary()` | 当前无单独 scenario | `src/app/runtime-capabilities.js`、`addon-static/bootstrap.js` |
 
@@ -65,7 +65,7 @@
 | `baseline-registration` | 基线注册快照 | 读取默认 demo 挂载状态与 ItemPane 基线本地化漂移 |
 | `capability-manifest` | 能力地图快照 | 读取结构化能力清单 |
 | `sample-item-pane` | 条目展示快照 | 检查条目标题/摘要/列值 |
-| `settings-snapshot` | 设置治理快照 | 读取 settings schema 与偏好面板状态 |
+| `settings-snapshot` | 设置治理快照 | 读取 settings schema 与偏好设置面板状态 |
 | `notifier-preview` | 通知器预演 | 模拟 notifier 诊断更新 |
 | `reader-current` | Reader 当前状态 | 获取 Reader 摘要、交互/UI 状态快照、窗口状态，以及 Reader 事件桥结构化报告 |
 | `window-snapshot` | 窗口挂载快照 | 读取主窗口数量与窗口级挂载状态 |

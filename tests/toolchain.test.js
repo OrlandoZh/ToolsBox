@@ -24,6 +24,12 @@ function removeIfExists(filePath) {
   }
 }
 
+function removeDirIfExists(dirPath) {
+  if (fs.existsSync(dirPath)) {
+    fs.rmSync(dirPath, { recursive: true, force: true });
+  }
+}
+
 function makeTempReferenceRoot() {
   const referenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "addontemplate-cleanroom-reference-"));
   fs.writeFileSync(path.join(referenceRoot, "snapshot.md"), "temporary reference snapshot\n", "utf-8");
@@ -164,6 +170,78 @@ function makeTempReleaseUploadProject(options = {}) {
   };
 }
 
+function buildMinimalMonitorSummary() {
+  return {
+    generatedAt: new Date().toISOString(),
+    total: 1,
+    passed: 1,
+    failed: 0,
+    passRate: 100,
+    averageDurationMs: 25,
+    runs: [
+      {
+        runName: "check",
+        success: true,
+        exitCode: 0,
+        status: "passed",
+        startedAtISO: new Date().toISOString(),
+      },
+    ],
+  };
+}
+
+function resetLocalReleaseArtifacts() {
+  const config = readJSON(path.join(projectRoot, "config", "addon.config.json"));
+  const distRoot = path.join(projectRoot, "dist");
+  const buildRoot = path.join(projectRoot, "build", config.addonRef);
+  const xpiName = `${config.addonRef}-${config.addonVersion}.xpi`;
+
+  removeDirIfExists(buildRoot);
+  [
+    path.join(distRoot, xpiName),
+    path.join(distRoot, "release-manifest.json"),
+    path.join(distRoot, "release-preflight.json"),
+    path.join(distRoot, "release-plan.json"),
+    path.join(distRoot, "release-notes.md"),
+    path.join(distRoot, "release-matrix.json"),
+    path.join(distRoot, "release-matrix.md"),
+    path.join(distRoot, "update.json"),
+  ].forEach(removeIfExists);
+}
+
+function prepareLocalReleasePreflight(options = {}) {
+  const {
+    verifyRemote = false,
+    remoteArgs = [],
+  } = options;
+  const referenceRoot = makeTempReferenceRoot();
+
+  resetLocalReleaseArtifacts();
+  execFileSync("node", ["scripts/package.mjs"], {
+    cwd: projectRoot,
+    stdio: "pipe",
+  });
+
+  const config = readJSON(path.join(projectRoot, "config", "addon.config.json"));
+  assert.ok(fs.existsSync(path.join(projectRoot, "build", config.addonRef, "build-report.json")));
+
+  try {
+    execFileSync("node", [
+      "scripts/release-preflight.mjs",
+      ...(verifyRemote ? ["--verify-remote", ...remoteArgs] : []),
+    ], {
+      cwd: projectRoot,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        CLEANROOM_REFERENCE_ROOT: referenceRoot,
+      },
+    });
+  } finally {
+    fs.rmSync(referenceRoot, { recursive: true, force: true });
+  }
+}
+
 const EXPORTED_STATIC_RUNTIME_BASELINE = [
   "addon-static/bootstrap.js",
   "addon-static/content/preferences.xhtml",
@@ -222,24 +300,7 @@ describe("Toolchain Scripts", () => {
   });
 
   it("should pass release preflight and generate integrity report", () => {
-    const referenceRoot = makeTempReferenceRoot();
-
-    execFileSync("node", ["scripts/package.mjs"], {
-      cwd: projectRoot,
-      stdio: "pipe",
-    });
-    try {
-      execFileSync("node", ["scripts/release-preflight.mjs"], {
-        cwd: projectRoot,
-        stdio: "pipe",
-        env: {
-          ...process.env,
-          CLEANROOM_REFERENCE_ROOT: referenceRoot,
-        },
-      });
-    } finally {
-      fs.rmSync(referenceRoot, { recursive: true, force: true });
-    }
+    prepareLocalReleasePreflight();
 
     const preflightReport = readJSON(path.join(projectRoot, "dist", "release-preflight.json"));
     assert.equal(preflightReport.status, "passed");
@@ -252,6 +313,8 @@ describe("Toolchain Scripts", () => {
   });
 
   it("should generate release upload plan and notes", () => {
+    prepareLocalReleasePreflight();
+
     execFileSync("node", ["scripts/release-prepare.mjs"], {
       cwd: projectRoot,
       stdio: "pipe",
@@ -405,6 +468,12 @@ describe("Toolchain Scripts", () => {
   });
 
   it("should generate local release matrix artifacts", () => {
+    prepareLocalReleasePreflight();
+    execFileSync("node", ["scripts/release-prepare.mjs"], {
+      cwd: projectRoot,
+      stdio: "pipe",
+    });
+
     removeIfExists(path.join(projectRoot, "dist", "release-install-smoke.json"));
     removeIfExists(path.join(projectRoot, "dist", "release-install-smoke.md"));
     removeIfExists(path.join(projectRoot, "dist", "release-install-smoke-stable.json"));
@@ -435,75 +504,340 @@ describe("Toolchain Scripts", () => {
   });
 
   it("should verify remote release URLs and carry the result into plan and matrix", async () => {
+    const config = readJSON(path.join(projectRoot, "config", "addon.config.json"));
+    resetLocalReleaseArtifacts();
     execFileSync("node", ["scripts/package.mjs"], {
       cwd: projectRoot,
       stdio: "pipe",
     });
-
-    let referenceRoot = null;
-
-    try {
-      const config = readJSON(path.join(projectRoot, "config", "addon.config.json"));
-      const outputName = `${config.addonRef}-${config.addonVersion}.xpi`;
-      const sourceUpdateManifest = readJSON(path.join(projectRoot, "dist", "update.json"));
-      const sourceXpiBuffer = fs.readFileSync(path.join(projectRoot, "dist", outputName));
-      const remoteUpdateLink = `data:application/x-xpinstall;base64,${sourceXpiBuffer.toString("base64")}`;
-      const remoteUpdateManifest = {
-        ...sourceUpdateManifest,
-        addons: {
-          ...sourceUpdateManifest.addons,
-          [config.addonId]: {
-            ...(sourceUpdateManifest.addons?.[config.addonId] || {}),
-            updates: [
-              {
-                ...(sourceUpdateManifest.addons?.[config.addonId]?.updates?.[0] || {}),
-                version: config.addonVersion,
-                update_link: remoteUpdateLink,
-                applications: {
-                  zotero: {
-                    strict_min_version: config.strictMinVersion,
-                    strict_max_version: config.strictMaxVersion,
-                  },
+    const outputName = `${config.addonRef}-${config.addonVersion}.xpi`;
+    const sourceUpdateManifest = readJSON(path.join(projectRoot, "dist", "update.json"));
+    const sourceXpiBuffer = fs.readFileSync(path.join(projectRoot, "dist", outputName));
+    const remoteUpdateLink = `data:application/x-xpinstall;base64,${sourceXpiBuffer.toString("base64")}`;
+    const remoteUpdateManifest = {
+      ...sourceUpdateManifest,
+      addons: {
+        ...sourceUpdateManifest.addons,
+        [config.addonId]: {
+          ...(sourceUpdateManifest.addons?.[config.addonId] || {}),
+          updates: [
+            {
+              ...(sourceUpdateManifest.addons?.[config.addonId]?.updates?.[0] || {}),
+              version: config.addonVersion,
+              update_link: remoteUpdateLink,
+              applications: {
+                zotero: {
+                  strict_min_version: config.strictMinVersion,
+                  strict_max_version: config.strictMaxVersion,
                 },
               },
-            ],
-          },
+            },
+          ],
         },
-      };
-      const remoteUpdateURL = `data:application/json,${encodeURIComponent(JSON.stringify(remoteUpdateManifest))}`;
-      referenceRoot = makeTempReferenceRoot();
-
-      await execNodeAsync([
-        "scripts/release-preflight.mjs",
-        "--verify-remote",
+      },
+    };
+    const remoteUpdateURL = `data:application/json,${encodeURIComponent(JSON.stringify(remoteUpdateManifest))}`;
+    prepareLocalReleasePreflight({
+      verifyRemote: true,
+      remoteArgs: [
         "--remote-update-url",
         remoteUpdateURL,
         "--remote-expected-update-link",
         remoteUpdateLink,
-      ], {
+      ],
+    });
+    await execNodeAsync(["scripts/release-prepare.mjs"]);
+    await execNodeAsync(["scripts/release-matrix.mjs"]);
+
+    const preflight = readJSON(path.join(projectRoot, "dist", "release-preflight.json"));
+    const releasePlan = readJSON(path.join(projectRoot, "dist", "release-plan.json"));
+    const releaseMatrix = readJSON(path.join(projectRoot, "dist", "release-matrix.json"));
+    const releaseNotes = fs.readFileSync(path.join(projectRoot, "dist", "release-notes.md"), "utf-8");
+
+    assert.equal(preflight.status, "passed");
+    assert.equal(preflight.remoteVerification?.status, "passed");
+    assert.equal(releasePlan.remoteVerification?.status, "passed");
+    assert.equal(releaseMatrix.remoteVerification?.status, "passed");
+    assert.equal(releaseMatrix.remoteVerification?.observedUpdateLink, remoteUpdateLink);
+    assert.ok(releaseNotes.includes("Status: `通过`"));
+  });
+
+  it("should wire governance and guard scripts into package workflows", () => {
+    const packageJSON = readJSON(path.join(projectRoot, "package.json"));
+    assert.equal(packageJSON.scripts["docs:sync-backfill-bundles"], "node scripts/docs-sync-backfill-bundles.mjs");
+    assert.equal(packageJSON.scripts["docs:sync-expansion-wave-contracts"], "node scripts/docs-sync-expansion-wave-contracts.mjs");
+    assert.equal(packageJSON.scripts["docs:sync-validation-surfaces"], "node scripts/docs-sync-validation-surfaces.mjs");
+    assert.equal(packageJSON.scripts["docs:sync-zotero-host-semantic-index"], "node scripts/docs-sync-zotero-host-semantic-index.mjs");
+    assert.equal(packageJSON.scripts["docs:sync-zotero-host-interface-contracts"], "node scripts/docs-sync-zotero-host-interface-contracts.mjs");
+    assert.equal(packageJSON.scripts["framework:governance:check"], "node scripts/framework-governance-check.mjs");
+    assert.equal(packageJSON.scripts["framework:bundle:audit"], "node scripts/framework-bundle-audit.mjs");
+    assert.equal(packageJSON.scripts["agent:workspace:guard"], "node scripts/agent-workspace-guard.mjs");
+    assert.equal(packageJSON.scripts["agent:workspace:guard:strict"], "node scripts/agent-workspace-guard.mjs --strict");
+    assert.equal(packageJSON.scripts["agent:obsidian:guard"], "node scripts/agent-obsidian-guard.mjs");
+    assert.equal(packageJSON.scripts["agent:obsidian:guard:strict"], "node scripts/agent-obsidian-guard.mjs --strict");
+    assert.equal(packageJSON.scripts["agent:host:guard"], "node scripts/zotero-host-interface-guard.mjs");
+    assert.equal(packageJSON.scripts["agent:host:guard:strict"], "node scripts/zotero-host-interface-guard.mjs --strict");
+    assert.equal(packageJSON.scripts["agent:host:semantic:guard"], "node scripts/zotero-host-semantic-index-guard.mjs");
+    assert.equal(packageJSON.scripts["agent:host:semantic:guard:strict"], "node scripts/zotero-host-semantic-index-guard.mjs --strict");
+    assert.equal(packageJSON.scripts["init:workspace"], "node scripts/init-workspace.mjs");
+    assert.equal(packageJSON.scripts["agent:sync"], "node scripts/agent-sync.mjs");
+    assert.ok(String(packageJSON.scripts.check || "").includes("framework:governance:check"));
+    assert.ok(String(packageJSON.scripts["agent:gate"] || "").includes("agent:workspace:guard:strict"));
+    assert.ok(String(packageJSON.scripts["agent:gate"] || "").includes("agent:host:guard:strict"));
+    assert.ok(String(packageJSON.scripts["agent:gate"] || "").includes("agent:host:semantic:guard:strict"));
+    assert.ok(String(packageJSON.scripts["agent:gate:release"] || "").includes("agent:workspace:guard:strict"));
+    assert.ok(String(packageJSON.scripts["agent:gate:release"] || "").includes("agent:host:guard:strict"));
+    assert.ok(String(packageJSON.scripts["agent:gate:release"] || "").includes("agent:host:semantic:guard:strict"));
+    assert.ok(String(packageJSON.scripts.check || "").includes("agent:workspace:guard"));
+    assert.ok(String(packageJSON.scripts.check || "").includes("agent:obsidian:guard"));
+    assert.ok(String(packageJSON.scripts.check || "").includes("agent:host:guard"));
+    assert.ok(String(packageJSON.scripts.check || "").includes("agent:host:semantic:guard"));
+  });
+
+  it("should pass framework governance check for the current template", async () => {
+    const result = await execNodeResult(["scripts/framework-governance-check.mjs"]);
+    assert.equal(result.code, 0);
+    assert.ok(result.stdout.includes("Framework governance check passed"));
+  });
+
+  it("should pass host interface guard for the current template", async () => {
+    const result = await execNodeResult(["scripts/zotero-host-interface-guard.mjs", "--strict"]);
+    assert.equal(result.code, 0);
+    assert.ok(result.stdout.includes("Host interface guard (strict): passed"));
+  });
+
+  it("should pass host semantic guard for the current template", async () => {
+    const result = await execNodeResult(["scripts/zotero-host-semantic-index-guard.mjs", "--strict"]);
+    assert.equal(result.code, 0);
+    assert.ok(result.stdout.includes("Host semantic guard (strict): passed"));
+  });
+
+  it("should generate adopted framework bundle audit for the current template", async () => {
+    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "addontemplate-framework-audit-"));
+    try {
+      const result = await execNodeResult([
+        "scripts/framework-bundle-audit.mjs",
+        "--output-dir",
+        outputDir,
+      ]);
+      assert.equal(result.code, 0);
+      const auditJSON = readJSON(path.join(outputDir, "framework-bundle-audit.json"));
+      const auditMarkdown = fs.readFileSync(path.join(outputDir, "framework-bundle-audit.md"), "utf-8");
+      assert.equal(auditJSON.summary.adoptedBundles, auditJSON.summary.totalBundles);
+      assert.equal(auditJSON.mirrorStatus, "current");
+      assert.ok(auditJSON.bundles.every((bundle) => bundle.adoptionStatus === "adopted"));
+      assert.ok(auditJSON.bundles.every((bundle) => bundle.mirrorStatus === "current"));
+      assert.ok(auditJSON.bundles.every((bundle) => typeof bundle.bundleLifecycle === "string"));
+      assert.ok(auditJSON.bundles.every((bundle) => typeof bundle.bundleVersion === "number"));
+      const expansionWaveBundle = auditJSON.bundles.find((bundle) => bundle.id === "expansion-wave-scaffold-v1");
+      assert.ok(expansionWaveBundle);
+      assert.equal(expansionWaveBundle.expansionWaveDetails.projectWaveStatus, "active");
+      assert.ok(result.stdout.includes("expansion-wave: active / generic-expansion-wave-v1 / ZOTERO-HOST-WAVE-001 / host-first -> surface smoke -> surface-local visual evidence"));
+      assert.ok(auditMarkdown.includes("Framework Backfill Audit"));
+      assert.ok(auditMarkdown.includes("Expansion Wave Overview"));
+      assert.ok(auditMarkdown.includes("Surface Verification Overview"));
+      assert.ok(auditMarkdown.includes("Registry Mirror"));
+      assert.ok(auditMarkdown.includes("Matched AGENTS Rule"));
+      assert.ok(auditMarkdown.includes("Project Wave Status: `active`"));
+      assert.ok(auditMarkdown.includes("| Bundle | Adoption | Mirror | Wave | Checks |"));
+      assert.ok(auditMarkdown.includes("projectWaveStatus=`active`"));
+      assert.ok(auditMarkdown.includes("workspace-init-guard-v1"));
+      assert.ok(auditMarkdown.includes("validation-decision-v1"));
+      assert.ok(auditMarkdown.includes("validation-decision-v2"));
+      assert.ok(auditMarkdown.includes("expansion-wave-scaffold-v1"));
+      assert.ok(auditMarkdown.includes("host-interface-contract-v1"));
+      assert.ok(auditMarkdown.includes("host-semantic-index-v1"));
+      assert.ok(auditMarkdown.includes("surface-verification-v1"));
+    } finally {
+      fs.rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should warn in host guard warn mode and fail in strict mode when contract adoption is incomplete", async () => {
+    const emptyProjectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "addontemplate-host-guard-project-"));
+    const registryPath = path.join(projectRoot, "config", "zotero-host-interface-contracts.json");
+
+    try {
+      const warnResult = await execNodeResult([
+        "scripts/zotero-host-interface-guard.mjs",
+        "--project-root",
+        emptyProjectRoot,
+        "--registry",
+        registryPath,
+      ]);
+      const strictResult = await execNodeResult([
+        "scripts/zotero-host-interface-guard.mjs",
+        "--strict",
+        "--project-root",
+        emptyProjectRoot,
+        "--registry",
+        registryPath,
+      ]);
+
+      assert.equal(warnResult.code, 0);
+      assert.equal(strictResult.code, 2);
+      assert.ok(warnResult.stdout.includes("Host interface guard (warn): warning"));
+      assert.ok(warnResult.stdout.includes("Contract menu-manager is failed."));
+      assert.ok(strictResult.stdout.includes("Contract menu-manager is failed."));
+    } finally {
+      fs.rmSync(emptyProjectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("should warn in host semantic guard warn mode and fail in strict mode when semantic index adoption is incomplete", async () => {
+    const emptyProjectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "addontemplate-host-semantic-guard-project-"));
+    const registryPath = path.join(projectRoot, "config", "zotero-host-semantic-index.json");
+
+    try {
+      const warnResult = await execNodeResult([
+        "scripts/zotero-host-semantic-index-guard.mjs",
+        "--project-root",
+        emptyProjectRoot,
+        "--registry",
+        registryPath,
+      ]);
+      const strictResult = await execNodeResult([
+        "scripts/zotero-host-semantic-index-guard.mjs",
+        "--strict",
+        "--project-root",
+        emptyProjectRoot,
+        "--registry",
+        registryPath,
+      ]);
+
+      assert.equal(warnResult.code, 0);
+      assert.equal(strictResult.code, 2);
+      assert.ok(warnResult.stdout.includes("Host semantic guard (warn): warning"));
+      assert.ok(warnResult.stdout.includes("Semantic domain menu-manager is failed."));
+      assert.ok(strictResult.stdout.includes("Semantic domain menu-manager is failed."));
+    } finally {
+      fs.rmSync(emptyProjectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("should warn in workspace guard warn mode and fail in strict mode when init-workspace report is missing", async () => {
+    const artifactsDir = fs.mkdtempSync(path.join(os.tmpdir(), "addontemplate-workspace-guard-"));
+
+    try {
+      const warnResult = await execNodeResult(["scripts/agent-workspace-guard.mjs"], {
         env: {
           ...process.env,
-          CLEANROOM_REFERENCE_ROOT: referenceRoot,
+          AGENT_ARTIFACTS_DIR: artifactsDir,
         },
       });
-      await execNodeAsync(["scripts/release-prepare.mjs"]);
-      await execNodeAsync(["scripts/release-matrix.mjs"]);
+      const strictResult = await execNodeResult(["scripts/agent-workspace-guard.mjs", "--strict"], {
+        env: {
+          ...process.env,
+          AGENT_ARTIFACTS_DIR: artifactsDir,
+        },
+      });
 
-      const preflight = readJSON(path.join(projectRoot, "dist", "release-preflight.json"));
-      const releasePlan = readJSON(path.join(projectRoot, "dist", "release-plan.json"));
-      const releaseMatrix = readJSON(path.join(projectRoot, "dist", "release-matrix.json"));
-      const releaseNotes = fs.readFileSync(path.join(projectRoot, "dist", "release-notes.md"), "utf-8");
-
-      assert.equal(preflight.status, "passed");
-      assert.equal(preflight.remoteVerification?.status, "passed");
-      assert.equal(releasePlan.remoteVerification?.status, "passed");
-      assert.equal(releaseMatrix.remoteVerification?.status, "passed");
-      assert.equal(releaseMatrix.remoteVerification?.observedUpdateLink, remoteUpdateLink);
-      assert.ok(releaseNotes.includes("Status: `通过`"));
+      assert.equal(warnResult.code, 0);
+      assert.equal(strictResult.code, 2);
+      assert.ok(warnResult.stdout.includes("missing-init-report"));
+      assert.ok(strictResult.stdout.includes("init:workspace"));
     } finally {
-      if (referenceRoot) {
-        fs.rmSync(referenceRoot, { recursive: true, force: true });
-      }
+      fs.rmSync(artifactsDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should warn on external obsidian workspaceDir in warn mode and fail in strict mode", async () => {
+    const artifactsDir = fs.mkdtempSync(path.join(os.tmpdir(), "addontemplate-obsidian-guard-script-"));
+    const externalWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), "addontemplate-obsidian-external-"));
+    try {
+      writeJSON(path.join(artifactsDir, "agent-obsidian-handoff.json"), {
+        generatedAt: new Date().toISOString(),
+        success: true,
+        workspaceDir: externalWorkspace,
+      });
+
+      const warnResult = await execNodeResult(["scripts/agent-obsidian-guard.mjs"], {
+        env: {
+          ...process.env,
+          AGENT_ARTIFACTS_DIR: artifactsDir,
+        },
+      });
+      assert.equal(warnResult.code, 0);
+      assert.ok(warnResult.stdout.includes("external-blocked"));
+
+      const strictResult = await execNodeResult(["scripts/agent-obsidian-guard.mjs", "--strict"], {
+        env: {
+          ...process.env,
+          AGENT_ARTIFACTS_DIR: artifactsDir,
+        },
+      });
+      assert.equal(strictResult.code, 2);
+      assert.ok(strictResult.stdout.includes("external-blocked"));
+    } finally {
+      fs.rmSync(artifactsDir, { recursive: true, force: true });
+      fs.rmSync(externalWorkspace, { recursive: true, force: true });
+    }
+  });
+
+  it("should block gate when obsidian workspaceDir points outside project root", async () => {
+    const artifactsDir = fs.mkdtempSync(path.join(os.tmpdir(), "addontemplate-gate-obsidian-guard-"));
+    const externalWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), "addontemplate-gate-external-"));
+    try {
+      writeJSON(path.join(artifactsDir, "agent-monitor.json"), buildMinimalMonitorSummary());
+      writeJSON(path.join(artifactsDir, "agent-obsidian-handoff.json"), {
+        generatedAt: new Date().toISOString(),
+        success: true,
+        workspaceDir: externalWorkspace,
+      });
+      const result = await execNodeResult(["scripts/agent-gate.mjs"], {
+        env: {
+          ...process.env,
+          AGENT_ARTIFACTS_DIR: artifactsDir,
+        },
+      });
+      assert.equal(result.code, 2);
+      const gateJSON = readJSON(path.join(artifactsDir, "agent-gate.json"));
+      assert.equal(gateJSON.gatePassed, false);
+      assert.ok(Array.isArray(gateJSON.issues));
+      assert.ok(gateJSON.issues.some((item) => String(item).includes("Obsidian workspaceDir 越界")));
+    } finally {
+      fs.rmSync(artifactsDir, { recursive: true, force: true });
+      fs.rmSync(externalWorkspace, { recursive: true, force: true });
+    }
+  });
+
+  it("should initialize workspace and generate fresh obsidian handoff in project-owned path", async () => {
+    const artifactsDir = fs.mkdtempSync(path.join(os.tmpdir(), "addontemplate-init-workspace-"));
+    try {
+      fs.mkdirSync(path.join(artifactsDir, "agent-runs"), { recursive: true });
+      fs.mkdirSync(path.join(artifactsDir, "agent-delegation", "TASK-OLD"), { recursive: true });
+      writeJSON(path.join(artifactsDir, "agent-memory.json"), {
+        projectRoot: "/tmp/legacy-project",
+      });
+
+      const result = await execNodeResult(["scripts/init-workspace.mjs"], {
+        env: {
+          ...process.env,
+          AGENT_ARTIFACTS_DIR: artifactsDir,
+        },
+      });
+      assert.equal(result.code, 0);
+
+      const handoff = readJSON(path.join(artifactsDir, "agent-obsidian-handoff.json"));
+      assert.ok(typeof handoff.workspaceDir === "string");
+      assert.ok(handoff.workspaceDir.startsWith(path.join(projectRoot, "obsidian", "agent-workbench")));
+      assert.equal(handoff.bootstrapShell, true);
+      assert.equal(handoff.summarySource, "bootstrap-shell");
+      assert.equal(handoff.runnableNextCommand, "npm run agent:sync");
+
+      const initReport = readJSON(path.join(artifactsDir, "init-workspace.json"));
+      assert.equal(initReport.success, true);
+      assert.equal(initReport.markerVersion, 1);
+      assert.equal(initReport.projectRoot, projectRoot);
+      assert.equal(initReport.guard.status, "within-project");
+      assert.equal(initReport.guard.scope, "path");
+      assert.ok(Array.isArray(initReport.cleanedArtifactPaths));
+      assert.ok(initReport.cleanedArtifactPaths.some((item) => item.endsWith(path.join("agent-runs"))));
+      assert.equal(fs.existsSync(path.join(artifactsDir, "agent-runs")), false);
+      assert.equal(fs.existsSync(path.join(artifactsDir, "agent-delegation")), false);
+      assert.equal(fs.existsSync(path.join(artifactsDir, "agent-memory.json")), false);
+    } finally {
+      fs.rmSync(artifactsDir, { recursive: true, force: true });
     }
   });
 

@@ -61,6 +61,7 @@ npm run package
 说明：`updateURL` 在 Zotero 7/8 的实际安装链路中应视为必填。留空时，构建虽然可能完成，但 Zotero 会把生成的包判为无效。
 说明：当前仓库 `config/addon.config.json` 中落地的 Gitee `updateURL` 仅用于这个模板项目自身的远端发布验收与测试；如果你是基于模板开发自己的插件，必须先替换 `addonId`、`homepage` 和 `updateURL`，不能继续沿用模板仓库的发布地址。
 说明：`build/` 与 `dist/` 都是本地可再生工件，已被 `.gitignore` 忽略；正常 `git push` 不会上传这些产物。若要交付纯源码，请使用 `npm run export:project`，不要直接压缩整个工作目录。
+说明：如果你在补 release / toolchain 测试，不要把仓库里已有的 `build/` / `dist/` 当稳定输入；需要先在测试里准备 fresh 工件，或改用临时 fixture。
 
 ### 4. Zotero 真机测试
 
@@ -102,6 +103,11 @@ npm run zotero:test
 5. 每轮改动后都执行 `npm run agent:monitor` 和 `npm run agent:gate`，以 gate 是否通过作为“是否继续推进”的主判据。
 6. 只有当前任务明确属于发布链时，才进入 `npm run release:plan -> npm run release:upload -- --provider <provider> --release-tag <tag> --target-base-url <url> -> 手动上传远端产物 -> npm run release:preflight -- --verify-remote -> npm run release:prepare -> npm run release:matrix -> npm run agent:gate:release`。
 7. 如果只是要导出纯源码或模板交付物，使用 `npm run export:project`，不要直接复制整个工作目录。
+
+补充说明：
+
+- 如果你调整了 `config/project-validation-overrides.json` 或 `config/project-expansion-wave.json`，同时也要更新 `docs/CURRENT_BACKLOG.md`，让机器可读 mirror 和人类可读 truth 保持同轮一致。
+- mirror 负责表达当前批次的验证/扩展判定，truth 负责表达当前阶段结论；不要让两者分别记录不同 scope 或不同 acceptanceTrack。
 
 ---
 
@@ -689,7 +695,7 @@ npm run release:matrix
 ### Q: 如何添加本地化？
 
 1. 在 `addon-static/locale/<locale>/main.ftl` 中新增或修改消息键，至少同步维护 `en-US`、`zh-CN`、`zh-TW`
-2. 官方注册面优先使用 `l10nID`，例如 ItemPane / 菜单 / 偏好面板等宿主契约点
+2. 官方注册面优先使用 `l10nID`，例如 ItemPane / 菜单 / 偏好设置面板等宿主契约点
 3. 修改后执行 `npm run verify`；如果改动影响宿主 UI，再补跑 `npm run agent:zotero:e2e`
 
 ---

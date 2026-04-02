@@ -559,6 +559,37 @@ export function summarizeVerificationContractStats(verificationContract) {
 }
 
 function summarizeServiceHealth(report, latestCycle) {
+  const isRecoverableMissingKeyServiceDegradation = (services) => {
+    const list = Array.isArray(services) ? services : [];
+    const unhealthy = list.filter((service) => {
+      if (!service || typeof service !== "object") {
+        return false;
+      }
+      const status = String(service?.status || "").trim().toLowerCase();
+      return service?.health?.ok === false || status === "degraded";
+    });
+    if (unhealthy.length === 0) {
+      return false;
+    }
+    return unhealthy.every((service) => {
+      const serviceID = String(service?.id || "").trim();
+      const details = service?.health?.details && typeof service.health.details === "object"
+        ? service.health.details
+        : {};
+      const errors = Array.isArray(details?.errors)
+        ? details.errors.map((entry) => String(entry || "").trim()).filter(Boolean)
+        : [];
+      return (
+        serviceID.endsWith(".ai-runtime")
+        && details.configValid === false
+        && details.readerChatInitialized === true
+        && details.annotationAIInitialized === true
+        && errors.length > 0
+        && errors.every((entry) => entry === "API key is required for non-local providers")
+      );
+    });
+  };
+
   const reportServiceSummary = report?.serviceSummary && typeof report.serviceSummary === "object"
     ? report.serviceSummary
     : null;
@@ -578,6 +609,11 @@ function summarizeServiceHealth(report, latestCycle) {
   );
   const source = reportServiceSummary || cycleChecks || null;
   const observed = Boolean(reportServiceSummary || hasCycleServiceChecks);
+  const serviceDetails = Array.isArray(cycleChecks?.services)
+    ? cycleChecks.services
+    : Array.isArray(reportServiceSummary?.services)
+      ? reportServiceSummary.services
+      : [];
   const serviceIssues = uniqueStrings([
     ...(Array.isArray(report?.issues) ? report.issues : []).filter((item) => String(item).includes("服务健康")),
     ...(Array.isArray(latestCycle?.issues) ? latestCycle.issues : []).filter((item) => String(item).includes("服务健康")),
@@ -590,6 +626,7 @@ function summarizeServiceHealth(report, latestCycle) {
     serviceUnhealthyCount: Number(source?.serviceUnhealthyCount || source?.unhealthy || 0),
     serviceHealthOK: observed ? Boolean(source?.serviceHealthOK ?? source?.healthOK ?? true) : true,
     serviceStatus: observed ? String(source?.serviceStatus || source?.status || "unknown") : "unknown",
+    serviceRecoverableMissingKey: isRecoverableMissingKeyServiceDegradation(serviceDetails),
     serviceIssues,
   };
 }
@@ -909,7 +946,7 @@ function summarizeToolbarEvidence(readerEventReport) {
   }
 
   const parts = [
-    readerEventReport.toolbarHookObserved ? "Toolbar 宿主点已观测" : "Toolbar 宿主点未观测",
+    readerEventReport.toolbarHookObserved ? "renderToolbar 宿主点已观测" : "renderToolbar 宿主点未观测",
     `Hook ${readerEventReport.hookScenarioStatusLabel || pickReaderEventStatusLabel(readerEventReport.hookScenarioStatus)}`,
     `细粒度 ${readerEventReport.fineGrainedScenarioStatusLabel || pickReaderEventStatusLabel(readerEventReport.fineGrainedScenarioStatus)}`,
   ];
@@ -1484,9 +1521,11 @@ function summarizeVisualCanonicalCoverageForCycles(cycles) {
     const baselines = Array.isArray(cycle?.visuals?.analysis?.baselines)
       ? cycle.visuals.analysis.baselines
       : [];
+    const canonicalCaptures = captures.filter((item) => item?.scope !== "surface-local");
+    const canonicalBaselines = baselines.filter((item) => item?.scope !== "surface-local");
     const observedKinds = uniqueStrings([
-      ...captures.map((item) => item?.kind),
-      ...baselines.map((item) => item?.kind),
+      ...canonicalCaptures.map((item) => item?.kind),
+      ...canonicalBaselines.map((item) => item?.kind),
     ]);
 
     if (bootMode) {
@@ -1499,7 +1538,7 @@ function summarizeVisualCanonicalCoverageForCycles(cycles) {
       }
     }
 
-    for (const entry of baselines) {
+    for (const entry of canonicalBaselines) {
       const canonicalTarget = extractVisualCanonicalTarget(entry, bootMode);
       if (!canonicalTarget) {
         continue;
@@ -2516,6 +2555,7 @@ export function summarizeE2EReport(report, options = {}) {
     serviceUnhealthyCount: serviceHealth.serviceUnhealthyCount,
     serviceHealthOK: serviceHealth.serviceHealthOK,
     serviceStatus: serviceHealth.serviceStatus,
+    serviceRecoverableMissingKey: serviceHealth.serviceRecoverableMissingKey,
     serviceIssues: serviceHealth.serviceIssues,
     httpObserved,
     httpRequestCount,

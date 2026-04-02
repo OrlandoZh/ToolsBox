@@ -30,6 +30,8 @@ export function createPluginAPI({
   listAgentCapabilities,
   getAgentCapability,
   inspectItemPresentation,
+  listHostActions,
+  runHostAction,
 }) {
   function cloneValue(value) {
     if (value === null || value === undefined) {
@@ -47,6 +49,8 @@ export function createPluginAPI({
       getCapability: getAgentCapability,
       runScenario: runAgentScenario,
       runAction: runAgentAction,
+      listHostActions,
+      runHostAction,
       inspectItem: inspectItemPresentation,
       describeReader(target) {
         return reader.getReaderSummary(target);

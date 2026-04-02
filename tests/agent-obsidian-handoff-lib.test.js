@@ -168,8 +168,11 @@ describe("Agent Obsidian Handoff Lib", () => {
       },
     });
 
+    assert.equal(summary.summarySource, "gate");
     assert.equal(summary.nextAction, "npm run agent:obsidian");
-    assert.equal(summary.headline, "视觉主阻断：疑似真实界面回归；library 几何一致 2000x1200；reader 几何一致 2000x1200；暂不刷新基线；canonical 基线覆盖完整：4/4 已对齐");
+    assert.equal(summary.summaryNextAction, "当前主阻断已排除采集稳定性、几何漂移与 canonical coverage 缺口；先执行 `npm run agent:obsidian` 固化 Reader UI / scenario 的人工复核结论。");
+    assert.equal(summary.runnableNextCommand, "npm run agent:obsidian");
+    assert.equal(summary.headline, "最近 Zotero E2E 未通过：失败。");
     assert.ok(summary.blockers.includes("最近 Zotero E2E 未通过：失败。"));
     assert.ok(!summary.blockers.includes("最近自动修复未恢复成功。"));
     assert.ok(!summary.blockers.includes("最近自动修复未恢复成功，建议回看补丁计划与诊断。"));
@@ -189,6 +192,8 @@ describe("Agent Obsidian Handoff Lib", () => {
     });
 
     assert.equal(summary.nextAction, "npm run agent:obsidian");
+    assert.equal(summary.summaryNextAction, "当前主阻断已排除采集稳定性、几何漂移与 canonical coverage 缺口；先执行 `npm run agent:obsidian` 固化 Reader UI / scenario 的人工复核结论。");
+    assert.equal(summary.runnableNextCommand, "npm run agent:obsidian");
     assert.ok(summary.commands.includes("npm run agent:obsidian"));
   });
 
@@ -216,13 +221,52 @@ describe("Agent Obsidian Handoff Lib", () => {
 
     assert.equal(summary.statusLabel, "可继续");
     assert.equal(summary.nextAction, "npm run agent:gate");
+    assert.equal(summary.summaryNextAction, "当前已满足 agent 质量闸门，可继续推进后续开发或发布流程。");
+    assert.equal(summary.runnableNextCommand, "npm run agent:gate");
     assert.ok(summary.commands.includes("npm run agent:gate"));
     assert.equal(summary.commands.includes("当前已满足 agent 质量闸门，可继续推进后续开发或发布流程。"), false);
+  });
+
+  it("should build bootstrap shell summary without pretending it is a current project conclusion", () => {
+    const summary = summarizeObsidianInterventionContext({
+      bootstrapShell: true,
+      currentTruthSummary: [
+        "- 当前真实完成度约为 `99%`",
+        "- 当前主阻断已清零",
+      ].join("\n"),
+      currentTruthActiveBatchId: "ENG-HIGH-104",
+      projectExpansionWave: {
+        currentWaveName: "Phase E Extension Wave 1",
+        acceptanceTrack: "functional-first",
+        inScopeModules: ["src/features/reader-chat.js"],
+      },
+      projectValidationOverrides: {
+        overrides: [
+          {
+            decision: "visual-required",
+            matchers: ["src/features/reader-chat.js"],
+          },
+        ],
+      },
+    });
+
+    assert.equal(summary.bootstrapShell, true);
+    assert.equal(summary.summarySource, "bootstrap-shell");
+    assert.equal(summary.statusLabel, "初始化占位");
+    assert.equal(summary.summaryHeadline, "当前工作台仍是初始化占位，不代表当前项目结论。");
+    assert.equal(summary.runnableNextCommand, "npm run agent:sync");
+    assert.equal(summary.projectContext.currentTruth.activeBatchId, "ENG-HIGH-104");
+    assert.equal(summary.projectContext.expansionWave.currentWaveName, "Phase E Extension Wave 1");
+    assert.equal(summary.projectContext.validationOverrides.overrideCount, 1);
   });
 
   it("should render obsidian markdown handoff", () => {
     const markdown = buildObsidianInterventionMarkdown({
       generatedAt: "2026-03-20T12:00:00.000Z",
+      generationId: "obsidian-generation-1",
+      summarySource: "gate",
+      summaryNextAction: "先执行 `npm run zotero:watch` 更新 watch 结论。",
+      runnableNextCommand: "npm run zotero:watch",
       statusLabel: "需关注",
       headline: "Zotero watch 当前为 已过期。",
       nextAction: "npm run zotero:watch",
@@ -238,6 +282,60 @@ describe("Agent Obsidian Handoff Lib", () => {
       visualGeometrySummary: "library 几何不一致 2000x1200 / 3388x2172",
       visualCanonicalCoverageSummary: "canonical 基线覆盖部分：仍不匹配 hot-reload-library.png、hot-reload-reader.png",
       visualCanonicalMismatchedTargets: ["hot-reload-library.png", "hot-reload-reader.png"],
+      projectContext: {
+        currentTruth: {
+          activeBatchId: "ENG-HIGH-104",
+          summary: "当前主阻断已清零；只剩 release-only gap。",
+          excerpt: ["当前主阻断已清零", "只剩 release-only gap"],
+        },
+        expansionWave: {
+          currentWaveName: "Phase E Extension Wave 1",
+          acceptanceTrack: "functional-first -> gate",
+          status: "active",
+          inScopeModules: ["src/features/reader-chat.js"],
+          outOfScopeModules: ["src/features/obsidian-canvas/index.js"],
+          explicitVisualUpgradeModules: ["src/features/reader-chat.js"],
+          moduleArchetypes: ["src/features/reader-chat.js -> visible-surface"],
+          summary: "Phase E Extension Wave 1 / functional-first -> gate",
+        },
+        validationOverrides: {
+          summary: "项目覆盖 2 条：required=1 / recommended=1 / not-needed=0",
+        },
+        validationDecision: {
+          level: "visual-required",
+          levelLabel: "需要视觉验证",
+          matchedDomain: ["visible-surface"],
+          matchedProjectOverride: ["src/features/reader-chat.js"],
+          requiredChecks: ["agent:zotero:e2e"],
+          requiredEvidence: ["Reader screenshot"],
+          escalatedByRuntimeSignals: false,
+          deferredEvidenceAction: null,
+        },
+      },
+      autoChain: {
+        gate: {
+          statusLabel: "需先处理",
+          generatedAt: "2026-03-20T12:00:01.000Z",
+          headline: "当前 gate 未通过。",
+        },
+        monitor: {
+          statusLabel: "需关注",
+          generatedAt: "2026-03-20T12:00:00.500Z",
+          headline: "Zotero watch 当前为 已过期。",
+        },
+        watch: {
+          statusLabel: "已过期",
+          ageText: "31m",
+        },
+        e2e: {
+          statusLabel: "缺失",
+          ageText: "-",
+        },
+        watchRecovery: {
+          statusLabel: "缺失",
+          ageText: "-",
+        },
+      },
       patchSummary: {
         planStatusLabel: "可进入受限补丁审阅",
         featureLabel: "本地化引用修正",
@@ -255,6 +353,12 @@ describe("Agent Obsidian Handoff Lib", () => {
     });
 
     assert.ok(markdown.includes("# Zotero Agent 当前状态总览"));
+    assert.ok(markdown.includes("summary_source: gate"));
+    assert.ok(markdown.includes("handoff_generation_id: obsidian-generation-1"));
+    assert.ok(markdown.includes("## 当前项目语义"));
+    assert.ok(markdown.includes("当前 wave：Phase E Extension Wave 1"));
+    assert.ok(markdown.includes("Validation mirror：项目覆盖 2 条"));
+    assert.ok(markdown.includes("## 当前自动链状态"));
     assert.ok(markdown.includes("自动阻塞项"));
     assert.ok(markdown.includes("npm run zotero:watch"));
     assert.ok(markdown.includes("## Reader 深层宿主状态"));
@@ -274,6 +378,10 @@ describe("Agent Obsidian Handoff Lib", () => {
 
   it("should render obsidian canvas handoff", () => {
     const canvas = buildObsidianInterventionCanvas({
+      generationId: "obsidian-generation-2",
+      summarySource: "gate",
+      summaryNextAction: "先执行 `npm run agent:sync`。",
+      runnableNextCommand: "npm run agent:sync",
       statusLabel: "需关注",
       headline: "当前 gate 未通过。",
       nextAction: "npm run agent:zotero:autofix",
@@ -281,6 +389,54 @@ describe("Agent Obsidian Handoff Lib", () => {
       candidateFiles: ["src/app/plugin.js"],
       commands: ["npm run agent:zotero:autofix"],
       evidenceLinks: ["dist/agent-gate.md"],
+      projectContext: {
+        currentTruth: {
+          activeBatchId: "ENG-HIGH-104",
+          summary: "当前主阻断已清零；只剩 release-only gap。",
+          excerpt: ["当前主阻断已清零"],
+        },
+        expansionWave: {
+          currentWaveName: "Phase E Extension Wave 1",
+          acceptanceTrack: "functional-first",
+          status: "active",
+          inScopeModules: ["src/features/reader-chat.js"],
+          outOfScopeModules: ["src/features/obsidian-canvas/index.js"],
+          explicitVisualUpgradeModules: ["src/features/reader-chat.js"],
+        },
+        validationOverrides: {
+          summary: "项目覆盖 1 条：required=1 / recommended=0 / not-needed=0",
+        },
+        validationDecision: {
+          level: "visual-required",
+          levelLabel: "需要视觉验证",
+          matchedDomain: ["visible-surface"],
+          matchedProjectOverride: ["src/features/reader-chat.js"],
+        },
+      },
+      autoChain: {
+        gate: {
+          statusLabel: "需先处理",
+          generatedAt: "2026-03-20T12:00:01.000Z",
+          headline: "当前 gate 未通过。",
+        },
+        monitor: {
+          statusLabel: "需关注",
+          generatedAt: "2026-03-20T12:00:00.500Z",
+          headline: "Monitor 已刷新。",
+        },
+        watch: {
+          statusLabel: "healthy",
+          ageText: "2m",
+        },
+        e2e: {
+          statusLabel: "passed",
+          ageText: "1m",
+        },
+        watchRecovery: {
+          statusLabel: "passed",
+          ageText: "1m",
+        },
+      },
       patchSummary: {
         planStatusLabel: "可进入受限补丁审阅",
         featureLabel: "本地化引用修正",
@@ -299,13 +455,12 @@ describe("Agent Obsidian Handoff Lib", () => {
     assert.ok(Array.isArray(canvas.nodes));
     assert.ok(Array.isArray(canvas.edges));
     assert.equal(canvas.nodes[0].type, "text");
-    assert.ok(canvas.nodes.some((item) => String(item.text).includes("人工指令窗口")));
-    assert.ok(canvas.nodes.some((item) => String(item.text).includes("人工指南双笔记")));
-    assert.ok(canvas.nodes.some((item) => String(item.text).includes("补丁摘要")));
-    assert.ok(canvas.nodes.some((item) => String(item.text).includes("创建文件 x1")));
-    assert.ok(canvas.nodes.some((item) => String(item.text).includes("白名单阻塞：行为回归")));
-    assert.ok(canvas.nodes.some((item) => String(item.text).includes("复验：必需 通过 1 / 失败 1；观察 通过 0 / 失败 1")));
-    assert.ok(canvas.nodes.some((item) => String(item.text).includes("类型画像：跨轮次检查 x1；聚合报告字段 x1")));
+    assert.ok(canvas.nodes.some((item) => String(item.text).includes("generation_id=obsidian-generation-2")));
+    assert.ok(canvas.nodes.some((item) => String(item.text).includes("当前项目态白板")));
+    assert.ok(canvas.nodes.some((item) => String(item.text).includes("Phase E Extension Wave 1")));
+    assert.ok(canvas.nodes.some((item) => String(item.text).includes("项目覆盖 1 条")));
+    assert.ok(canvas.nodes.some((item) => String(item.text).includes("当前自动链状态")));
+    assert.ok(canvas.nodes.some((item) => String(item.text).includes("人工入口与辅助说明")));
   });
 
   it("should build shared visual view-model without changing core summary semantics", () => {
@@ -539,7 +694,8 @@ describe("Agent Obsidian Handoff Lib", () => {
       assert.ok(markdown.includes(testCase.label));
 
       const canvas = buildObsidianInterventionCanvas(summary);
-      assert.ok(canvas.nodes.some((item) => String(item.text).includes("白名单阻塞")));
+      assert.ok(canvas.nodes.some((item) => String(item.text).includes("当前项目态白板")));
+      assert.ok(canvas.nodes.some((item) => String(item.text).includes("当前自动链状态")));
     }
   });
 
@@ -555,7 +711,7 @@ describe("Agent Obsidian Handoff Lib", () => {
             readerHostStateNote: "已从 Reader interaction diagnostics 场景读回 2 项深层宿主状态。",
             readerDispatchSummary: "文本浮层 synthetic-fallback；侧栏批注头 customEvent",
             contextMenuSummary: "已观测 5 类；synthetic-fallback 5 类",
-            toolbarEvidenceSummary: "Toolbar 宿主点已观测；Hook 通过；细粒度 通过；分发 customEvent",
+            toolbarEvidenceSummary: "renderToolbar 宿主点已观测；Hook 通过；细粒度 通过；分发 customEvent",
             visualEvidenceSummary: "library 已对齐；reader 已对齐",
             visualCaptureStabilitySummary: "视觉采集稳定性：library 稳定（2 次，哈希收敛）；reader 待稳（3 次，重试上限）",
           },
@@ -574,7 +730,7 @@ describe("Agent Obsidian Handoff Lib", () => {
     assert.ok(summary.readerDispatchSummary?.includes("customEvent"));
     assert.ok(summary.contextMenuSummary?.includes("已观测 5 类"));
     assert.ok(summary.contextMenuSummary?.includes("synthetic-fallback 5 类"));
-    assert.ok(summary.toolbarEvidenceSummary?.includes("Toolbar 宿主点已观测"));
+    assert.ok(summary.toolbarEvidenceSummary?.includes("renderToolbar 宿主点已观测"));
     assert.ok(summary.visualEvidenceSummary?.includes("已对齐"));
     assert.ok(summary.visualCaptureStabilitySummary?.includes("library 稳定"));
   });
@@ -857,7 +1013,7 @@ describe("Agent Obsidian Handoff Lib", () => {
       diagnosis: null,
       readerHostStateSummary: "侧边栏视图 annotations；上下文面板 打开",
       readerHostStateNote: "已从 Reader interaction diagnostics 场景读回 2 项深层宿主状态。",
-      toolbarEvidenceSummary: "Toolbar 宿主点已观测；Hook 通过；细粒度 通过",
+      toolbarEvidenceSummary: "renderToolbar 宿主点已观测；Hook 通过；细粒度 通过",
       visualEvidenceSummary: "library 已对齐；reader 已对齐",
       visualCaptureStabilitySummary: "视觉采集稳定性：library 稳定（2 次，哈希收敛）；reader 待稳（3 次，重试上限）",
       visualCaptureStabilityStages: [
@@ -871,7 +1027,7 @@ describe("Agent Obsidian Handoff Lib", () => {
     assert.ok(markdown.includes("# Zotero Agent 当前状态总览"));
     assert.ok(markdown.includes("## Reader 深层宿主状态"));
     assert.ok(markdown.includes("侧边栏视图 annotations"));
-    assert.ok(markdown.includes("Toolbar 证据"));
+    assert.ok(markdown.includes("renderToolbar 证据"));
     assert.ok(markdown.includes("视觉证据"));
     assert.ok(markdown.includes("视觉采集稳定性"));
     assert.ok(markdown.includes("用尽预算 stage：reader（3 次）"));

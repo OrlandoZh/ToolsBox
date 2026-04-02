@@ -517,7 +517,7 @@ api.reader.createAnnotation(itemID, {
 
 - `listCapabilities()`：返回结构化能力地图
 - `getCapability(id)`：读取单个能力元数据
-- `runScenario("settings-snapshot")`：读取 settings schema 与 preference pane 快照
+- `runScenario("settings-snapshot")`：读取 settings schema 与偏好设置面板快照
 - `runScenario("window-snapshot")`：读取主窗口数量与窗口级挂载状态
 - `runScenario("capability-manifest")`：返回完整能力地图快照
 - `inspectReader(itemID)`：读取更适合 agent 消费的 Reader 交互快照

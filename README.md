@@ -76,8 +76,11 @@
 
 - 主仓默认跟踪源码、配置、测试、文档与模板静态资源
 - `build/`、`dist/`、`.zotero-runtime/`、`obsidian/agent-workbench/` 视为可再生工件，不作为源码事实来源；它们已被 `.gitignore` 忽略，不会在正常 `git add` / `git push` 中污染源码上传
+- release / toolchain 测试不要把现有 `build/` / `dist/` 当成稳定夹具；凡是要断言 `release:preflight`、`release:prepare`、`release:matrix`、`release:upload` 结果的测试，都应先重置或重新生成本地工件
 - 如果要交付纯源码或纯模板工程，不要直接压缩整个工作目录；使用 `npm run export:project` 生成剔除运行时工件与 agent 附件的最小工程
 - reference 材料仅作为可选本地研究输入，不进入主历史；如需本地复核，见 [本地 Reference 快照说明](docs/REFERENCE_SNAPSHOTS.md)
+- 触达 `src/features/menu-manager.js`、`item-pane.js`、`item-tree.js`、`preference-panes.js`、`reader.js` 这类宿主接口包装层时，先对齐 [Zotero Host Interface Contracts](docs/ZOTERO_HOST_INTERFACE_CONTRACTS.md)，再运行 `npm run agent:host:guard`
+- `validationDecision` 只决定是否需要视觉证据；如果 `watch`、`watch-recovery`、workspace/host/provenance guard 已给出更具体的恢复动作，优先处理这些独立严格阻断，不要被泛化视觉建议带偏
 
 ## 架构
 
@@ -187,6 +190,7 @@ npm run agent:release # 以 agent runner 执行 release:plan，并记录遥测
 npm run agent:monitor # 生成 agent 汇总（按任务分组、失败原因、最近执行）
 npm run agent:dashboard # 基于 monitor 数据生成 dist/agent-dashboard.html
 npm run agent:obsidian # 生成 Obsidian 人工介入文档与白板
+npm run agent:sync # 原子刷新当前项目态 Obsidian 工作台
 # AGENT_OBSIDIAN_VISUALS=1 npm run agent:obsidian # 额外生成 Mermaid / Excalidraw companion 视图
 npm run agent:gate # 基于 monitor 数据执行开发档位质量闸门，并生成 gate 报告
 npm run agent:gate:release # 以发布档位执行更严格的质量闸门
@@ -209,6 +213,11 @@ npm run zotero:test    # 在 Zotero 内执行 zotero-tests/*.test.js
 npm run zotero:scenario # 在 Zotero 内执行 zotero-scenarios/*.scenario.js
 ```
 
+说明：
+
+- `build/` / `dist/` 是命令副产物，不是稳定输入；如果你在补 release/toolchain 测试，先准备 fresh 工件，再断言 JSON/Markdown 输出
+- 默认优先把 release/build 断言写成“测试内自准备”，不要依赖仓库里上一次运行遗留的 `release-preflight.json`、`release-matrix.json`、`build-report.json` 等文件
+
 ## Zotero 真机测试
 
 1. 复制 `.env.example` 为 `.env.local`
@@ -221,15 +230,28 @@ npm run zotero:scenario # 在 Zotero 内执行 zotero-scenarios/*.scenario.js
 
 1. 先读 [当前剩余任务清单](docs/CURRENT_BACKLOG.md) 的“当前单一事实源”，不要直接根据旧 `dist/` 工件或 README 历史段落判断当前主线
 2. 先运行 `npm run check`，确认源码、配置、文档 truth 与 clean-room 门禁都处于一致状态
-3. 如果 `config/addon.config.json` 仍是模板默认值，例如 `cleanroom-template@example.com`、`Your Team`、模板仓库 `homepage` 或模板专用 `updateURL`，先暂停开发并询问用户初始化信息：`addonName`、`addonId`、`addonRef`、`author`、`homepage`、`updateURL`，同时确认是保留完整 agent 工程链还是导出纯项目
-4. 如果改动会影响宿主运行时、场景或 UI，优先执行 `npm run agent:zotero:e2e`；需要连续迭代热重载时再使用 `npm run zotero:watch`
-5. 每轮改动后重建 `npm run agent:monitor` 与 `npm run agent:gate`，以 monitor / gate 结论而不是单条命令输出来判断是否可以继续推进
-6. 只有在当前任务明确属于发布链时，才进入 `npm run release:plan -> npm run release:upload -- --provider <provider> --release-tag <tag> --target-base-url <url> -> 手动上传远端产物 -> npm run release:preflight -- --verify-remote -> npm run release:prepare -> npm run release:matrix -> npm run agent:gate:release`
-7. 如果目标是交付纯源码，而不是把本地工件一起带走，使用 `npm run export:project`
+3. 如果刚执行过 `npm run init:workspace`、刚迁移仓库，或需要给人类查看当前 Obsidian 工作台，优先执行 `npm run agent:sync`，不要停在 bootstrap shell
+4. 如果 `config/addon.config.json` 仍是模板默认值，例如 `cleanroom-template@example.com`、`Your Team`、模板仓库 `homepage` 或模板专用 `updateURL`，先暂停开发并询问用户初始化信息：`addonName`、`addonId`、`addonRef`、`author`、`homepage`、`updateURL`，同时确认是保留完整 agent 工程链还是导出纯项目
+5. 如果改动会影响宿主运行时、场景或 UI，优先执行 `npm run agent:zotero:e2e`；需要连续迭代热重载时再使用 `npm run zotero:watch`
+6. 每轮改动后重建 `npm run agent:monitor` 与 `npm run agent:gate`，以 monitor / gate 结论而不是单条命令输出来判断是否可以继续推进
+7. 只有在当前任务明确属于发布链时，才进入 `npm run release:plan -> npm run release:upload -- --provider <provider> --release-tag <tag> --target-base-url <url> -> 手动上传远端产物 -> npm run release:preflight -- --verify-remote -> npm run release:prepare -> npm run release:matrix -> npm run agent:gate:release`
+8. 如果目标是交付纯源码，而不是把本地工件一起带走，使用 `npm run export:project`
+
+补充规则：
+
+- 如果本轮改动改变了当前批次的验证分级、可见面判定或 in-scope 模块，除了更新 `config/project-validation-overrides.json` / `config/project-expansion-wave.json`，还要同步更新 `docs/CURRENT_BACKLOG.md`
+- project mirror 负责机器可读判定，`docs/CURRENT_BACKLOG.md` 负责当前阶段 truth；两者必须同轮收口，不要各写一套阶段结论
 
 ## Codex / Opencode 分工脚手架
 
 当前仓库已落地一套 Codex / Opencode 委托分工脚手架，用于区分高逻辑任务与低逻辑任务的执行与审查：
+
+默认协作口径：
+
+- 中大型任务先由 controller 读 truth、拆 scope、定 owner，再决定是否启动委托，不要直接让多个 worker 同时改未切清的写域
+- 默认每批次只有一个 strict write owner；并发 lane 只允许出现在 `read-only`、`review` 或写域完全不重叠的场景
+- 如果仓库已经保留 `config/agent-delegation-tasks.json`，优先复用现有 `agent:delegate:*` 命令，而不是临时拼第二套委托协议
+- worker 遇到提权、GUI、联网、宿主启动或 scope 扩张需求时，应回 blocker 和精确命令，不自行绕过权限边界
 
 ### 任务分类
 
@@ -334,6 +356,8 @@ node scripts/agent-delegation.mjs close <taskId> --message "feat: 基本实现 x
 - 当前真实完成度约为 `99%`；`ENG-HIGH-103` 的启动诊断 + runtime 清理 + `pre-capture settle`、`READER-HIGH-124 / READER-LOW-261~263` 的 capture / freshness 收口、`READER-HIGH-125` 的 library-only 根因边界冻结、以及 `READER-HIGH-126` 的 library host-noise 修复均已完成并转为历史契约 / review artifact
 - latest live rerun 已把 current truth 固定回单一事实源：最新 `watch` 工件为 `healthy`（`2026-03-30T11:34:05.136Z`），最新 direct `agent:zotero:e2e` 为 `passed`（`2026-03-30T11:31:37.694Z`，`failedStage=null`，`errorCategory=null`）
 - 最新开发态 `agent:monitor` / `agent:gate` 已在 `2026-03-30T11:35:48.300Z` / `2026-03-30T11:35:48.379Z` 回到 `stable / ready`，并继续直接消费同一份 `2026-03-30T11:31:37.694Z` E2E 摘要；freshest-valid artifact 消费与 consumer 收口继续保持生效
+- 当前已显式进入 `ZOTERO-HOST-WAVE-001`：以 `reference/zotero-main` 为唯一宿主真相，收口 `Zotero host inventory + reusable host actions + surface smoke + surface-local visual evidence`；本 wave 默认采用“surface smoke 先成立，再采局部 surface 证据，整窗截图只作补充”的验证路径
+- 本 wave 当前 in-scope surfaces 已写入 `config/project-validation-surfaces.json`：覆盖 `preference pane`、`context pane`、`item pane sidenav`、`reader renderToolbar`、`reader sidebar view` 与 `menu item`，不再把 project mirror 保持为空壳
 - `details.runtimeSanitization` 已稳定透传到 direct E2E / monitor / gate：本轮 direct E2E 记录了 `exclusiveProjectRuntime=true`，并在启动前终止了 project-managed `watch` `zotero` / `plugin-container`；旧的 startup/RDP bring-up timeout 口径继续只保留为已收口的诊断能力
 - 最新 library `pre-capture settle` 已稳定收敛到 `visibleBannerIDs=[mac-word-plugin-install-container]`；`sync-reminder-container`、`post-upgrade-container`、`file-renaming-banner-container`、`retracted-items-container` 与 `architecture-warning-container` 会在 capture 前被压平，library drift 已消失，`reader 视图继续对齐`，且 `library / reader` 几何一致 `2000x1200`
 - `READER-LOW-261` 已把 stage-scoped capture failure 结构化落进既有 E2E / validation 展示链；`READER-LOW-262` 已引入 `capture-command-failed` / `visualPrimaryBlockerKind=capture-command-failed` 并同步 consumer；`READER-LOW-263` 已在 live rerun 上证明 freshest-valid direct artifact 消费与 truth 对齐，`visual screenshot capture` 链已恢复到稳定基线
@@ -364,7 +388,9 @@ node scripts/agent-delegation.mjs close <taskId> --message "feat: 基本实现 x
 - 能力覆盖汇总：`agent:monitor` / `agent:dashboard` 会额外展示 capability manifest 的覆盖情况，区分“已覆盖 / 失败 / 未覆盖”能力
 - 工件隔离：默认写入 `dist/`；若设置 `AGENT_ARTIFACTS_DIR=/tmp/addon-template-agent-artifacts`，则 `agent:zotero:e2e` / `agent:zotero:autofix` / `agent:zotero:watch-recovery` / `agent:monitor` / `agent:dashboard` / `agent:gate` / agent 遥测都会改写到自定义目录，便于测试或故障复盘时避免污染当前真机结论
 - 可视化：`agent:dashboard` 产出 `dist/agent-dashboard.html`，主页面可直接看到 Zotero 热重载状态、最近真机验证、服务状态、Reader 事件桥摘要、自动修复摘要、关键恢复步骤与耗时，以及工程化硬化信号摘要
-- 人工介入：`agent:obsidian` 会把当前 `loop / gate / monitor / e2e` 结论导出到独立的 `obsidian/agent-workbench/` 工作台目录；默认输出仍是 Markdown 状态页、证据页、Quickstart、Advanced Guide、人工指令窗口与 `.canvas` 白板，其中白板以“项目架构 + agent 自动链 + 人工指令窗口 + 证据工件”组织，便于人工接管问题分析与修复决策
+- 人工介入：`agent:obsidian` 会把当前 `gate -> monitor -> loop` 结论导出到独立的 `obsidian/agent-workbench/` 工作台目录；默认输出仍是 Markdown 状态页、证据页、Quickstart、Advanced Guide、人工指令窗口与 `.canvas` 白板，其中状态页/白板会同时展示 `CURRENT_BACKLOG`、project wave、validation override 与自动链状态
+- 默认刷新入口：`agent:sync` 会按 `agent:monitor -> agent:gate -> agent:obsidian -> agent:obsidian:guard:strict` 原子刷新当前项目态工作台
+- 初始化语义：`init:workspace` 只生成带 `bootstrap_shell=true` 的初始化占位工作台；若需要给人类查看当前项目态，请继续执行 `npm run agent:sync`
 - 可选视觉层：当设置 `AGENT_OBSIDIAN_VISUALS=1` 时，`agent:obsidian` 会额外生成 Mermaid 闭环流程图与 Excalidraw 人工复核决策图；这两份仅是 companion 视图，不参与任何 gate / loop 判定，也不替代现有人工窗口
 - 人工工作台位置：默认目录为 `obsidian/agent-workbench/`；如需统一放进单独的 Obsidian 管理空间，可设置 `AGENT_OBSIDIAN_DIR=/path/to/vault-folder`
 - 人工介入窗口：`agent:zotero:loop:human` 会先刷新 Obsidian 工作台，再打开一个短暂人工窗口；若无人修改 `10-Zotero-Agent-人工指令窗口.md`，当前回合继续按自动路径推进；若人工填写“下一步指令”或改为 `hold`，本回合会按人工意图改写路径或暂停

@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 1,
+  "summary": "Template-level host-visible surface contract. Real host-visible surfaces should pass surface smoke before visual baselines or whole-window screenshots are treated as authoritative.",
+  "surfaces": [
+    {
+      "id": "preference-pane",
+      "version": 1,
+      "summary": "A Zotero preference pane registered through the host preference pane API and reachable from the preferences sidebar.",
+      "kind": "preference-pane",
+      "entryMatchers": [
+        "^src/features/preference-panes(?:/|\\.|$)",
+        "^src/app/feature-composer(?:/|\\.|$)",
+        "^addon-static/content/.*preferences.*\\.xhtml$"
+      ],
+      "hostSemanticDomains": [
+        "preference-panes"
+      ],
+      "requiredHostAssertions": [
+        "The preference pane is registered through the host preference pane API.",
+        "The preference pane can be opened from the preferences sidebar.",
+        "The pane renders its core controls after it is opened."
+      ],
+      "supportsVisualEvidence": true,
+      "nonGoals": [
+        "Whole-window screenshots without proving the pane was opened.",
+        "Non-visible settings/schema changes that do not alter the preference pane surface."
+      ]
+    },
+    {
+      "id": "context-pane",
+      "version": 1,
+      "summary": "A Zotero context pane surface that can be toggled from a reader-side integration, using the host's context pane terminology.",
+      "kind": "context-pane",
+      "entryMatchers": [
+        "^src/features/reader(?:/|\\.|$)",
+        "^src/features/reader-chat(?:/|\\.|$)",
+        "^src/features/reader-ui-surface(?:/|\\.|$)"
+      ],
+      "hostSemanticDomains": [
+        "reader-events"
+      ],
+      "requiredHostAssertions": [
+        "A reader-side trigger can toggle the context pane.",
+        "The context pane becomes visible after the trigger runs.",
+        "The context pane content is ready, not just registered or initialized."
+      ],
+      "supportsVisualEvidence": true,
+      "nonGoals": [
+        "Treating a trigger registration alone as proof that the context pane works.",
+        "Using a whole-window screenshot as the only evidence when the context pane content is empty."
+      ]
+    },
+    {
+      "id": "item-pane-sidenav",
+      "version": 1,
+      "summary": "A Zotero Item Pane sidenav surface that switches a real pane button and confirms the target pane becomes visible.",
+      "kind": "item-pane-sidenav",
+      "entryMatchers": [
+        "^src/app/host-action-catalog(?:/|\\.|$)",
+        "^src/app/host-actions(?:/|\\.|$)",
+        "^src/features/item-pane(?:/|\\.|$)",
+        "^src/platform/zotero-host(?:/|\\.|$)"
+      ],
+      "hostSemanticDomains": [
+        "item-pane"
+      ],
+      "requiredHostAssertions": [
+        "The target Item Pane button or pane ID is aligned with the host Item Pane container.",
+        "The selected Item Pane pane becomes visible after the sidenav switch.",
+        "A surface-local evidence target can be returned for the selected Item Pane pane."
+      ],
+      "supportsVisualEvidence": true,
+      "nonGoals": [
+        "Treating ItemPane registration alone as proof that the pane is reachable from the live sidenav.",
+        "Using whole-window screenshots before proving the target pane is actually selected."
+      ]
+    },
+    {
+      "id": "annotation-context-menu",
+      "version": 1,
+      "summary": "A reader annotation context menu surface aligned with Zotero's createAnnotationContextMenu terminology.",
+      "kind": "annotation-context-menu",
+      "entryMatchers": [
+        "^src/features/annotation-ai(?:/|\\.|$)",
+        "^src/features/reader(?:/|\\.|$)"
+      ],
+      "hostSemanticDomains": [
+        "reader-events",
+        "menu-manager"
+      ],
+      "requiredHostAssertions": [
+        "The host reaches a real annotation selection scenario.",
+        "The annotation context menu item becomes visible in the reader.",
+        "The menu item can be triggered from the live host menu, not just from listener registration."
+      ],
+      "supportsVisualEvidence": true,
+      "nonGoals": [
+        "Equating listener registration with a visible annotation context menu.",
+        "Generic reader screenshots that do not show the menu surface."
+      ]
+    },
+    {
+      "id": "render-toolbar",
+      "version": 1,
+      "summary": "A reader UI surface aligned with Zotero Reader's renderToolbar event type.",
+      "kind": "render-toolbar",
+      "entryMatchers": [
+        "^src/features/reader(?:/|\\.|$)",
+        "^src/features/reader-chat(?:/|\\.|$)"
+      ],
+      "hostSemanticDomains": [
+        "reader-events"
+      ],
+      "requiredHostAssertions": [
+        "The renderToolbar integration is registered in the expected reader host location.",
+        "The injected toolbar UI becomes visible when the reader toolbar is rendered.",
+        "The injected toolbar UI triggers the intended follow-up surface or action."
+      ],
+      "supportsVisualEvidence": true,
+      "nonGoals": [
+        "Assuming a renderToolbar callback exists means the injected UI is visible to users.",
+        "Using visual drift counts before confirming the toolbar UI exists in the host."
+      ]
+    },
+    {
+      "id": "menu-item",
+      "version": 1,
+      "summary": "A host-visible menu item aligned with Zotero menu targets and MenuData.menuType terminology.",
+      "kind": "menu-item",
+      "entryMatchers": [
+        "^src/features/menu-manager(?:/|\\.|$)"
+      ],
+      "hostSemanticDomains": [
+        "menu-manager"
+      ],
+      "requiredHostAssertions": [
+        "The menu item is registered against the expected host menu target.",
+        "The menu item becomes visible when the live host menu is shown.",
+        "The menu item triggers the intended command or follow-up surface."
+      ],
+      "supportsVisualEvidence": true,
+      "nonGoals": [
+        "Assuming menu registration alone means the menu item is visible to users.",
+        "Using generic screenshots before confirming the live host menu contains the item."
+      ]
+    },
+    {
+      "id": "reader-sidebar-view",
+      "version": 1,
+      "summary": "A Reader sidebar view surface aligned with Zotero Reader sidebarView semantics and live sidebar buttons or panels.",
+      "kind": "reader-sidebar-view",
+      "entryMatchers": [
+        "^src/app/host-action-catalog(?:/|\\.|$)",
+        "^src/app/host-actions(?:/|\\.|$)",
+        "^src/features/reader(?:/|\\.|$)"
+      ],
+      "hostSemanticDomains": [
+        "reader-events"
+      ],
+      "requiredHostAssertions": [
+        "The requested Reader sidebar view is selected through a host-aligned view id such as annotations.",
+        "The selected Reader sidebar button or panel is observable after the switch.",
+        "A surface-local evidence target can be returned for the selected Reader sidebar view."
+      ],
+      "supportsVisualEvidence": true,
+      "nonGoals": [
+        "Assuming sidebar preferences alone prove the live Reader sidebar switched.",
+        "Using whole-window screenshots before the selected sidebar surface is confirmed."
+      ]
+    }
+  ]
+}

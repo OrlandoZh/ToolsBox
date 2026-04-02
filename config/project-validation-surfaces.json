@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "status": "active",
+  "summary": "Current project host-visible surfaces for ZOTERO-HOST-WAVE-001. Surface smoke is authoritative for visible host integrations before whole-window screenshots are treated as proof.",
+  "surfaces": [
+    {
+      "id": "cleanroom-preferences-pane",
+      "contractSurfaceId": "preference-pane",
+      "summary": "Open the cleanroom preference pane from Zotero preferences and verify that the pane root plus core controls render.",
+      "ownerPaths": [
+        "src/app/host-action-catalog.js",
+        "src/app/host-actions.js",
+        "src/features/preference-panes.js",
+        "src/platform/zotero-host.js",
+        "zotero-scenarios/preferences-surface-smoke.scenario.js"
+      ],
+      "smokeChecks": [
+        "Host Action `preferences.openPane` opens the preferences window and selects the requested pane.",
+        "The target preference pane root is visible and at least one core control is ready.",
+        "A surface-local evidence target is returned for the selected preference pane."
+      ],
+      "visualEvidencePolicy": "required"
+    },
+    {
+      "id": "cleanroom-library-item-pane-sidenav",
+      "contractSurfaceId": "item-pane-sidenav",
+      "summary": "Switch a library Item Pane sidenav button and verify that the selected pane becomes visible and ready.",
+      "ownerPaths": [
+        "src/app/host-action-catalog.js",
+        "src/app/host-actions.js",
+        "src/features/item-pane.js",
+        "src/platform/zotero-host.js",
+        "zotero-scenarios/item-pane-surface-smoke.scenario.js"
+      ],
+      "smokeChecks": [
+        "Host Action `itemPane.selectPane` scrolls or switches to the requested pane.",
+        "The target pane is visible in the Item Pane container after selection.",
+        "A surface-local evidence target is returned for the selected Item Pane surface."
+      ],
+      "visualEvidencePolicy": "required"
+    },
+    {
+      "id": "cleanroom-context-pane-sidenav",
+      "contractSurfaceId": "context-pane",
+      "summary": "Open the right context pane and switch to the requested context pane section for the active reader tab.",
+      "ownerPaths": [
+        "src/app/host-action-catalog.js",
+        "src/app/host-actions.js",
+        "src/features/reader.js",
+        "src/platform/zotero-host.js",
+        "zotero-scenarios/context-pane-surface-smoke.scenario.js"
+      ],
+      "smokeChecks": [
+        "Host Action `contextPane.setOpen` opens the right context pane.",
+        "Host Action `contextPane.selectPane` makes the requested pane visible in the active context pane container.",
+        "A surface-local evidence target is returned for the selected context pane surface."
+      ],
+      "visualEvidencePolicy": "required"
+    },
+    {
+      "id": "cleanroom-reader-toolbar-surface",
+      "contractSurfaceId": "render-toolbar",
+      "summary": "Verify that the Reader renderToolbar injection becomes visible in a live reader instance and exposes a local evidence target.",
+      "ownerPaths": [
+        "src/app/host-action-catalog.js",
+        "src/app/host-actions.js",
+        "src/features/reader.js",
+        "zotero-scenarios/reader-surface-smoke.scenario.js"
+      ],
+      "smokeChecks": [
+        "A live reader instance is opened through Host Action `reader.open`.",
+        "The renderToolbar integration becomes visible in the reader toolbar.",
+        "A surface-local evidence target is returned for the toolbar surface."
+      ],
+      "visualEvidencePolicy": "required"
+    },
+    {
+      "id": "cleanroom-reader-sidebar-view",
+      "contractSurfaceId": "reader-sidebar-view",
+      "summary": "Switch the active Reader sidebar view and verify that the requested sidebar surface is selected and ready.",
+      "ownerPaths": [
+        "src/app/host-action-catalog.js",
+        "src/app/host-actions.js",
+        "src/features/reader.js",
+        "zotero-scenarios/reader-surface-smoke.scenario.js"
+      ],
+      "smokeChecks": [
+        "Host Action `reader.sidebar.selectView` selects the requested reader sidebar view.",
+        "The selected sidebar view is observed in the live reader state or DOM.",
+        "A surface-local evidence target is returned for the active reader sidebar view."
+      ],
+      "visualEvidencePolicy": "required"
+    },
+    {
+      "id": "cleanroom-live-menu-item",
+      "contractSurfaceId": "menu-item",
+      "summary": "Show a live Zotero menu target, verify the registered menu item is visible, and trigger it through Host Actions.",
+      "ownerPaths": [
+        "src/app/host-action-catalog.js",
+        "src/app/host-actions.js",
+        "src/features/menu-manager.js",
+        "src/platform/zotero-host.js",
+        "zotero-scenarios/menu-surface-smoke.scenario.js"
+      ],
+      "smokeChecks": [
+        "Host Action `menu.show` opens the live host menu for the requested target.",
+        "The registered menu item becomes visible in the live menu popup.",
+        "Host Action `menu.trigger` dispatches the live menu command and returns a local evidence target."
+      ],
+      "visualEvidencePolicy": "required"
+    }
+  ]
+}

@@ -14,12 +14,13 @@ describe("Capability Manifest", () => {
     });
 
     const capabilityIds = listCapabilityIds(manifest);
-    assert.ok(capabilityIds.length >= 11);
+    assert.ok(capabilityIds.length >= 12);
     assert.includes(capabilityIds, "settings-governance");
     assert.includes(capabilityIds, "multi-window-mount");
     assert.includes(capabilityIds, "reader-annotation-roundtrip");
     assert.includes(capabilityIds, "reader-ui-state");
     assert.includes(capabilityIds, "reader-event-hooks");
+    assert.includes(capabilityIds, "host-actions");
 
     const settingsCapability = findCapabilityById(manifest, "settings-governance");
     assert.equal(settingsCapability.agentScenario, "settings-snapshot");
@@ -40,5 +41,9 @@ describe("Capability Manifest", () => {
     assert.equal(readerEventHooksCapability.agentScenario, "reader-current");
     assert.includes(readerEventHooksCapability.zoteroScenarios, "reader event hook diagnostics");
     assert.includes(readerEventHooksCapability.zoteroScenarios, "reader fine-grained hook diagnostics");
+
+    const hostActionsCapability = findCapabilityById(manifest, "host-actions");
+    assert.equal(hostActionsCapability.agentScenario, "host-actions");
+    assert.includes(hostActionsCapability.zoteroScenarios, "preference pane surface smoke");
   });
 });

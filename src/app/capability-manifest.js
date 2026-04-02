@@ -141,7 +141,7 @@ export function createCapabilityManifest({ config } = {}) {
       id: "reader-event-hooks",
       label: "Reader 事件桥",
       category: "feature",
-      description: "验证 agent 可通过 Zotero Reader 官方事件 API 注册/注销事件监听器，并覆盖 toolbar、文本选择浮层与多类上下文菜单等宿主注入点。",
+      description: "验证 agent 可通过 Zotero Reader 官方事件 API 注册/注销事件监听器，并覆盖 `renderToolbar`、文本选择浮层与多类上下文菜单等宿主注入点。",
       agentScenario: "reader-current",
       zoteroScenarios: [
         "reader event hook diagnostics",
@@ -187,10 +187,39 @@ export function createCapabilityManifest({ config } = {}) {
       ],
     },
     {
+      id: "host-actions",
+      label: "宿主动作编排",
+      category: "feature",
+      description: "验证 agent 可枚举稳定的 Host Actions，并以统一结果结构执行偏好设置、右侧栏、Reader 与 live menu 宿主动作。",
+      agentScenario: "host-actions",
+      zoteroScenarios: [
+        "preference pane surface smoke",
+        "library item pane surface smoke",
+        "context pane surface smoke",
+        "reader surface smoke",
+        "live menu surface smoke",
+      ],
+      entrypoints: [
+        "plugin.api.agent.listHostActions()",
+        "plugin.api.agent.runHostAction(actionId, payload)",
+      ],
+      ownedBy: [
+        "src/app/host-action-catalog.js",
+        "src/app/host-actions.js",
+        "src/app/plugin-agent.js",
+        "src/app/plugin-api.js",
+      ],
+      successSignals: [
+        "Host Action catalog returns source-driven descriptors",
+        "runHostAction() returns preconditions / observedState / readiness / surfaceTarget / failureKind",
+        "surface smoke scenarios reuse Host Actions instead of one-off DOM probes",
+      ],
+    },
+    {
       id: "settings-governance",
       label: "设置治理",
       category: "governance",
-      description: "验证 settings schema、校验与 preference pane 暴露是否完整。",
+      description: "验证 settings schema、校验与偏好设置面板暴露是否完整。",
       agentScenario: "settings-snapshot",
       zoteroScenarios: ["settings schema and preference pane diagnostics"],
       entrypoints: [

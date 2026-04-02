@@ -330,11 +330,11 @@ const DIAGNOSIS_RULES = [
         key: "toolbar-bridge-registration-drift",
         severity: "high",
         confidence: 0.93,
-        summary: "Reader Toolbar / 官方 listener 桥接存在漂移。",
+        summary: "Reader renderToolbar / 官方 listener 桥接存在漂移。",
         patterns: [
           "reader 官方事件监听注册异常",
-          "reader toolbar 宿主桥接未恢复",
-          "reader toolbar 宿主点未观测",
+          "reader renderToolbar 宿主桥接未恢复",
+          "reader renderToolbar 宿主点未观测",
         ],
       },
       {

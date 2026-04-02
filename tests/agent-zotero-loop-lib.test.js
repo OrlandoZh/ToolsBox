@@ -408,7 +408,7 @@ describe("Agent Zotero Loop Lib", () => {
         frontpageSummary: {
           status: "blocked",
           statusLabel: "需先处理",
-          headline: "Reader Toolbar / 官方 listener 桥接存在漂移。",
+          headline: "Reader renderToolbar / 官方 listener 桥接存在漂移。",
           nextAction: "npm run agent:zotero:e2e",
         },
       },
@@ -417,6 +417,6 @@ describe("Agent Zotero Loop Lib", () => {
     assert.equal(state.gate.present, true);
     assert.equal(state.gate.status, "blocked");
     assert.equal(state.frontpageSummary.nextAction, "npm run agent:zotero:e2e");
-    assert.ok(state.issues.some((item) => item.includes("Reader Toolbar / 官方 listener 桥接存在漂移")));
+    assert.ok(state.issues.some((item) => item.includes("Reader renderToolbar / 官方 listener 桥接存在漂移")));
   });
 });

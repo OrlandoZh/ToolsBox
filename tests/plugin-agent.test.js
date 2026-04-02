@@ -183,6 +183,29 @@ describe("Plugin Agent", () => {
       getItemTitle(item) {
         return item?.getField?.("title") || "Untitled";
       },
+      listHostActions() {
+        return [
+          { id: "preferences.openPane", executable: true },
+          { id: "menu.show", executable: true },
+        ];
+      },
+      async runHostAction(actionId) {
+        return {
+          actionId,
+          ok: true,
+          preconditions: [],
+          observedState: {},
+          readiness: {
+            ok: true,
+            total: 0,
+            passed: 0,
+            failed: 0,
+            checks: [],
+          },
+          surfaceTarget: null,
+          failureKind: null,
+        };
+      },
       runAgentAction() {
         return true;
       },
@@ -248,6 +271,7 @@ describe("Plugin Agent", () => {
     assert.equal(diagnostics.readerEventKnownTypeCount, 3);
     assert.equal(diagnostics.readerEventProbeTypeCount, 2);
     assert.equal(diagnostics.readerEventSyntheticFallbackAvailable, true);
+    assert.equal(diagnostics.hostActionCount, 2);
     assert.deepEqual(diagnostics.readerEventListeners, [{
       type: "renderToolbar",
       pluginID: "cleanroom-template@example.com",
@@ -263,8 +287,9 @@ describe("Plugin Agent", () => {
     assert.equal(diagnostics.lifecycleBoundaryEvents[0]?.event, "plugin.start.failed");
 
     const capabilities = agent.listCapabilities();
-    assert.ok(capabilities.length >= 11);
+    assert.ok(capabilities.length >= 12);
     assert.equal(agent.getCapability("settings-governance").agentScenario, "settings-snapshot");
+    assert.equal(agent.getCapability("host-actions").agentScenario, "host-actions");
     assert.includes(
       agent.getCapability("reader-annotation-roundtrip").zoteroScenarios,
       "reader annotation roundtrip",
@@ -301,6 +326,13 @@ describe("Plugin Agent", () => {
     const windowSnapshot = agent.runAgentScenario("window-snapshot");
     assert.equal(windowSnapshot.mainWindowCount, 1);
     assert.equal(windowSnapshot.windows[0].hasMenuItem, true);
+
+    const hostActions = agent.listHostActions();
+    assert.equal(hostActions.length, 2);
+    assert.equal(hostActions[0].id, "preferences.openPane");
+
+    const hostActionScenario = agent.runAgentScenario("host-actions");
+    assert.equal(hostActionScenario.total, 2);
   });
 
   it("should execute built-in notifier scenario", () => {
