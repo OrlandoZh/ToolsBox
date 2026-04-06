@@ -2,8 +2,13 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { buildReactUI } from "./build-react-ui.mjs";
 import { withBuildLock } from "./build-lock.mjs";
 import { applyBuildInjection } from "./build-injection-lib.mjs";
+import {
+  loadOptionalBundleRegistry,
+  listOptionalBundles,
+} from "./optional-bundles-lib.mjs";
 import {
   assertNonEmptyString,
   assertPlainObject,
@@ -50,6 +55,14 @@ async function copyDir(source, target) {
     await ensureDir(path.dirname(dstPath));
     await fs.copyFile(srcPath, dstPath);
   }
+}
+
+function escapeXHTML(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 export function validateBuildConfig(config, filePath = configPath) {
@@ -250,7 +263,12 @@ function transformModuleSource(sourceCode, importRows) {
   return `${importPrelude}\n${transformed}\nreturn ${exportObject};`;
 }
 
-async function bundleEntry({ entryFile, srcRootPath, config }) {
+async function bundleEntry({
+  entryFile,
+  srcRootPath,
+  config,
+  optionalBundleRegistry = null,
+}) {
   const moduleMap = new Map();
 
   async function visit(filePath) {
@@ -299,6 +317,7 @@ async function bundleEntry({ entryFile, srcRootPath, config }) {
 (function(__global) {
   "use strict";
   __global.__CLEANROOM_TEMPLATE_CONFIG__ = ${JSON.stringify(config)};
+  __global.__CLEANROOM_TEMPLATE_OPTIONAL_BUNDLES__ = ${JSON.stringify(optionalBundleRegistry)};
 
   const __moduleDefs = {
 ${moduleDefs}
@@ -339,13 +358,25 @@ function patchPreferences(templateContent, config) {
   return templateContent.replaceAll("__PREFS_PREFIX__", config.prefsPrefix);
 }
 
-async function writeBuildReport({ buildRoot, bundlePath, config }) {
+function patchReactUIDemoShell(templateContent, config) {
+  return templateContent
+    .replaceAll("__ADDON_REF__", escapeXHTML(config.addonRef))
+    .replaceAll("__ADDON_NAME__", escapeXHTML(config.addonName));
+}
+
+async function writeBuildReport({
+  buildRoot,
+  bundlePath,
+  config,
+  optionalBundles = [],
+}) {
   const report = {
     generatedAt: new Date().toISOString(),
     addonRef: config.addonRef,
     addonVersion: config.addonVersion,
     buildRoot,
     bundlePath,
+    optionalBundles,
   };
 
   await fs.writeFile(
@@ -373,6 +404,14 @@ export async function main() {
       label: "config/addon.config.json",
     });
     validateBuildConfig(config, configPath);
+    let optionalBundleRegistry = null;
+    try {
+      optionalBundleRegistry = loadOptionalBundleRegistry(projectRoot).registry;
+    } catch (error) {
+      throw wrapScriptError(error, {
+        failedStage: "read-optional-bundle-registry",
+      });
+    }
 
     const buildRoot = path.join(projectRoot, "build", config.addonRef);
     const scriptsRoot = path.join(buildRoot, "content", "scripts");
@@ -435,6 +474,20 @@ export async function main() {
       });
     }
 
+    const reactUIDemoShellPath = path.join(buildRoot, "content", "react-ui", "demo.xhtml");
+    try {
+      const reactUIDemoShell = await fs.readFile(reactUIDemoShellPath, "utf-8");
+      const patchedReactUIDemoShell = patchReactUIDemoShell(reactUIDemoShell, config);
+      await fs.writeFile(reactUIDemoShellPath, patchedReactUIDemoShell, "utf-8");
+    } catch (error) {
+      if (error?.code !== "ENOENT") {
+        throw wrapScriptError(error, {
+          failedStage: "patch-react-ui-shell",
+          details: { reactUIDemoShellPath },
+        });
+      }
+    }
+
     const entryFile = path.join(srcRoot, "main.js");
     let bundle = null;
     try {
@@ -442,6 +495,7 @@ export async function main() {
         entryFile,
         srcRootPath: srcRoot,
         config,
+        optionalBundleRegistry,
       });
     } catch (error) {
       throw wrapScriptError(error, {
@@ -460,11 +514,51 @@ export async function main() {
       });
     }
 
+    let reactUIBuildResult = null;
+    try {
+      reactUIBuildResult = await buildReactUI({
+        config,
+        buildRoot,
+        registry: optionalBundleRegistry,
+      });
+    } catch (error) {
+      throw wrapScriptError(error, {
+        failedStage: "build-react-ui",
+        details: {
+          buildRoot,
+          bundleId: "react-ui",
+        },
+      });
+    }
+
+    const optionalBundleResults = listOptionalBundles(optionalBundleRegistry).map((bundle) => {
+      if (bundle.id === "react-ui") {
+        return reactUIBuildResult || {
+          bundleId: bundle.id,
+          enabled: bundle.enabled,
+          lane: bundle.lane,
+          implementationStatus: bundle.implementationStatus,
+          status: "skipped",
+          reason: "not-built",
+        };
+      }
+
+      return {
+        bundleId: bundle.id,
+        enabled: bundle.enabled,
+        lane: bundle.lane,
+        implementationStatus: bundle.implementationStatus,
+        status: bundle.implementationStatus === "planned" ? "planned" : "skipped",
+        reason: bundle.implementationStatus === "planned" ? "not-implemented" : "not-built",
+      };
+    });
+
     try {
       await writeBuildReport({
         buildRoot,
         bundlePath,
         config,
+        optionalBundles: optionalBundleResults,
       });
     } catch (error) {
       throw wrapScriptError(error, {

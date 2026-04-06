@@ -58,6 +58,7 @@ export interface MenuManagerOptions {
 
 export interface MenuRegistrationSnapshot {
   id: string;
+  registeredMenuID: string;
   target: string;
   useOfficialAPI: boolean;
   menuPaths: string[];
@@ -77,8 +78,36 @@ export interface LiveMenuState {
   fieldName: string | null;
   collectionTreeRowID: unknown;
   collectionTreeRowType: unknown;
+  resolvedState?: Record<string, unknown> | null;
+  resolvedMenu?: Partial<MenuData> | null;
   phase: string | null;
   observedAt: string | null;
+}
+
+export interface MenuResolvedState extends Record<string, unknown> {
+  itemCount: number;
+  hasItems: boolean;
+  selectedType: string | null;
+  selectedTypes: string[];
+  editable: boolean | null;
+  tabID: string | null;
+  tabType: string | null;
+  tabSubType: string | null;
+  fieldName: string | null;
+  libraryType: string | null;
+  hasCollectionSelection: boolean;
+  hasSavedSearchSelection: boolean;
+  collectionTreeRowType: string | null;
+  preferenceFlags: Record<string, unknown>;
+  itemKinds: {
+    noteCount: number;
+    attachmentCount: number;
+    regularCount: number;
+    hasNotes: boolean;
+    hasAttachments: boolean;
+    hasRegularItems: boolean;
+    mixed: boolean;
+  };
 }
 
 /**
@@ -142,6 +171,13 @@ export interface MenuContext {
   menuElem?: Element;
   items?: unknown[];
   window?: Window;
+  tabID?: string;
+  tabType?: string;
+  tabSubType?: string;
+  editable?: boolean;
+  fieldName?: string;
+  collectionTreeRow?: unknown;
+  libraryType?: string;
   setL10nArgs: (args: unknown) => void;
   setEnabled: (enabled: boolean) => void;
   setVisible: (visible: boolean) => void;
@@ -159,12 +195,36 @@ export interface MenuData {
   icon?: string;
   darkIcon?: string;
   enableForTabTypes?: string[];
+  visible?: boolean;
+  disabled?: boolean;
+  enabled?: boolean;
   onShowing?: (event: Event, context: MenuContext) => void;
   onShown?: (event: Event, context: MenuContext) => void;
   onHiding?: (event: Event, context: MenuContext) => void;
   onHidden?: (event: Event, context: MenuContext) => void;
   onCommand?: (event: Event, context: MenuContext) => void;
   menus?: MenuData[];
+}
+
+export interface MenuStateResolverOptions {
+  prefs?: {
+    get: (key: string) => unknown;
+  };
+  preferenceKeys?: string[];
+  extraResolvers?: Array<(context: MenuContext, state: MenuResolvedState) => Record<string, unknown>>;
+}
+
+export interface StateDrivenMenuOptions {
+  id?: string;
+  target: string;
+  baseMenu: MenuData;
+  resolveState?: (context: MenuContext) => MenuResolvedState | Record<string, unknown>;
+  buildMenu?: (payload: {
+    state: MenuResolvedState | Record<string, unknown>;
+    context: MenuContext;
+    baseMenu: MenuData;
+    menuId: string;
+  }) => Partial<MenuData> | MenuData;
 }
 
 /**
@@ -211,6 +271,7 @@ export interface MenuManager {
     icon?: string;
     menus: MenuData[];
   }): string | null;
+  registerStateDrivenMenu(options: StateDrivenMenuOptions): string | null;
   registerSeparator(target: string, id?: string): string | null;
 
   // 注销方法
@@ -227,6 +288,7 @@ export interface MenuManager {
 }
 
 export function createMenuManager(options: MenuManagerOptions): MenuManager;
+export function createMenuStateResolver(options?: MenuStateResolverOptions): (context?: MenuContext) => MenuResolvedState;
 
 // ========== Item Pane ==========
 
@@ -255,7 +317,7 @@ export interface SectionOptions {
   onInit?: (props: { item?: unknown }) => void;
   onDestroy?: (props: unknown) => void;
   onItemChange?: (props: { item?: unknown; setEnabled: (enabled: boolean) => void }) => boolean | void;
-  onRender?: (props: {
+  onRender: (props: {
     doc: Document;
     body: HTMLElement;
     item?: unknown;
@@ -309,6 +371,20 @@ export interface ItemPane {
   getInfoRowCount(): number;
   hasSection(paneID: string): boolean;
   hasInfoRow(rowID: string): boolean;
+  resolveSectionPaneID(paneID: string): string | null;
+  getRegistrationSnapshot(): {
+    sections: Array<{
+      paneID: string;
+      registeredPaneID: string | null;
+      headerL10nID: string | null;
+      sidenavL10nID: string | null;
+    }>;
+    infoRows: Array<{
+      rowID: string;
+      registeredRowID: string | null;
+      labelL10nID: string | null;
+    }>;
+  };
 
   // 便捷工厂方法
   createSimpleSection(options: {
@@ -413,9 +489,25 @@ export interface CommandOptions {
   category?: string;
   description?: string;
   handler: (context?: unknown) => void;
-  condition?: () => boolean;
+  condition?: (context?: unknown) => boolean;
+  aliases?: string[];
+  keywords?: string[];
   shortcut?: string;
   icon?: string;
+}
+
+export interface CommandSnapshot {
+  id: string;
+  label: string;
+  category: string;
+  description: string;
+  shortcut: string | null;
+  icon: string | null;
+  aliases: string[];
+  keywords: string[];
+  enabled: boolean;
+  searchable: boolean;
+  type: string;
 }
 
 export interface CommandPalette {
@@ -427,6 +519,8 @@ export interface CommandPalette {
   getCommandCount(): number;
   hasCommand(commandId: string): boolean;
   getAllCommands(): Array<{ id: string; label: string; category: string }>;
+  getCommandSnapshot(commandId?: string | null, context?: unknown): CommandSnapshot[] | CommandSnapshot | null;
+  searchCommands(query: string, context?: unknown, options?: { includeDisabled?: boolean; limit?: number }): CommandSnapshot[];
   executeCommand(commandId: string, context?: unknown): boolean;
 }
 
@@ -484,10 +578,25 @@ export interface ReaderSummary {
   annotationCount: number;
 }
 
+export interface ReaderSelectionSnapshot {
+  hasSelection: boolean;
+  sourceKind: string;
+  text: string;
+  textLength: number;
+  tabID: string | null;
+  itemID: number | null;
+  readerType: string | null;
+  selectedAnnotationIDs: number[];
+  annotationCount: number;
+  uiState?: Record<string, unknown> | null;
+}
+
 export interface ReaderEvent {
   type?: string;
   doc?: Document | null;
   reader?: unknown;
+  params?: Record<string, unknown>;
+  append?: (...args: unknown[]) => void;
   [key: string]: unknown;
 }
 
@@ -543,17 +652,30 @@ export interface Reader {
   closeByItemID(itemID: number): boolean;
   getAnnotationIDs(identifier: string | number): number[];
   getReaderSummary(target?: unknown): ReaderSummary | null;
+  getSelectionSnapshot(source?: unknown, options?: {
+    maxTextLength?: number;
+    includeUIState?: boolean;
+    view?: "primary" | "secondary";
+  }): ReaderSelectionSnapshot | null;
   getReaderUIStateSnapshot(target?: unknown): Record<string, unknown> | null;
   getReaderInteractionSnapshot(target?: unknown): Record<string, unknown> | null;
   getActiveSummary(): ReaderSummary | null;
   waitForReaderReady(target: unknown, options?: { timeoutMs?: number; intervalMs?: number }): Promise<unknown | null>;
   setContextPaneOpen(target: unknown, open: boolean, options?: { timeoutMs?: number; intervalMs?: number }): Promise<Record<string, unknown> | null>;
-  selectSidebarView(target: unknown, view: string, options?: { timeoutMs?: number; intervalMs?: number }): Promise<{
+  selectSidebarView(target: unknown, view: string, options?: {
+    timeoutMs?: number;
+    intervalMs?: number;
+    activationPolicy?: "host-first" | "ui-required";
+  }): Promise<{
     view: string;
     uiState: Record<string, unknown> | null;
     button: Element | null;
     panel: Element | null;
     doc: Document | null;
+    activationPolicy?: "host-first" | "ui-required";
+    activationStrategy?: string | null;
+    actionElementObserved?: boolean;
+    actionDispatched?: boolean;
   } | null>;
   findToolbarElement(target: unknown, options?: { selector?: string; view?: "primary" | "secondary" }): Element | null;
   findSidebarViewElements(target: unknown, view: string, options?: { view?: "primary" | "secondary" }): {
@@ -592,6 +714,62 @@ export interface Reader {
 
 export function createReader(options?: ReaderOptions): Reader;
 
+export interface ReaderSelectionActionDescriptor {
+  id?: string;
+  label: string;
+  description?: string;
+  aliases?: string[];
+  keywords?: string[];
+  condition?: (context?: unknown) => boolean;
+  handler: (context?: unknown) => unknown | Promise<unknown>;
+}
+
+export interface ReaderSelectionActionSnapshot {
+  id: string;
+  label: string;
+  description: string;
+  aliases: string[];
+  keywords: string[];
+  enabled: boolean;
+  hasSelection: boolean;
+}
+
+export interface ReaderSelectionActionExecutionResult {
+  ok: boolean;
+  actionId: string | null;
+  selection: ReaderSelectionSnapshot | null;
+  result: unknown;
+  errorMessage: string | null;
+  skipped: boolean;
+}
+
+export interface ReaderSelectionActionsOptions {
+  logger?: Logger;
+  lifecycle?: LifecycleManager;
+  reader?: {
+    getSelectionSnapshot: (
+      source?: unknown,
+      options?: {
+        maxTextLength?: number;
+        includeUIState?: boolean;
+        view?: "primary" | "secondary";
+      }
+    ) => ReaderSelectionSnapshot | null;
+  } | null;
+}
+
+export interface ReaderSelectionActions {
+  registerAction(options: ReaderSelectionActionDescriptor): string | null;
+  unregisterAction(actionId: string): boolean;
+  unregisterAll(): void;
+  hasAction(actionId: string): boolean;
+  getActionCount(): number;
+  getActionSnapshot(actionId?: string | null, input?: unknown): ReaderSelectionActionSnapshot[] | ReaderSelectionActionSnapshot | null;
+  executeAction(actionId: string, input?: unknown): Promise<ReaderSelectionActionExecutionResult>;
+}
+
+export function createReaderSelectionActions(options?: ReaderSelectionActionsOptions): ReaderSelectionActions;
+
 // ========== Preference Panes ==========
 
 export interface PreferencePanesOptions {
@@ -600,6 +778,13 @@ export interface PreferencePanesOptions {
   pluginID: string;
   rootURI: string;
   zotero?: unknown;
+}
+
+export interface PreferencePaneLoadContext {
+  window: Window | null;
+  paneID: string;
+  pluginID: string;
+  resolveURI: (uri: string) => string;
 }
 
 export interface PreferencePaneOptions {
@@ -611,6 +796,9 @@ export interface PreferencePaneOptions {
   scripts?: string[];
   stylesheets?: string[];
   helpURL?: string;
+  onPreferenceLoad?: (
+    context: PreferencePaneLoadContext
+  ) => void | Promise<void>;
 }
 
 export interface PreferencePanes {

@@ -194,6 +194,7 @@ export function createCapabilityManifest({ config } = {}) {
       agentScenario: "host-actions",
       zoteroScenarios: [
         "preference pane surface smoke",
+        "preference pane control interaction",
         "library item pane surface smoke",
         "context pane surface smoke",
         "reader surface smoke",
@@ -212,6 +213,7 @@ export function createCapabilityManifest({ config } = {}) {
       successSignals: [
         "Host Action catalog returns source-driven descriptors",
         "runHostAction() returns preconditions / observedState / readiness / surfaceTarget / failureKind",
+        "Preference pane live control actions verify control state plus pref writeback",
         "surface smoke scenarios reuse Host Actions instead of one-off DOM probes",
       ],
     },
@@ -219,9 +221,12 @@ export function createCapabilityManifest({ config } = {}) {
       id: "settings-governance",
       label: "设置治理",
       category: "governance",
-      description: "验证 settings schema、校验与偏好设置面板暴露是否完整。",
+      description: "验证 settings schema、校验与偏好设置面板暴露/写回是否完整。",
       agentScenario: "settings-snapshot",
-      zoteroScenarios: ["settings schema and preference pane diagnostics"],
+      zoteroScenarios: [
+        "settings schema and preference pane diagnostics",
+        "preference pane control interaction",
+      ],
       entrypoints: [
         "plugin.api.settings.listDefinitions()",
         "plugin.api.settings.validate(key, value)",
@@ -233,8 +238,9 @@ export function createCapabilityManifest({ config } = {}) {
       ],
       successSignals: [
         "定义数量 >= 默认 prefs 数量",
-        "enabled/menuLabel/logLevel 的 schema 可读",
+        "enabled/menuLabel/logLevel/themeMode 的 schema 可读",
         "偏好设置面板已注册",
+        "live preference controls can write back menuLabel/logLevel/themeMode",
       ],
     },
     {

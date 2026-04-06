@@ -49,6 +49,14 @@
 - `mupdf-loader.mjs` 采用多路径加载策略（XHR/NetUtil/fetch）并做 wasm magic number 校验。
 - 具备初始化幂等（`_initPromise`）、显式 `dispose()`、内存释放说明，属于较成熟的“重资源组件管理模式”。
 
+### 2.6 右侧栏贴边占位策略
+
+- bundle 可见一套基于 live sidebar 几何的容器占位逻辑。
+- 其做法不是写死固定侧栏宽度，而是先读取当前 `#zotero-item-pane` / `#zotero-context-pane` 的实际 `getBoundingClientRect()`。
+- 在 context pane 且 stacked 布局下，会继续下探到 `#zotero-context-pane-inner`，优先按真正可用的 inner bounds 占位；找不到 inner 时再回退到外层 sidebar bounds。
+- 当侧栏宽高过窄时，会直接跳过显示或先把宿主侧栏扩到最小阈值，再重新计算容器位置与尺寸。
+- 同时会在 tab 切换后重绑 sidebar observer，持续跟踪 `item pane` / `context pane` 之间 DOM 宿主变化。
+
 ## 3. 与当前模板的对照
 
 当前项目（`addon-static/bootstrap.js -> src/main.js -> src/app/plugin.js`）已经具备：
@@ -79,6 +87,10 @@
 3. 重资源加载器设计
 - 模式：幂等初始化、多路加载、完整校验、可释放。
 - 价值：可直接迁移到未来 PDF/向量索引/模型运行时等高成本模块。
+
+4. 贴边式 surface 的 live geometry 占位
+- 模式：先读宿主右侧栏或 context pane 的真实几何，再决定容器宽高、位置与最小可显示阈值。
+- 价值：很适合模板后续补“贴边模式”或宿主内嵌 panel 的细节打磨，避免固定宽度在 stacked layout、窄栏或 tab 切换下漂移。
 
 ### 4.2 中借鉴价值（需改造后吸收）
 
@@ -116,7 +128,7 @@
 因此对本项目最合理的路线是：
 
 - 继续保持当前模块化 + agent 可观测闭环主线；
-- 在不破坏 clean-room 和可测试性的前提下，吸收 BibGenie 的“服务治理”经验。
+- 在不破坏 clean-room 和可测试性的前提下，吸收 BibGenie 的“服务治理 + 贴边占位几何治理”经验。
 
 ## 6. 推荐落地项（面向当前仓库）
 
@@ -137,6 +149,12 @@
 
 3. 扩展重资源模板
 - 抽象 `resource-loader` 约定：`init/dispose/status`，复用于后续高成本模块。
+
+4. 为贴边式 surface 补几何占位 contract
+- 固定先读取 live `sidebarWidth/sidebarHeight` 与当前 pane bounds，再决定容器宽高。
+- stacked context pane 优先按 inner pane bounds 占位，避免把外层侧栏空白也算进内容宽度。
+- 设定最小可显示阈值；过窄时优先降级或延后显示，而不是硬塞固定宽度。
+- tab / pane 切换后重绑 observer，避免继续盯旧 DOM。
 
 ### P1（与 agent 闭环联动）
 

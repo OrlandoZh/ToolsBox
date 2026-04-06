@@ -1,15 +1,29 @@
 const LOG_LEVEL_OPTIONS = ["debug", "info", "warn", "error"];
+const THEME_MODE_OPTIONS = ["follow-host", "light", "dark"];
+
+function normalizeThemeModeSetting(value, fallback = "follow-host") {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "auto") {
+    return "follow-host";
+  }
+  if (THEME_MODE_OPTIONS.includes(normalized)) {
+    return normalized;
+  }
+  return fallback;
+}
 
 const PRESET_GROUP_BY_KEY = {
   enabled: "core",
   logLevel: "core",
   menuLabel: "ui",
+  themeMode: "ui",
 };
 
 const PRESET_DESCRIPTION_BY_KEY = {
   enabled: "控制插件功能是否启用。",
   logLevel: "控制插件日志级别。",
   menuLabel: "覆盖默认菜单文案。",
+  themeMode: "控制插件显示界面的主题模式（follow-host/light/dark）。",
 };
 
 function inferSettingType(value) {
@@ -70,6 +84,14 @@ function normalizeDefinition(input, fallbackDefaultValue) {
   if (key === "logLevel" && !definition.allowedValues) {
     definition.allowedValues = LOG_LEVEL_OPTIONS.slice();
   }
+  if (key === "themeMode" && !definition.allowedValues) {
+    definition.allowedValues = THEME_MODE_OPTIONS.slice();
+  }
+  if (key === "themeMode" && typeof definition.normalize !== "function") {
+    definition.normalize = (value) => {
+      return normalizeThemeModeSetting(value, normalizeThemeModeSetting(definition.defaultValue));
+    };
+  }
 
   return definition;
 }
@@ -100,4 +122,4 @@ export function createSettingsSchema({ defaultPrefs = {}, overrides = [] } = {})
   });
 }
 
-export { LOG_LEVEL_OPTIONS };
+export { LOG_LEVEL_OPTIONS, THEME_MODE_OPTIONS, normalizeThemeModeSetting };

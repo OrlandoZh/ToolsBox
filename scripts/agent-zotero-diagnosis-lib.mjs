@@ -419,6 +419,33 @@ const DIAGNOSIS_RULES = [
         ],
       },
       {
+        key: "item-pane-info-row-ftl-structure-drift",
+        severity: "medium",
+        confidence: 0.92,
+        summary: "ItemPane InfoRow 的 FTL 结构发生漂移。",
+        patterns: [
+          "ftl key cleanroom-item-pane-info-row-label 结构漂移",
+        ],
+      },
+      {
+        key: "item-pane-section-header-ftl-structure-drift",
+        severity: "medium",
+        confidence: 0.92,
+        summary: "ItemPane Section Header 的 FTL 结构发生漂移。",
+        patterns: [
+          "ftl key cleanroom-item-pane-section-header 结构漂移",
+        ],
+      },
+      {
+        key: "item-pane-section-sidenav-ftl-structure-drift",
+        severity: "medium",
+        confidence: 0.92,
+        summary: "ItemPane Section Sidenav 的 FTL 结构发生漂移。",
+        patterns: [
+          "ftl key cleanroom-item-pane-section-sidenav 结构漂移",
+        ],
+      },
+      {
         key: "item-pane-info-row-ftl-value-drift",
         severity: "medium",
         confidence: 0.91,

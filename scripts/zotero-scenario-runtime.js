@@ -1,7 +1,40 @@
-function createErrorPayload(error) {
+var SCENARIO_RUNTIME_STATE_KEY = "__CLEANROOM_ZOTERO_SCENARIO_RUNTIME__";
+
+function createScenarioError(message, options = {}) {
+  const error = new Error(String(message || "Scenario failed"));
+  error.cleanroomScenarioErrorKind = String(options.kind || "").trim() || "scenario-execution-failed";
+  error.cleanroomScenarioPhase = String(options.phase || "").trim() || "scenario";
+  error.cleanroomScenarioStep = String(options.step || "").trim() || "run";
+  if (options.scenarioName) {
+    error.cleanroomScenarioName = String(options.scenarioName);
+  }
+  return error;
+}
+
+function createErrorPayload(error, fallback = {}) {
   return {
     message: error && error.message ? String(error.message) : String(error),
     stack: error && error.stack ? String(error.stack) : "",
+    kind: String(
+      error?.cleanroomScenarioErrorKind
+      || fallback.kind
+      || "scenario-execution-failed",
+    ).trim(),
+    phase: String(
+      error?.cleanroomScenarioPhase
+      || fallback.phase
+      || "scenario",
+    ).trim(),
+    step: String(
+      error?.cleanroomScenarioStep
+      || fallback.step
+      || "run",
+    ).trim(),
+    scenarioName: String(
+      error?.cleanroomScenarioName
+      || fallback.scenarioName
+      || "",
+    ).trim() || null,
   };
 }
 
@@ -9,17 +42,29 @@ function createAssert() {
   return {
     equal(actual, expected, message) {
       if (actual !== expected) {
-        throw new Error(message || `Expected ${expected}, got ${actual}`);
+        throw createScenarioError(message || `Expected ${expected}, got ${actual}`, {
+          kind: "scenario-assertion-failed",
+          phase: "assert",
+          step: "assert.equal",
+        });
       }
     },
     ok(value, message) {
       if (!value) {
-        throw new Error(message || "Expected truthy value");
+        throw createScenarioError(message || "Expected truthy value", {
+          kind: "scenario-assertion-failed",
+          phase: "assert",
+          step: "assert.ok",
+        });
       }
     },
     notOk(value, message) {
       if (value) {
-        throw new Error(message || "Expected falsy value");
+        throw createScenarioError(message || "Expected falsy value", {
+          kind: "scenario-assertion-failed",
+          phase: "assert",
+          step: "assert.notOk",
+        });
       }
     },
     includes(haystack, needle, message) {
@@ -29,16 +74,71 @@ function createAssert() {
           ? haystack.includes(needle)
           : haystack && needle in haystack;
       if (!contains) {
-        throw new Error(message || `Expected ${JSON.stringify(haystack)} to include ${JSON.stringify(needle)}`);
+        throw createScenarioError(
+          message || `Expected ${JSON.stringify(haystack)} to include ${JSON.stringify(needle)}`,
+          {
+            kind: "scenario-assertion-failed",
+            phase: "assert",
+            step: "assert.includes",
+          },
+        );
       }
     },
     deepEqual(actual, expected, message) {
       const actualText = JSON.stringify(actual);
       const expectedText = JSON.stringify(expected);
       if (actualText !== expectedText) {
-        throw new Error(message || `Expected ${expectedText}, got ${actualText}`);
+        throw createScenarioError(message || `Expected ${expectedText}, got ${actualText}`, {
+          kind: "scenario-assertion-failed",
+          phase: "assert",
+          step: "assert.deepEqual",
+        });
       }
     },
+  };
+}
+
+function createScenarioRuntimeState() {
+  return {
+    addonConfig: null,
+    scenarios: [],
+    scenarioMap: new Map(),
+    registeredScenarios: [],
+    execution: {
+      registeredScenarioNames: [],
+      selectedScenarioNames: [],
+      currentScenario: null,
+      lastStartedScenario: null,
+      lastCompletedScenario: null,
+      completedCount: 0,
+      failedCount: 0,
+      lastErrorKind: null,
+    },
+  };
+}
+
+function getScenarioRuntimeState({ create = false } = {}) {
+  if (!globalThis[SCENARIO_RUNTIME_STATE_KEY] && create) {
+    globalThis[SCENARIO_RUNTIME_STATE_KEY] = createScenarioRuntimeState();
+  }
+  return globalThis[SCENARIO_RUNTIME_STATE_KEY] || null;
+}
+
+function snapshotScenarioExecution(execution) {
+  const state = execution && typeof execution === "object" ? execution : {};
+  return {
+    registeredScenarioNames: Array.isArray(state.registeredScenarioNames)
+      ? state.registeredScenarioNames.slice()
+      : [],
+    selectedScenarioNames: Array.isArray(state.selectedScenarioNames)
+      ? state.selectedScenarioNames.slice()
+      : [],
+    currentScenario: typeof state.currentScenario === "string" ? state.currentScenario : null,
+    lastStartedScenario: typeof state.lastStartedScenario === "string" ? state.lastStartedScenario : null,
+    lastCompletedScenario: typeof state.lastCompletedScenario === "string" ? state.lastCompletedScenario : null,
+    completedCount: Number(state.completedCount || 0),
+    failedCount: Number(state.failedCount || 0),
+    lastErrorKind: typeof state.lastErrorKind === "string" ? state.lastErrorKind : null,
   };
 }
 
@@ -106,6 +206,35 @@ ${xrefOffset}
 `;
 
   return new TextEncoder().encode(pdf);
+}
+
+function resetScenarioReaderEnvironment(plugin) {
+  if (!plugin?.api?.reader) {
+    return;
+  }
+
+  try {
+    if (typeof plugin.api.reader.unregisterAllEventListeners === "function") {
+      plugin.api.reader.unregisterAllEventListeners();
+    }
+  }
+  catch {}
+
+  const readers = typeof plugin.api.reader.getAllReaders === "function"
+    ? plugin.api.reader.getAllReaders()
+    : [];
+  if (!Array.isArray(readers)) {
+    return;
+  }
+
+  readers.forEach((reader) => {
+    try {
+      if (typeof reader?.close === "function") {
+        reader.close();
+      }
+    }
+    catch {}
+  });
 }
 
 function createScenarioHelpers(baseContext) {
@@ -180,8 +309,13 @@ function createScenarioHelpers(baseContext) {
     }
 
     if (errors.length > 0) {
-      throw new Error(
+      throw createScenarioError(
         `Scenario cleanup failed: ${errors.map((error) => error?.message || String(error)).join("; ")}`,
+        {
+          kind: "scenario-cleanup-failed",
+          phase: "cleanup",
+          step: "cleanup",
+        },
       );
     }
   }
@@ -246,7 +380,11 @@ function createScenarioHelpers(baseContext) {
       await wait(intervalMs);
     }
 
-    throw new Error(options.message || "Timed out waiting for condition");
+    throw createScenarioError(options.message || "Timed out waiting for condition", {
+      kind: "scenario-helper-timeout",
+      phase: options.phase || "helper",
+      step: options.step || "waitFor",
+    });
   }
 
   async function createItem(options = {}) {
@@ -425,14 +563,35 @@ function createScenarioHelpers(baseContext) {
       throw new Error(`Unable to open reader for item #${itemID}`);
     }
 
-    if (reader._initPromise && typeof reader._initPromise.then === "function") {
-      await reader._initPromise;
+    if (typeof plugin.api.reader.waitForReaderReady === "function") {
+      await plugin.api.reader.waitForReaderReady(reader, {
+        timeoutMs: options.timeoutMs ?? 8000,
+        intervalMs: 50,
+      });
     }
 
-    const primaryViewPromise = reader._internalReader?._primaryView?.initializedPromise;
-    if (primaryViewPromise && typeof primaryViewPromise.then === "function") {
-      await primaryViewPromise;
-    }
+    const { frameWindow } = await getReaderFrameWindow(reader, {
+      timeoutMs: options.timeoutMs ?? 8000,
+      intervalMs: 50,
+    });
+
+    await waitFor(
+      () => frameWindow?.document?.readyState === "complete"
+        ? true
+        : null,
+      {
+        timeoutMs: options.timeoutMs ?? 8000,
+        intervalMs: 50,
+        message: `Timed out waiting for reader document readiness for item #${itemID}`,
+      },
+    );
+
+    await new Promise((resolve) => {
+      const raf = typeof frameWindow?.requestAnimationFrame === "function"
+        ? frameWindow.requestAnimationFrame.bind(frameWindow)
+        : (callback) => setTimeout(callback, 0);
+      raf(() => raf(resolve));
+    });
 
     await waitFor(
       () => plugin.api.reader.getReaderSummary(itemID),
@@ -560,25 +719,26 @@ function createScenarioHelpers(baseContext) {
     const params = options.params && typeof options.params === "object"
       ? JSON.parse(JSON.stringify(options.params))
       : {};
-    const detail = {
-      type: eventType,
-      params,
-      append,
-    };
+    const useCustomEventDispatch = options.includeDoc !== false;
 
-    if (options.includeDoc !== false) {
-      detail.doc = frameWindow.document;
+    if (useCustomEventDispatch) {
+      const detail = {
+        type: eventType,
+        params,
+        append,
+        doc: frameWindow.document,
+      };
+
+      const event = new frameWindow.CustomEvent("customEvent", {
+        detail: cloneIntoFrameWindow(frameWindow, detail),
+      });
+      frameWindow.dispatchEvent(event);
     }
 
-    const event = new frameWindow.CustomEvent("customEvent", {
-      detail: cloneIntoFrameWindow(frameWindow, detail),
-    });
-    frameWindow.dispatchEvent(event);
-
-    let dispatchMode = "customEvent";
+    let dispatchMode = useCustomEventDispatch ? "customEvent" : null;
     let syntheticFallback = null;
     if (
-      appendedGroups.length === 0
+      (!useCustomEventDispatch || appendedGroups.length === 0)
       && plugin?.api?.reader
       && typeof plugin.api.reader.dispatchSyntheticEvent === "function"
     ) {
@@ -704,17 +864,29 @@ function createScenarioHelpers(baseContext) {
   };
 }
 
-async function runScenarioCase(scenario, baseContext) {
+async function runScenarioCase(scenario, baseContext, runtimeState) {
   const startedAt = Date.now();
   const runtime = createScenarioHelpers(baseContext);
   const scenarioContext = {
     ...baseContext,
     helpers: runtime.helpers,
   };
+  const execution = runtimeState?.execution;
+  if (execution) {
+    execution.currentScenario = scenario.name;
+    execution.lastStartedScenario = scenario.name;
+  }
 
   try {
+    resetScenarioReaderEnvironment(baseContext.plugin);
     const details = await scenario.run(scenarioContext);
     await runtime.cleanup();
+    if (execution) {
+      execution.currentScenario = null;
+      execution.lastCompletedScenario = scenario.name;
+      execution.completedCount += 1;
+      execution.lastErrorKind = null;
+    }
     return {
       name: scenario.name,
       status: "passed",
@@ -727,37 +899,79 @@ async function runScenarioCase(scenario, baseContext) {
       await runtime.cleanup();
     }
     catch (cleanupError) {
+      const cleanupFailure = createScenarioError(
+        `${error?.message || error}; cleanup failed: ${cleanupError?.message || cleanupError}`,
+        {
+          kind: "scenario-cleanup-failed",
+          phase: "cleanup",
+          step: "cleanup",
+          scenarioName: scenario.name,
+        },
+      );
+      if (execution) {
+        execution.currentScenario = null;
+        execution.lastCompletedScenario = scenario.name;
+        execution.completedCount += 1;
+        execution.failedCount += 1;
+        execution.lastErrorKind = cleanupFailure.cleanroomScenarioErrorKind;
+      }
       return {
         name: scenario.name,
         status: "failed",
         durationMs: Date.now() - startedAt,
-        error: createErrorPayload(
-          new Error(
-            `${error?.message || error}; cleanup failed: ${cleanupError?.message || cleanupError}`,
-          ),
-        ),
+        error: createErrorPayload(cleanupFailure, {
+          scenarioName: scenario.name,
+        }),
       };
     }
 
+    if (execution) {
+      execution.currentScenario = null;
+      execution.lastCompletedScenario = scenario.name;
+      execution.completedCount += 1;
+      execution.failedCount += 1;
+      execution.lastErrorKind = String(error?.cleanroomScenarioErrorKind || "scenario-execution-failed");
+    }
     return {
       name: scenario.name,
       status: "failed",
       durationMs: Date.now() - startedAt,
-      error: createErrorPayload(error),
+      error: createErrorPayload(error, {
+        scenarioName: scenario.name,
+      }),
     };
   }
 }
 
-this.runCleanroomZoteroScenarios = async function runCleanroomZoteroScenarios(options) {
-  const scenarios = [];
+this.loadCleanroomZoteroScenarios = async function loadCleanroomZoteroScenarios(options) {
+  const runtimeState = createScenarioRuntimeState();
+  runtimeState.addonConfig = options.addonConfig;
   const registerZoteroScenario = function registerZoteroScenario(name, run) {
-    if (typeof name !== "string" || !name) {
+    const normalizedName = typeof name === "string" ? name.trim() : "";
+    if (!normalizedName) {
       throw new Error("registerZoteroScenario(name, run) requires a non-empty name");
     }
     if (typeof run !== "function") {
-      throw new Error(`Scenario '${name}' must provide a function`);
+      throw new Error(`Scenario '${normalizedName}' must provide a function`);
     }
-    scenarios.push({ name, run });
+    if (runtimeState.scenarioMap.has(normalizedName)) {
+      throw new Error(`Duplicate Zotero scenario registered: ${normalizedName}`);
+    }
+
+    const sourceFileHref = typeof scope.__CLEANROOM_CURRENT_SCENARIO_FILE__ === "string"
+      ? scope.__CLEANROOM_CURRENT_SCENARIO_FILE__
+      : null;
+    const scenario = {
+      name: normalizedName,
+      run,
+      sourceFileHref,
+    };
+    runtimeState.scenarios.push(scenario);
+    runtimeState.scenarioMap.set(normalizedName, scenario);
+    runtimeState.registeredScenarios.push({
+      name: normalizedName,
+      sourceFileHref,
+    });
   };
 
   const scope = {
@@ -767,34 +981,91 @@ this.runCleanroomZoteroScenarios = async function runCleanroomZoteroScenarios(op
     console,
     addonConfig: options.addonConfig,
     registerZoteroScenario,
+    __CLEANROOM_CURRENT_SCENARIO_FILE__: null,
   };
 
   for (const fileHref of options.fileHrefs) {
+    scope.__CLEANROOM_CURRENT_SCENARIO_FILE__ = fileHref;
     Services.scriptloader.loadSubScript(fileHref, scope);
   }
+
+  runtimeState.execution.registeredScenarioNames = runtimeState.registeredScenarios.map((entry) => entry.name);
+  globalThis[SCENARIO_RUNTIME_STATE_KEY] = runtimeState;
+
+  return JSON.stringify({
+    registeredScenarios: runtimeState.registeredScenarios,
+    execution: snapshotScenarioExecution(runtimeState.execution),
+  });
+};
+
+this.runCleanroomZoteroScenarioByName = async function runCleanroomZoteroScenarioByName(options) {
+  const runtimeState = getScenarioRuntimeState();
+  if (!runtimeState) {
+    throw new Error("Zotero scenario runtime has not been initialized");
+  }
+
+  const scenarioName = typeof options?.name === "string" ? options.name.trim() : "";
+  if (!scenarioName) {
+    throw new Error("runCleanroomZoteroScenarioByName(name) requires a non-empty scenario name");
+  }
+
+  const scenario = runtimeState.scenarioMap.get(scenarioName);
+  if (!scenario) {
+    throw new Error(`Unknown Zotero scenario: ${scenarioName}`);
+  }
+
+  runtimeState.execution.selectedScenarioNames = Array.isArray(options?.selectedScenarioNames)
+    ? options.selectedScenarioNames
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
+    : [scenarioName];
 
   const context = {
     assert: createAssert(),
     Zotero,
     Services,
     ChromeUtils,
-    addonConfig: options.addonConfig,
-    plugin: Zotero[options.addonConfig.instanceKey],
+    addonConfig: runtimeState.addonConfig,
+    plugin: Zotero[runtimeState.addonConfig.instanceKey],
   };
 
+  const result = await runScenarioCase(scenario, context, runtimeState);
+  return JSON.stringify({
+    result,
+    execution: snapshotScenarioExecution(runtimeState.execution),
+  });
+};
+
+this.listCleanroomZoteroScenarios = function listCleanroomZoteroScenarios() {
+  const runtimeState = getScenarioRuntimeState();
+  return JSON.stringify({
+    registeredScenarios: Array.isArray(runtimeState?.registeredScenarios)
+      ? runtimeState.registeredScenarios
+      : [],
+    execution: snapshotScenarioExecution(runtimeState?.execution),
+  });
+};
+
+this.runCleanroomZoteroScenarios = async function runCleanroomZoteroScenarios(options) {
+  await this.loadCleanroomZoteroScenarios(options);
+  const runtimeState = getScenarioRuntimeState();
   const results = [];
-  for (const scenario of scenarios) {
-    results.push(await runScenarioCase(scenario, context));
+
+  for (const scenario of runtimeState.scenarios) {
+    const payload = JSON.parse(await this.runCleanroomZoteroScenarioByName({
+      name: scenario.name,
+      selectedScenarioNames: runtimeState.scenarios.map((entry) => entry.name),
+    }));
+    results.push(payload.result);
   }
 
-  const summary = {
-    total: results.length,
-    passed: results.filter((result) => result.status === "passed").length,
-    failed: results.filter((result) => result.status === "failed").length,
-  };
-
   return JSON.stringify({
-    summary,
+    summary: {
+      total: runtimeState.scenarios.length,
+      passed: results.filter((result) => result.status === "passed").length,
+      failed: results.filter((result) => result.status === "failed").length,
+    },
     results,
+    execution: snapshotScenarioExecution(runtimeState.execution),
   });
 };

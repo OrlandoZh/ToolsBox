@@ -18,6 +18,7 @@ describe("Agent Zotero Capture Window Lib", () => {
       height: 600,
       title: "My Library",
       source: "chrome-target",
+      windowNumber: "431",
     });
 
     assert.deepEqual(bounds, {
@@ -27,6 +28,7 @@ describe("Agent Zotero Capture Window Lib", () => {
       height: 600,
       title: "My Library",
       source: "chrome-target",
+      windowNumber: 431,
     });
   });
 
@@ -255,7 +257,7 @@ describe("Agent Zotero Capture Window Lib", () => {
     assert.ok(String(result.summary || "").includes("reader 超时"));
   });
 
-  it("should treat reader snapshots without matching window state as not ready", async () => {
+  it("should treat reader snapshots without matching window state or selected-tab evidence as not ready", async () => {
     const result = await waitForVisualStageSettled({
       stage: "reader",
       stableSampleTarget: 2,
@@ -269,6 +271,7 @@ describe("Agent Zotero Capture Window Lib", () => {
           tabID: "reader-tab",
           annotationCount: 0,
           active: true,
+          selectedTabMatched: false,
           hasMatchingWindowState: false,
           sidebarView: "annotations",
         },
@@ -278,10 +281,39 @@ describe("Agent Zotero Capture Window Lib", () => {
     assert.equal(result.settled, false);
     assert.equal(result.timedOut, true);
     assert.equal(result.consecutiveStableSamples, 0);
+    assert.ok(String(result.snapshotSummary || "").includes("selected false"));
     assert.ok(String(result.snapshotSummary || "").includes("window false"));
   });
 
-  it("should mark ready reader settle snapshots only when the matching window is active", () => {
+  it("should settle reader snapshots when selected-tab evidence confirms the active reader", async () => {
+    const result = await waitForVisualStageSettled({
+      stage: "reader",
+      stableSampleTarget: 2,
+      maxPolls: 3,
+      intervalMs: 0,
+      sleep: async () => {},
+      sample: async () => ({
+        settleSnapshot: {
+          stage: "reader",
+          itemID: 402,
+          tabID: "reader-tab",
+          selectedTabID: "reader-tab",
+          selectedTabMatched: true,
+          annotationCount: 0,
+          active: true,
+          hasMatchingWindowState: false,
+          sidebarView: "annotations",
+        },
+      }),
+    });
+
+    assert.equal(result.settled, true);
+    assert.equal(result.timedOut, false);
+    assert.equal(result.snapshot?.selectedTabMatched, true);
+    assert.ok(String(result.snapshotSummary || "").includes("selected true"));
+  });
+
+  it("should mark ready reader settle snapshots when either matching window or selected-tab evidence is active", () => {
     assert.equal(isVisualStageSettleSnapshotReady({
       stage: "reader",
       itemID: 301,
@@ -294,6 +326,15 @@ describe("Agent Zotero Capture Window Lib", () => {
       itemID: 301,
       tabID: "reader-tab",
       active: true,
+      selectedTabMatched: true,
+      hasMatchingWindowState: false,
+    }), true);
+    assert.equal(isVisualStageSettleSnapshotReady({
+      stage: "reader",
+      itemID: 301,
+      tabID: "reader-tab",
+      active: true,
+      selectedTabMatched: false,
       hasMatchingWindowState: false,
     }), false);
   });
@@ -305,12 +346,14 @@ describe("Agent Zotero Capture Window Lib", () => {
       tabID: "reader-tab",
       annotationCount: 2,
       active: true,
+      selectedTabMatched: true,
       hasMatchingWindowState: true,
       sidebarView: "annotations",
     });
 
     assert.ok(String(summary).includes("item#301"));
     assert.ok(String(summary).includes("tab reader-tab"));
+    assert.ok(String(summary).includes("selected true"));
     assert.ok(String(summary).includes("sidebar annotations"));
   });
 });

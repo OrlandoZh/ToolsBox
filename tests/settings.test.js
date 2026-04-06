@@ -69,14 +69,31 @@ describe("Settings", () => {
         enabled: true,
         menuLabel: "",
         logLevel: "info",
+        themeMode: "follow-host",
       },
     });
 
     const definitions = settings.listDefinitions();
-    assert.equal(definitions.length, 3);
+    assert.equal(definitions.length, 4);
     assert.equal(settings.getDefinition("enabled").group, "core");
     assert.equal(settings.getDefinition("menuLabel").group, "ui");
     assert.equal(settings.getDefinition("logLevel").type, "string");
+    assert.deepEqual(settings.getDefinition("themeMode").allowedValues, ["follow-host", "light", "dark"]);
+  });
+
+  it("should normalize legacy auto theme mode to follow-host during ensureDefaults", () => {
+    prefValues.set("test.themeMode", "auto");
+
+    const settings = createSettingsSystem({
+      prefBranch: "test",
+      defaultPrefs: {
+        themeMode: "follow-host",
+      },
+    });
+
+    settings.ensureDefaults();
+    assert.equal(prefValues.get("test.themeMode"), "follow-host");
+    assert.equal(settings.get("themeMode"), "follow-host");
   });
 
   it("should validate enum setting values", () => {

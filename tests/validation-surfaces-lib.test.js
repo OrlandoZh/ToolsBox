@@ -22,6 +22,14 @@ describe("Validation Surfaces Lib", () => {
     assert.ok(registry.surfaces.some((entry) => entry.id === "reader-sidebar-view"));
     assert.deepEqual(registry.surfaces.find((entry) => entry.id === "preference-pane")?.hostSemanticDomains, ["preference-panes"]);
     assert.deepEqual(registry.surfaces.find((entry) => entry.id === "render-toolbar")?.hostSemanticDomains, ["reader-events"]);
+    assert.ok(
+      registry.surfaces.find((entry) => entry.id === "context-pane")?.requiredHostAssertions
+        ?.some((entry) => entry.includes("live pane bounds")),
+    );
+    assert.ok(
+      registry.surfaces.find((entry) => entry.id === "reader-sidebar-view")?.requiredHostAssertions
+        ?.some((entry) => entry.includes("live sidebar bounds")),
+    );
   });
 
   it("should load the current project mirror in active state", () => {

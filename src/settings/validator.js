@@ -28,7 +28,9 @@ function normalizeNumber(value) {
 }
 
 function validateString(definition, value) {
-  const normalized = String(value ?? "");
+  const normalized = typeof definition?.normalize === "function"
+    ? String(definition.normalize(value))
+    : String(value ?? "");
   if (Array.isArray(definition.allowedValues) && definition.allowedValues.length > 0) {
     if (!definition.allowedValues.includes(normalized)) {
       return {

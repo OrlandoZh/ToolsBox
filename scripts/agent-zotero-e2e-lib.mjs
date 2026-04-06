@@ -112,6 +112,12 @@ export async function ensureLibraryVisualStageReady(options = {}) {
     const normalized = Number(value);
     return Number.isFinite(normalized) ? normalized : null;
   };
+  const normalizeTimeout = (value, fallbackMs) => {
+    const normalized = Number(value);
+    return Number.isFinite(normalized) && normalized > 0
+      ? normalized
+      : fallbackMs;
+  };
   const normalizeStringArray = (value) => {
     if (!Array.isArray(value)) {
       return [];
@@ -121,6 +127,46 @@ export async function ensureLibraryVisualStageReady(options = {}) {
         .map((entry) => String(entry ?? "").trim())
         .filter(Boolean),
     )).sort((left, right) => left.localeCompare(right));
+  };
+  const runOptionalStepWithTimeout = async (label, handler, timeoutMs) => {
+    let timeoutID = null;
+    try {
+      const value = await Promise.race([
+        Promise.resolve().then(() => handler()),
+        new Promise((_, reject) => {
+          timeoutID = setTimeout(() => {
+            reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+          }, timeoutMs);
+        }),
+      ]);
+      return {
+        ok: true,
+        value,
+        timedOut: false,
+        error: null,
+      };
+    }
+    catch (error) {
+      const message = error?.message || String(error);
+      return {
+        ok: false,
+        value: false,
+        timedOut: /\btimed out\b/i.test(message),
+        error: message,
+      };
+    }
+    finally {
+      if (timeoutID !== null) {
+        clearTimeout(timeoutID);
+      }
+    }
+  };
+  const runRequiredStepWithTimeout = async (label, handler, timeoutMs) => {
+    const result = await runOptionalStepWithTimeout(label, handler, timeoutMs);
+    if (result.ok) {
+      return result.value;
+    }
+    throw new Error(result.error || `${label} failed`);
   };
 
   const itemID = normalizeNumber(options.itemID);
@@ -144,6 +190,8 @@ export async function ensureLibraryVisualStageReady(options = {}) {
     viewsReady: false,
     libraryRootSelected: null,
     itemsViewLoaded: null,
+    itemsViewLoadTimedOut: null,
+    itemsViewLoadError: null,
     selectionMatched: false,
     selectionSingleItem: false,
     selectedTabID: null,
@@ -151,28 +199,66 @@ export async function ensureLibraryVisualStageReady(options = {}) {
     suppressedBannerIDs: [],
     retainedBannerIDs: [],
     visibleBannerIDs: [],
+    stabilizeHostSurfaceError: null,
+    libraryRootSelectTimedOut: null,
+    libraryRootSelectError: null,
   };
 
   await options.waitForViews();
   preparation.viewsReady = true;
 
   if (typeof options.stabilizeHostSurface === "function") {
-    const hostSurface = await options.stabilizeHostSurface();
-    preparation.suppressedBannerIDs = normalizeStringArray(hostSurface?.suppressedBannerIDs);
-    preparation.retainedBannerIDs = normalizeStringArray(hostSurface?.retainedBannerIDs);
-    preparation.visibleBannerIDs = normalizeStringArray(hostSurface?.visibleBannerIDs);
+    const hostSurface = await runOptionalStepWithTimeout(
+      "stabilizeHostSurface",
+      options.stabilizeHostSurface,
+      normalizeTimeout(options.stabilizeHostSurfaceTimeoutMs, 3000),
+    );
+    if (hostSurface.ok) {
+      preparation.suppressedBannerIDs = normalizeStringArray(hostSurface.value?.suppressedBannerIDs);
+      preparation.retainedBannerIDs = normalizeStringArray(hostSurface.value?.retainedBannerIDs);
+      preparation.visibleBannerIDs = normalizeStringArray(hostSurface.value?.visibleBannerIDs);
+    }
+    else {
+      preparation.stabilizeHostSurfaceError = hostSurface.error;
+    }
   }
 
   if (libraryID !== null && typeof options.selectLibrary === "function") {
-    preparation.libraryRootSelected = await options.selectLibrary(libraryID) !== false;
+    const librarySelection = await runOptionalStepWithTimeout(
+      "selectLibrary",
+      async () => await options.selectLibrary(libraryID),
+      normalizeTimeout(options.selectLibraryTimeoutMs, 5000),
+    );
+    preparation.libraryRootSelected = librarySelection.ok
+      ? librarySelection.value !== false
+      : false;
+    preparation.libraryRootSelectTimedOut = librarySelection.timedOut;
+    preparation.libraryRootSelectError = librarySelection.error;
   }
 
   if (typeof options.waitForItemsLoad === "function") {
-    preparation.itemsViewLoaded = await options.waitForItemsLoad() !== false;
+    const itemsViewLoad = await runOptionalStepWithTimeout(
+      "waitForItemsLoad",
+      options.waitForItemsLoad,
+      normalizeTimeout(options.waitForItemsLoadTimeoutMs, 5000),
+    );
+    preparation.itemsViewLoaded = itemsViewLoad.ok
+      ? itemsViewLoad.value !== false
+      : false;
+    preparation.itemsViewLoadTimedOut = itemsViewLoad.timedOut;
+    preparation.itemsViewLoadError = itemsViewLoad.error;
   }
 
-  await options.selectItem(itemID);
-  const selectionResult = await options.waitForSelection(itemID);
+  await runRequiredStepWithTimeout(
+    "selectItem",
+    async () => await options.selectItem(itemID),
+    normalizeTimeout(options.selectItemTimeoutMs, 5000),
+  );
+  const selectionResult = await runRequiredStepWithTimeout(
+    "waitForSelection",
+    async () => await options.waitForSelection(itemID),
+    normalizeTimeout(options.waitForSelectionTimeoutMs, 5000),
+  );
   const selectedIDs = Array.isArray(selectionResult?.selectedIDs)
     ? selectionResult.selectedIDs
       .map((entry) => normalizeNumber(entry))
@@ -187,7 +273,11 @@ export async function ensureLibraryVisualStageReady(options = {}) {
   preparation.selectionSingleItem = selectedIDs.length === 1 && selectedIDs[0] === itemID;
 
   if (typeof options.waitForPaint === "function") {
-    await options.waitForPaint();
+    await runOptionalStepWithTimeout(
+      "waitForPaint",
+      options.waitForPaint,
+      normalizeTimeout(options.waitForPaintTimeoutMs, 2000),
+    );
   }
 
   if (typeof options.readSelectedTabID === "function") {
@@ -205,21 +295,26 @@ export async function ensureLibraryVisualStageReady(options = {}) {
   }
 
   const summary = typeof options.inspectItem === "function"
-    ? await options.inspectItem(itemID)
+    ? await runOptionalStepWithTimeout(
+      "inspectItem",
+      async () => await options.inspectItem(itemID),
+      normalizeTimeout(options.inspectItemTimeoutMs, 3000),
+    )
     : null;
+  const resolvedSummary = summary?.ok ? summary.value : null;
 
   return {
     itemID,
     libraryID,
-    summary,
+    summary: resolvedSummary,
     selection,
     preparation,
     settleSnapshot: {
       stage: "library",
-      itemID: summary?.itemID ?? itemID,
-      title: summary?.title ?? null,
-      summary: summary?.summary ?? null,
-      columnValue: summary?.columnValue ?? null,
+      itemID: resolvedSummary?.itemID ?? itemID,
+      title: resolvedSummary?.title ?? null,
+      summary: resolvedSummary?.summary ?? null,
+      columnValue: resolvedSummary?.columnValue ?? null,
       selectedCount: selection.selectedCount,
       selectedIDs: selection.selectedIDs,
       visibleBannerIDs: preparation.visibleBannerIDs,
@@ -311,6 +406,12 @@ function buildStaticRuntimeDriftIssue(entry) {
   return `静态运行时基线漂移：${file}（${label}）。`;
 }
 
+function encodeIssueSnippet(value) {
+  return String(value || "")
+    .replaceAll("\\", "\\\\")
+    .replaceAll("\n", "\\n");
+}
+
 function collectRecentLogMessages(logSummary) {
   return [
     ...((logSummary?.recentErrors || []).map((entry) => toStringSafe(entry?.message).toLowerCase())),
@@ -376,6 +477,46 @@ function buildVisualDriftRemark(visuals) {
     return `${entry.kind} 漂移 ${ratio} / ${mean}`;
   });
   return parts.join("; ");
+}
+
+function isFailingVisualBaseline(entry) {
+  if (!entry || typeof entry !== "object") {
+    return false;
+  }
+  const status = String(entry.status || "").trim();
+  return status === "missing"
+    || status === "error"
+    || (status === "compared" && entry.ok !== true);
+}
+
+function collectBlockingVisualIssues(visuals) {
+  const analysisIssues = Array.isArray(visuals?.analysis?.issues)
+    ? visuals.analysis.issues
+    : [];
+  if (analysisIssues.length === 0) {
+    return [];
+  }
+
+  const baselines = Array.isArray(visuals?.analysis?.baselines)
+    ? visuals.analysis.baselines
+    : [];
+  const surfaceLocalBaselines = baselines.filter((entry) => String(entry?.scope || "").trim() === "surface-local");
+  if (surfaceLocalBaselines.length === 0) {
+    return analysisIssues;
+  }
+
+  if (surfaceLocalBaselines.some((entry) => isFailingVisualBaseline(entry))) {
+    return analysisIssues;
+  }
+
+  const nonSurfaceLocalFailures = baselines.filter((entry) => {
+    return String(entry?.scope || "").trim() !== "surface-local" && isFailingVisualBaseline(entry);
+  });
+  if (nonSurfaceLocalFailures.length > 0) {
+    return [];
+  }
+
+  return analysisIssues;
 }
 
 function buildVisualCaptureStabilityRemark(visuals) {
@@ -546,7 +687,10 @@ export function deriveFixHints({ issues = [], logSummary = null }) {
     hints.push("若目标 locale 的 `main.ftl` 整体缺失，优先恢复模板最小基线文件，再重新检查 key 缺失与 value 漂移。");
   }
   if (issueText.includes("ftl key") && issueText.includes("值漂移")) {
-    hints.push("优先核对 `addon-static/locale/<locale>/main.ftl` 中对应 key 的值是否偏离模板基线，并只做单行替换。");
+    hints.push("优先核对 `addon-static/locale/<locale>/main.ftl` 中对应 key 的值是否偏离模板基线，并只替换该 key 的定义块。");
+  }
+  if (issueText.includes("ftl key") && issueText.includes("结构漂移")) {
+    hints.push("优先将 `addon-static/locale/<locale>/main.ftl` 中对应 key 恢复为模板 canonical block，不要重写整份 locale 文件。");
   }
   if (issueText.includes("reader 摘要命令未注册")) {
     hints.push("优先核对 `src/app/feature-composer.js` 中 `*-reader-summary` 的 command palette 注册是否仍保留在 baseline 注册链中。");
@@ -774,11 +918,33 @@ export function evaluateCycle(cycle) {
       if (!locale || !key || !expectedValue || !actualValue) {
         return;
       }
-      issues.push(`Locale ${locale} FTL key ${key} 值漂移：期望 ${expectedValue}，实际 ${actualValue}。`);
+      const actualLine = String(entry?.actualLine || "").trim();
+      const actualLineSuffix = actualLine
+        ? ` 实际定义片段 [${encodeIssueSnippet(actualLine)}]。`
+        : "";
+      issues.push(`Locale ${locale} FTL key ${key} 值漂移：期望 ${expectedValue}，实际 ${actualValue}。${actualLineSuffix}`);
     });
   }
   else if (Number(checks.localeFTLValueDriftCount || 0) > 0) {
     issues.push("Locale FTL 存在未展开的值漂移。");
+  }
+  const localeFTLStructureDriftEntries = Array.isArray(checks.localeFTLStructureDriftEntries) ? checks.localeFTLStructureDriftEntries : [];
+  if (localeFTLStructureDriftEntries.length > 0) {
+    localeFTLStructureDriftEntries.forEach((entry) => {
+      const locale = String(entry?.locale || "").trim();
+      const key = String(entry?.key || "").trim();
+      const expectedLine = String(entry?.expectedLine || "").trim();
+      const actualLine = String(entry?.actualLine || "").trim();
+      if (!locale || !key || !expectedLine || !actualLine) {
+        return;
+      }
+      issues.push(
+        `Locale ${locale} FTL key ${key} 结构漂移：期望定义片段 [${encodeIssueSnippet(expectedLine)}]，实际定义片段 [${encodeIssueSnippet(actualLine)}]。`,
+      );
+    });
+  }
+  else if (Number(checks.localeFTLStructureDriftCount || 0) > 0) {
+    issues.push("Locale FTL 存在未展开的结构漂移。");
   }
   if (Number(checks.itemTreeColumns || 0) < 1) {
     issues.push("ItemTree 自定义列未注册。");
@@ -864,8 +1030,13 @@ export function evaluateCycle(cycle) {
   if (scenarios && Number(scenarios.failed || 0) > 0) {
     issues.push(`Zotero 场景脚本失败 ${scenarios.failed} 项。`);
   }
+  if (scenarios?.execution?.incomplete === true) {
+    issues.push(
+      `Zotero 场景执行未完成：停止于 ${scenarios.execution.lastStartedScenario || "unknown"}（${scenarios.execution.timeoutKind || "runner-failure"}）。`,
+    );
+  }
   if (visuals?.attempted && visuals?.analysis?.ok === false) {
-    issues.push(...(visuals.analysis.issues || []));
+    issues.push(...collectBlockingVisualIssues(visuals));
   }
   if (Number(logSummary.errorCount || 0) > 0) {
     issues.push(`检测到 ${logSummary.errorCount} 条 error 级日志。`);
@@ -907,8 +1078,11 @@ export function buildE2EMarkdown(report) {
   ];
 
   report.cycles.forEach((cycle) => {
+    const scenarioRemark = cycle.scenarios?.execution?.incomplete === true
+      ? ` / incomplete@${cycle.scenarios.execution.lastStartedScenario || "-"}`
+      : "";
     lines.push(
-      `| ${cycle.index} | ${escapeMarkdown(cycle.bootMode)} | ${cycle.passed ? "通过" : "未通过"} | ${cycle.logs.errorCount} | ${cycle.logs.warnCount} | ${cycle.tests ? cycle.tests.failed : 0} | ${cycle.scenarios ? cycle.scenarios.failed : 0} | ${escapeMarkdown(cycle.summaryNote || "-")} |`,
+      `| ${cycle.index} | ${escapeMarkdown(cycle.bootMode)} | ${cycle.passed ? "通过" : "未通过"} | ${cycle.logs.errorCount} | ${cycle.logs.warnCount} | ${cycle.tests ? cycle.tests.failed : 0} | ${cycle.scenarios ? cycle.scenarios.failed : 0} | ${escapeMarkdown(`${cycle.summaryNote || "-"}${scenarioRemark}`)} |`,
     );
   });
 

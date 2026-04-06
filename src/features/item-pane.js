@@ -65,11 +65,11 @@ export function createItemPane(options) {
    * @param {Function} [sectionOptions.onInit] - 初始化回调
    * @param {Function} [sectionOptions.onDestroy] - 销毁回调
    * @param {Function} [sectionOptions.onItemChange] - 条目变化回调
-   * @param {Function} [sectionOptions.onRender] - 同步渲染回调
-   * @param {Function} [sectionOptions.onAsyncRender] - 异步渲染回调
+   * @param {Function} sectionOptions.onRender - 同步渲染回调；必须在这里完成初始 DOM 构建
+   * @param {Function} [sectionOptions.onAsyncRender] - 异步渲染回调；只用于加载耗时数据或补充异步内容
    * @param {Function} [sectionOptions.onToggle] - 展开/折叠回调
    * @param {Array} [sectionOptions.sectionButtons] - 头部按钮配置
-   * @returns {string|null} paneID，失败返回 null
+   * @returns {string|null} Zotero 返回的 registered paneID；应保存该值并在注销时传给 unregisterSection()
    */
   function registerSection(sectionOptions) {
     if (!isAvailable()) {
@@ -94,6 +94,11 @@ export function createItemPane(options) {
 
     if (!paneID) {
       error("itemPane.registerSection.noPaneID", {});
+      return null;
+    }
+
+    if (typeof onRender !== "function") {
+      error("itemPane.registerSection.noOnRender", { paneID });
       return null;
     }
 
@@ -144,9 +149,7 @@ export function createItemPane(options) {
         config.onItemChange = onItemChange;
       }
 
-      if (typeof onRender === "function") {
-        config.onRender = onRender;
-      }
+      config.onRender = onRender;
 
       if (typeof onAsyncRender === "function") {
         config.onAsyncRender = onAsyncRender;
@@ -442,6 +445,25 @@ export function createItemPane(options) {
   }
 
   /**
+   * 将声明态 paneID 解析为宿主返回的已注册 paneID
+   * @param {string} paneID - 声明态或已注册的 paneID
+   * @returns {string|null}
+   */
+  function resolveSectionPaneID(paneID) {
+    if (!paneID) {
+      return null;
+    }
+
+    if (registeredSections.has(paneID)) {
+      return registeredSections.get(paneID)?.registeredPaneID || paneID;
+    }
+
+    const registration = Array.from(registeredSections.values())
+      .find((value) => value?.registeredPaneID === paneID);
+    return registration?.registeredPaneID || null;
+  }
+
+  /**
    * 获取注册的 InfoRow 数量
    * @returns {number}
    */
@@ -631,6 +653,7 @@ export function createItemPane(options) {
     registerSection,
     unregisterSection,
     hasSection,
+    resolveSectionPaneID,
     getSectionCount,
 
     // InfoRow 操作

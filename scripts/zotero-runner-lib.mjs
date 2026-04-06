@@ -6,6 +6,7 @@ import process from "node:process";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { acquireBuildLock } from "./build-lock.mjs";
+import { createScriptError } from "./script-runtime-lib.mjs";
 
 const DEFAULT_ENV_FILES = [".env", ".env.local"];
 
@@ -41,6 +42,32 @@ const RETRYABLE_RDP_ERROR_CODES = new Set([
   "ECONNRESET",
   "EPIPE",
 ]);
+
+function createRdpEventTimeoutError({
+  label = "rdp-event",
+  timeoutMs,
+  phase = "waitForEvent",
+  consoleActor = null,
+  resultID = null,
+  elapsedMs = timeoutMs,
+} = {}) {
+  return createScriptError(
+    "timeout",
+    `Timed out waiting for RDP event (${label})`,
+    {
+      failedStage: "chrome-evaluation",
+      details: {
+        kind: "chrome-evaluation-timeout",
+        label,
+        timeoutMs: Number(timeoutMs || 0),
+        phase,
+        consoleActor,
+        resultID,
+        elapsedMs: Number(elapsedMs || timeoutMs || 0),
+      },
+    },
+  );
+}
 
 const DEFAULT_BINARY_CANDIDATES = [
   "/Applications/Zotero.app/Contents/MacOS/zotero",
@@ -672,7 +699,7 @@ export function buildAddon(projectRoot, options = {}) {
   });
 }
 
-export async function readAddonRuntimeInfo(projectRoot) {
+export async function readAddonRuntimeInfo(projectRoot, options = {}) {
   const configPath = path.join(projectRoot, "config", "addon.config.json");
   const config = JSON.parse(await fsp.readFile(configPath, "utf-8"));
   const buildPath = path.join(projectRoot, "build", config.addonRef);
@@ -681,8 +708,9 @@ export async function readAddonRuntimeInfo(projectRoot) {
     "dist",
     `${config.addonRef}-${config.addonVersion}.xpi`,
   );
+  const requireBuild = options?.requireBuild !== false;
 
-  if (!fs.existsSync(buildPath)) {
+  if (requireBuild && !fs.existsSync(buildPath)) {
     throw new Error(`Build output not found: ${buildPath}`);
   }
 
@@ -859,6 +887,10 @@ export class RdpClient {
 
   waitForEvent(predicate, {
     timeoutMs = 5000,
+    label = "rdp-event",
+    phase = "waitForEvent",
+    consoleActor = null,
+    resultID = null,
   } = {}) {
     const queuedIndex = this.eventQueue.findIndex((message) => predicate(message));
     if (queuedIndex >= 0) {
@@ -879,12 +911,20 @@ export class RdpClient {
         },
       };
 
+      const startedAt = Date.now();
       const timer = setTimeout(() => {
         const index = this.eventWaiters.indexOf(waiter);
         if (index >= 0) {
           this.eventWaiters.splice(index, 1);
         }
-        reject(new Error("Timed out waiting for RDP event"));
+        reject(createRdpEventTimeoutError({
+          label,
+          timeoutMs,
+          phase,
+          consoleActor,
+          resultID,
+          elapsedMs: Date.now() - startedAt,
+        }));
       }, timeoutMs);
 
       this.eventWaiters.push(waiter);
@@ -1223,7 +1263,13 @@ export class RdpClient {
     return await this.waitForAddonById(addonId);
   }
 
-  async evaluateInChrome(expression) {
+  async evaluateInChrome(expression, options = {}) {
+    const label = typeof options?.label === "string" && options.label.trim()
+      ? options.label.trim()
+      : "chrome-evaluation";
+    const timeoutMs = Number.isFinite(Number(options?.timeoutMs))
+      ? Number(options.timeoutMs)
+      : 15000;
     const target = await this.getParentProcessTarget();
     const consoleActor = target.consoleActor;
     if (!consoleActor) {
@@ -1272,14 +1318,29 @@ export class RdpClient {
       await: true,
     });
 
-    const result = await this.waitForEvent(
-      (message) => (
-        message.from === consoleActor
-        && message.type === "evaluationResult"
-        && message.resultID === evaluation.resultID
-      ),
-      { timeoutMs: 15000 },
-    );
+    let result = null;
+    try {
+      result = await this.waitForEvent(
+        (message) => (
+          message.from === consoleActor
+          && message.type === "evaluationResult"
+          && message.resultID === evaluation.resultID
+        ),
+        {
+          timeoutMs,
+          label,
+          phase: "evaluateInChrome",
+          consoleActor,
+          resultID: evaluation.resultID || null,
+        },
+      );
+    }
+    catch (error) {
+      if (error?.details?.kind === "chrome-evaluation-timeout") {
+        throw error;
+      }
+      throw error;
+    }
 
     if (result.hasException) {
       throw new Error(result.exceptionMessage || result.result?.preview?.message || "Chrome evaluation failed");

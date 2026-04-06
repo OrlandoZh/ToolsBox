@@ -330,9 +330,19 @@ describe("Toolchain Scripts", () => {
     assert.ok(Array.isArray(releasePlan.artifactFiles));
     assert.ok(releasePlan.artifactFiles.includes("release-notes.md"));
     assert.equal(releasePlan.remoteVerification?.status, "pending");
+    assert.equal(releasePlan.workflowState?.id, "remote-verification-pending");
+    assert.equal(releasePlan.gateContract?.requiredRunName, "release-plan");
+    assert.equal(releasePlan.gateContract?.preferredPreparationCommand, "npm run agent:release");
+    assert.ok(Array.isArray(releasePlan.nextSteps));
+    assert.ok(releasePlan.nextSteps.some((item) => String(item).includes("npm run agent:release")));
+    assert.ok(releasePlan.nextSteps.some((item) => String(item).includes("release:install-smoke:stable")));
     assert.ok(releaseNotes.includes("## Upload Steps"));
+    assert.ok(releaseNotes.includes("## Workflow State"));
+    assert.ok(releaseNotes.includes("## Release Gate Contract"));
     assert.ok(releaseNotes.includes("## Remote Verification"));
     assert.ok(releaseNotes.includes("SHA256"));
+    assert.ok(releaseNotes.includes("npm run agent:release"));
+    assert.ok(releaseNotes.includes("npm run agent:gate:release"));
     assert.ok(releaseNotes.includes("npm run release:upload -- --provider <provider> --release-tag <tag> --target-base-url <url>"));
   });
 
@@ -424,9 +434,19 @@ describe("Toolchain Scripts", () => {
       assert.equal(uploadPlan.checks.preflightPassed, true);
       assert.equal(uploadPlan.checks.targetBaseURLMatchesManifest, true);
       assert.equal(uploadPlan.checks.networkUploadImplemented, false);
+      assert.equal(uploadPlan.gateContract?.requiredRunName, "release-plan");
+      assert.equal(uploadPlan.gateContract?.preferredPreparationCommand, "npm run agent:release");
+      assert.ok(Array.isArray(uploadPlan.nextSteps));
+      assert.ok(uploadPlan.nextSteps.some((item) => String(item).includes("npm run agent:release")));
       assert.equal(uploadPlan.uploadActions[0].targetURL, fixture.releaseManifest.updateURL);
       assert.equal(uploadPlan.uploadActions[1].targetURL, fixture.releaseManifest.updateLink);
+      assert.equal(uploadPlan.uploadActions[2].command, "npm run release:preflight -- --verify-remote");
+      assert.equal(uploadPlan.uploadActions[4].command, "npm run agent:gate:release");
+      assert.ok(uploadPlanMD.includes("## Release Gate Contract"));
+      assert.ok(uploadPlanMD.includes("## Next Steps"));
       assert.ok(uploadPlanMD.includes("This script is plan-only."));
+      assert.ok(uploadPlanMD.includes("does not create `release-plan` telemetry"));
+      assert.ok(uploadPlanMD.includes("npm run agent:release"));
       assert.ok(uploadPlanMD.includes("Manually upload `update.json`"));
     } finally {
       fs.rmSync(fixture.root, { recursive: true, force: true });
@@ -505,61 +525,82 @@ describe("Toolchain Scripts", () => {
 
   it("should verify remote release URLs and carry the result into plan and matrix", async () => {
     const config = readJSON(path.join(projectRoot, "config", "addon.config.json"));
-    resetLocalReleaseArtifacts();
-    execFileSync("node", ["scripts/package.mjs"], {
-      cwd: projectRoot,
-      stdio: "pipe",
-    });
-    const outputName = `${config.addonRef}-${config.addonVersion}.xpi`;
-    const sourceUpdateManifest = readJSON(path.join(projectRoot, "dist", "update.json"));
-    const sourceXpiBuffer = fs.readFileSync(path.join(projectRoot, "dist", outputName));
-    const remoteUpdateLink = `data:application/x-xpinstall;base64,${sourceXpiBuffer.toString("base64")}`;
-    const remoteUpdateManifest = {
-      ...sourceUpdateManifest,
-      addons: {
-        ...sourceUpdateManifest.addons,
-        [config.addonId]: {
-          ...(sourceUpdateManifest.addons?.[config.addonId] || {}),
-          updates: [
-            {
-              ...(sourceUpdateManifest.addons?.[config.addonId]?.updates?.[0] || {}),
-              version: config.addonVersion,
-              update_link: remoteUpdateLink,
-              applications: {
-                zotero: {
-                  strict_min_version: config.strictMinVersion,
-                  strict_max_version: config.strictMaxVersion,
+
+    try {
+      resetLocalReleaseArtifacts();
+      execFileSync("node", ["scripts/package.mjs"], {
+        cwd: projectRoot,
+        stdio: "pipe",
+      });
+      const outputName = `${config.addonRef}-${config.addonVersion}.xpi`;
+      const sourceUpdateManifest = readJSON(path.join(projectRoot, "dist", "update.json"));
+      const sourceXpiBuffer = fs.readFileSync(path.join(projectRoot, "dist", outputName));
+      const remoteUpdateLink = `data:application/x-xpinstall;base64,${sourceXpiBuffer.toString("base64")}`;
+      const remoteUpdateManifest = {
+        ...sourceUpdateManifest,
+        addons: {
+          ...sourceUpdateManifest.addons,
+          [config.addonId]: {
+            ...(sourceUpdateManifest.addons?.[config.addonId] || {}),
+            updates: [
+              {
+                ...(sourceUpdateManifest.addons?.[config.addonId]?.updates?.[0] || {}),
+                version: config.addonVersion,
+                update_link: remoteUpdateLink,
+                applications: {
+                  zotero: {
+                    strict_min_version: config.strictMinVersion,
+                    strict_max_version: config.strictMaxVersion,
+                  },
                 },
               },
-            },
-          ],
+            ],
+          },
         },
-      },
-    };
-    const remoteUpdateURL = `data:application/json,${encodeURIComponent(JSON.stringify(remoteUpdateManifest))}`;
-    prepareLocalReleasePreflight({
-      verifyRemote: true,
-      remoteArgs: [
-        "--remote-update-url",
-        remoteUpdateURL,
-        "--remote-expected-update-link",
-        remoteUpdateLink,
-      ],
-    });
-    await execNodeAsync(["scripts/release-prepare.mjs"]);
-    await execNodeAsync(["scripts/release-matrix.mjs"]);
+      };
+      const remoteUpdateURL = `data:application/json,${encodeURIComponent(JSON.stringify(remoteUpdateManifest))}`;
+      prepareLocalReleasePreflight({
+        verifyRemote: true,
+        remoteArgs: [
+          "--remote-update-url",
+          remoteUpdateURL,
+          "--remote-expected-update-link",
+          remoteUpdateLink,
+        ],
+      });
+      await execNodeAsync(["scripts/release-prepare.mjs"]);
+      await execNodeAsync(["scripts/release-matrix.mjs"]);
 
-    const preflight = readJSON(path.join(projectRoot, "dist", "release-preflight.json"));
-    const releasePlan = readJSON(path.join(projectRoot, "dist", "release-plan.json"));
-    const releaseMatrix = readJSON(path.join(projectRoot, "dist", "release-matrix.json"));
-    const releaseNotes = fs.readFileSync(path.join(projectRoot, "dist", "release-notes.md"), "utf-8");
+      const preflight = readJSON(path.join(projectRoot, "dist", "release-preflight.json"));
+      const releasePlan = readJSON(path.join(projectRoot, "dist", "release-plan.json"));
+      const releaseMatrix = readJSON(path.join(projectRoot, "dist", "release-matrix.json"));
+      const releaseNotes = fs.readFileSync(path.join(projectRoot, "dist", "release-notes.md"), "utf-8");
 
-    assert.equal(preflight.status, "passed");
-    assert.equal(preflight.remoteVerification?.status, "passed");
-    assert.equal(releasePlan.remoteVerification?.status, "passed");
-    assert.equal(releaseMatrix.remoteVerification?.status, "passed");
-    assert.equal(releaseMatrix.remoteVerification?.observedUpdateLink, remoteUpdateLink);
-    assert.ok(releaseNotes.includes("Status: `通过`"));
+      assert.equal(preflight.status, "passed");
+      assert.equal(preflight.remoteVerification?.status, "passed");
+      assert.equal(preflight.remoteVerification?.evidenceMode, "synthetic");
+      assert.equal(preflight.remoteVerification?.releaseReady, false);
+      assert.ok(String(preflight.remoteVerification?.summary || "").includes("data: 内联 URL"));
+      assert.equal(releasePlan.remoteVerification?.status, "passed");
+      assert.equal(releasePlan.workflowState?.id, "remote-verification-synthetic");
+      assert.equal(releasePlan.remoteVerification?.evidenceMode, "synthetic");
+      assert.equal(releasePlan.remoteVerification?.releaseReady, false);
+      assert.ok(String(releasePlan.remoteVerification?.summary || "").includes("data: 内联 URL"));
+      assert.equal(releaseMatrix.status, "attention");
+      assert.equal(releaseMatrix.remoteVerification?.status, "passed");
+      assert.equal(releaseMatrix.remoteVerification?.evidenceMode, "synthetic");
+      assert.equal(releaseMatrix.remoteVerification?.releaseReady, false);
+      assert.ok(String(releaseMatrix.remoteVerification?.summary || "").includes("data: 内联 URL"));
+      assert.equal(releaseMatrix.remoteVerification?.observedUpdateLink, remoteUpdateLink);
+      assert.ok(releaseMatrix.attentionIssues.some((item) => String(item).includes("远端发布验证")));
+      assert.ok(releaseNotes.includes("Status: `通过`"));
+      assert.ok(releaseNotes.includes("## Workflow State"));
+      assert.ok(releaseNotes.includes("仅测试型验证"));
+      assert.ok(releaseNotes.includes("Evidence Mode: `测试型`"));
+      assert.ok(releaseNotes.includes("Release Ready: `no`"));
+    } finally {
+      resetLocalReleaseArtifacts();
+    }
   });
 
   it("should wire governance and guard scripts into package workflows", () => {
@@ -571,8 +612,11 @@ describe("Toolchain Scripts", () => {
     assert.equal(packageJSON.scripts["docs:sync-zotero-host-interface-contracts"], "node scripts/docs-sync-zotero-host-interface-contracts.mjs");
     assert.equal(packageJSON.scripts["framework:governance:check"], "node scripts/framework-governance-check.mjs");
     assert.equal(packageJSON.scripts["framework:bundle:audit"], "node scripts/framework-bundle-audit.mjs");
+    assert.equal(packageJSON.scripts["build:react-ui"], "node scripts/build-react-ui.mjs");
     assert.equal(packageJSON.scripts["agent:workspace:guard"], "node scripts/agent-workspace-guard.mjs");
     assert.equal(packageJSON.scripts["agent:workspace:guard:strict"], "node scripts/agent-workspace-guard.mjs --strict");
+    assert.equal(packageJSON.scripts["agent:context"], "node scripts/agent-context.mjs");
+    assert.equal(packageJSON.scripts["agent:context:guard"], "node scripts/agent-context-guard.mjs");
     assert.equal(packageJSON.scripts["agent:obsidian:guard"], "node scripts/agent-obsidian-guard.mjs");
     assert.equal(packageJSON.scripts["agent:obsidian:guard:strict"], "node scripts/agent-obsidian-guard.mjs --strict");
     assert.equal(packageJSON.scripts["agent:host:guard"], "node scripts/zotero-host-interface-guard.mjs");
@@ -585,9 +629,11 @@ describe("Toolchain Scripts", () => {
     assert.ok(String(packageJSON.scripts["agent:gate"] || "").includes("agent:workspace:guard:strict"));
     assert.ok(String(packageJSON.scripts["agent:gate"] || "").includes("agent:host:guard:strict"));
     assert.ok(String(packageJSON.scripts["agent:gate"] || "").includes("agent:host:semantic:guard:strict"));
+    assert.ok(String(packageJSON.scripts["agent:gate"] || "").includes("agent:context"));
     assert.ok(String(packageJSON.scripts["agent:gate:release"] || "").includes("agent:workspace:guard:strict"));
     assert.ok(String(packageJSON.scripts["agent:gate:release"] || "").includes("agent:host:guard:strict"));
     assert.ok(String(packageJSON.scripts["agent:gate:release"] || "").includes("agent:host:semantic:guard:strict"));
+    assert.ok(String(packageJSON.scripts["agent:gate:release"] || "").includes("agent:context"));
     assert.ok(String(packageJSON.scripts.check || "").includes("agent:workspace:guard"));
     assert.ok(String(packageJSON.scripts.check || "").includes("agent:obsidian:guard"));
     assert.ok(String(packageJSON.scripts.check || "").includes("agent:host:guard"));
@@ -632,7 +678,7 @@ describe("Toolchain Scripts", () => {
       const expansionWaveBundle = auditJSON.bundles.find((bundle) => bundle.id === "expansion-wave-scaffold-v1");
       assert.ok(expansionWaveBundle);
       assert.equal(expansionWaveBundle.expansionWaveDetails.projectWaveStatus, "active");
-      assert.ok(result.stdout.includes("expansion-wave: active / generic-expansion-wave-v1 / ZOTERO-HOST-WAVE-001 / host-first -> surface smoke -> surface-local visual evidence"));
+      assert.ok(result.stdout.includes("expansion-wave: active / generic-expansion-wave-v1 / ZOTERO-HOST-POLISH-WAVE-001 / host-first -> live geometry / interaction consistency -> surface smoke -> surface-local evidence -> full gate"));
       assert.ok(auditMarkdown.includes("Framework Backfill Audit"));
       assert.ok(auditMarkdown.includes("Expansion Wave Overview"));
       assert.ok(auditMarkdown.includes("Surface Verification Overview"));
@@ -861,9 +907,11 @@ describe("Toolchain Scripts", () => {
       assert.ok(exportManifest.staticRuntimeBaselineFiles.includes(relativePath), `missing baseline manifest entry: ${relativePath}`);
     });
     assert.equal(exportPackage.scripts.build, "node scripts/build.mjs");
+    assert.equal(exportPackage.scripts["build:react-ui"], "node scripts/build-react-ui.mjs");
     assert.ok(!("agent:gate" in exportPackage.scripts));
     assert.ok(exportReadme.includes("纯项目"));
     assert.ok(exportReadme.includes("静态运行时基线"));
+    assert.ok(exportReadme.includes("build:react-ui"));
     assert.ok(exportReadme.includes("addon-static/content/style/main.css"));
     assert.ok(exportReadme.includes("addon-static/locale/zh-CN/main.ftl"));
     assert.ok(fs.existsSync(path.join(projectRoot, "dist", "cleanroomtemplate-0.1.0-pure-project.zip")));

@@ -3,6 +3,48 @@
  * 提供 Zotero 命令面板注册和管理功能
  */
 
+function normalizeString(value) {
+  return String(value || "").trim();
+}
+
+function normalizeStringArray(values) {
+  return Array.from(new Set(
+    (Array.isArray(values) ? values : [])
+      .map((value) => normalizeString(value))
+      .filter(Boolean),
+  ));
+}
+
+function normalizeSearchTerms(query) {
+  return normalizeString(query)
+    .toLowerCase()
+    .split(/\s+/u)
+    .filter(Boolean);
+}
+
+function createCommandDescriptor(commandId, commandOptions = {}, { searchable = true } = {}) {
+  return {
+    id: commandId,
+    label: normalizeString(commandOptions.label),
+    category: normalizeString(commandOptions.category) || "Plugin",
+    description: normalizeString(commandOptions.description),
+    handler: commandOptions.handler,
+    condition: typeof commandOptions.condition === "function"
+      ? commandOptions.condition
+      : null,
+    shortcut: normalizeString(commandOptions.shortcut),
+    icon: normalizeString(commandOptions.icon),
+    aliases: normalizeStringArray(commandOptions.aliases),
+    keywords: normalizeStringArray(commandOptions.keywords),
+    searchable,
+  };
+}
+
+function sortSnapshots(left, right) {
+  return String(left?.label || "").localeCompare(String(right?.label || ""), "en")
+    || String(left?.id || "").localeCompare(String(right?.id || ""), "en");
+}
+
 /**
  * 创建命令面板管理器
  * @param {Object} options - 配置选项
@@ -56,6 +98,107 @@ export function createCommandPalette(options) {
     );
   }
 
+  function getCommandDescriptor(commandId) {
+    const registration = registeredCommands.get(commandId);
+    return registration?.descriptor || null;
+  }
+
+  function evaluateCommandCondition(descriptor, context = {}) {
+    if (!descriptor || typeof descriptor !== "object") {
+      return false;
+    }
+    if (typeof descriptor.condition !== "function") {
+      return true;
+    }
+    try {
+      return descriptor.condition(context) !== false;
+    } catch (err) {
+      error("commandPalette.condition.error", {
+        commandId: descriptor.id,
+        message: String(err?.message || err),
+      });
+      return false;
+    }
+  }
+
+  function createCommandSnapshot(descriptor, type, context = {}) {
+    if (!descriptor || typeof descriptor !== "object") {
+      return null;
+    }
+    return {
+      id: descriptor.id,
+      label: descriptor.label,
+      category: descriptor.category,
+      description: descriptor.description,
+      shortcut: descriptor.shortcut || null,
+      icon: descriptor.icon || null,
+      aliases: descriptor.aliases.slice(),
+      keywords: descriptor.keywords.slice(),
+      enabled: evaluateCommandCondition(descriptor, context),
+      searchable: descriptor.searchable !== false,
+      type: type || "fallback",
+    };
+  }
+
+  function buildCommandSearchScore(snapshot, query) {
+    const terms = normalizeSearchTerms(query);
+    if (terms.length === 0) {
+      return snapshot.enabled ? 10 : 1;
+    }
+
+    const exactValues = [
+      snapshot.id,
+      snapshot.label,
+      ...snapshot.aliases,
+    ]
+      .map((value) => normalizeString(value).toLowerCase())
+      .filter(Boolean);
+    const prefixValues = [
+      snapshot.label,
+      snapshot.category,
+      snapshot.id,
+      ...snapshot.aliases,
+      ...snapshot.keywords,
+    ]
+      .map((value) => normalizeString(value).toLowerCase())
+      .filter(Boolean);
+    const containsValues = [
+      snapshot.label,
+      snapshot.category,
+      snapshot.description,
+      snapshot.id,
+      ...snapshot.aliases,
+      ...snapshot.keywords,
+    ]
+      .map((value) => normalizeString(value).toLowerCase())
+      .filter(Boolean);
+
+    let score = 0;
+    for (const term of terms) {
+      let termScore = 0;
+      if (exactValues.some((value) => value === term)) {
+        termScore = 120;
+      } else if (prefixValues.some((value) => value.startsWith(term))) {
+        termScore = 80;
+      } else if (containsValues.some((value) => value.includes(term))) {
+        termScore = 40;
+      }
+
+      if (termScore === 0) {
+        return 0;
+      }
+      score += termScore;
+    }
+
+    if (snapshot.enabled) {
+      score += 5;
+    }
+    if (snapshot.shortcut) {
+      score += 1;
+    }
+    return score;
+  }
+
   /**
    * 注册命令
    * @param {Object} commandOptions - 命令配置
@@ -65,52 +208,42 @@ export function createCommandPalette(options) {
    * @param {string} [commandOptions.description] - 命令描述
    * @param {Function} commandOptions.handler - 命令处理函数
    * @param {Function} [commandOptions.condition] - 显示条件 () => boolean
+   * @param {string[]} [commandOptions.aliases] - 搜索别名
+   * @param {string[]} [commandOptions.keywords] - 搜索关键词
    * @param {string} [commandOptions.shortcut] - 快捷键（可选）
    * @param {string} [commandOptions.icon] - 图标路径（可选）
    * @returns {string|null} 命令 ID
    */
   function registerCommand(commandOptions) {
-    const {
-      id: customId,
-      label,
-      category = "Plugin",
-      description = "",
-      handler,
-      condition,
-      shortcut,
-      icon,
-    } = commandOptions;
+    const commandId = normalizeString(commandOptions?.id) || `command-${++commandCounter}`;
+    const descriptor = createCommandDescriptor(commandId, commandOptions);
 
-    if (!label) {
+    if (!descriptor.label) {
       error("commandPalette.registerCommand.noLabel", {});
       return null;
     }
 
-    if (typeof handler !== "function") {
+    if (typeof descriptor.handler !== "function") {
       error("commandPalette.registerCommand.noHandler", {});
       return null;
     }
-
-    const commandId = customId || `command-${++commandCounter}`;
 
     try {
       // Zotero 7+ Prompt API
       if (Zotero && Zotero.Prompt && typeof Zotero.Prompt.register === "function") {
         const config = {
           id: commandId,
-          label,
-          category,
+          label: descriptor.label,
+          category: descriptor.category,
         };
 
-        // 显示条件
-        if (typeof condition === "function") {
-          config.when = condition;
+        if (typeof descriptor.condition === "function") {
+          config.when = () => evaluateCommandCondition(descriptor);
         }
 
-        // 回调
         config.callback = (prompt) => {
           try {
-            handler(prompt);
+            descriptor.handler(prompt);
           } catch (err) {
             error("commandPalette.handler.error", {
               commandId,
@@ -123,30 +256,27 @@ export function createCommandPalette(options) {
 
         registeredCommands.set(commandId, {
           type: "prompt",
+          descriptor,
           config,
         });
 
-        debug("commandPalette.registerCommand.prompt", { commandId, label });
-
+        debug("commandPalette.registerCommand.prompt", { commandId, label: descriptor.label });
         return commandId;
       }
 
-      // 降级：存储配置，等待其他机制触发
       registeredCommands.set(commandId, {
         type: "fallback",
+        descriptor,
         config: {
-          label,
-          category,
-          description,
-          handler,
-          condition,
-          shortcut,
-          icon,
+          label: descriptor.label,
+          category: descriptor.category,
+          description: descriptor.description,
+          shortcut: descriptor.shortcut,
+          icon: descriptor.icon,
         },
       });
 
-      debug("commandPalette.registerCommand.fallback", { commandId, label });
-
+      debug("commandPalette.registerCommand.fallback", { commandId, label: descriptor.label });
       return commandId;
     } catch (err) {
       error("commandPalette.registerCommand.failed", {
@@ -172,32 +302,40 @@ export function createCommandPalette(options) {
     }
 
     const commandId = `anonymous-${id}`;
+    const descriptor = createCommandDescriptor(commandId, {
+      id: commandId,
+      label: "",
+      category: "",
+      description: "",
+      handler,
+    }, {
+      searchable: false,
+    });
 
     try {
       if (Zotero && Zotero.Prompt && typeof Zotero.Prompt.register === "function") {
-        Zotero.Prompt.register([
-          {
-            id,
-            callback: (prompt) => {
-              try {
-                handler(prompt);
-              } catch (err) {
-                error("commandPalette.anonymousHandler.error", {
-                  commandId,
-                  message: String(err?.message || err),
-                });
-              }
-            },
+        const config = {
+          id,
+          callback: (prompt) => {
+            try {
+              descriptor.handler(prompt);
+            } catch (err) {
+              error("commandPalette.anonymousHandler.error", {
+                commandId,
+                message: String(err?.message || err),
+              });
+            }
           },
-        ]);
+        };
+        Zotero.Prompt.register([config]);
 
         registeredCommands.set(commandId, {
           type: "anonymous",
-          id,
+          descriptor,
+          config,
         });
 
         debug("commandPalette.registerAnonymousCommand.created", { commandId });
-
         return commandId;
       }
 
@@ -270,14 +408,55 @@ export function createCommandPalette(options) {
    */
   function getAllCommands() {
     const result = [];
-    registeredCommands.forEach((reg, id) => {
+    registeredCommands.forEach((registration, id) => {
+      if (!registration?.descriptor?.label) {
+        return;
+      }
       result.push({
         id,
-        label: reg.config?.label || "",
-        category: reg.config?.category || "",
+        label: registration.descriptor.label,
+        category: registration.descriptor.category,
       });
     });
-    return result;
+    return result.sort(sortSnapshots);
+  }
+
+  function getCommandSnapshot(commandId = null, context = {}) {
+    if (typeof commandId === "string" && commandId.trim()) {
+      const registration = registeredCommands.get(commandId);
+      return registration
+        ? createCommandSnapshot(registration.descriptor, registration.type, context)
+        : null;
+    }
+
+    return Array.from(registeredCommands.values())
+      .map((registration) => createCommandSnapshot(registration.descriptor, registration.type, context))
+      .filter((snapshot) => snapshot?.label)
+      .sort(sortSnapshots);
+  }
+
+  function searchCommands(query, context = {}, options = {}) {
+    const includeDisabled = options?.includeDisabled === true;
+    const limit = Number.isFinite(Number(options?.limit))
+      ? Math.max(1, Math.trunc(Number(options.limit)))
+      : null;
+
+    const scored = getCommandSnapshot(null, context)
+      .filter((snapshot) => snapshot?.searchable !== false)
+      .map((snapshot) => ({
+        snapshot,
+        score: buildCommandSearchScore(snapshot, query),
+      }))
+      .filter((entry) => entry.score > 0)
+      .filter((entry) => includeDisabled || entry.snapshot.enabled)
+      .sort((left, right) => (
+        right.score - left.score
+        || Number(right.snapshot.enabled) - Number(left.snapshot.enabled)
+        || sortSnapshots(left.snapshot, right.snapshot)
+      ))
+      .map((entry) => entry.snapshot);
+
+    return limit ? scored.slice(0, limit) : scored;
   }
 
   /**
@@ -287,13 +466,13 @@ export function createCommandPalette(options) {
    * @returns {boolean} 是否成功
    */
   function executeCommand(commandId, context = {}) {
-    const registration = registeredCommands.get(commandId);
-    if (!registration || !registration.config?.handler) {
+    const descriptor = getCommandDescriptor(commandId);
+    if (!descriptor || typeof descriptor.handler !== "function") {
       return false;
     }
 
     try {
-      registration.config.handler(context);
+      descriptor.handler(context);
       return true;
     } catch (err) {
       error("commandPalette.executeCommand.error", {
@@ -325,6 +504,8 @@ export function createCommandPalette(options) {
     getCommandCount,
     hasCommand,
     getAllCommands,
+    getCommandSnapshot,
+    searchCommands,
 
     // 执行方法
     executeCommand,

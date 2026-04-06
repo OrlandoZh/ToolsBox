@@ -1,3 +1,5 @@
+import { isOptionalBundleEnabled } from "./optional-bundles.js";
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -34,7 +36,9 @@ const HOST_ACTION_CATALOG = Object.freeze([
     readinessAssertions: [
       "The preferences window exists and is focused.",
       "The requested pane is selected in the preferences sidebar.",
-      "The pane root and at least one core control are visible.",
+      "The pane fragment is mounted and structurally observable.",
+      "The pane exposes interactive controls, preference bindings, or load/localization bridge signals.",
+      "A surface-local evidence target is returned for the selected pane root, and its geometry is settled on the live pane fragment.",
     ],
     evidenceTargets: [
       "preference-pane",
@@ -42,6 +46,140 @@ const HOST_ACTION_CATALOG = Object.freeze([
     ownerModules: [
       "src/platform/zotero-host.js",
       "src/app/host-actions.js",
+    ],
+    executable: true,
+  },
+  {
+    id: "preferences.selectTab",
+    label: "Select Preference Tab",
+    status: HOST_ACTION_STATUSES.READY,
+    category: "preferences",
+    summary: "Open a live Zotero preference pane, select a tab-like subsection, and verify the active panel is ready.",
+    authoritativeSource: [
+      {
+        file: "chrome/content/zotero/preferences/preferences.js",
+        anchor: "waitForFirstPaneLoad() / waitForPaneSelect()",
+      },
+    ],
+    preconditions: [
+      "The requested preference pane is already registered in PreferencePanes.",
+      "The pane exposes a live tab or tab-like control identified by tabID.",
+    ],
+    executionEntry: "host.preparePreferencePane() + live tab activation replay",
+    readinessAssertions: [
+      "The requested preference pane is selected in the preferences sidebar.",
+      "An interactive root or tab host surface is observed for advanced panes.",
+      "The requested tab is observed and activated in the live host.",
+      "The active panel is visible and contains live controls or pane content.",
+    ],
+    evidenceTargets: [
+      "preference-pane",
+    ],
+    ownerModules: [
+      "src/app/host-actions.js",
+      "src/platform/zotero-host.js",
+    ],
+    executable: true,
+  },
+  {
+    id: "preferences.setCheckbox",
+    label: "Set Preference Checkbox",
+    status: HOST_ACTION_STATUSES.READY,
+    category: "preferences",
+    summary: "Open a live Zotero preference pane, toggle a checkbox control, and verify the pref writeback.",
+    authoritativeSource: [
+      {
+        file: "reference/zotero-main/chrome/content/zotero/preferences/preferences.js",
+        anchor: "_syncToPrefOnModify() / _initImportedNodesPostInsert()",
+      },
+    ],
+    preconditions: [
+      "The requested preference pane is already registered in PreferencePanes.",
+      "A live checkbox control can be located by controlID, preferenceID, or selector.",
+      "The requested checked state is provided.",
+    ],
+    executionEntry: "host.preparePreferencePane() + live checkbox replay",
+    readinessAssertions: [
+      "The live checkbox control is observed in the requested preference pane.",
+      "A live checkbox action is dispatched against the control element.",
+      "The checkbox state matches the requested value after the action.",
+      "The associated preference writeback matches the requested value.",
+      "A surface-local evidence target is returned for the control or pane fallback.",
+    ],
+    evidenceTargets: [
+      "preference-control",
+    ],
+    ownerModules: [
+      "src/app/host-actions.js",
+      "src/platform/zotero-host.js",
+    ],
+    executable: true,
+  },
+  {
+    id: "preferences.setTextbox",
+    label: "Set Preference Textbox",
+    status: HOST_ACTION_STATUSES.READY,
+    category: "preferences",
+    summary: "Open a live Zotero preference pane, update a textbox control, and verify the pref writeback.",
+    authoritativeSource: [
+      {
+        file: "reference/zotero-main/chrome/content/zotero/preferences/preferences.js",
+        anchor: "_syncToPrefOnModify() / _initImportedNodesPostInsert()",
+      },
+    ],
+    preconditions: [
+      "The requested preference pane is already registered in PreferencePanes.",
+      "A live textbox control can be located by controlID, preferenceID, or selector.",
+      "The requested value is provided.",
+    ],
+    executionEntry: "host.preparePreferencePane() + live textbox input/change replay",
+    readinessAssertions: [
+      "The live textbox control is observed in the requested preference pane.",
+      "Input/change events are dispatched on the live textbox control.",
+      "The textbox value matches the requested value after the action.",
+      "The associated preference writeback matches the requested value.",
+      "A surface-local evidence target is returned for the control or pane fallback.",
+    ],
+    evidenceTargets: [
+      "preference-control",
+    ],
+    ownerModules: [
+      "src/app/host-actions.js",
+      "src/platform/zotero-host.js",
+    ],
+    executable: true,
+  },
+  {
+    id: "preferences.selectMenulist",
+    label: "Select Preference Menulist",
+    status: HOST_ACTION_STATUSES.READY,
+    category: "preferences",
+    summary: "Open a live Zotero preference pane, select a menulist value, and verify the pref writeback.",
+    authoritativeSource: [
+      {
+        file: "reference/zotero-main/chrome/content/zotero/preferences/preferences.js",
+        anchor: "_syncToPrefOnModify() / _initImportedNodesPostInsert()",
+      },
+    ],
+    preconditions: [
+      "The requested preference pane is already registered in PreferencePanes.",
+      "A live menulist control can be located by controlID, preferenceID, or selector.",
+      "The requested value is provided.",
+    ],
+    executionEntry: "host.preparePreferencePane() + live menulist command/change replay",
+    readinessAssertions: [
+      "The live menulist control is observed in the requested preference pane.",
+      "Command/change events are dispatched on the live menulist control.",
+      "The menulist state matches the requested value after the action.",
+      "The associated preference writeback matches the requested value.",
+      "A surface-local evidence target is returned for the control or pane fallback.",
+    ],
+    evidenceTargets: [
+      "preference-control",
+    ],
+    ownerModules: [
+      "src/app/host-actions.js",
+      "src/platform/zotero-host.js",
     ],
     executable: true,
   },
@@ -64,6 +202,8 @@ const HOST_ACTION_CATALOG = Object.freeze([
     executionEntry: "host.setContextPaneOpen()",
     readinessAssertions: [
       "The context pane open state matches the requested value.",
+      "When opened, the context pane root or sidenav surface is structurally observable.",
+      "When opened, the context pane exposes navigation or content signals, not just a collapsed-state flip.",
     ],
     evidenceTargets: [
       "context-pane",
@@ -97,6 +237,10 @@ const HOST_ACTION_CATALOG = Object.freeze([
     executionEntry: "host.selectItemPane()",
     readinessAssertions: [
       "The requested Item Pane section is visible.",
+      "The selected Item Pane fragment is mounted with observable content.",
+      "The matching Item Pane sidenav button is discoverable in the live host.",
+      "If the selected surface is edge-attached, it follows live pane bounds or returns an explicit narrow-width degrade.",
+      "A surface-local evidence target is returned for the selected Item Pane surface.",
     ],
     evidenceTargets: [
       "item-pane-sidenav",
@@ -135,6 +279,10 @@ const HOST_ACTION_CATALOG = Object.freeze([
     readinessAssertions: [
       "The context pane is open.",
       "The requested context pane section is visible.",
+      "The selected context pane fragment is mounted with observable content.",
+      "The matching context pane sidenav button is discoverable in the live host.",
+      "If the selected surface is edge-attached, it follows live pane bounds or returns an explicit narrow-width degrade.",
+      "A surface-local evidence target is returned for the selected context pane surface.",
     ],
     evidenceTargets: [
       "context-pane",
@@ -192,9 +340,48 @@ const HOST_ACTION_CATALOG = Object.freeze([
     executionEntry: "reader.setContextPaneOpen()",
     readinessAssertions: [
       "Reader UI state reports the requested contextPaneOpen value.",
+      "When opened, the shared context pane root or sidenav is structurally observable.",
+      "When opened, the surface exposes navigation or content signals.",
+      "When opened, edge-attached occupancy follows live pane bounds or returns an explicit narrow-width degrade.",
+      "A surface-local evidence target is returned for the opened reader context pane surface.",
     ],
     evidenceTargets: [
       "context-pane",
+    ],
+    ownerModules: [
+      "src/features/reader.js",
+      "src/app/host-actions.js",
+    ],
+    executable: true,
+  },
+  {
+    id: "reader.toolbar.triggerButton",
+    label: "Trigger Reader Toolbar Button",
+    status: HOST_ACTION_STATUSES.READY,
+    category: "reader",
+    summary: "Locate a live renderToolbar button in the active reader surface and replay its host-visible action.",
+    authoritativeSource: [
+      {
+        file: "reference/zotero-main/test/content/support.js",
+        anchor: "dialog.getButton(button).click()",
+      },
+      {
+        file: "reference/zotero-main/test/tests/pluginAPITest.js",
+        anchor: "simulateMenuItemClick()",
+      },
+    ],
+    preconditions: [
+      "A reader instance is already open for the target attachment.",
+      "The renderToolbar integration exposes a stable live button selector or marker.",
+    ],
+    executionEntry: "reader.findToolbarElement() + live button click replay",
+    readinessAssertions: [
+      "The target toolbar button is discoverable in the live reader document.",
+      "The button action is replayed through a live click-compatible path.",
+      "A surface-local evidence target can be returned for the toolbar button surface.",
+    ],
+    evidenceTargets: [
+      "render-toolbar",
     ],
     ownerModules: [
       "src/features/reader.js",
@@ -222,6 +409,9 @@ const HOST_ACTION_CATALOG = Object.freeze([
     readinessAssertions: [
       "Reader UI state reports the requested sidebarView value.",
       "The corresponding sidebar button or panel is observable.",
+      "The observed sidebar surface has structural or content signals, not just a matching state field.",
+      "If the selected surface is sidebar-attached, it follows live sidebar bounds or returns an explicit narrow-width degrade.",
+      "A surface-local evidence target is returned for the active reader sidebar surface.",
     ],
     evidenceTargets: [
       "reader-sidebar-view",
@@ -252,6 +442,9 @@ const HOST_ACTION_CATALOG = Object.freeze([
     readinessAssertions: [
       "The live menu popup is open.",
       "The registered menu item is visible in the live menu popup.",
+      "The live menu item is actionable rather than hidden or disabled.",
+      "The popup exposes real menu structure or item content, not just an empty shell.",
+      "A surface-local evidence target is returned for the live menu popup or menu item surface.",
     ],
     evidenceTargets: [
       "menu-item",
@@ -282,6 +475,8 @@ const HOST_ACTION_CATALOG = Object.freeze([
     executionEntry: "menu.show + live menu command dispatch",
     readinessAssertions: [
       "The live menu item command is dispatched without error.",
+      "The live menu item remains actionable while being triggered.",
+      "A surface-local evidence target remains available for the triggered menu item surface.",
     ],
     evidenceTargets: [
       "menu-item",
@@ -342,6 +537,43 @@ const HOST_ACTION_CATALOG = Object.freeze([
       "src/platform/zotero-host.js",
     ],
     executable: false,
+  },
+  {
+    id: "window.openReactDemo",
+    label: "Open React Demo Window",
+    status: HOST_ACTION_STATUSES.READY,
+    category: "window",
+    summary: "Open or reuse the standalone example window backed by the optional React UI bundle.",
+    authoritativeSource: [
+      {
+        file: "src/utils/window-shell.js",
+        anchor: "createWindowShellManager()",
+      },
+      {
+        file: "addon-static/content/react-ui/demo.xhtml",
+        anchor: "standalone shell",
+      },
+    ],
+    preconditions: [
+      "Optional bundle `react-ui` is enabled.",
+      "A main Zotero window can open a dialog window.",
+    ],
+    executionEntry: "reactUIDemo.openDemoWindow()",
+    readinessAssertions: [
+      "The example window opens or reuses an existing shell.",
+      "The window is ready and focused.",
+      "A surface-local evidence target is available for the window shell.",
+    ],
+    evidenceTargets: [
+      "window-shell",
+    ],
+    ownerModules: [
+      "src/features/react-ui-demo.js",
+      "src/utils/window-shell.js",
+      "src/app/host-actions.js",
+    ],
+    executable: true,
+    requiredBundle: "react-ui",
   },
   {
     id: "dialog.modal.confirmation",
@@ -445,19 +677,29 @@ const HOST_ACTION_CATALOG = Object.freeze([
   },
 ]);
 
-export function listHostActionDescriptors() {
-  return HOST_ACTION_CATALOG.map((entry) => clone(entry));
+function shouldExposeHostAction(entry, options = {}) {
+  const requiredBundle = String(entry?.requiredBundle || "").trim();
+  if (!requiredBundle) {
+    return true;
+  }
+  return isOptionalBundleEnabled(options.optionalBundles, requiredBundle);
 }
 
-export function getHostActionDescriptor(actionId) {
+export function listHostActionDescriptors(options = {}) {
+  return HOST_ACTION_CATALOG
+    .filter((entry) => shouldExposeHostAction(entry, options))
+    .map((entry) => clone(entry));
+}
+
+export function getHostActionDescriptor(actionId, options = {}) {
   const id = String(actionId || "").trim();
   if (!id) {
     return null;
   }
-  const matched = HOST_ACTION_CATALOG.find((entry) => entry.id === id);
+  const matched = HOST_ACTION_CATALOG.find((entry) => entry.id === id && shouldExposeHostAction(entry, options));
   return matched ? clone(matched) : null;
 }
 
-export function isExecutableHostAction(actionId) {
-  return Boolean(getHostActionDescriptor(actionId)?.executable);
+export function isExecutableHostAction(actionId, options = {}) {
+  return Boolean(getHostActionDescriptor(actionId, options)?.executable);
 }

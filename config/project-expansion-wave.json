@@ -2,39 +2,55 @@
   "schemaVersion": 1,
   "status": "active",
   "currentContractId": "generic-expansion-wave-v1",
-  "currentWaveName": "ZOTERO-HOST-WAVE-001",
-  "summary": "Inventory the checked-in Zotero host source mirror, promote stable non-destructive entrypoints into reusable Host Actions, and upgrade validation to surface smoke plus surface-local evidence.",
+  "currentWaveName": "ZOTERO-HOST-POLISH-WAVE-001",
+  "summary": "Tighten host-visible surface interaction consistency, edge-mode geometry handling, and surface-local evidence while keeping the previous optional bundle lane as a completed baseline and release-only follow-up out of scope.",
   "inScopeModules": [
-    "zotero-host-inventory",
-    "host-action-runner",
-    "surface-smoke-scenarios",
-    "surface-local-visual-evidence"
+    "preference-pane-polish",
+    "context-pane-edge-mode",
+    "item-pane-sidenav-polish",
+    "reader-toolbar-sidebar-polish",
+    "menu-item-polish",
+    "surface-evidence-consistency"
   ],
   "outOfScopeModules": [
-    "release-remote-distribution",
-    "destructive-modal-host-actions"
+    "reader-deeper-event-points",
+    "p1-whitelist-expansion",
+    "agent-runtime-implementation",
+    "ai-service-implementation",
+    "release-remote-distribution"
   ],
   "moduleArchetypes": [
     {
-      "module": "zotero-host-inventory",
-      "archetype": "host-integration"
-    },
-    {
-      "module": "host-action-runner",
-      "archetype": "host-integration"
-    },
-    {
-      "module": "surface-smoke-scenarios",
+      "module": "preference-pane-polish",
       "archetype": "visible-surface"
     },
     {
-      "module": "surface-local-visual-evidence",
+      "module": "context-pane-edge-mode",
       "archetype": "visible-surface"
+    },
+    {
+      "module": "item-pane-sidenav-polish",
+      "archetype": "visible-surface"
+    },
+    {
+      "module": "reader-toolbar-sidebar-polish",
+      "archetype": "visible-surface"
+    },
+    {
+      "module": "menu-item-polish",
+      "archetype": "visible-surface"
+    },
+    {
+      "module": "surface-evidence-consistency",
+      "archetype": "workspace-integration"
     }
   ],
-  "acceptanceTrack": "host-first -> surface smoke -> surface-local visual evidence",
+  "acceptanceTrack": "host-first -> live geometry / interaction consistency -> surface smoke -> surface-local evidence -> full gate",
   "explicitVisualUpgradeModules": [
-    "surface-smoke-scenarios",
-    "surface-local-visual-evidence"
+    "preference-pane-polish",
+    "context-pane-edge-mode",
+    "item-pane-sidenav-polish",
+    "reader-toolbar-sidebar-polish",
+    "menu-item-polish"
   ]
 }

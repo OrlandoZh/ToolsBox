@@ -3,6 +3,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { resolveAgentArtifactPath, resolveAgentArtifactsDir } from "./agent-artifacts.mjs";
+import { summarizeAgentContextSnapshot } from "./agent-context-lib.mjs";
 import {
   buildVisualExhaustedStageSummary,
   buildPureVisualReaderFailureSummary,
@@ -12,6 +13,10 @@ import {
   buildScriptFailureInfo,
   createScriptError,
 } from "./script-runtime-lib.mjs";
+import {
+  RELEASE_PLAN_RUN_DESCRIPTION,
+  RELEASE_PLAN_RUN_NAME,
+} from "./release-flow-contract-lib.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,6 +43,7 @@ function escapeHTML(value) {
 
 const TASK_DESCRIPTIONS = {
   check: "执行统一质量检查（lint、格式、类型与测试）",
+  [RELEASE_PLAN_RUN_NAME]: RELEASE_PLAN_RUN_DESCRIPTION,
   "telemetry-test": "遥测链路成功样例，用于验证记录与统计",
   "telemetry-fail-test": "遥测链路失败样例，用于验证失败监控",
 };
@@ -215,6 +221,17 @@ function createFailureRows(reasons) {
   <td>${escapeHTML(reason.reason || "未知")}</td>
   <td>${escapeHTML(reason.count ?? 0)}</td>
 </tr>`).join("\n");
+}
+
+async function loadJSONIfExists(filePath) {
+  return await fs.readFile(filePath, "utf-8")
+    .then((content) => JSON.parse(content))
+    .catch((error) => {
+      if (error && error.code === "ENOENT") {
+        return null;
+      }
+      throw error;
+    });
 }
 
 function buildFailureHTML(failureInfo) {
@@ -618,6 +635,59 @@ function renderFrontpageSummary(summary) {
           <div class="frontpage-card frontpage-card-wide">
             <div class="label">关键信号</div>
             <ul class="signal-list">${signalItems}</ul>
+          </div>
+        </div>
+      </section>`;
+}
+
+function renderAgentContext(summary) {
+  const context = summary.agentContext && typeof summary.agentContext === "object"
+    ? summary.agentContext
+    : { present: false };
+  const warningList = Array.isArray(context.driftRef?.warnings) ? context.driftRef.warnings.slice(0, 4) : [];
+  const warningItems = warningList.length === 0
+    ? "<li>当前没有额外 drift 警告</li>"
+    : warningList.map((item) => `<li>${escapeHTML(item)}</li>`).join("");
+  const severityClass = context.present && String(context.driftRef?.status || "missing") === "clear"
+    ? "status-ok"
+    : (context.present ? "status-warn" : "status-warn");
+
+  return `<section class="panel full">
+        <div class="frontpage-head">
+          <div>
+            <h2>Agent Context</h2>
+            <div class="frontpage-headline">${escapeHTML(context.summary || "缺少 agent-context 工件。")}</div>
+          </div>
+          <span class="status-pill ${severityClass}">${escapeHTML(context.present ? (context.driftRef?.status || "missing") : "missing")}</span>
+        </div>
+        <div class="frontpage-grid">
+          <div class="frontpage-card">
+            <div class="label">Compact Digest</div>
+            <div class="frontpage-command"><code>${escapeHTML(context.budgetMeta?.digest || "-")}</code></div>
+            <div class="subtle">${escapeHTML(context.budgetMeta?.profile || "-")}</div>
+          </div>
+          <div class="frontpage-card">
+            <div class="label">状态指纹</div>
+            <div class="frontpage-command"><code>${escapeHTML(context.statusRef?.dynamicFingerprint || "-")}</code></div>
+            <div class="subtle">${escapeHTML(context.statusRef?.stableContextKey || "-")}</div>
+          </div>
+          <div class="frontpage-card">
+            <div class="label">当前 Wave</div>
+            <div class="watch-value">${escapeHTML(context.truthRef?.currentWaveName || "-")}</div>
+            <div class="subtle">${escapeHTML(context.truthRef?.validationLevel || "-")}</div>
+          </div>
+          <div class="frontpage-card">
+            <div class="label">Context 下一步</div>
+            <div class="frontpage-command"><code>${escapeHTML(context.actionRef?.nextAction || "-")}</code></div>
+          </div>
+          <div class="frontpage-card frontpage-card-wide">
+            <div class="label">主阻断 / 建议证据</div>
+            <div class="watch-value">${escapeHTML(context.actionRef?.mainBlocker || "当前没有明确主阻断")}</div>
+            <div class="subtle">${escapeHTML((context.evidenceRefs || []).join("；") || "当前没有额外建议证据")}</div>
+          </div>
+          <div class="frontpage-card frontpage-card-wide">
+            <div class="label">Drift 警告</div>
+            <ul class="signal-list">${warningItems}</ul>
           </div>
         </div>
       </section>`;
@@ -1080,7 +1150,7 @@ function renderReleaseMatrix(summary) {
   if (!matrix || typeof matrix !== "object") {
     return `<section class="panel full">
         <h2>本地发布矩阵</h2>
-        <div class="subtle">当前还没有发布矩阵工件，可先执行 \`npm run release:plan\` 或 \`npm run release:matrix\`。</div>
+        <div class="subtle">当前还没有发布矩阵工件，可先执行 \`npm run agent:release\`；如仅调试工件，也可直接运行 \`npm run release:plan\` 或 \`npm run release:matrix\`。</div>
       </section>`;
   }
 
@@ -1141,6 +1211,8 @@ function renderReleaseMatrix(summary) {
             <div class="subtle">宿主噪声画像: ${escapeHTML(matrix.hostNoiseRuntimeErrorPortrait || "-")}</div>
             <div class="subtle">宿主噪声渠道: ${escapeHTML(hostNoiseText)}</div>
             <div class="subtle">远端摘要: ${escapeHTML(remoteVerification?.summary || "-")}</div>
+            <div class="subtle">远端证据模式: ${escapeHTML(remoteVerification?.evidenceModeLabel || remoteVerification?.evidenceMode || "-")}</div>
+            <div class="subtle">远端发布就绪: ${escapeHTML(remoteVerification ? (remoteVerification.releaseReady === true ? "是" : "否") : "-")}</div>
             <div class="subtle">远端 update.json: ${escapeHTML(remoteVerification?.effectiveUpdateURL || "-")}</div>
             <div class="subtle">远端 update_link: ${escapeHTML(remoteVerification?.observedUpdateLink || remoteVerification?.expectedUpdateLink || "-")}</div>
           </div>
@@ -1177,6 +1249,7 @@ function buildDashboardHTML(summary) {
   const recoveryCardValue = escapeHTML(summary.zoteroValidation?.watchRecovery?.statusLabel || "缺失");
   const recoveryCardSubtle = escapeHTML(summary.zoteroValidation?.watchRecovery?.ageText || "-");
   const frontpageSection = renderFrontpageSummary(summary);
+  const contextSection = renderAgentContext(summary);
   const validationSection = renderZoteroValidation(summary);
   const hardeningSection = renderEngineeringHardening(summary);
   const memorySection = renderAgentMemory(summary);
@@ -1525,6 +1598,7 @@ function buildDashboardHTML(summary) {
         <div class="bar"><div class="bar-ok"></div><div class="bar-bad"></div></div>
       </section>
       ${frontpageSection}
+      ${contextSection}
       ${watchSection}
       ${validationSection}
       ${hardeningSection}
@@ -1560,9 +1634,13 @@ function buildDashboardHTML(summary) {
 
 async function main() {
   const monitorPath = resolveAgentArtifactPath(projectRoot, "agent-monitor.json");
+  const contextPath = resolveAgentArtifactPath(projectRoot, "agent-context.json");
   const htmlPath = resolveAgentArtifactPath(projectRoot, "agent-dashboard.html");
 
-  const source = await fs.readFile(monitorPath, "utf-8");
+  const [source, agentContext] = await Promise.all([
+    fs.readFile(monitorPath, "utf-8"),
+    loadJSONIfExists(contextPath),
+  ]);
   const summary = JSON.parse(source);
   assert(summary && typeof summary === "object", "Invalid monitor summary data", {
     failedStage: "read-monitor",
@@ -1570,6 +1648,7 @@ async function main() {
       filePath: monitorPath,
     },
   });
+  summary.agentContext = summarizeAgentContextSnapshot(agentContext);
 
   const html = buildDashboardHTML(summary);
   await fs.mkdir(resolveAgentArtifactsDir(projectRoot), { recursive: true });

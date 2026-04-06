@@ -1,3 +1,22 @@
+:root {
+  color-scheme: light dark;
+  --cleanroom-menuitem-color: var(--cleanroom-theme-text-primary, var(--fill-primary, CanvasText));
+  --cleanroom-menuitem-active-bg: color-mix(
+    in srgb,
+    var(--cleanroom-theme-accent, var(--color-accent, var(--accent-blue, #4072e5))) 18%,
+    transparent
+  );
+  --cleanroom-menuitem-active-color: var(--cleanroom-theme-text-primary, var(--fill-primary, CanvasText));
+  --cleanroom-status-zero-color: var(--cleanroom-theme-accent, var(--color-accent, var(--accent-blue, #4072e5)));
+  --cleanroom-status-ready-color: var(--cleanroom-theme-success, var(--accent-green, #39bf68));
+}
+
 #cleanroom-template-menuitem {
   font-weight: 600;
+  color: var(--cleanroom-menuitem-color);
+}
+
+#cleanroom-template-menuitem[_moz-menuactive="true"] {
+  background-color: var(--cleanroom-menuitem-active-bg);
+  color: var(--cleanroom-menuitem-active-color);
 }

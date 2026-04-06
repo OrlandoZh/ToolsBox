@@ -25,6 +25,7 @@ describe("Capability Manifest", () => {
     const settingsCapability = findCapabilityById(manifest, "settings-governance");
     assert.equal(settingsCapability.agentScenario, "settings-snapshot");
     assert.includes(settingsCapability.ownedBy, "src/settings/schema.js");
+    assert.includes(settingsCapability.zoteroScenarios, "preference pane control interaction");
 
     const windowCapability = findCapabilityById(manifest, "multi-window-mount");
     assert.includes(windowCapability.successSignals.join(" "), "样式");
@@ -45,5 +46,6 @@ describe("Capability Manifest", () => {
     const hostActionsCapability = findCapabilityById(manifest, "host-actions");
     assert.equal(hostActionsCapability.agentScenario, "host-actions");
     assert.includes(hostActionsCapability.zoteroScenarios, "preference pane surface smoke");
+    assert.includes(hostActionsCapability.zoteroScenarios, "preference pane control interaction");
   });
 });

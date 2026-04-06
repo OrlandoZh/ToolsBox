@@ -10,6 +10,7 @@ describe("Agent Capability Lib", () => {
           results: [
             { name: "baseline registration diagnostics", status: "passed" },
             { name: "settings schema and preference pane diagnostics", status: "passed" },
+            { name: "preference pane control interaction", status: "passed" },
             { name: "multi-window mount diagnostics", status: "failed" },
           ],
         },

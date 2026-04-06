@@ -5,6 +5,7 @@
 ## Current Truth
 
 - 当前“完成度 / 当前主线 / 当前剩余项”只认 [docs/CURRENT_BACKLOG.md](docs/CURRENT_BACKLOG.md) 的“当前单一事实源”
+- 如只需快速定向当前项目态，可先读 `dist/agent-context.json` 的 `runtimeCompact` 视图；一旦涉及 truth、wave、validation 或 scope 判定，仍必须回到 `docs/CURRENT_BACKLOG.md` 与对应 mirror
 - 不要直接根据旧 `dist/` 工件、README 历史段落或单次命令输出判断当前主线
 - 如果 truth 变化，先更新 `docs/CURRENT_BACKLOG.md`，再运行 `npm run docs:sync-current-truth`
 
@@ -35,6 +36,8 @@
 3. 需要把 Obsidian 工作台刷新成“当前项目态”时，优先运行 `npm run agent:sync`
 4. `agent:sync` 会按 `agent:monitor -> agent:gate -> agent:obsidian -> agent:obsidian:guard:strict` 原子刷新当前状态页与白板
 5. 涉及运行时、UI、场景或宿主集成的改动，优先运行 `npm run agent:zotero:e2e`
+5.1. 若 `zotero:scenario` 或 `agent:zotero:e2e` 在 scenario 阶段失败/超时，先用 `npm run zotero:scenario -- --list-scenarios` 确认可选场景，再用 `--scenario-file <pattern>` / `--scenario <pattern>` 做最小复现
+5.2. filtered `zotero:scenario` 只用于调试，不改 current truth；当前主结论仍以 full `agent:zotero:e2e -> agent:monitor -> agent:gate` 为准
 6. 需要连续热重载观察时，再运行 `npm run zotero:watch`
 7. 每轮改动后运行 `npm run agent:monitor` 与 `npm run agent:gate`
 8. 以 `agent:gate` / `agent:gate:release` 结论作为是否继续推进的主判据
@@ -65,6 +68,14 @@
 - 若要描述 Reader 侧的工具栏注入，优先写 `renderToolbar`，不要改写成宽泛的工具栏入口别名。
 - 若要描述菜单注入，优先写 `menu item`，不要改写成含义更松散的旧菜单别名。
 - 若只是说明可见位置，可以把 `侧边栏`、`窗格`、`工具栏` 作为补充描述；不要让位置描述反过来替代宿主 API 名称。
+
+## UI Creation Path Rule
+
+- 需要为 Zotero 可见面选择 UI 实现路线时，先看 `docs/UI_CREATION_PATHS.md`；优先按“宿主注册式 surface -> 统一节点工厂 / ztoolkit UI -> HTML micro-app -> standalone dialog / window shell -> XUL custom element -> host patch”递进，不要一开始就直接 patch 宿主。
+- 需要回溯“新增参考项目为什么被映射到某条 UI 路线”时，再看 `docs/REFERENCE_PLUGIN_UI_ANALYSIS.md`；它只负责来源追踪，不替代 `docs/UI_CREATION_PATHS.md` 的路线选型。
+- 若不是在选 UI 路线，而是在抽 `reference/plugin/*` 中窗口、服务、队列、iframe、重资源等通用技术链，先看 `docs/REFERENCE_PLUGIN_TECHNICAL_CHAINS.md`。
+- 引用 `reference/plugin/*` 时，只提炼可复用技术路径与关键技术节点，不照抄产品 UI 结构、命名或非 clean-room 实现细节。
+- 需要判断某条 UI 路线当前模板验证是否已充分覆盖、是否应补 route-specific contract 时，先看 `docs/UI_VALIDATION_PATHS.md`；默认保持“surface smoke / surface-local evidence 优先”，不要把所有 UI 路线一律升级成 strict visual。
 
 ## Host Interface Rule
 

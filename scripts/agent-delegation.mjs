@@ -18,6 +18,7 @@ import {
   captureProjectSnapshot,
   diffProjectSnapshots,
   loadDelegationManifest,
+  loadDelegationRuntimeContext,
   renderDelegationReviewMarkdown,
   resolveDelegationTaskArtifacts,
 } from "./agent-delegation-lib.mjs";
@@ -37,7 +38,7 @@ function usage() {
 
 Commands:
   list [--json] [--manifest <path>]
-  run <taskId> [taskId...] [--manifest <path>]
+  run <taskId> [taskId...] [--manifest <path>] [--inline-contract]
   review <taskId> [taskId...] [--reviewer <name>] [--manifest <path>]
   close <taskId> [--dry-run] [--message <text>] [--json] [--manifest <path>]
 `);
@@ -50,6 +51,7 @@ function parseArgs(argv) {
     reviewer: "codex",
     json: false,
     dryRun: false,
+    inlineContract: false,
     manifestPath: null,
     message: null,
   };
@@ -70,6 +72,10 @@ function parseArgs(argv) {
     }
     if (arg === "--dry-run") {
       options.dryRun = true;
+      continue;
+    }
+    if (arg === "--inline-contract") {
+      options.inlineContract = true;
       continue;
     }
     if (arg === "--manifest") {
@@ -186,12 +192,22 @@ async function writeTaskSnapshot(filePath, payload) {
   await writeJSONArtifact(filePath, payload);
 }
 
-async function runDelegationTask(task) {
+async function runDelegationTask(task, options = {}) {
   const artifacts = resolveDelegationTaskArtifacts(projectRoot, task.taskId);
   await fs.mkdir(artifacts.baseDir, { recursive: true });
+  const runtimeContext = await loadDelegationRuntimeContext(projectRoot);
 
-  const prompt = buildDelegationPrompt(task);
-  const invocation = buildMcoRunInvocation(task, projectRoot, { prompt });
+  const prompt = buildDelegationPrompt(task, {
+    manifestPath: options.manifestPath,
+    inlineContract: options.inlineContract,
+    runtimeContext,
+  });
+  const invocation = buildMcoRunInvocation(task, projectRoot, {
+    prompt,
+    manifestPath: options.manifestPath,
+    inlineContract: options.inlineContract,
+    runtimeContext,
+  });
   const startedAt = Date.now();
   const beforeSnapshot = await captureProjectSnapshot(projectRoot);
 
@@ -207,6 +223,11 @@ async function runDelegationTask(task) {
       commandLine: formatCommandLine(invocation.command, invocation.args),
       cwd: invocation.cwd,
       prompt,
+      promptMode: invocation.promptMode,
+      contractReference: invocation.contractReference,
+      runtimeContextProfile: invocation.runtimeContextProfile,
+      runtimeContextDigest: invocation.runtimeContextDigest,
+      promptAssembly: invocation.promptAssembly,
     }),
     writeTaskSnapshot(artifacts.beforeSnapshotJSON, beforeSnapshot),
   ]);
@@ -366,7 +387,7 @@ async function main() {
   if (options.command === "run") {
     assertDelegationBatchSafe(tasks);
     for (const task of tasks) {
-      await runDelegationTask(task);
+      await runDelegationTask(task, options);
       console.log(`Delegation run completed: ${task.taskId}`);
     }
     return;

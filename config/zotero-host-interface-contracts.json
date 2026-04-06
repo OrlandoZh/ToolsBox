@@ -110,6 +110,7 @@
           "file": "src/features/item-pane.js",
           "snippets": [
             "function registerSection(sectionOptions) {",
+            "error(\"itemPane.registerSection.noOnRender\", { paneID });",
             "config.header.l10nID = header.l10nID;",
             "config.sidenav.l10nID = sidenav.l10nID;",
             "const registeredPaneID = Zotero.ItemPaneManager.registerSection(config);"
@@ -131,6 +132,7 @@
           "snippets": [
             "registerSection(options: SectionOptions): string | null;",
             "registerInfoRow(options: InfoRowOptions): string | null;",
+            "onRender: (props: {",
             "headerL10nID: string;",
             "labelL10nID: string;"
           ]
@@ -229,6 +231,8 @@
             "function resolveURI(uri) {",
             "async function registerPane(paneOptions) {",
             "const resolvedSrc = resolveURI(src);",
+            "const useOnPreferenceLoad = typeof onPreferenceLoad === \"function\";",
+            "registerPreferencePaneLoadHandler(paneId, onPreferenceLoad);",
             "const paneId = await Zotero.PreferencePanes.register(registerOptions);",
             "Zotero.PreferencePanes.unregister(paneId);"
           ]
@@ -240,7 +244,8 @@
           "snippets": [
             "registerPane(options: PreferencePaneOptions): Promise<string | null>;",
             "resolveURI(uri: string): string;",
-            "label?: string;"
+            "label?: string;",
+            "onPreferenceLoad?: ("
           ]
         }
       ],
@@ -311,7 +316,7 @@
             "isEventAPIAvailable(): boolean;",
             "waitForReaderReady(target: unknown, options?: { timeoutMs?: number; intervalMs?: number }): Promise<unknown | null>;",
             "setContextPaneOpen(target: unknown, open: boolean, options?: { timeoutMs?: number; intervalMs?: number }): Promise<Record<string, unknown> | null>;",
-            "selectSidebarView(target: unknown, view: string, options?: { timeoutMs?: number; intervalMs?: number }): Promise<{",
+            "selectSidebarView(target: unknown, view: string, options?: {",
             "findToolbarElement(target: unknown, options?: { selector?: string; view?: \"primary\" | \"secondary\" }): Element | null;",
             "findSidebarViewElements(target: unknown, view: string, options?: { view?: \"primary\" | \"secondary\" }): {",
             "registerEventListener(type: string, handler: (event: ReaderEvent) => void, options?: { pluginID?: string }): (() => void) | null;",

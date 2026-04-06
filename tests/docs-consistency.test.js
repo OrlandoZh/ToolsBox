@@ -144,71 +144,116 @@ describe("Documentation Consistency", () => {
     const roadmap = readDoc("docs/AGENT_AUTONOMY_ROADMAP.md");
     const legal = readDoc("LEGAL_RISK_CHECKLIST.md");
 
-    assert.ok(summary.includes("`ENG-HIGH-103`"));
-    assert.ok(summary.includes("`READER-HIGH-124 / READER-LOW-261~263`"));
-    assert.ok(summary.includes("`READER-HIGH-125`"));
-    assert.ok(summary.includes("`READER-HIGH-126`"));
-    assert.ok(summary.includes("`99%`"));
-    assert.ok(summary.includes("`2026-03-30T11:34:05.136Z`"));
-    assert.ok(summary.includes("`2026-03-30T11:31:37.694Z`"));
-    assert.ok(summary.includes("`2026-03-30T11:35:48.300Z`"));
-    assert.ok(summary.includes("`2026-03-30T11:35:48.379Z`"));
-    assert.ok(summary.includes("最新开发态 `agent:monitor` / `agent:gate`"));
-    assert.ok(summary.includes("`agent:zotero:e2e` 为 `passed`"));
-    assert.ok(summary.includes("`stable / ready`"));
-    assert.ok(summary.includes("最新 `watch` 工件为 `healthy`"));
-    assert.ok(summary.includes("`failedStage=null`"));
-    assert.ok(summary.includes("`errorCategory=null`"));
-    assert.ok(summary.includes("`details.runtimeSanitization`"));
-    assert.ok(summary.includes("`exclusiveProjectRuntime=true`"));
-    assert.ok(summary.includes("project-managed `watch` `zotero` / `plugin-container`"));
-    assert.ok(summary.includes("`visibleBannerIDs=[mac-word-plugin-install-container]`"));
-    assert.ok(summary.includes("`sync-reminder-container`"));
-    assert.ok(summary.includes("`post-upgrade-container`"));
-    assert.ok(summary.includes("`file-renaming-banner-container`"));
-    assert.ok(summary.includes("`retracted-items-container`"));
-    assert.ok(summary.includes("`architecture-warning-container`"));
-    assert.ok(summary.includes("library drift 已消失"));
-    assert.ok(summary.includes("当前主阻断已清零"));
-    assert.ok(summary.includes("`visual screenshot capture`"));
-    assert.ok(summary.includes("reader 视图"));
-    assert.ok(summary.includes("`2000x1200`"));
-    assert.ok(summary.includes("freshest-valid artifact"));
-    assert.ok(summary.includes("单一事实源"));
-    assert.ok(summary.includes("远端 `updateURL` 闭环验证"));
-    assert.ok(summary.includes("`release-only` 人工流程"));
-    assert.ok(summary.includes("`capture-command-failed`"));
-    assert.ok(summary.includes("`ENG-HIGH-103` 的启动诊断 + runtime 清理 + `pre-capture settle`"));
-    assert.ok(summary.includes("`agent:gate:release`"));
-    assert.ok(summary.includes("`gatePassed=false`"));
-    assert.ok(summary.includes("`release-matrix` 最新工件为 `failed`"));
-    assert.ok(summary.includes("`readinessMode=native`"));
-    assert.ok(summary.includes("`apiReady=true`"));
-    assert.ok(summary.includes("`https://gitee.com/zouser/user/releases/download/1.1/update.json`"));
-    assert.ok(summary.includes("`updateURLHTTPStatus=200`"));
-    assert.ok(summary.includes("未包含 `cleanroom-template@example.com` 首条更新记录"));
-    assert.ok(summary.includes("未提供有效 `update_link`"));
-    assert.ok(summary.includes("仅用于这个模板仓库自身的远端发布验收与测试"));
-    assert.ok(summary.includes("下游项目仍需在各自 `config/addon.config.json` 中替换自己的 `addonId` / `homepage` / `updateURL`"));
-    assert.ok(summary.includes("`2026-03-30T16:19:38.678Z`"));
-    assert.ok(summary.includes("`2026-03-30T16:19:52.762Z`"));
-    assert.equal(summary.includes("`startup / RDP bring-up timeout`"), false);
-    assert.equal(summary.includes("`failedStage=launch-session`"), false);
-    assert.equal(summary.includes("`agent:obsidian`"), false);
-    assert.equal(summary.includes("`watch stale`"), false);
-    assert.equal(summary.includes("`nextAction=npm run agent:gate`"), false);
-    assert.equal(summary.includes("`agent:gate` 为 `ready`"), false);
-    assert.equal(summary.includes("`2026-03-29T14:51:46.240Z`"), false);
-    assert.equal(summary.includes("`2026-03-30T02:18:25.631Z`"), false);
-    assert.equal(summary.includes("`2026-03-30T03:23:12.011Z`"), false);
-    assert.equal(summary.includes("`2026-03-30T03:24:42.589Z`"), false);
-    assert.equal(summary.includes("`2026-03-30T03:24:42.678Z`"), false);
-    assert.equal(summary.includes("`2026-03-29T17:31:23.539Z`"), false);
-    assert.equal(summary.includes("缺少库视图截图"), false);
-    assert.equal(summary.includes("缺少 Reader 截图"), false);
-    assert.equal(summary.includes("双层口径"), false);
-    assert.equal(summary.includes("`预期 UI 变化`"), false);
-    assert.equal(summary.includes("`实际回归`"), false);
+    [
+      "`ENG-HIGH-103`",
+      "`READER-HIGH-124 / READER-LOW-261~263`",
+      "`READER-HIGH-125`",
+      "`READER-HIGH-126`",
+      "`99%`",
+      "`2026-04-06T02:55:03.754Z`",
+      "`2026-04-06T02:56:31.821Z`",
+      "`2026-04-06T02:57:08.129Z`",
+      "`2026-04-06T02:57:08.402Z`",
+      "`2026-04-04T10:03:46.084Z`",
+      "最新开发态 `agent:monitor` / `agent:gate`",
+      "`stable / ready`",
+      "`restart` 与 `hot-reload` 两轮均通过",
+      "`agent:zotero:e2e:update-baseline`",
+      "`visualEvidenceSummary`",
+      "属于预期 UI 变化",
+      "`library / reader / surface-preference-cleanroomtemplate-preferences / surface-item-pane-cleanroomtemplate-details` 全部对齐",
+      "supplemental `capture-unstable`",
+      "blocking `surface-local` evidence 优先",
+      "`latestPassed=true`",
+      "`gatePassed=true`",
+      "`zotero:watch`",
+      "`agent:context`",
+      "`runtime-compact-v1`",
+      "`HOST-HIGH-201`",
+      "`HOST-HIGH-201 / HOST-LOW-301~303`",
+      "`ZOTERO-HOST-POLISH-WAVE-001`",
+      "`OPTIONAL-BUNDLE-WAVE-001`",
+      "`config/optional-bundles.json`",
+      "`host-first -> live geometry / interaction consistency -> surface smoke -> surface-local evidence -> full gate`",
+      "`react-ui` 当前固定为 `ts-isolated + implemented + enabled=false`",
+      "`agent-runtime` 固定为 `ts-isolated + planned + enabled=false`",
+      "`ai-service` 固定为 `js-core + planned + enabled=false`",
+      "`build:react-ui`",
+      "`window-shell + theme-manager + host action gating`",
+      "`config/project-validation-surfaces.json`",
+      "`details.runtimeSanitization`",
+      "`exclusiveProjectRuntime=true`",
+      "project-managed `watch` `zotero` / `plugin-container`",
+      "`visibleBannerIDs=[mac-word-plugin-install-container]`",
+      "`main.ftl + i18n bridge`",
+      "`sync-reminder-container`",
+      "`post-upgrade-container`",
+      "`file-renaming-banner-container`",
+      "`retracted-items-container`",
+      "`architecture-warning-container`",
+      "`selectedTabMatched=true`",
+      "`capture-command-failed`",
+      "`windowBounds + sidebarWidth`",
+      "`ENG-HIGH-103` 的启动诊断 + runtime 清理 + `pre-capture settle`",
+      "`agent:gate:release`",
+      "`gatePassed=false`",
+      "`release-preflight` / `release-plan` / `release-matrix`",
+      "刷新为 `远端验证失败 / failed`",
+      "`readinessMode=native`",
+      "`apiReady=true`",
+      "`https://gitee.com/zouser/user/releases/download/1.1/update.json`",
+      "`updateURLHTTPStatus=200`",
+      "未包含 `cleanroom-template@example.com` 首条更新记录",
+      "未提供有效 `update_link`",
+      "仅用于这个模板仓库自身的远端发布验收与测试",
+      "下游项目仍需在各自 `config/addon.config.json` 中替换自己的 `addonId` / `homepage` / `updateURL`",
+      "`2026-04-04T11:51:00.836Z`",
+      "`2026-04-04T11:51:01.248Z`",
+      "`2026-04-04T11:53:52.789Z`",
+      "`2026-04-04T11:54:00.719Z`",
+      "`2026-04-04T11:54:09.269Z`",
+      "`2026-04-04T11:54:15.996Z`",
+      "`workflowState`",
+      "`gateContract`",
+      "`nextSteps`",
+      "`npm run agent:release`",
+      "`release-plan` 遥测",
+      "当前 active 开发阻断已清零",
+      "release-only 的 `ENG-HIGH-104 / ENG-LOW-211~213` 继续保留为次级 follow-up",
+      "`ENG-HIGH-104 / ENG-LOW-211~213`",
+    ].forEach((snippet) => {
+      assert.ok(summary.includes(snippet), `Missing current-truth snippet: ${snippet}`);
+    });
+
+    [
+      "`2026-04-05T16:57:19.319Z`",
+      "`2026-04-05T16:50:34.863Z`",
+      "`2026-04-05T16:55:50.350Z`",
+      "`2026-04-05T16:47:07.196Z`",
+      "`2026-04-05T16:58:58.507Z`",
+      "`2026-04-05T16:58:58.729Z`",
+      "`visualDriftCount=0`",
+      "`blockerCount=0`",
+      "fresh visual evidence fully aligned",
+      "`startup / RDP bring-up timeout`",
+      "`failedStage=launch-session`",
+      "`agent:obsidian`",
+      "`watch stale`",
+      "`nextAction=npm run agent:gate`",
+      "`agent:gate` 为 `ready`",
+      "`2026-03-29T14:51:46.240Z`",
+      "`2026-03-30T02:18:25.631Z`",
+      "`2026-03-30T03:23:12.011Z`",
+      "`2026-03-30T03:24:42.589Z`",
+      "`2026-03-30T03:24:42.678Z`",
+      "`2026-03-29T17:31:23.539Z`",
+      "缺少库视图截图",
+      "缺少 Reader 截图",
+      "双层口径",
+      "`实际回归`",
+    ].forEach((snippet) => {
+      assert.equal(summary.includes(snippet), false, `Unexpected stale current-truth snippet: ${snippet}`);
+    });
 
     assert.ok(backlog.includes("<!-- CURRENT-TRUTH-SUMMARY:START -->"));
     assert.ok(readme.includes("<!-- CURRENT-TRUTH-SUMMARY:START -->"));
@@ -250,27 +295,41 @@ describe("Documentation Consistency", () => {
     assert.ok(roadmap.includes("`READER-HIGH-126`"));
     assert.ok(roadmap.includes("`AGENT_OBSIDIAN_VISUALS=1`"));
     assert.equal(readme.includes("`agent:gate` 当前已通过"), false);
-    assert.equal(assessment.includes("`gatePassed=true`"), false);
+    assert.ok(assessment.includes("`gatePassed=true`"));
+    assert.ok(assessment.includes("`gatePassed=false`"));
     assert.equal(roadmap.includes("`capture-unstable` 不再是 fresh 主阻断"), false);
   });
 
-  it("should keep the next follow-up focused on release/updateURL without reopening completed reader batches", () => {
+  it("should keep HOST-HIGH-201 as the current main batch while preserving release/updateURL as follow-up", () => {
     const backlog = readDoc("docs/CURRENT_BACKLOG.md");
     const readme = readDoc("README.md");
     const checklist = readDoc("FRAMEWORK_CHECKLIST.md");
     const assessment = readDoc("FRAMEWORK_ASSESSMENT.md");
     const roadmap = readDoc("docs/AGENT_AUTONOMY_ROADMAP.md");
 
+    assert.ok(backlog.includes("`HOST-HIGH-201 / HOST-LOW-301~303`"));
+    assert.ok(readme.includes("`HOST-HIGH-201 / HOST-LOW-301~303`"));
+    assert.ok(checklist.includes("`HOST-HIGH-201 / HOST-LOW-301~303`"));
+    assert.ok(assessment.includes("`HOST-HIGH-201 / HOST-LOW-301~303`"));
+    assert.ok(roadmap.includes("`HOST-HIGH-201 / HOST-LOW-301~303`"));
+    assert.ok(backlog.includes("`ZOTERO-HOST-POLISH-WAVE-001`"));
+    assert.ok(readme.includes("`ZOTERO-HOST-POLISH-WAVE-001`"));
     assert.ok(backlog.includes("`ENG-HIGH-104 / ENG-LOW-211~213`"));
     assert.ok(readme.includes("`ENG-HIGH-104 / ENG-LOW-211~213`"));
     assert.ok(checklist.includes("`ENG-HIGH-104 / ENG-LOW-211~213`"));
     assert.ok(assessment.includes("`ENG-HIGH-104 / ENG-LOW-211~213`"));
     assert.ok(roadmap.includes("`ENG-HIGH-104 / ENG-LOW-211~213`"));
+    assert.ok(backlog.includes("宿主可见 UI"));
+    assert.ok(backlog.includes("贴边 geometry"));
     assert.ok(backlog.includes("远端发布编排"));
     assert.ok(backlog.includes("远端 `updateURL` 闭环验证"));
     assert.equal(backlog.includes("当前 active 高逻辑已切到 `READER-HIGH-126`"), false);
     assert.equal(readme.includes("当前 active 高逻辑已切到 `READER-HIGH-126`"), false);
     assert.equal(assessment.includes("当前 active 高逻辑已切到 `READER-HIGH-126`"), false);
     assert.equal(roadmap.includes("当前 active 高逻辑已切到 `READER-HIGH-126`"), false);
+    assert.equal(backlog.includes("当前 active 高逻辑已切到 `ENG-HIGH-104`"), false);
+    assert.equal(readme.includes("当前 active 高逻辑已切到 `ENG-HIGH-104`"), false);
+    assert.equal(assessment.includes("当前 active 高逻辑已切到 `ENG-HIGH-104`"), false);
+    assert.equal(roadmap.includes("当前 active 高逻辑已切到 `ENG-HIGH-104`"), false);
   });
 });

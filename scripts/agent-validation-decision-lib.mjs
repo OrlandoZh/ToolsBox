@@ -489,6 +489,17 @@ function evaluateVisualEvidence(level, e2e) {
     || Number(report.visualEvidenceItemCount || 0) > 0
   );
   const visualEvidenceFailingCount = hasE2E ? Number(report.visualEvidenceFailingItemCount || 0) : 0;
+  const visualEvidenceItems = Array.isArray(report.visualEvidenceItems) ? report.visualEvidenceItems : [];
+  const hasScopeAwareEvidenceItems = visualEvidenceItems.some((item) => {
+    return typeof item?.scope === "string" && item.scope.trim().length > 0;
+  });
+  const blockingVisualEvidenceFailingCount = hasE2E
+    ? (
+      hasScopeAwareEvidenceItems
+        ? visualEvidenceItems.filter((item) => String(item?.scope || "").trim() === "surface-local").length
+        : visualEvidenceFailingCount
+    )
+    : 0;
   const e2ePassed = hasE2E && String(report.status || "") === "passed";
 
   const evidence = {
@@ -497,13 +508,14 @@ function evaluateVisualEvidence(level, e2e) {
     visualEvidencePresent,
     visualEvidenceItemCount: hasE2E ? Number(report.visualEvidenceItemCount || 0) : 0,
     visualEvidenceFailingCount,
+    blockingVisualEvidenceFailingCount,
     missing: false,
     failed: false,
   };
 
   if (level === VISUAL_LEVEL.required) {
     evidence.missing = !hasE2E || !visualEvidencePresent;
-    evidence.failed = hasE2E && visualEvidencePresent && (!e2ePassed || visualEvidenceFailingCount > 0);
+    evidence.failed = hasE2E && visualEvidencePresent && (!e2ePassed || blockingVisualEvidenceFailingCount > 0);
   }
 
   return evidence;

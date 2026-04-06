@@ -6,6 +6,9 @@ import {
   buildGateFrontpageSummary,
 } from "./agent-frontpage-summary-lib.mjs";
 import {
+  summarizeAgentContextSnapshot,
+} from "./agent-context-lib.mjs";
+import {
   DEFAULT_WATCH_STALE_AFTER_MINUTES,
   summarizeZoteroWatchStatus,
 } from "./zotero-watch-status-lib.mjs";
@@ -34,6 +37,12 @@ import {
   writeJSONArtifact,
 } from "./script-runtime-lib.mjs";
 import { summarizeEngineeringHardening } from "./engineering-hardening-lib.mjs";
+import { normalizeRemoteReleaseVerification } from "./release-remote-verification-lib.mjs";
+import {
+  buildReleaseGateContract,
+  RELEASE_PLAN_RUN_DESCRIPTION,
+  RELEASE_PLAN_RUN_NAME,
+} from "./release-flow-contract-lib.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,10 +51,12 @@ const scriptStartedAt = Date.now();
 
 const TASK_DESCRIPTIONS = {
   check: "执行统一质量检查（lint、格式、类型、verify、test）",
-  "release-plan": "执行本地发布计划（package + preflight + release notes）",
+  [RELEASE_PLAN_RUN_NAME]: RELEASE_PLAN_RUN_DESCRIPTION,
   "telemetry-test": "遥测成功样例，用于验证日志链路",
   "telemetry-fail-test": "遥测失败样例，用于验证失败统计",
 };
+
+const RELEASE_GATE_CONTRACT = buildReleaseGateContract();
 
 const PROFILE_DEFAULTS = {
   dev: {
@@ -62,7 +73,7 @@ const PROFILE_DEFAULTS = {
     minPassRate: 85,
     maxRecentFailed: 0,
     recentWindow: 10,
-    requiredRuns: ["check", "release-plan"],
+    requiredRuns: ["check", RELEASE_PLAN_RUN_NAME],
     watchStatusEnabled: false,
     watchStaleAfterMinutes: DEFAULT_WATCH_STALE_AFTER_MINUTES,
     zoteroValidationEnabled: false,
@@ -676,8 +687,8 @@ function evaluateReleaseMatrix(releaseMatrix, policy) {
         "缺少本地发布矩阵工件，尚未确认 stable/beta 渠道的发布准备状态。",
       ],
       recommendations: [
-        "先运行 `npm run release:plan` 生成最新发布工件与基础矩阵。",
-        "随后补跑 `npm run release:install-smoke:stable` 和 `npm run release:install-smoke:beta`，再执行 `npm run release:matrix`。",
+        `先运行 \`${RELEASE_GATE_CONTRACT.preferredPreparationCommand}\` 生成最新发布工件并记录 \`${RELEASE_GATE_CONTRACT.requiredRunName}\` 遥测。`,
+        `随后补跑 \`${RELEASE_GATE_CONTRACT.installSmokeStableCommand}\` 与 \`${RELEASE_GATE_CONTRACT.installSmokeBetaCommand}\`，再执行 \`npm run release:matrix\`。`,
       ],
       present: false,
       status: "missing",
@@ -701,17 +712,20 @@ function evaluateReleaseMatrix(releaseMatrix, policy) {
     });
   }
   const remoteVerification = releaseMatrix.remoteVerification && typeof releaseMatrix.remoteVerification === "object"
-    ? releaseMatrix.remoteVerification
+    ? normalizeRemoteReleaseVerification(releaseMatrix.remoteVerification)
     : null;
   if (remoteVerification && remoteVerification.status !== "passed") {
     const remoteLabel = remoteVerification.statusLabel || remoteVerification.status || "未知";
     issues.push(`远端发布验证未通过：${remoteLabel} / ${remoteVerification.summary || "-"}`);
+  } else if (remoteVerification && remoteVerification.releaseReady !== true) {
+    const evidenceModeLabel = remoteVerification.evidenceModeLabel || remoteVerification.evidenceMode || "未知";
+    issues.push(`远端发布验证缺少真实 HTTP(S) 分发证据：${evidenceModeLabel} / ${remoteVerification.summary || "-"}`);
   }
 
   if (issues.length > 0) {
     recommendations.push("先运行 `npm run release:matrix` 刷新本地发布矩阵。");
     recommendations.push("若缺少安装态验证，请补跑 `npm run release:install-smoke:stable` 与 `npm run release:install-smoke:beta`。");
-    if (remoteVerification && remoteVerification.status !== "passed") {
+    if (remoteVerification && (remoteVerification.status !== "passed" || remoteVerification.releaseReady !== true)) {
       recommendations.push("确认自定义发布端已上传最新 `update.json` 与 `.xpi`，再运行 `npm run release:preflight -- --verify-remote`。");
       recommendations.push("随后运行 `npm run release:prepare && npm run release:matrix`，刷新远端验证摘要。");
     }
@@ -741,7 +755,7 @@ function evaluateReleaseMatrix(releaseMatrix, policy) {
   };
 }
 
-function evaluateGate(summary, policy, watchStatus = null, obsidianGuard = null) {
+function evaluateGate(summary, policy, watchStatus = null, obsidianGuard = null, agentContext = null) {
   const allRuns = Array.isArray(summary.runs) ? summary.runs : [];
   const effectiveRuns = allRuns.filter((run) => !isDiagnosticRunName(run.runName));
   const effectivePassed = effectiveRuns.filter((run) => run.success === true).length;
@@ -790,7 +804,11 @@ function evaluateGate(summary, policy, watchStatus = null, obsidianGuard = null)
   }
   requiredChecks.forEach((item) => {
     if (!item.exists) {
-      issues.push(`缺少关键任务记录：${item.runName}。`);
+      if (item.runName === RELEASE_PLAN_RUN_NAME) {
+        issues.push(`缺少关键任务记录：${item.runName}（release gate 只认 \`${RELEASE_GATE_CONTRACT.preferredPreparationCommand}\` 产生的遥测，不只认 \`dist/release-plan.json\`）。`);
+      } else {
+        issues.push(`缺少关键任务记录：${item.runName}。`);
+      }
       return;
     }
     if (!item.ok) {
@@ -811,7 +829,7 @@ function evaluateGate(summary, policy, watchStatus = null, obsidianGuard = null)
   if (issues.length > 0) {
     recommendations.push("先运行 `npm run agent:check` 修复基础质量问题。");
     if (policy.profile === "release") {
-      recommendations.push("发布前运行 `npm run agent:release`，并确认 release-plan 最近一次为成功。");
+      recommendations.push(`发布前运行 \`${RELEASE_GATE_CONTRACT.preferredPreparationCommand}\`，并确认 \`${RELEASE_GATE_CONTRACT.requiredRunName}\` 最近一次为成功。`);
     }
     recommendations.push("运行 `npm run agent:dashboard` 查看失败原因分布与最近记录。");
   } else {
@@ -830,6 +848,7 @@ function evaluateGate(summary, policy, watchStatus = null, obsidianGuard = null)
     recommendations,
     watchStatusCheck.status,
   );
+  const contextSummary = summarizeAgentContextSnapshot(agentContext);
 
   const frontpageSummary = buildGateFrontpageSummary({
     gatePassed: issues.length === 0,
@@ -841,6 +860,7 @@ function evaluateGate(summary, policy, watchStatus = null, obsidianGuard = null)
     zoteroValidation: zoteroValidationCheck,
     validationDecision,
   });
+  frontpageSummary.agentContext = contextSummary;
 
   return {
     generatedAt: new Date().toISOString(),
@@ -874,6 +894,7 @@ function evaluateGate(summary, policy, watchStatus = null, obsidianGuard = null)
     releaseMatrix: releaseMatrixCheck,
     validationDecision,
     provenance: summary.provenance || null,
+    agentContext: contextSummary,
     readinessSummary: frontpageSummary,
     frontpageSummary,
     issues,
@@ -971,6 +992,28 @@ function buildMarkdown(report) {
     lines.push(`- 所需检查: ${(report.validationDecision.requiredChecks || []).join("；") || "-"}`);
     lines.push(`- 所需证据: ${(report.validationDecision.requiredEvidence || []).join("；") || "-"}`);
     lines.push(`- 补证动作: ${report.validationDecision.deferredEvidenceAction || "-"}`);
+  }
+
+  lines.push("", "## Agent Context", "");
+  if (!report.agentContext?.present) {
+    lines.push("- 未发现 `agent-context.json`，当前 gate 仅基于 monitor / memory / gate 原始工件继续评估。");
+  } else {
+    lines.push(`- Context 生成时间: \`${report.agentContext.generatedAt || "-"}\``);
+    lines.push(`- Compact Profile: \`${report.agentContext.budgetMeta?.profile || "-"}\``);
+    lines.push(`- Compact Digest: \`${report.agentContext.budgetMeta?.digest || "-"}\``);
+    lines.push(`- Truth Ref: batch=\`${report.agentContext.truthRef?.activeBatchId || "-"}\` / wave=\`${report.agentContext.truthRef?.currentWaveName || "-"}\` / validation=\`${report.agentContext.truthRef?.validationLevel || "-"}\``);
+    lines.push(`- Action Ref: next=\`${report.agentContext.actionRef?.nextAction || "-"}\` / blocker=${report.agentContext.actionRef?.mainBlocker || "-"}`);
+    lines.push(`- Status Ref: monitor=\`${report.agentContext.statusRef?.monitorStatus || "-"}\` / gate=\`${report.agentContext.statusRef?.gateStatus || "-"}\` / memory=\`${report.agentContext.statusRef?.memoryFingerprint || report.agentContext.statusRef?.memoryStrategyLabel || "-"}\` / release=\`${report.agentContext.statusRef?.releaseStatus || "-"}\``);
+    lines.push(`- Drift Ref: \`${report.agentContext.driftRef?.status || "missing"}\` / warning \`${report.agentContext.driftRef?.warningCount ?? 0}\``);
+    lines.push(`- 建议证据: ${(report.agentContext.evidenceRefs || []).join("；") || "-"}`);
+    lines.push(`- Artifact Refs: truth=\`${report.agentContext.artifactRefs?.currentTruth || "-"}\` / monitor=\`${report.agentContext.artifactRefs?.monitor || "-"}\` / gate=\`${report.agentContext.artifactRefs?.gate || "-"}\` / memory=\`${report.agentContext.artifactRefs?.memory || "-"}\``);
+    lines.push(`- Budget: \`${report.agentContext.budgetMeta?.withinBudget ? "within-budget" : "warning"}\` / violation \`${report.agentContext.budgetMeta?.violationCount ?? 0}\``);
+    if (Array.isArray(report.agentContext.driftRef?.warnings) && report.agentContext.driftRef.warnings.length > 0) {
+      lines.push("- Drift 警告:");
+      report.agentContext.driftRef.warnings.forEach((item) => {
+        lines.push(`- ${item}`);
+      });
+    }
   }
 
   lines.push("", "## 工件来源可信度", "");
@@ -1136,6 +1179,8 @@ function buildMarkdown(report) {
     if (report.releaseMatrix.remoteVerification) {
       lines.push(`- 远端验证: \`${report.releaseMatrix.remoteVerification.statusLabel || report.releaseMatrix.remoteVerification.status || "未知"}\``);
       lines.push(`- 远端摘要: ${report.releaseMatrix.remoteVerification.summary || "-"}`);
+      lines.push(`- 远端证据模式: \`${report.releaseMatrix.remoteVerification.evidenceModeLabel || report.releaseMatrix.remoteVerification.evidenceMode || "未知"}\``);
+      lines.push(`- 远端发布就绪: \`${report.releaseMatrix.remoteVerification.releaseReady === true ? "是" : "否"}\``);
       lines.push(`- 远端 update.json: \`${report.releaseMatrix.remoteVerification.effectiveUpdateURL || "-"}\``);
       lines.push(`- 远端 update_link: \`${report.releaseMatrix.remoteVerification.observedUpdateLink || report.releaseMatrix.remoteVerification.expectedUpdateLink || "-"}\``);
     }
@@ -1213,8 +1258,9 @@ async function main() {
     scope: "path",
     env: process.env,
   });
+  const agentContext = await loadJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-context.json"));
 
-  const report = evaluateGate(summary, policy, watchStatus, obsidianGuard);
+  const report = evaluateGate(summary, policy, watchStatus, obsidianGuard, agentContext);
   report.durationMs = Math.max(0, Date.now() - scriptStartedAt);
   if (!report.gatePassed) {
     Object.assign(

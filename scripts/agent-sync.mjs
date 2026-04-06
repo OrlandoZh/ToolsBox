@@ -47,7 +47,6 @@ function runNpmScript(scriptName, { allowFailure = false } = {}) {
 }
 
 async function main() {
-  await runNpmScript("agent:monitor");
   const gateResult = await runNpmScript("agent:gate", { allowFailure: true });
   await runNpmScript("agent:obsidian");
   const guardResult = await runNpmScript("agent:obsidian:guard:strict", { allowFailure: true });
@@ -59,7 +58,7 @@ async function main() {
     console.log("Agent sync completed with a blocked gate; Obsidian workspace has still been refreshed to the latest project state.");
     process.exit(gateResult.code);
   }
-  console.log("Agent sync completed: monitor, gate, obsidian handoff, and strict Obsidian guard are aligned.");
+  console.log("Agent sync completed: gate chain, agent-context, obsidian handoff, and strict Obsidian guard are aligned.");
 }
 
 main().catch((error) => {

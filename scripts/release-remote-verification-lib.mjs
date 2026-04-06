@@ -5,6 +5,12 @@ const REMOTE_RELEASE_STATUS_LABELS = Object.freeze({
   failed: "失败",
 });
 
+const REMOTE_RELEASE_EVIDENCE_MODE_LABELS = Object.freeze({
+  "live-remote": "真实远端",
+  synthetic: "测试型",
+  unknown: "未知",
+});
+
 function toISODate(dateLike) {
   if (!dateLike) {
     return null;
@@ -40,8 +46,63 @@ function normalizeURLString(value) {
   }
 }
 
-function isHTTPURL(url) {
+function normalizeEvidenceMode(mode) {
+  const normalized = String(mode || "").trim().toLowerCase();
+  return Object.hasOwn(REMOTE_RELEASE_EVIDENCE_MODE_LABELS, normalized)
+    ? normalized
+    : null;
+}
+
+function getURLScheme(url) {
+  const normalized = normalizeString(url);
+  if (!normalized) {
+    return null;
+  }
+  try {
+    return String(new URL(normalized).protocol || "").replace(/:$/u, "").toLowerCase() || null;
+  } catch {
+    return null;
+  }
+}
+
+function isFetchableReleaseURL(url) {
   return typeof url === "string" && /^(https?:\/\/|data:)/iu.test(url);
+}
+
+function isLiveRemoteURL(url) {
+  return typeof url === "string" && /^https?:\/\//iu.test(url);
+}
+
+function isSyntheticReleaseURL(url) {
+  return getURLScheme(url) === "data";
+}
+
+function pickEvidenceModeLabel(mode) {
+  return REMOTE_RELEASE_EVIDENCE_MODE_LABELS[normalizeEvidenceMode(mode)] || REMOTE_RELEASE_EVIDENCE_MODE_LABELS.unknown;
+}
+
+function inferRemoteReleaseEvidenceMode({ effectiveUpdateURL, expectedUpdateLink, observedUpdateLink } = {}) {
+  const urls = [
+    normalizeURLString(effectiveUpdateURL),
+    normalizeURLString(observedUpdateLink) || normalizeURLString(expectedUpdateLink),
+  ].filter(Boolean);
+  if (urls.length === 0) {
+    return "unknown";
+  }
+  if (urls.some((url) => isSyntheticReleaseURL(url))) {
+    return "synthetic";
+  }
+  if (urls.every((url) => isLiveRemoteURL(url))) {
+    return "live-remote";
+  }
+  return "unknown";
+}
+
+function buildPassedSummary(evidenceMode) {
+  if (normalizeEvidenceMode(evidenceMode) === "synthetic") {
+    return "远端 update.json 与 update_link 已校验，但当前使用 data: 内联 URL，仅可作为测试/本地验证，不代表真实远端发布已就绪。";
+  }
+  return "远端 update.json 与 update_link 已校验通过，版本、兼容范围与本地发布工件一致。";
 }
 
 function isPlaceholderReleaseURL(url) {
@@ -88,7 +149,7 @@ function buildUnconfiguredSummary({ configuredUpdateURL, effectiveUpdateURL, exp
   if (!configuredUpdateURL) {
     return "addon.config.json 缺少有效的远端 updateURL，尚未配置远端发布验证。";
   }
-  if (!isHTTPURL(effectiveUpdateURL || configuredUpdateURL)) {
+  if (!isFetchableReleaseURL(effectiveUpdateURL || configuredUpdateURL)) {
     return "远端 updateURL 不是有效的可访问 URL，尚未配置远端发布验证。";
   }
   if (isPlaceholderReleaseURL(configuredUpdateURL) || isPlaceholderReleaseURL(effectiveUpdateURL)) {
@@ -97,7 +158,7 @@ function buildUnconfiguredSummary({ configuredUpdateURL, effectiveUpdateURL, exp
   if (!expectedUpdateLink) {
     return "本地 release-manifest 尚未生成期望的 update_link，无法执行远端验证。";
   }
-  if (!isHTTPURL(expectedUpdateLink)) {
+  if (!isFetchableReleaseURL(expectedUpdateLink)) {
     return "本地 release-manifest 的 update_link 不是有效的可访问 URL，无法执行远端验证。";
   }
   if (isPlaceholderReleaseURL(expectedUpdateLink)) {
@@ -146,12 +207,16 @@ export function buildPendingRemoteReleaseVerification({
   const configured = Boolean(
     effectiveUpdateURL
     && normalizedExpectedUpdateLink
-    && isHTTPURL(effectiveUpdateURL)
-    && isHTTPURL(normalizedExpectedUpdateLink)
+    && isFetchableReleaseURL(effectiveUpdateURL)
+    && isFetchableReleaseURL(normalizedExpectedUpdateLink)
     && !isPlaceholderReleaseURL(effectiveUpdateURL)
     && !isPlaceholderReleaseURL(normalizedExpectedUpdateLink)
   );
   const status = configured ? "pending" : "unconfigured";
+  const evidenceMode = inferRemoteReleaseEvidenceMode({
+    effectiveUpdateURL,
+    expectedUpdateLink: normalizedExpectedUpdateLink,
+  });
   const checks = createBaseChecks({
     configuredUpdateURL,
     effectiveUpdateURL,
@@ -185,6 +250,9 @@ export function buildPendingRemoteReleaseVerification({
     observedVersion: null,
     observedStrictMinVersion: null,
     observedStrictMaxVersion: null,
+    evidenceMode,
+    evidenceModeLabel: pickEvidenceModeLabel(evidenceMode),
+    releaseReady: false,
     updateURLHTTPStatus: null,
     updateLinkHTTPStatus: null,
     checks,
@@ -339,6 +407,11 @@ export async function verifyRemoteRelease({
   const observedVersion = normalizeString(remoteEntry?.version);
   const observedStrictMinVersion = normalizeString(remoteEntry?.applications?.zotero?.strict_min_version);
   const observedStrictMaxVersion = normalizeString(remoteEntry?.applications?.zotero?.strict_max_version);
+  const evidenceMode = inferRemoteReleaseEvidenceMode({
+    effectiveUpdateURL: base.effectiveUpdateURL,
+    expectedUpdateLink: base.expectedUpdateLink,
+    observedUpdateLink,
+  });
   const updateLinkProbe = observedUpdateLink
     ? await probeReachable(observedUpdateLink, timeoutMs, fetchImpl)
     : null;
@@ -408,8 +481,9 @@ export async function verifyRemoteRelease({
 
   const issues = collectCheckIssues(checks);
   const status = issues.length === 0 ? "passed" : "failed";
+  const releaseReady = status === "passed" && evidenceMode === "live-remote";
   const summary = status === "passed"
-    ? "远端 update.json 与 update_link 已校验通过，版本、兼容范围与本地发布工件一致。"
+    ? buildPassedSummary(evidenceMode)
     : (issues[0] || "远端发布验证未通过。");
 
   return {
@@ -423,6 +497,9 @@ export async function verifyRemoteRelease({
     observedVersion,
     observedStrictMinVersion,
     observedStrictMaxVersion,
+    evidenceMode,
+    evidenceModeLabel: pickEvidenceModeLabel(evidenceMode),
+    releaseReady,
     updateURLHTTPStatus: jsonProbe.status,
     updateLinkHTTPStatus: updateLinkProbe?.status ?? null,
     checks,
@@ -476,6 +553,19 @@ export function normalizeRemoteReleaseVerification(record, {
   const issues = Array.isArray(record.issues)
     ? record.issues.map((item) => String(item || "").trim()).filter(Boolean)
     : collectCheckIssues(normalizedChecks);
+  const effectiveUpdateURL = normalizeURLString(record.effectiveUpdateURL) || fallback.effectiveUpdateURL;
+  const expectedUpdateLink = normalizeURLString(record.expectedUpdateLink) || fallback.expectedUpdateLink;
+  const observedUpdateLink = normalizeURLString(record.observedUpdateLink);
+  const evidenceMode = normalizeEvidenceMode(record.evidenceMode)
+    || inferRemoteReleaseEvidenceMode({
+      effectiveUpdateURL,
+      expectedUpdateLink,
+      observedUpdateLink,
+    });
+  const releaseReady = status === "passed" && evidenceMode === "live-remote";
+  const summary = status === "passed"
+    ? buildPassedSummary(evidenceMode)
+    : (normalizeString(record.summary) || fallback.summary);
 
   return {
     ...fallback,
@@ -484,17 +574,20 @@ export function normalizeRemoteReleaseVerification(record, {
     configured: record.configured === true || (record.configured !== false && fallback.configured),
     status,
     statusLabel: normalizeString(record.statusLabel) || pickStatusLabel(status),
-    summary: normalizeString(record.summary) || fallback.summary,
+    summary,
     configuredUpdateURL: normalizeURLString(record.configuredUpdateURL) || fallback.configuredUpdateURL,
-    effectiveUpdateURL: normalizeURLString(record.effectiveUpdateURL) || fallback.effectiveUpdateURL,
-    expectedUpdateLink: normalizeURLString(record.expectedUpdateLink) || fallback.expectedUpdateLink,
+    effectiveUpdateURL,
+    expectedUpdateLink,
     expectedVersion: normalizeString(record.expectedVersion) || fallback.expectedVersion,
     expectedStrictMinVersion: normalizeString(record.expectedStrictMinVersion) || fallback.expectedStrictMinVersion,
     expectedStrictMaxVersion: normalizeString(record.expectedStrictMaxVersion) || fallback.expectedStrictMaxVersion,
-    observedUpdateLink: normalizeURLString(record.observedUpdateLink),
+    observedUpdateLink,
     observedVersion: normalizeString(record.observedVersion),
     observedStrictMinVersion: normalizeString(record.observedStrictMinVersion),
     observedStrictMaxVersion: normalizeString(record.observedStrictMaxVersion),
+    evidenceMode,
+    evidenceModeLabel: normalizeString(record.evidenceModeLabel) || pickEvidenceModeLabel(evidenceMode),
+    releaseReady,
     updateURLHTTPStatus: Number.isFinite(Number(record.updateURLHTTPStatus))
       ? Number(record.updateURLHTTPStatus)
       : null,
@@ -521,4 +614,9 @@ export function summarizeRemoteReleaseVerification(record, options = {}) {
     statusLabel: normalized.statusLabel,
     summary: normalized.summary,
   };
+}
+
+export function isLiveRemoteReleaseVerification(record, options = {}) {
+  const normalized = normalizeRemoteReleaseVerification(record, options);
+  return normalized.releaseReady === true;
 }

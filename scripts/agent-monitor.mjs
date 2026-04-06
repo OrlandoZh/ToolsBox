@@ -704,6 +704,8 @@ function buildMarkdown(summary) {
         "",
         `- 状态: \`${summary.releaseMatrix.remoteVerification.statusLabel || summary.releaseMatrix.remoteVerification.status || "未知"}\``,
         `- 摘要: ${summary.releaseMatrix.remoteVerification.summary || "-"}`,
+        `- 证据模式: \`${summary.releaseMatrix.remoteVerification.evidenceModeLabel || summary.releaseMatrix.remoteVerification.evidenceMode || "未知"}\``,
+        `- 发布就绪: \`${summary.releaseMatrix.remoteVerification.releaseReady === true ? "是" : "否"}\``,
         `- update.json: \`${summary.releaseMatrix.remoteVerification.effectiveUpdateURL || "-"}\``,
         `- 期望 update_link: \`${summary.releaseMatrix.remoteVerification.expectedUpdateLink || "-"}\``,
         `- 观测 update_link: \`${summary.releaseMatrix.remoteVerification.observedUpdateLink || "-"}\``,

@@ -1261,6 +1261,8 @@ function summarizeVisualEvidenceItems(cycles) {
         cycleIndex,
         bootMode,
         kind,
+        scope: String(capture?.scope || baseline?.scope || "window-stage").trim() || "window-stage",
+        surfaceId: String(capture?.surfaceId || baseline?.surfaceId || "").trim() || null,
         canonicalTarget: extractVisualCanonicalTarget(baseline, bootMode) || null,
         capturePath: String(
           capture?.path
@@ -1648,6 +1650,8 @@ export function pickVisualCaptureSelectionReasonLabel(reason) {
       return "哈希收敛";
     case "stable-low-drift-pair":
       return "低漂移收敛";
+    case "baseline-best-match":
+      return "基线最佳匹配";
     case "max-attempt-reached":
     default:
       return "重试上限";
@@ -2189,6 +2193,11 @@ export function summarizeE2EReport(report, options = {}) {
       failedCycles: 0,
       testFailed: 0,
       scenarioFailed: 0,
+      scenarioExecutionObserved: false,
+      scenarioIncompleteCycleCount: 0,
+      scenarioTimeoutKinds: [],
+      scenarioLastStartedScenario: null,
+      scenarioLastCompletedScenario: null,
       logErrorCount: 0,
       logWarnCount: 0,
       errorBoundaryHitCount: 0,
@@ -2345,6 +2354,19 @@ export function summarizeE2EReport(report, options = {}) {
   const failedCycles = cycles.filter((cycle) => cycle?.passed !== true).length;
   const testFailed = cycles.reduce((sum, cycle) => sum + Number(cycle?.tests?.failed || 0), 0);
   const scenarioFailed = cycles.reduce((sum, cycle) => sum + Number(cycle?.scenarios?.failed || 0), 0);
+  const scenarioExecutionObserved = cycles.some((cycle) => cycle?.scenarios?.execution && typeof cycle.scenarios.execution === "object");
+  const scenarioIncompleteCycleCount = cycles.reduce((sum, cycle) => {
+    return sum + (cycle?.scenarios?.execution?.incomplete === true ? 1 : 0);
+  }, 0);
+  const scenarioTimeoutKinds = uniqueStrings(
+    cycles.map((cycle) => cycle?.scenarios?.execution?.timeoutKind).filter(Boolean),
+  );
+  const scenarioLastStartedScenario = typeof latestCycle?.scenarios?.execution?.lastStartedScenario === "string"
+    ? latestCycle.scenarios.execution.lastStartedScenario
+    : null;
+  const scenarioLastCompletedScenario = typeof latestCycle?.scenarios?.execution?.lastCompletedScenario === "string"
+    ? latestCycle.scenarios.execution.lastCompletedScenario
+    : null;
   const logErrorCount = cycles.reduce((sum, cycle) => sum + Number(cycle?.logs?.errorCount || 0), 0);
   const logWarnCount = cycles.reduce((sum, cycle) => sum + Number(cycle?.logs?.warnCount || 0), 0);
   const errorBoundaryHitCount = cycles.reduce((sum, cycle) => {
@@ -2517,6 +2539,11 @@ export function summarizeE2EReport(report, options = {}) {
     failedCycles,
     testFailed,
     scenarioFailed,
+    scenarioExecutionObserved,
+    scenarioIncompleteCycleCount,
+    scenarioTimeoutKinds,
+    scenarioLastStartedScenario,
+    scenarioLastCompletedScenario,
     logErrorCount,
     logWarnCount,
     errorBoundaryHitCount,

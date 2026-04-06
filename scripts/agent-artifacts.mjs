@@ -38,3 +38,17 @@ export function resolveAgentMemoryArtifacts(projectRoot) {
     signalIndexJSON: path.join(signalsDir, "index.json"),
   };
 }
+
+export function resolveAgentContextArtifacts(projectRoot) {
+  const artifactsDir = resolveAgentArtifactsDir(projectRoot);
+  const archiveDir = path.join(artifactsDir, "agent-context");
+
+  return {
+    artifactsDir,
+    reportJSON: resolveAgentArtifactPath(projectRoot, "agent-context.json"),
+    reportMD: resolveAgentArtifactPath(projectRoot, "agent-context.md"),
+    archiveDir,
+    latestJSON: path.join(archiveDir, "latest.json"),
+    latestMD: path.join(archiveDir, "latest.md"),
+  };
+}

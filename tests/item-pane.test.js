@@ -87,11 +87,27 @@ describe("ItemPane", () => {
     assert.equal(errors[2].message, "itemPane.createConditionalInfoRow.noLabelL10nID");
   });
 
+  it("should require onRender when registering sections", () => {
+    const registeredSectionID = itemPane.registerSection({
+      paneID: "demo-section",
+      header: { l10nID: "demo-section-header" },
+      sidenav: { l10nID: "demo-section-sidenav" },
+      onAsyncRender: async () => {},
+    });
+
+    assert.equal(registeredSectionID, null);
+    assert.equal(registeredSectionIDs.length, 0);
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0].message, "itemPane.registerSection.noOnRender");
+    assert.equal(errors[0].details?.paneID, "demo-section");
+  });
+
   it("should track registered ids returned by Zotero managers", () => {
     const registeredSectionID = itemPane.registerSection({
       paneID: "demo-section",
       header: { l10nID: "demo-section-header" },
       sidenav: { l10nID: "demo-section-sidenav" },
+      onRender() {},
     });
     const registeredRowID = itemPane.registerInfoRow({
       rowID: "demo-row",
@@ -105,6 +121,14 @@ describe("ItemPane", () => {
     assert.ok(itemPane.hasSection(registeredSectionID));
     assert.ok(itemPane.hasInfoRow("demo-row"));
     assert.ok(itemPane.hasInfoRow(registeredRowID));
+    assert.equal(
+      itemPane.resolveSectionPaneID("demo-section"),
+      "cleanroom-template@example.com:demo-section",
+    );
+    assert.equal(
+      itemPane.resolveSectionPaneID(registeredSectionID),
+      "cleanroom-template@example.com:demo-section",
+    );
     assert.deepEqual(itemPane.getRegistrationSnapshot(), {
       sections: [{
         paneID: "demo-section",

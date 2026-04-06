@@ -13,6 +13,24 @@ export const MODIFIERS = {
   META: "meta", // macOS Command
 };
 
+function createBindingTracker() {
+  let settled = false;
+  let resolveBinding;
+  const promise = new Promise((resolve) => {
+    resolveBinding = resolve;
+  });
+  return {
+    promise,
+    settle(value) {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolveBinding(value);
+    },
+  };
+}
+
 /**
  * 创建键盘管理器
  * @param {Object} options - 配置选项
@@ -29,7 +47,6 @@ export function createKeyboardManager(options) {
 
   // 注册追踪
   const registeredShortcuts = new Map();
-  let shortcutCounter = 0;
 
   // 平台检测
   let isMac = false;
@@ -95,8 +112,8 @@ export function createKeyboardManager(options) {
       return result;
     }
 
-    modifiers.forEach((m) => {
-      const lower = String(m).toLowerCase();
+    modifiers.forEach((modifier) => {
+      const lower = String(modifier).toLowerCase();
       if (lower === "ctrl" || lower === "control") {
         // macOS: Ctrl -> Meta (Command)
         result[isMac ? "meta" : "ctrl"] = true;
@@ -122,11 +139,13 @@ export function createKeyboardManager(options) {
       return null;
     }
 
-    const parts = shortcut.split("+").map((p) => p.trim());
-    const key = parts.pop().toUpperCase();
+    const parts = shortcut.split("+").map((part) => part.trim());
+    const key = parts.pop()?.toUpperCase();
+    if (!key) {
+      return null;
+    }
 
     const modifiers = normalizeModifiers(parts);
-
     return { key, modifiers };
   }
 
@@ -143,13 +162,10 @@ export function createKeyboardManager(options) {
 
     const eventKey = String(event.key || "").toUpperCase();
     const parsedKey = String(parsed.key || "").toUpperCase();
-
-    // 键匹配
     if (eventKey !== parsedKey) {
       return false;
     }
 
-    // 修饰键匹配
     const mods = parsed.modifiers;
     return (
       event.ctrlKey === mods.ctrl &&
@@ -171,25 +187,11 @@ export function createKeyboardManager(options) {
     if (modifiers.alt) parts.push("alt");
     if (modifiers.shift) parts.push("shift");
     if (modifiers.meta) parts.push("meta");
-    parts.push(key.toLowerCase());
+    parts.push(String(key || "").toLowerCase());
     return `shortcut-${parts.join("-")}`;
   }
 
-  /**
-   * 注册快捷键
-   * @param {Object} shortcutOptions - 快捷键配置
-   * @param {string} [shortcutOptions.key] - 键名
-   * @param {Array<string>} [shortcutOptions.modifiers] - 修饰键数组
-   * @param {string} [shortcutOptions.shortcut] - 快捷键字符串（与 key/modifiers 二选一）
-   * @param {Function} shortcutOptions.handler - 处理函数
-   * @param {string} [shortcutOptions.id] - 自定义 ID
-   * @param {string} [shortcutOptions.description] - 描述
-   * @param {Window} [shortcutOptions.window] - 作用窗口（默认全局）
-   * @param {boolean} [shortcutOptions.preventDefault] - 是否阻止默认行为
-   * @param {boolean} [shortcutOptions.stopPropagation] - 是否阻止冒泡
-   * @returns {string|null} 快捷键 ID
-   */
-  function registerShortcut(shortcutOptions) {
+  function createShortcutDefinition(shortcutOptions, errorPrefix) {
     const {
       key,
       modifiers,
@@ -200,9 +202,10 @@ export function createKeyboardManager(options) {
       window: targetWindow,
       preventDefault = true,
       stopPropagation = false,
-    } = shortcutOptions;
+      ready,
+      resolveWindow,
+    } = shortcutOptions || {};
 
-    // 解析快捷键
     let parsed;
     if (shortcut) {
       parsed = parseShortcut(shortcut);
@@ -214,78 +217,262 @@ export function createKeyboardManager(options) {
     }
 
     if (!parsed || !parsed.key) {
-      error("keyboardManager.registerShortcut.invalidKey", {});
+      error(`${errorPrefix}.invalidKey`, {});
       return null;
     }
 
     if (typeof handler !== "function") {
-      error("keyboardManager.registerShortcut.noHandler", {});
+      error(`${errorPrefix}.noHandler`, {});
       return null;
     }
 
-    const shortcutId = customId || generateShortcutId(parsed.key, parsed.modifiers);
+    return {
+      parsed,
+      handler,
+      shortcutId: customId || generateShortcutId(parsed.key, parsed.modifiers),
+      description: typeof description === "string" ? description : "",
+      targetWindow,
+      preventDefault,
+      stopPropagation,
+      ready,
+      resolveWindow,
+    };
+  }
 
-    // 检查冲突
-    if (registeredShortcuts.has(shortcutId)) {
-      warn("keyboardManager.registerShortcut.conflict", { shortcutId });
+  function createShortcutSnapshot(shortcutId, registration) {
+    if (!registration) {
+      return null;
     }
+    return {
+      id: shortcutId,
+      description: registration.description || "",
+      key: registration.parsed?.key,
+      modifiers: registration.parsed?.modifiers,
+      state: registration.state || "inactive",
+      bindingMode: registration.bindingMode || "immediate",
+      windowBound: Boolean(registration.window),
+      errorMessage: registration.errorMessage || null,
+    };
+  }
 
-    try {
-      // 创建事件处理器
-      const eventHandler = (event) => {
-        if (matchesShortcut(event, parsed)) {
-          if (preventDefault) {
-            event.preventDefault();
-          }
-          if (stopPropagation) {
-            event.stopPropagation();
-          }
+  function getShortcutState(shortcutId) {
+    return createShortcutSnapshot(shortcutId, registeredShortcuts.get(shortcutId));
+  }
 
-          try {
-            handler(event);
-          } catch (err) {
-            error("keyboardManager.handler.error", {
-              shortcutId,
-              message: String(err?.message || err),
-            });
-          }
-        }
-      };
+  function replaceShortcutRegistration(shortcutId, nextRegistration) {
+    registeredShortcuts.set(shortcutId, nextRegistration);
+    return nextRegistration;
+  }
 
-      // 注册事件监听
-      const target = targetWindow || (typeof window !== "undefined" ? window : null);
-      if (target) {
-        target.addEventListener("keydown", eventHandler);
+  function updateShortcutRegistration(shortcutId, patch) {
+    const registration = registeredShortcuts.get(shortcutId);
+    if (!registration) {
+      return null;
+    }
+    return replaceShortcutRegistration(shortcutId, {
+      ...registration,
+      ...patch,
+    });
+  }
+
+  function ensureNoShortcutConflict(shortcutId) {
+    if (!registeredShortcuts.has(shortcutId)) {
+      return;
+    }
+    warn("keyboardManager.registerShortcut.conflict", { shortcutId });
+    unregister(shortcutId);
+  }
+
+  function createEventHandler(shortcutId, parsed, handler, { preventDefault, stopPropagation }) {
+    return (event) => {
+      if (!matchesShortcut(event, parsed)) {
+        return;
       }
 
-      // 追踪注册
-      const cleanup = () => {
-        if (target) {
+      if (preventDefault) {
+        event.preventDefault();
+      }
+      if (stopPropagation) {
+        event.stopPropagation();
+      }
+
+      try {
+        handler(event);
+      } catch (err) {
+        error("keyboardManager.handler.error", {
+          shortcutId,
+          message: String(err?.message || err),
+        });
+      }
+    };
+  }
+
+  function bindShortcutTarget(shortcutId, definition, target) {
+    const eventHandler = createEventHandler(shortcutId, definition.parsed, definition.handler, {
+      preventDefault: definition.preventDefault,
+      stopPropagation: definition.stopPropagation,
+    });
+
+    if (target && typeof target.addEventListener === "function") {
+      target.addEventListener("keydown", eventHandler);
+    }
+
+    return {
+      target: target || null,
+      cleanup() {
+        if (target && typeof target.removeEventListener === "function") {
           target.removeEventListener("keydown", eventHandler);
         }
-      };
+      },
+    };
+  }
 
-      registeredShortcuts.set(shortcutId, {
-        parsed,
-        description,
-        handler,
-        cleanup,
-        window: target,
+  async function waitForReadySignal(ready) {
+    if (ready === undefined) {
+      return;
+    }
+    const value = typeof ready === "function" ? ready() : ready;
+    if (value && typeof value.then === "function") {
+      await value;
+    }
+  }
+
+  async function resolveDeferredWindow(source, fallbackTarget) {
+    const candidate = source === undefined ? fallbackTarget : source;
+    const value = typeof candidate === "function" ? candidate() : candidate;
+    if (value && typeof value.then === "function") {
+      return await value;
+    }
+    return value || null;
+  }
+
+  function settleShortcutBinding(registration, snapshot = null) {
+    registration?.bindingTracker?.settle(snapshot);
+    return snapshot;
+  }
+
+  /**
+   * 注册快捷键
+   * @param {Object} shortcutOptions - 快捷键配置
+   * @returns {string|null} 快捷键 ID
+   */
+  function registerShortcut(shortcutOptions) {
+    const definition = createShortcutDefinition(shortcutOptions, "keyboardManager.registerShortcut");
+    if (!definition) {
+      return null;
+    }
+
+    ensureNoShortcutConflict(definition.shortcutId);
+    const bindingTracker = createBindingTracker();
+
+    try {
+      const target = definition.targetWindow || (typeof window !== "undefined" ? window : null);
+      const binding = bindShortcutTarget(definition.shortcutId, definition, target);
+      const registration = replaceShortcutRegistration(definition.shortcutId, {
+        parsed: definition.parsed,
+        description: definition.description,
+        handler: definition.handler,
+        cleanup: binding.cleanup,
+        window: binding.target,
+        state: binding.target ? "active" : "inactive",
+        bindingMode: "immediate",
+        errorMessage: null,
+        bindingTracker,
       });
+
+      const snapshot = createShortcutSnapshot(definition.shortcutId, registration);
+      settleShortcutBinding(registration, snapshot);
 
       debug("keyboardManager.registerShortcut.created", {
-        shortcutId,
-        key: parsed.key,
-        modifiers: parsed.modifiers,
+        shortcutId: definition.shortcutId,
+        key: definition.parsed.key,
+        modifiers: definition.parsed.modifiers,
       });
-
-      return shortcutId;
+      return definition.shortcutId;
     } catch (err) {
       error("keyboardManager.registerShortcut.failed", {
         message: String(err?.message || err),
       });
+      bindingTracker.settle(null);
       return null;
     }
+  }
+
+  function registerDeferredShortcut(shortcutOptions) {
+    const definition = createShortcutDefinition(shortcutOptions, "keyboardManager.registerDeferredShortcut");
+    if (!definition) {
+      return null;
+    }
+
+    ensureNoShortcutConflict(definition.shortcutId);
+    const bindingTracker = createBindingTracker();
+    replaceShortcutRegistration(definition.shortcutId, {
+      parsed: definition.parsed,
+      description: definition.description,
+      handler: definition.handler,
+      cleanup: () => {},
+      window: null,
+      state: "pending",
+      bindingMode: "deferred",
+      errorMessage: null,
+      bindingTracker,
+    });
+
+    Promise.resolve().then(async () => {
+      try {
+        await waitForReadySignal(definition.ready);
+
+        if (!registeredShortcuts.has(definition.shortcutId)) {
+          bindingTracker.settle(null);
+          return;
+        }
+
+        const fallbackWindow = definition.targetWindow || (typeof window !== "undefined" ? window : null);
+        const target = await resolveDeferredWindow(definition.resolveWindow, fallbackWindow);
+
+        if (!registeredShortcuts.has(definition.shortcutId)) {
+          bindingTracker.settle(null);
+          return;
+        }
+
+        const binding = bindShortcutTarget(definition.shortcutId, definition, target);
+        const registration = updateShortcutRegistration(definition.shortcutId, {
+          cleanup: binding.cleanup,
+          window: binding.target,
+          state: binding.target ? "active" : "inactive",
+          errorMessage: null,
+        });
+        const snapshot = createShortcutSnapshot(definition.shortcutId, registration);
+        settleShortcutBinding(registration, snapshot);
+
+        debug("keyboardManager.registerDeferredShortcut.ready", {
+          shortcutId: definition.shortcutId,
+          state: registration?.state || "missing",
+        });
+      } catch (err) {
+        const registration = updateShortcutRegistration(definition.shortcutId, {
+          cleanup: () => {},
+          window: null,
+          state: "failed",
+          errorMessage: String(err?.message || err),
+        });
+        error("keyboardManager.registerDeferredShortcut.failed", {
+          shortcutId: definition.shortcutId,
+          message: String(err?.message || err),
+        });
+        settleShortcutBinding(registration, createShortcutSnapshot(definition.shortcutId, registration));
+      }
+    });
+
+    return definition.shortcutId;
+  }
+
+  function waitForShortcutBinding(shortcutId) {
+    const registration = registeredShortcuts.get(shortcutId);
+    if (!registration) {
+      return Promise.resolve(null);
+    }
+    return registration.bindingTracker?.promise || Promise.resolve(createShortcutSnapshot(shortcutId, registration));
   }
 
   /**
@@ -304,6 +491,7 @@ export function createKeyboardManager(options) {
         registration.cleanup();
       }
       registeredShortcuts.delete(shortcutId);
+      settleShortcutBinding(registration, null);
 
       debug("keyboardManager.unregister.removed", { shortcutId });
       return true;
@@ -349,16 +537,10 @@ export function createKeyboardManager(options) {
    * @returns {Array<{id: string, description: string}>}
    */
   function getAllShortcuts() {
-    const result = [];
-    registeredShortcuts.forEach((reg, id) => {
-      result.push({
-        id,
-        description: reg.description || "",
-        key: reg.parsed?.key,
-        modifiers: reg.parsed?.modifiers,
-      });
-    });
-    return result;
+    return Array.from(registeredShortcuts.entries())
+      .map(([shortcutId, registration]) => createShortcutSnapshot(shortcutId, registration))
+      .filter(Boolean)
+      .sort((left, right) => String(left?.id || "").localeCompare(String(right?.id || ""), "en"));
   }
 
   /**
@@ -378,7 +560,7 @@ export function createKeyboardManager(options) {
     if (modifiers.shift) parts.push(modNames.shift);
     if (modifiers.meta && !modifiers.ctrl) parts.push(modNames.meta);
 
-    parts.push(key.toUpperCase());
+    parts.push(String(key || "").toUpperCase());
     return parts.join(isMac ? "" : "+");
   }
 
@@ -393,12 +575,15 @@ export function createKeyboardManager(options) {
 
     // 注册方法
     registerShortcut,
+    registerDeferredShortcut,
+    waitForShortcutBinding,
     unregister,
     unregisterAll,
 
     // 查询方法
     getShortcutCount,
     hasShortcut,
+    getShortcutState,
     getAllShortcuts,
 
     // 工具方法

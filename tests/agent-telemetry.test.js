@@ -4824,6 +4824,9 @@ describe("Agent Telemetry", () => {
         effectiveUpdateURL: "https://downloads.example.net/cleanroomtemplate/update.json",
         expectedUpdateLink: "https://downloads.example.net/cleanroomtemplate/cleanroomtemplate-0.1.0.xpi",
         observedUpdateLink: null,
+        evidenceMode: "live-remote",
+        evidenceModeLabel: "真实远端",
+        releaseReady: false,
         issues: [
           "尚未执行远端 update.json / update_link 验证。",
         ],
@@ -4876,11 +4879,122 @@ describe("Agent Telemetry", () => {
     assert.ok(monitorMD.includes("## 本地发布矩阵"));
     assert.ok(monitorMD.includes("### 远端发布验证"));
     assert.ok(monitorMD.includes("阻断型错误"));
+    assert.ok(monitorMD.includes("证据模式"));
+    assert.ok(monitorMD.includes("发布就绪"));
     assert.ok(monitorMD.includes("待补验证"));
     assert.ok(dashboardHTML.includes("本地发布矩阵"));
     assert.ok(dashboardHTML.includes("远端摘要"));
+    assert.ok(dashboardHTML.includes("远端证据模式"));
+    assert.ok(dashboardHTML.includes("远端发布就绪"));
     assert.ok(dashboardHTML.includes("阻断错误画像"));
     assert.ok(dashboardHTML.includes("渠道矩阵"));
+  });
+
+  it("should render release-plan task description in dashboard run tables", () => {
+    execNode(["scripts/agent-runner.mjs", "release-plan", "--", "node", "-e", "process.exit(0)"]);
+
+    execNode(["scripts/agent-monitor.mjs"]);
+    execNode(["scripts/agent-dashboard.mjs"]);
+
+    const dashboardHTML = readArtifactText("agent-dashboard.html");
+    assert.ok(dashboardHTML.includes("release-plan"));
+    assert.ok(dashboardHTML.includes("执行本地发布计划（package + preflight + release notes + matrix）"));
+  });
+
+  it("should explain that release gate requires agent release telemetry when release-plan run is missing", () => {
+    execNode(["scripts/agent-runner.mjs", "check", "--", "node", "-e", "process.exit(0)"]);
+
+    writeReleaseMatrix({
+      generatedAt: "2026-03-23T10:05:00.000Z",
+      addonId: "cleanroom-template@example.com",
+      addonVersion: "0.1.0",
+      status: "passed",
+      statusLabel: "通过",
+      summary: "本地 stable/beta 发布矩阵已通过。",
+      passedProfileCount: 2,
+      failedProfileCount: 0,
+      attentionProfileCount: 0,
+      blockingRuntimeErrorCount: 0,
+      hostNoiseErrorCount: 0,
+      blockingRuntimeErrorPortrait: "-",
+      hostNoiseRuntimeErrorPortrait: "-",
+      artifacts: {
+        xpiName: "cleanroomtemplate-0.1.0.xpi",
+        xpiSHA256Actual: "abc123",
+        xpiSizeBytesActual: 12345,
+      },
+      blockingIssues: [],
+      attentionIssues: [],
+      hostNoiseIssues: [],
+      remoteVerification: {
+        status: "passed",
+        statusLabel: "通过",
+        summary: "远端 update.json 与 update_link 已校验通过，版本、兼容范围与本地发布工件一致。",
+        effectiveUpdateURL: "https://downloads.example.net/cleanroomtemplate/update.json",
+        expectedUpdateLink: "https://downloads.example.net/cleanroomtemplate/cleanroomtemplate-0.1.0.xpi",
+        observedUpdateLink: "https://downloads.example.net/cleanroomtemplate/cleanroomtemplate-0.1.0.xpi",
+        evidenceMode: "live-remote",
+        evidenceModeLabel: "真实远端",
+        releaseReady: true,
+        issues: [],
+      },
+      profiles: [
+        {
+          id: "stable",
+          label: "稳定版",
+          status: "passed",
+          statusLabel: "通过",
+          summary: "稳定版安装态 smoke 通过。",
+          metadataConsistent: true,
+          packageConsistent: true,
+          installSmokePresent: true,
+          installSmokePassed: true,
+          blockingRuntimeErrorPortrait: "-",
+          hostNoiseRuntimeErrorPortrait: "-",
+          installSmoke: {
+            readinessMode: "native",
+            durationMs: 1000,
+          },
+        },
+        {
+          id: "beta",
+          label: "Beta 版",
+          status: "passed",
+          statusLabel: "通过",
+          summary: "Beta 版安装态 smoke 通过。",
+          metadataConsistent: true,
+          packageConsistent: true,
+          installSmokePresent: true,
+          installSmokePassed: true,
+          blockingRuntimeErrorPortrait: "-",
+          hostNoiseRuntimeErrorPortrait: "-",
+          installSmoke: {
+            readinessMode: "native",
+            durationMs: 980,
+          },
+        },
+      ],
+    });
+
+    execNode(["scripts/agent-monitor.mjs"]);
+
+    assert.throws(() => {
+      execNode([
+        "scripts/agent-gate.mjs",
+        "--profile",
+        "release",
+        "--min-pass-rate",
+        "0",
+        "--max-recent-failed",
+        "999",
+      ]);
+    }, "release gate should fail when release-plan telemetry is missing");
+
+    const gateJSON = readArtifactJSON("agent-gate.json");
+    assert.equal(gateJSON.gatePassed, false);
+    assert.equal(gateJSON.releaseMatrix?.status, "passed");
+    assert.ok(gateJSON.issues.some((item) => String(item).includes("不只认 `dist/release-plan.json`")));
+    assert.ok(gateJSON.recommendations.some((item) => String(item).includes("npm run agent:release")));
   });
 
   it("should keep host-noise visible without blocking release gate", () => {
@@ -5158,6 +5272,107 @@ describe("Agent Telemetry", () => {
     assert.ok(gateJSON.issues.some((item) => String(item).includes("远端发布验证未通过")));
     assert.ok(gateJSON.recommendations.some((item) => String(item).includes("release:preflight -- --verify-remote")));
     assert.ok(gateMD.includes("远端验证"));
+  });
+
+  it("should fail release gate when remote verification only has synthetic evidence", () => {
+    execNode(["scripts/agent-runner.mjs", "check", "--", "node", "-e", "process.exit(0)"]);
+    execNode(["scripts/agent-runner.mjs", "release-plan", "--", "node", "-e", "process.exit(0)"]);
+
+    writeReleaseMatrix({
+      generatedAt: "2026-03-23T10:30:00.000Z",
+      addonId: "cleanroom-template@example.com",
+      addonVersion: "0.1.0",
+      status: "passed",
+      statusLabel: "通过",
+      summary: "本地 stable/beta 发布矩阵已通过。",
+      passedProfileCount: 2,
+      failedProfileCount: 0,
+      attentionProfileCount: 0,
+      blockingRuntimeErrorCount: 0,
+      hostNoiseErrorCount: 0,
+      blockingRuntimeErrorPortrait: "-",
+      hostNoiseRuntimeErrorPortrait: "-",
+      artifacts: {
+        xpiName: "cleanroomtemplate-0.1.0.xpi",
+        xpiSHA256Actual: "abc123",
+        xpiSizeBytesActual: 12345,
+      },
+      blockingIssues: [],
+      attentionIssues: [],
+      hostNoiseIssues: [],
+      remoteVerification: {
+        status: "passed",
+        statusLabel: "通过",
+        summary: "远端 update.json 与 update_link 已校验，但当前使用 data: 内联 URL，仅可作为测试/本地验证，不代表真实远端发布已就绪。",
+        effectiveUpdateURL: "data:application/json,%7B%22addons%22%3A%7B%7D%7D",
+        expectedUpdateLink: "data:application/x-xpinstall;base64,ZmFrZS14cGk=",
+        observedUpdateLink: "data:application/x-xpinstall;base64,ZmFrZS14cGk=",
+        issues: [],
+      },
+      profiles: [
+        {
+          id: "stable",
+          label: "稳定版",
+          status: "passed",
+          statusLabel: "通过",
+          summary: "稳定版安装态 smoke 通过。",
+          metadataConsistent: true,
+          packageConsistent: true,
+          installSmokePresent: true,
+          installSmokePassed: true,
+          blockingRuntimeErrorPortrait: "-",
+          hostNoiseRuntimeErrorPortrait: "-",
+          installSmoke: {
+            readinessMode: "native",
+            durationMs: 1000,
+          },
+        },
+        {
+          id: "beta",
+          label: "Beta 版",
+          status: "passed",
+          statusLabel: "通过",
+          summary: "Beta 版安装态 smoke 通过。",
+          metadataConsistent: true,
+          packageConsistent: true,
+          installSmokePresent: true,
+          installSmokePassed: true,
+          blockingRuntimeErrorPortrait: "-",
+          hostNoiseRuntimeErrorPortrait: "-",
+          installSmoke: {
+            readinessMode: "native",
+            durationMs: 980,
+          },
+        },
+      ],
+    });
+
+    execNode(["scripts/agent-monitor.mjs"]);
+
+    assert.throws(() => {
+      execNode([
+        "scripts/agent-gate.mjs",
+        "--profile",
+        "release",
+        "--min-pass-rate",
+        "0",
+        "--max-recent-failed",
+        "999",
+      ]);
+    }, "release gate should fail when remote verification only uses synthetic evidence");
+
+    const gateJSON = readArtifactJSON("agent-gate.json");
+    const gateMD = readArtifactText("agent-gate.md");
+    assert.equal(gateJSON.gatePassed, false);
+    assert.equal(gateJSON.releaseMatrix?.status, "passed");
+    assert.equal(gateJSON.releaseMatrix?.remoteVerification?.status, "passed");
+    assert.equal(gateJSON.releaseMatrix?.remoteVerification?.evidenceMode, "synthetic");
+    assert.equal(gateJSON.releaseMatrix?.remoteVerification?.releaseReady, false);
+    assert.ok(gateJSON.issues.some((item) => String(item).includes("真实 HTTP(S) 分发证据")));
+    assert.ok(gateJSON.recommendations.some((item) => String(item).includes("release:preflight -- --verify-remote")));
+    assert.ok(gateMD.includes("远端证据模式"));
+    assert.ok(gateMD.includes("测试型"));
+    assert.ok(gateMD.includes("远端发布就绪: `否`"));
   });
 
   it("should display unsupported diagnosis blocker category in monitor and dashboard", () => {

@@ -33,5 +33,15 @@ describe("Build Artifacts", () => {
     );
     assert.ok(typeof manifest.applications.zotero.update_url === "string");
     assert.ok(manifest.applications.zotero.update_url.length > 0);
+
+    const report = readJSON(
+      path.join(projectRoot, "build", config.addonRef, "build-report.json"),
+    );
+    const reactUIBundle = Array.isArray(report.optionalBundles)
+      ? report.optionalBundles.find((entry) => entry.bundleId === "react-ui")
+      : null;
+
+    assert.equal(reactUIBundle?.status, "skipped");
+    assert.equal(reactUIBundle?.reason, "disabled");
   });
 });

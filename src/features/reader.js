@@ -77,6 +77,10 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function normalizeActivationPolicy(value) {
+  return value === "ui-required" ? "ui-required" : "host-first";
+}
+
 /**
  * 创建 Reader 工具实例
  * @param {Object} options - 配置选项
@@ -512,6 +516,142 @@ export function createReader(options = {}) {
     };
   }
 
+  function normalizeSelectionMaxTextLength(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return 2000;
+    }
+    return Math.max(1, Math.trunc(numeric));
+  }
+
+  function truncateSelectionText(value, maxTextLength) {
+    const normalized = toPlainString(value);
+    if (!normalized) {
+      return "";
+    }
+    return normalized.slice(0, maxTextLength);
+  }
+
+  function getEventParameterSelectionText(eventSource, maxTextLength) {
+    const params = eventSource?.params && typeof eventSource.params === "object"
+      ? eventSource.params
+      : {};
+    const annotation = params.annotation && typeof params.annotation === "object"
+      ? params.annotation
+      : null;
+
+    const annotationText = truncateSelectionText(
+      annotation?.text ?? annotation?.annotationText,
+      maxTextLength,
+    );
+    if (annotationText) {
+      return {
+        text: annotationText,
+        sourceKind: "event-annotation",
+      };
+    }
+
+    const directText = truncateSelectionText(
+      params.text
+      ?? params.selectedText
+      ?? params.selectionText
+      ?? params.annotationText,
+      maxTextLength,
+    );
+    if (directText) {
+      return {
+        text: directText,
+        sourceKind: "event-params",
+      };
+    }
+
+    return {
+      text: "",
+      sourceKind: "none",
+    };
+  }
+
+  function getLiveReaderSelectionText(target, options = {}) {
+    const frameWindow = getReaderFrameWindow(target, options);
+    if (!frameWindow) {
+      return "";
+    }
+
+    const directSelection = typeof frameWindow.getSelection === "function"
+      ? frameWindow.getSelection()
+      : null;
+    const fallbackSelection = !directSelection && typeof frameWindow?.document?.defaultView?.getSelection === "function"
+      ? frameWindow.document.defaultView.getSelection()
+      : null;
+    const selection = directSelection || fallbackSelection;
+    if (!selection || typeof selection.toString !== "function") {
+      return "";
+    }
+    return toPlainString(selection.toString()) || "";
+  }
+
+  function getSelectionSnapshot(source, options = {}) {
+    const maxTextLength = normalizeSelectionMaxTextLength(options.maxTextLength);
+    const eventSource = source && typeof source === "object" && !Array.isArray(source)
+      && (source.reader !== undefined || source.params !== undefined)
+      ? source
+      : null;
+    const resolvedReader = eventSource
+      ? resolveReader(eventSource.reader) || eventSource.reader || null
+      : resolveReader(source);
+    if (!resolvedReader && !eventSource) {
+      return null;
+    }
+
+    const summary = getReaderSummary(resolvedReader);
+    let text = "";
+    let sourceKind = "none";
+
+    if (eventSource) {
+      const eventSelection = getEventParameterSelectionText(eventSource, maxTextLength);
+      text = eventSelection.text;
+      sourceKind = eventSelection.sourceKind;
+    }
+
+    if (!text && resolvedReader) {
+      text = truncateSelectionText(
+        getLiveReaderSelectionText(resolvedReader, options),
+        maxTextLength,
+      );
+      if (text) {
+        sourceKind = "iframe-selection";
+      }
+    }
+
+    const selectedAnnotationIDs = Array.isArray(readReaderProperty(resolvedReader, "selectedAnnotationIDs"))
+      ? readReaderProperty(resolvedReader, "selectedAnnotationIDs")
+        .map((entry) => Number(entry))
+        .filter((entry) => Number.isFinite(entry))
+      : [];
+
+    const snapshot = {
+      hasSelection: Boolean(text),
+      sourceKind,
+      text,
+      textLength: text.length,
+      tabID: summary?.tabID || toPlainString(readReaderProperty(resolvedReader, "tabID")),
+      itemID: summary?.itemID ?? toPlainNumber(readReaderProperty(resolvedReader, "itemID")),
+      readerType: summary?.type || (
+        Number.isFinite(toPlainNumber(readReaderProperty(resolvedReader, "itemID")))
+          ? getReaderType(readReaderProperty(resolvedReader, "itemID"))
+          : null
+      ),
+      selectedAnnotationIDs,
+      annotationCount: summary?.annotationCount ?? 0,
+    };
+
+    if (options.includeUIState === true && resolvedReader) {
+      snapshot.uiState = getReaderUIStateSnapshot(resolvedReader);
+    }
+
+    return snapshot;
+  }
+
   function cloneEventListenerEntry(entry) {
     return {
       type: entry.type,
@@ -908,6 +1048,74 @@ export function createReader(options = {}) {
       || null;
   }
 
+  async function waitForReaderBootstrapPromise(promise, options = {}) {
+    if (!promise || typeof promise.then !== "function") {
+      return {
+        settled: false,
+        timedOut: false,
+        rejected: false,
+        message: null,
+      };
+    }
+
+    const timeoutMs = Number.isFinite(Number(options.timeoutMs))
+      ? Math.max(1, Number(options.timeoutMs))
+      : 1000;
+    const label = typeof options.label === "string" && options.label.trim()
+      ? options.label.trim()
+      : "reader-bootstrap";
+    let timeoutHandle = null;
+
+    try {
+      const outcome = await Promise.race([
+        Promise.resolve(promise).then(
+          () => ({
+            settled: true,
+            timedOut: false,
+            rejected: false,
+            message: null,
+          }),
+          (reason) => ({
+            settled: false,
+            timedOut: false,
+            rejected: true,
+            message: String(reason?.message || reason),
+          }),
+        ),
+        new Promise((resolve) => {
+          timeoutHandle = setTimeout(() => {
+            resolve({
+              settled: false,
+              timedOut: true,
+              rejected: false,
+              message: null,
+            });
+          }, timeoutMs);
+        }),
+      ]);
+
+      if (outcome?.timedOut) {
+        debug("reader.waitForReaderReady.bootstrapTimeout", {
+          label,
+          timeoutMs,
+        });
+      } else if (outcome?.rejected) {
+        debug("reader.waitForReaderReady.bootstrapRejected", {
+          label,
+          timeoutMs,
+          message: outcome.message,
+        });
+      }
+
+      return outcome;
+    }
+    finally {
+      if (timeoutHandle !== null) {
+        clearTimeout(timeoutHandle);
+      }
+    }
+  }
+
   async function waitForReaderReady(target, options = {}) {
     const resolvedReader = resolveReader(target);
     if (!resolvedReader) {
@@ -917,11 +1125,13 @@ export function createReader(options = {}) {
     const timeoutMs = Number.isFinite(Number(options.timeoutMs)) ? Number(options.timeoutMs) : 8000;
     const intervalMs = Number.isFinite(Number(options.intervalMs)) ? Number(options.intervalMs) : 50;
     const deadline = Date.now() + timeoutMs;
+    const bootstrapWaitTimeoutMs = Math.max(50, Math.min(timeoutMs, 1000));
 
     const initPromise = readReaderProperty(resolvedReader, "_initPromise");
-    if (initPromise && typeof initPromise.then === "function") {
-      await initPromise;
-    }
+    await waitForReaderBootstrapPromise(initPromise, {
+      timeoutMs: bootstrapWaitTimeoutMs,
+      label: "reader-init",
+    });
 
     while (Date.now() < deadline) {
       const primaryFrameWindow = getReaderFrameWindow(resolvedReader, { view: "primary" });
@@ -932,9 +1142,11 @@ export function createReader(options = {}) {
         readReaderProperty(readReaderProperty(resolvedReader, "_internalReader"), "_primaryView"),
         "initializedPromise",
       );
-      if (primaryViewPromise && typeof primaryViewPromise.then === "function") {
-        await primaryViewPromise;
-      }
+      const remainingMs = Math.max(intervalMs, deadline - Date.now());
+      await waitForReaderBootstrapPromise(primaryViewPromise, {
+        timeoutMs: Math.max(50, Math.min(remainingMs, bootstrapWaitTimeoutMs)),
+        label: "primary-view",
+      });
       await sleep(intervalMs);
     }
 
@@ -957,12 +1169,51 @@ export function createReader(options = {}) {
     return null;
   }
 
+  function dispatchLiveClick(element) {
+    if (!element) {
+      return {
+        activationStrategy: null,
+        actionDispatched: false,
+      };
+    }
+
+    if (typeof element.click === "function") {
+      element.click();
+      return {
+        activationStrategy: "click",
+        actionDispatched: true,
+      };
+    }
+
+    if (typeof element.dispatchEvent === "function") {
+      const ownerWindow = element.ownerGlobal || element.ownerDocument?.defaultView || globalThis;
+      const MouseEventCtor = ownerWindow?.MouseEvent || globalThis.MouseEvent;
+      if (MouseEventCtor) {
+        element.dispatchEvent(new MouseEventCtor("click", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          detail: 1,
+        }));
+        return {
+          activationStrategy: "dispatch-click",
+          actionDispatched: true,
+        };
+      }
+    }
+
+    return {
+      activationStrategy: null,
+      actionDispatched: false,
+    };
+  }
+
   function collectSidebarViewSelectors(view) {
     const token = String(view || "").trim().toLowerCase();
     if (!token) {
       return [];
     }
-    return [
+    const selectors = [
       `[data-sidebar-view="${token}"]`,
       `[data-view="${token}"]`,
       `[data-tab="${token}"]`,
@@ -975,6 +1226,95 @@ export function createReader(options = {}) {
       `toolbarbutton[data-l10n-id*="${token}"]`,
       `[role="tab"][data-l10n-id*="${token}"]`,
     ];
+
+    if (["thumbnails", "thumbnail", "thumbs", "thumb"].includes(token)) {
+      selectors.unshift(
+        "#viewThumbnail",
+        "button[data-l10n-id='pdfjs-thumbs-button']",
+      );
+    }
+
+    if (token === "outline") {
+      selectors.unshift(
+        "#viewOutline",
+        "button[data-l10n-id='pdfjs-document-outline-button']",
+      );
+    }
+
+    if (token === "attachments") {
+      selectors.unshift(
+        "#viewAttachments",
+        "button[data-l10n-id='pdfjs-attachments-button']",
+      );
+    }
+
+    if (token === "layers") {
+      selectors.unshift(
+        "#viewLayers",
+        "button[data-l10n-id='pdfjs-layers-button']",
+      );
+    }
+
+    return selectors;
+  }
+
+  function collectSidebarPanelSelectors(view) {
+    const token = String(view || "").trim().toLowerCase();
+    if (!token) {
+      return [];
+    }
+
+    const selectors = [
+      `[data-sidebar-panel="${token}"]`,
+      `[data-panel="${token}"]`,
+      `[id*="${token}"][role='tabpanel']`,
+      `[role='tabpanel'][data-view="${token}"]`,
+    ];
+
+    if (["thumbnails", "thumbnail", "thumbs", "thumb"].includes(token)) {
+      selectors.unshift("#thumbnailView");
+    }
+
+    if (token === "outline") {
+      selectors.unshift("#outlineView");
+    }
+
+    if (token === "attachments") {
+      selectors.unshift("#attachmentsView");
+    }
+
+    if (token === "layers") {
+      selectors.unshift("#layersView");
+    }
+
+    selectors.push("#sidebarContent");
+    return selectors;
+  }
+
+  function collectToolbarElementSelectors(selector) {
+    const explicitSelector = typeof selector === "string" && selector.trim()
+      ? selector.trim()
+      : null;
+    if (explicitSelector) {
+      return [explicitSelector];
+    }
+
+    return [
+      "[data-cleanroom-reader-toolbar-action]",
+      "[data-cleanroom-reader-toolbar-marker]",
+      ".cleanroom-reader-toolbar-marker",
+      "#cleanroom-reader-toolbar-marker",
+      "#toolbarContainer .toolbarButton",
+      "#toolbarViewer .toolbarButton",
+      "#viewFindButton",
+      "#sidebarToggleButton",
+      "[role='toolbar'] [data-cleanroom-surface]",
+      ".toolbar .cleanroom-surface",
+      "[role='toolbar']",
+      "#toolbarContainer",
+      ".toolbar",
+      ".reader-toolbar",
+    ];
   }
 
   function findToolbarElement(target, options = {}) {
@@ -984,21 +1324,7 @@ export function createReader(options = {}) {
       return null;
     }
 
-    const explicitSelector = typeof options.selector === "string" && options.selector.trim()
-      ? options.selector.trim()
-      : null;
-    const selectors = explicitSelector
-      ? [explicitSelector]
-      : [
-        "[data-cleanroom-reader-toolbar-marker]",
-        ".cleanroom-reader-toolbar-marker",
-        "#cleanroom-reader-toolbar-marker",
-        "[role='toolbar'] [data-cleanroom-surface]",
-        ".toolbar .cleanroom-surface",
-        "[role='toolbar']",
-        ".reader-toolbar",
-      ];
-    return queryFirst(doc, selectors);
+    return queryFirst(doc, collectToolbarElementSelectors(options.selector));
   }
 
   function findSidebarViewElements(target, view, options = {}) {
@@ -1015,12 +1341,7 @@ export function createReader(options = {}) {
 
     const selectors = collectSidebarViewSelectors(view);
     const button = queryFirst(doc, selectors);
-    const panel = queryFirst(doc, [
-      `[data-sidebar-panel="${String(view || "").trim().toLowerCase()}"]`,
-      `[data-panel="${String(view || "").trim().toLowerCase()}"]`,
-      `[id*="${String(view || "").trim().toLowerCase()}"][role='tabpanel']`,
-      `[role='tabpanel'][data-view="${String(view || "").trim().toLowerCase()}"]`,
-    ]);
+    const panel = queryFirst(doc, collectSidebarPanelSelectors(view));
 
     return {
       button,
@@ -1064,6 +1385,7 @@ export function createReader(options = {}) {
     }
 
     await waitForReaderReady(resolvedReader, options);
+    const activationPolicy = normalizeActivationPolicy(options.activationPolicy);
 
     const initialState = getReaderUIStateSnapshot(resolvedReader);
     if (initialState?.sidebarOpen === false && typeof resolvedReader.toggleSidebar === "function") {
@@ -1079,42 +1401,33 @@ export function createReader(options = {}) {
     }
 
     let activated = false;
+    let activationStrategy = null;
 
-    if (typeof resolvedReader.setSidebarView === "function") {
+    if (activationPolicy !== "ui-required" && typeof resolvedReader.setSidebarView === "function") {
       try {
         await resolvedReader.setSidebarView(normalizedView);
         activated = true;
+        activationStrategy = "host-api";
       }
       catch {}
     }
 
-    if (!activated && typeof resolvedReader.changeSidebarView === "function") {
+    if (!activated && activationPolicy !== "ui-required" && typeof resolvedReader.changeSidebarView === "function") {
       try {
         await resolvedReader.changeSidebarView(normalizedView);
         activated = true;
+        activationStrategy = "host-api";
       }
       catch {}
     }
 
     const { button } = findSidebarViewElements(resolvedReader, normalizedView, options);
-    if (!activated && button && typeof button.click === "function") {
+    if (!activated && button) {
       try {
-        button.click();
-        activated = true;
-      }
-      catch {}
-    }
-
-    if (!activated && button && typeof button.dispatchEvent === "function") {
-      try {
-        const ownerWindow = button.ownerGlobal || button.ownerDocument?.defaultView || null;
-        const MouseEventCtor = ownerWindow?.MouseEvent || globalThis.MouseEvent;
-        if (MouseEventCtor) {
-          button.dispatchEvent(new MouseEventCtor("click", {
-            bubbles: true,
-            cancelable: true,
-          }));
+        const liveActivation = dispatchLiveClick(button);
+        if (liveActivation.actionDispatched) {
           activated = true;
+          activationStrategy = liveActivation.activationStrategy;
         }
       }
       catch {}
@@ -1137,6 +1450,10 @@ export function createReader(options = {}) {
         return {
           view: normalizedView,
           uiState: snapshot,
+          activationPolicy,
+          activationStrategy,
+          actionElementObserved: Boolean(button),
+          actionDispatched: activated,
           ...findSidebarViewElements(resolvedReader, normalizedView, options),
         };
       }
@@ -1146,6 +1463,10 @@ export function createReader(options = {}) {
     return {
       view: normalizedView,
       uiState: getReaderUIStateSnapshot(resolvedReader),
+      activationPolicy,
+      activationStrategy,
+      actionElementObserved: Boolean(button),
+      actionDispatched: activated,
       ...findSidebarViewElements(resolvedReader, normalizedView, options),
     };
   }
@@ -1573,6 +1894,7 @@ export function createReader(options = {}) {
     closeByItemID,
     getAnnotationIDs,
     getReaderSummary,
+    getSelectionSnapshot,
     getReaderUIStateSnapshot,
     getReaderInteractionSnapshot,
     getActiveSummary,

@@ -127,6 +127,82 @@ describe("Agent Zotero E2E Lib", () => {
     assert.deepEqual(result.settleSnapshot.visibleBannerIDs, []);
   });
 
+  it("should continue library preparation when itemsView.waitForLoad times out", async () => {
+    const steps = [];
+
+    const result = await ensureLibraryVisualStageReady({
+      itemID: 303,
+      waitForViews: async () => {
+        steps.push("waitForViews");
+        return true;
+      },
+      waitForItemsLoad: async () => {
+        steps.push("waitForItemsLoad");
+        await new Promise(() => {});
+      },
+      waitForItemsLoadTimeoutMs: 10,
+      selectItem: async (itemID) => {
+        steps.push(`selectItem:${itemID}`);
+      },
+      waitForSelection: async (itemID) => {
+        steps.push(`waitForSelection:${itemID}`);
+        return {
+          selectedIDs: [itemID],
+          selectedCount: 1,
+        };
+      },
+      inspectItem: async (itemID) => {
+        steps.push(`inspectItem:${itemID}`);
+        return {
+          itemID,
+          title: "Timed Library Item",
+          summary: "Timed Library Item #303",
+          columnValue: "note · 1",
+        };
+      },
+    });
+
+    assert.deepEqual(steps, [
+      "waitForViews",
+      "waitForItemsLoad",
+      "selectItem:303",
+      "waitForSelection:303",
+      "inspectItem:303",
+    ]);
+    assert.equal(result.preparation.itemsViewLoaded, false);
+    assert.equal(result.preparation.itemsViewLoadTimedOut, true);
+    assert.ok(
+      /waitForItemsLoad timed out after 10ms/i.test(result.preparation.itemsViewLoadError),
+    );
+    assert.equal(result.preparation.selectionMatched, true);
+    assert.equal(result.preparation.selectionSingleItem, true);
+    assert.equal(result.settleSnapshot.itemID, 303);
+  });
+
+  it("should fail fast when the library item selection step hangs", async () => {
+    let error = null;
+    try {
+      await ensureLibraryVisualStageReady({
+        itemID: 404,
+        waitForViews: async () => true,
+        selectItem: async () => {
+          await new Promise(() => {});
+        },
+        selectItemTimeoutMs: 10,
+        waitForSelection: async () => ({
+          selectedIDs: [404],
+          selectedCount: 1,
+        }),
+      });
+    }
+    catch (caught) {
+      error = caught;
+    }
+
+    assert.ok(error);
+    assert.ok(/selectItem timed out after 10ms/i.test(String(error.message || error)));
+  });
+
   it("should summarize logs and classify errors", () => {
     const summary = summarizeLogs([
       { level: "info", message: "hello" },
@@ -187,6 +263,57 @@ describe("Agent Zotero E2E Lib", () => {
     assert.ok(result.diagnoses.length > 0);
     assert.equal(result.primaryDiagnosis?.feature, "bootstrap");
     assert.ok(Array.isArray(result.primaryDiagnosis?.candidateFiles));
+  });
+
+  it("should flag incomplete scenario execution as a separate cycle issue", () => {
+    const result = evaluateCycle({
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 3,
+        passed: 1,
+        failed: 1,
+        results: [
+          {
+            name: "menu surface smoke",
+            status: "failed",
+            error: {
+              kind: "chrome-evaluation-timeout",
+              message: "Timed out waiting for RDP event (scenario:menu surface smoke)",
+            },
+          },
+        ],
+        execution: {
+          incomplete: true,
+          lastStartedScenario: "menu surface smoke",
+          timeoutKind: "chrome-evaluation-timeout",
+        },
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: false,
+      },
+    });
+
+    assert.ok(result.issues.some((item) => item.includes("Zotero 场景执行未完成")));
+    assert.ok(result.issues.some((item) => item.includes("chrome-evaluation-timeout")));
   });
 
   it("should render markdown report with cycle summary", () => {
@@ -338,6 +465,57 @@ describe("Agent Zotero E2E Lib", () => {
     assert.ok(markdown.includes("基线注册"));
     assert.ok(markdown.includes("## 结构化诊断"));
     assert.ok(markdown.includes("item-pane:item-pane-section-missing"));
+  });
+
+  it("should render incomplete scenario execution markers in markdown cycle summaries", () => {
+    const markdown = buildE2EMarkdown({
+      generatedAt: "2026-04-03T00:00:00.000Z",
+      strategy: "hot",
+      visualBaselineDir: "/tmp/visual-baseline",
+      visualBaselineMode: "compare",
+      passed: false,
+      issues: ["Zotero 场景执行未完成"],
+      hints: [],
+      diagnostics: [],
+      cycles: [{
+        index: 1,
+        bootMode: "hot-reload",
+        passed: false,
+        summaryNote: "发现 1 项问题",
+        tests: { failed: 0 },
+        scenarios: {
+          failed: 1,
+          execution: {
+            incomplete: true,
+            lastStartedScenario: "menu surface smoke",
+          },
+        },
+        logs: {
+          errorCount: 0,
+          warnCount: 0,
+          recentErrors: [],
+        },
+        visuals: {
+          captures: [],
+          warnings: [],
+          analysis: {
+            ok: true,
+            summary: {
+              baseline: {
+                comparedCount: 0,
+                missingCount: 0,
+                driftCount: 0,
+                errorCount: 0,
+                updateRequested: false,
+              },
+            },
+          },
+        },
+      }],
+      visuals: [],
+    });
+
+    assert.ok(markdown.includes("incomplete@menu surface smoke"));
   });
 
   it("should render stable-low-drift-pair reason in markdown summaries", () => {
@@ -779,6 +957,132 @@ describe("Agent Zotero E2E Lib", () => {
 
     assert.equal(result.passed, true);
     assert.equal(result.issues.length, 0);
+  });
+
+  it("should treat whole-window visual drift as supplemental when all surface-local baselines pass", () => {
+    const result = evaluateCycle({
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: false,
+          issues: [
+            "library 截图与基线像素漂移过大：99.00% > 35.00%",
+            "reader 截图与基线像素漂移过大：98.00% > 5.00%",
+          ],
+          baselines: [
+            {
+              kind: "library",
+              scope: "window-stage",
+              status: "compared",
+              ok: false,
+            },
+            {
+              kind: "reader",
+              scope: "window-stage",
+              status: "compared",
+              ok: false,
+            },
+            {
+              kind: "surface-reader-toolbar",
+              scope: "surface-local",
+              status: "compared",
+              ok: true,
+            },
+            {
+              kind: "surface-reader-sidebar-thumbnails",
+              scope: "surface-local",
+              status: "compared",
+              ok: true,
+            },
+          ],
+        },
+      },
+    });
+
+    assert.equal(result.passed, true);
+    assert.equal(result.issues.includes("library 截图与基线像素漂移过大：99.00% > 35.00%"), false);
+    assert.equal(result.issues.includes("reader 截图与基线像素漂移过大：98.00% > 5.00%"), false);
+  });
+
+  it("should keep visual drift blocking when a surface-local baseline still fails", () => {
+    const result = evaluateCycle({
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: false,
+          issues: [
+            "surface-reader-sidebar-thumbnails 截图与基线尺寸不一致：当前 480x1200，基线 2000x1200",
+          ],
+          baselines: [
+            {
+              kind: "library",
+              scope: "window-stage",
+              status: "compared",
+              ok: false,
+            },
+            {
+              kind: "surface-reader-sidebar-thumbnails",
+              scope: "surface-local",
+              status: "compared",
+              ok: false,
+            },
+          ],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("surface-reader-sidebar-thumbnails 截图与基线尺寸不一致：当前 480x1200，基线 2000x1200"));
   });
 
   it("should report service health degradation as cycle issue", () => {
@@ -1903,6 +2207,7 @@ describe("Agent Zotero E2E Lib", () => {
           key: "cleanroom-item-pane-section-header",
           expectedValue: "模板示例",
           actualValue: "模板示例-错误",
+          actualLine: "cleanroom-item-pane-section-header =\\n    .label = 模板示例-错误".replace("\\n", "\n"),
         }],
       },
       tests: {
@@ -1930,9 +2235,66 @@ describe("Agent Zotero E2E Lib", () => {
     });
 
     assert.equal(result.passed, false);
-    assert.ok(result.issues.includes("Locale zh-CN FTL key cleanroom-item-pane-section-header 值漂移：期望 模板示例，实际 模板示例-错误。"));
+    assert.ok(result.issues.includes("Locale zh-CN FTL key cleanroom-item-pane-section-header 值漂移：期望 模板示例，实际 模板示例-错误。 实际定义片段 [cleanroom-item-pane-section-header =\\n    .label = 模板示例-错误]。"));
     assert.equal(result.primaryDiagnosis?.fingerprint, "localization:item-pane-section-header-ftl-value-drift");
-    assert.ok(result.hints.some((item) => String(item).includes("单行替换")));
+    assert.ok(result.hints.some((item) => String(item).includes("定义块")));
+  });
+
+  it("should prioritize localization diagnosis when locale ftl structure drifts", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+        localeFTLOK: false,
+        localeFTLMissingCount: 0,
+        localeFTLMissingEntries: [],
+        localeFTLValueDriftCount: 0,
+        localeFTLValueDriftEntries: [],
+        localeFTLStructureDriftCount: 1,
+        localeFTLStructureDriftEntries: [{
+          locale: "zh-CN",
+          key: "cleanroom-item-pane-section-header",
+          expectedLine: "cleanroom-item-pane-section-header =\n    .label = 模板示例",
+          actualLine: "cleanroom-item-pane-section-header = 模板示例",
+        }],
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.issues.includes("Locale zh-CN FTL key cleanroom-item-pane-section-header 结构漂移：期望定义片段 [cleanroom-item-pane-section-header =\\n    .label = 模板示例]，实际定义片段 [cleanroom-item-pane-section-header = 模板示例]。"));
+    assert.equal(result.primaryDiagnosis?.fingerprint, "localization:item-pane-section-header-ftl-structure-drift");
+    assert.ok(result.hints.some((item) => String(item).includes("main.ftl")));
   });
 
   it("should prioritize lifecycle diagnosis when baseline registration chain is collectively missing", () => {

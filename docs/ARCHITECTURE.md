@@ -56,6 +56,27 @@
 - 一旦存在更具体的恢复动作，frontpage / gate / monitor 优先给出该恢复动作
 - 只有真实可见面或视觉运行时信号触发时，才把当前批次升级为视觉主路径
 
+### 6. Reference-derived 技术链沉淀
+
+**目标**：把 `reference/plugin/*` 中可泛化的实现模式沉淀成模板原语，而不是让每轮开发重新按项目记忆 reference。
+
+**方法**：
+- UI 路线选型继续看 [UI Creation Paths](UI_CREATION_PATHS.md)
+- 跨项目技术链抽象看 [Reference Plugin Technical Chains](REFERENCE_PLUGIN_TECHNICAL_CHAINS.md)
+- 当前模板已经把其中几条常见链路沉淀成默认原语：
+  - `src/features/preference-panes.js`
+  - `src/utils/window-shell.js`
+  - `src/app/host-action-catalog.js`
+  - `src/app/host-actions.js`
+  - `src/services/registry.js`
+  - `src/services/file-state-store.js`
+  - `src/platform/zotero-file-storage.js`
+  - `src/platform/zotero-json-state-store.js`
+  - `src/services/resource-loader.js`
+  - `src/services/task-runner.js`
+  - `src/services/task-queue.js`
+- 继续坚持“借模式，不借产品实现；借生命周期，不借 reference 的高风险边界”
+
 ---
 
 ## 模块分层
@@ -285,6 +306,12 @@ import { createLogger } from "./core/logger.js";
 2. 使用工厂模式导出
 3. 更新 `types/utils.d.ts`
 
+### 添加新服务模块
+
+1. 在 `src/services/` 创建新模块
+2. 让它只负责服务/资源/任务编排骨架，不直接携带产品 UI 语义
+3. 更新 `src/services/index.js` 与 `types/services.d.ts`
+
 ### 自定义偏好设置
 
 1. 在 `config/addon.config.json` 添加默认值
@@ -309,6 +336,7 @@ import { createLogger } from "./core/logger.js";
 ├── src/
 │   ├── core/                  # 核心工具
 │   ├── features/              # 功能模块
+│   ├── services/              # 服务模块
 │   ├── utils/                 # 工具模块
 │   ├── platform/              # 平台适配
 │   ├── app/                   # 应用层
@@ -321,6 +349,7 @@ import { createLogger } from "./core/logger.js";
 │   ├── index.d.ts             # 类型主导出
 │   ├── core.d.ts              # Core 类型
 │   ├── features.d.ts          # Features 类型
+│   ├── services.d.ts          # Services 类型
 │   ├── utils.d.ts             # Utils 类型
 │   └── platform.d.ts          # Platform 类型
 ├── build/                     # 构建输出

@@ -16,5 +16,7 @@ describe("Zotero Host Semantic Index", () => {
     assert.ok(source.includes("reader-events"));
     assert.ok(source.includes("renderToolbar"));
     assert.ok(source.includes("annotation context menu"));
+    assert.ok(source.includes("sidebarWidth"));
+    assert.ok(source.includes("stacked 布局优先 inner pane bounds"));
   });
 });

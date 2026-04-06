@@ -18,6 +18,7 @@
   "defaultPrefs": {
     "enabled": true,
     "menuLabel": "",
-    "logLevel": "info"
+    "logLevel": "info",
+    "themeMode": "follow-host"
   }
 }

@@ -75,11 +75,12 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   const workspace = resolveObsidianWorkspaceFiles(projectRoot, process.env);
   const visualsEnabled = resolveObsidianVisualsEnabled(process.env);
-  const [loop, gate, monitor, e2e, projectExpansionWave, projectValidationOverrides] = await Promise.all([
+  const [loop, gate, monitor, e2e, agentContext, projectExpansionWave, projectValidationOverrides] = await Promise.all([
     readJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-zotero-loop.json")),
     readJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-gate.json")),
     readJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-monitor.json")),
     readJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-zotero-e2e.json")),
+    readJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-context.json")),
     readProjectJSONIfExists(path.join("config", "project-expansion-wave.json")),
     readProjectJSONIfExists(path.join("config", "project-validation-overrides.json")),
   ]);
@@ -96,6 +97,7 @@ async function main() {
     gate,
     monitor,
     e2e,
+    agentContext,
     currentTruthSummary,
     currentTruthActiveBatchId: readCurrentTruthActiveBatchId(projectRoot),
     projectExpansionWave,
@@ -151,6 +153,7 @@ async function main() {
     sourceGateGeneratedAt: summary.sourceGateGeneratedAt || null,
     sourceMonitorGeneratedAt: summary.sourceMonitorGeneratedAt || null,
     sourceLoopGeneratedAt: summary.sourceLoopGeneratedAt || null,
+    sourceAgentContextGeneratedAt: summary.agentContext?.generatedAt || null,
     bootstrapShell: summary.bootstrapShell === true,
     projectContext: summary.projectContext || null,
     durationMs: Math.max(0, Date.now() - scriptStartedAt),

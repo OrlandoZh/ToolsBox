@@ -7,6 +7,11 @@ import {
   normalizeRemoteReleaseVerification,
 } from "./release-remote-verification-lib.mjs";
 import {
+  buildReleaseGateContract,
+  buildReleaseNextSteps,
+  buildReleaseWorkflowState,
+} from "./release-flow-contract-lib.mjs";
+import {
   assertScript,
   buildScriptFailureInfo,
   createScriptError,
@@ -87,8 +92,13 @@ function collectRemoteWarnings(remoteVerification) {
     return [];
   }
 
-  if (remoteVerification.status === "passed") {
+  if (remoteVerification.status === "passed" && remoteVerification.releaseReady === true) {
     return [];
+  }
+  if (remoteVerification.status === "passed") {
+    return [
+      remoteVerification.summary || "远端验证仅覆盖 synthetic / 本地内联 URL，仍需真实 HTTP(S) 发布端验证。",
+    ];
   }
   if (remoteVerification.status === "unconfigured") {
     return [
@@ -105,7 +115,16 @@ function collectRemoteWarnings(remoteVerification) {
     : [remoteVerification.summary || "远端发布验证未通过"];
 }
 
-function buildReleaseNotesMarkdown({ config, releaseManifest, preflight, warnings, remoteVerification }) {
+function buildReleaseNotesMarkdown({
+  config,
+  releaseManifest,
+  preflight,
+  warnings,
+  remoteVerification,
+  workflowState,
+  gateContract,
+  nextSteps,
+}) {
   const lines = [
     `# Release ${config.addonVersion}`,
     "",
@@ -126,12 +145,26 @@ function buildReleaseNotesMarkdown({ config, releaseManifest, preflight, warning
     "- `npm run release:local` passed",
     "- `npm run zotero:test` passed",
     "",
+    "## Workflow State",
+    `- State: \`${workflowState?.label || "未知"}\``,
+    `- Summary: ${workflowState?.summary || "-"}`,
+    `- Gate-tracked local run: \`${gateContract?.preferredPreparationCommand || "-"}\``,
+    `- Required telemetry: \`${gateContract?.requiredRunName || "-"}\``,
+    "",
     "## Remote Verification",
     `- Status: \`${remoteVerification?.statusLabel || "缺失"}\``,
     `- Summary: ${remoteVerification?.summary || "-"}`,
+    `- Evidence Mode: \`${remoteVerification?.evidenceModeLabel || remoteVerification?.evidenceMode || "未知"}\``,
+    `- Release Ready: \`${remoteVerification?.releaseReady === true ? "yes" : "no"}\``,
     `- update.json target: \`${remoteVerification?.effectiveUpdateURL || releaseManifest.updateURL || "-"}\``,
     `- Expected update_link: \`${remoteVerification?.expectedUpdateLink || releaseManifest.updateLink || "-"}\``,
     `- Observed update_link: \`${remoteVerification?.observedUpdateLink || "-"}\``,
+    "",
+    "## Release Gate Contract",
+    `- Preferred local prep: \`${gateContract?.preferredPreparationCommand || "-"}\``,
+    `- Remote verify: \`${gateContract?.remoteVerificationCommand || "-"}\``,
+    `- Refresh consumers: \`${gateContract?.refreshReleaseConsumersCommand || "-"}\``,
+    `- Final gate: \`${gateContract?.releaseGateCommand || "-"}\``,
     "",
     "## Changelog",
     "- Replace this section with user-facing changes.",
@@ -143,8 +176,14 @@ function buildReleaseNotesMarkdown({ config, releaseManifest, preflight, warning
     "4. Verify `update_link` points to the uploaded `.xpi` and is publicly reachable.",
     "5. Run `npm run release:preflight -- --verify-remote` to record remote verification against the live release URLs.",
     "6. Re-run `npm run release:prepare && npm run release:matrix` to refresh release-facing consumers.",
-    "7. Publish release notes with checksum.",
+    "7. Run `npm run agent:gate:release` to confirm the release profile is green.",
+    "8. Publish release notes with checksum.",
   ];
+
+  if (Array.isArray(nextSteps) && nextSteps.length > 0) {
+    lines.push("", "## Next Steps");
+    nextSteps.forEach((step) => lines.push(`- ${step}`));
+  }
 
   if (Array.isArray(remoteVerification?.issues) && remoteVerification.issues.length > 0) {
     lines.push("## Remote Verification Issues", "");
@@ -243,6 +282,9 @@ async function main() {
     config,
     releaseManifest,
   }) || buildPendingRemoteReleaseVerification({ config, releaseManifest });
+  const gateContract = buildReleaseGateContract();
+  const workflowState = buildReleaseWorkflowState(remoteVerification);
+  const nextSteps = buildReleaseNextSteps(remoteVerification, gateContract);
   const warnings = [
     ...collectWarnings(config, releaseManifest),
     ...collectRemoteWarnings(remoteVerification),
@@ -265,6 +307,9 @@ async function main() {
     checksum: preflight.xpiSHA256,
     sizeBytes: preflight.xpiSizeBytes,
     warnings,
+    workflowState,
+    gateContract,
+    nextSteps,
     remoteVerification,
     checks: {
       updateManifestHasEntry: Boolean(updateManifest.addons?.[config.addonId]?.updates?.[0]),
@@ -284,6 +329,9 @@ async function main() {
     preflight,
     warnings,
     remoteVerification,
+    workflowState,
+    gateContract,
+    nextSteps,
   });
 
   await writeJSONArtifact(path.join(projectRoot, "dist", "release-plan.json"), plan);
@@ -318,6 +366,9 @@ main().catch(async (error) => {
       checksum: null,
       sizeBytes: 0,
       warnings: [],
+      workflowState: null,
+      gateContract: buildReleaseGateContract(),
+      nextSteps: [],
       remoteVerification: null,
       checks: {},
       ...failureInfo,

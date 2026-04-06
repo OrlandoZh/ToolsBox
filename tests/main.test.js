@@ -35,6 +35,7 @@ function createConfig() {
       enabled: true,
       menuLabel: "",
       logLevel: "info",
+      themeMode: "follow-host",
     },
   };
 }
@@ -152,7 +153,7 @@ describe("Main Bootstrap", () => {
     assert.typeOf(globalThis.Zotero.CleanroomTemplate.shutdown, "function");
     assert.ok(globalThis.Zotero.CleanroomTemplate.api);
     assert.equal(preferenceRegistrations.length, 1);
-    assert.equal(promptRegistrations.length, 2);
+    assert.equal(promptRegistrations.length, 3);
     assert.equal(menuRegistrations.length, 2);
   });
 
@@ -169,7 +170,7 @@ describe("Main Bootstrap", () => {
 
     assert.equal(globalThis.Zotero.CleanroomTemplate, firstInstance);
     assert.equal(preferenceRegistrations.length, 1);
-    assert.equal(promptRegistrations.length, 2);
+    assert.equal(promptRegistrations.length, 3);
     assert.equal(menuRegistrations.length, 2);
   });
 
@@ -197,7 +198,7 @@ describe("Main Bootstrap", () => {
 
     assert.ok(globalThis.Zotero.CleanroomTemplate);
     assert.equal(preferenceRegistrations.length, 1);
-    assert.equal(promptRegistrations.length, 2);
+    assert.equal(promptRegistrations.length, 3);
     assert.equal(menuRegistrations.length, 2);
   });
 

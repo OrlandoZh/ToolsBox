@@ -293,7 +293,7 @@ import { createItemPane } from "./features/item-pane.js";
 const itemPane = createItemPane({ logger, lifecycle, pluginID });
 
 // 注册自定义面板
-itemPane.registerSection({
+const paneID = itemPane.registerSection({
   paneID: "my-section",
   header: {
     l10nID: "my-plugin-section-header",
@@ -305,6 +305,10 @@ itemPane.registerSection({
   },
   onRender: ({ doc, body, item }) => {
     body.textContent = `Item: ${item?.getField("title")}`;
+  },
+  onAsyncRender: async ({ body, item }) => {
+    const metadata = await loadExtraMetadata(item);
+    body.dataset.metadataReady = metadata ? "true" : "false";
   }
 });
 
@@ -333,7 +337,20 @@ itemPane.unregisterAll();
 itemPane.isAvailable();
 ```
 
-> 注意：ItemPane 官方 API 对标签的要求是 `l10nID`。当前 `createSimpleSection()` 也要求传入 `headerL10nID`，`createFieldInfoRow()` / `createConditionalInfoRow()` 也要求传入 `labelL10nID`；不要把纯字符串标签当作稳定契约。
+> 注意：`registerSection()` 返回的是 Zotero 实际注册后的 pane ID，清理时应把这个返回值传给 `unregisterSection()`，不要假设返回对象自带 `unregister()`。
+>
+> 注意：`onRender` 是 ItemPane Section 的必需同步入口，必须在这里完成初始 DOM 构建；`onAsyncRender` 只用于补充异步数据或耗时渲染，不要把首屏 UI 延后到异步回调里。
+>
+> 注意：ItemPane 官方 API 对标签的要求是 `l10nID`。当前 `createSimpleSection()` 也要求传入 `headerL10nID`，`createFieldInfoRow()` / `createConditionalInfoRow()` 也要求传入 `labelL10nID`；不要把纯字符串标签当作稳定契约。对于 FTL：
+>
+> ```ftl
+> my-plugin-section-header =
+>     .label = My Panel
+> my-plugin-section-sidenav =
+>     .tooltiptext = Open My Panel
+> ```
+>
+> `header.l10nID` 对应 `.label`，`sidenav.l10nID` 对应 `.tooltiptext`。
 ---
 
 ### Item Tree
@@ -445,6 +462,8 @@ reader.isAnnotationsAvailable();
 - `zoomAutoEnabled` / `zoomPageWidthEnabled` / `zoomPageHeightEnabled`
 - `navigation`
 - `primaryViewState` / `secondViewState`
+
+其中 `sidebarWidth` 特别适合贴边式 surface 作为 live geometry 输入；默认优先把它当“当前宿主宽度信号”，而不是回退成固定宽度常量。
 
 `reader.getReaderInteractionSnapshot(target)` 会在此基础上补充：
 

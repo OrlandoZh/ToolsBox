@@ -197,18 +197,34 @@ export interface ShortcutOptions {
   id?: string;
   description?: string;
   window?: Window;
+  ready?: PromiseLike<unknown> | (() => unknown | PromiseLike<unknown>);
+  resolveWindow?: Window | null | (() => Window | null | PromiseLike<Window | null>);
   preventDefault?: boolean;
   stopPropagation?: boolean;
+}
+
+export interface ShortcutSnapshot {
+  id: string;
+  description: string;
+  key?: string;
+  modifiers?: Record<string, boolean>;
+  state: "active" | "inactive" | "pending" | "failed";
+  bindingMode: "immediate" | "deferred";
+  windowBound: boolean;
+  errorMessage: string | null;
 }
 
 export interface KeyboardManager {
   isMacOS(): boolean;
   registerShortcut(options: ShortcutOptions): string | null;
+  registerDeferredShortcut(options: ShortcutOptions): string | null;
+  waitForShortcutBinding(shortcutId: string): Promise<ShortcutSnapshot | null>;
   unregister(shortcutId: string): boolean;
   unregisterAll(): void;
   getShortcutCount(): number;
   hasShortcut(shortcutId: string): boolean;
-  getAllShortcuts(): Array<{ id: string; description: string; key?: string; modifiers?: Record<string, boolean> }>;
+  getShortcutState(shortcutId: string): ShortcutSnapshot | null;
+  getAllShortcuts(): ShortcutSnapshot[];
   parseShortcut(shortcut: string): { key: string; modifiers: Record<string, boolean> } | null;
   formatShortcut(key: string, modifiers: Record<string, boolean>): string;
   normalizeModifiers(modifiers: string[]): Record<string, boolean>;

@@ -186,6 +186,22 @@
           "avoid": [
             "偏好页"
           ]
+        },
+        {
+          "term": "interactive root",
+          "preferredChinese": "交互根节点",
+          "useFor": [
+            "指代 advanced preference pane 中承载 tab/panel 状态的插件自有根节点。"
+          ],
+          "avoid": []
+        },
+        {
+          "term": "tab panel",
+          "preferredChinese": "标签面板",
+          "useFor": [
+            "指代 preference pane 内由 tab 切换出的 active panel surface。"
+          ],
+          "avoid": []
         }
       ],
       "enums": [
@@ -215,9 +231,10 @@
             "image",
             "scripts",
             "stylesheets",
-            "helpURL"
+            "helpURL",
+            "onPreferenceLoad"
           ],
-          "notes": "label 缺失时回退插件名；URI 字段按 plugin root 解析。"
+          "notes": "label 缺失时回退插件名；URI 字段按 plugin root 解析；模板默认更偏向 onPreferenceLoad bridge，而非 legacy scripts。"
         }
       ],
       "surfaceSemantics": [
@@ -228,10 +245,13 @@
           "surfaceTerms": [
             "PreferencePanes",
             "preference pane",
-            "preferences sidebar"
+            "preferences sidebar",
+            "interactive root",
+            "tab panel"
           ],
           "notes": [
-            "验证 preference pane 时，需证明 pane 已从侧边栏可打开且核心控件已渲染。"
+            "验证 preference pane 时，需证明 pane 已从侧边栏可打开且核心控件已渲染。",
+            "若 pane 暴露 tab/panel 结构，需进一步证明 interactive root、active tab 与 active panel content 已就绪；单页 pane 仍可按结构/行为签名验证推进。"
           ]
         }
       ],
@@ -241,7 +261,8 @@
           "snippets": [
             "registerPane(options: PreferencePaneOptions): Promise<string | null>;",
             "resolveURI(uri: string): string;",
-            "label?: string;"
+            "label?: string;",
+            "onPreferenceLoad?: ("
           ]
         }
       ],
@@ -323,7 +344,7 @@
             "onToggle",
             "sectionButtons"
           ],
-          "notes": "header.l10nID 与 sidenav.l10nID 对应 FTL key 必须已注入。"
+          "notes": "onRender 负责首帧 DOM 构建；header.l10nID 对应 FTL `.label`，sidenav.l10nID 对应 FTL `.tooltiptext`，两者必须已注入。"
         },
         {
           "name": "InfoRowOptions",
@@ -357,7 +378,8 @@
             "sidenav.l10nID"
           ],
           "notes": [
-            "Item Pane 是宿主接口包装层，不因文件名命中就默认转成 visual-required。"
+            "Item Pane 是宿主接口包装层，不因文件名命中就默认转成 visual-required。",
+            "Section 的初始 DOM 必须在 onRender 建立；onAsyncRender 只补异步数据，不替代首帧结构。"
           ]
         },
         {
@@ -381,6 +403,7 @@
           "snippets": [
             "registerSection(options: SectionOptions): string | null;",
             "registerInfoRow(options: InfoRowOptions): string | null;",
+            "onRender: (props: {",
             "headerL10nID: string;",
             "labelL10nID: string;"
           ]
@@ -569,6 +592,16 @@
           "avoid": [
             "Reader 右侧栏按钮"
           ]
+        },
+        {
+          "term": "sidebarWidth",
+          "preferredChinese": "侧栏宽度",
+          "useFor": [
+            "描述 Reader sidebar 或贴边式 surface 可读取的 live geometry 状态字段。"
+          ],
+          "avoid": [
+            "固定贴边宽度"
+          ]
         }
       ],
       "enums": [
@@ -656,7 +689,8 @@
             "Sidebar"
           ],
           "notes": [
-            "位置描述可以作为补充，但不能反向替代 context pane 这一宿主术语。"
+            "位置描述可以作为补充，但不能反向替代 context pane 这一宿主术语。",
+            "若 context pane 内 surface 采用贴边模式，优先读取 live pane bounds；stacked 布局优先 inner pane bounds，不要写死固定宽度。"
           ]
         },
         {
@@ -669,7 +703,8 @@
             "annotations"
           ],
           "notes": [
-            "Reader sidebar view 必须沿用宿主 view id 语义，不要把按钮文案或视觉位置当成稳定接口名。"
+            "Reader sidebar view 必须沿用宿主 view id 语义，不要把按钮文案或视觉位置当成稳定接口名。",
+            "sidebarWidth 可作为贴边式 geometry 信号，但它是状态字段，不是新的 surface 名或布局模式名。"
           ]
         }
       ],
@@ -681,7 +716,7 @@
             "readonly READER_EVENT_TYPES: typeof READER_EVENT_TYPES;",
             "waitForReaderReady(target: unknown, options?: { timeoutMs?: number; intervalMs?: number }): Promise<unknown | null>;",
             "setContextPaneOpen(target: unknown, open: boolean, options?: { timeoutMs?: number; intervalMs?: number }): Promise<Record<string, unknown> | null>;",
-            "selectSidebarView(target: unknown, view: string, options?: { timeoutMs?: number; intervalMs?: number }): Promise<{",
+            "selectSidebarView(target: unknown, view: string, options?: {",
             "registerEventListener(type: string, handler: (event: ReaderEvent) => void, options?: { pluginID?: string }): (() => void) | null;",
             "dispatchSyntheticEvent(target: unknown, options?: {",
             "getReaderFrameWindow(target: unknown, options?: { view?: \"primary\" | \"secondary\" }): Window | null;"

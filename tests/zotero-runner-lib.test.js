@@ -17,6 +17,8 @@ import {
   installProxyAddon,
   parseDotEnv,
   prepareRuntime,
+  readAddonRuntimeInfo,
+  RdpClient,
   resolveRuntimePaths,
   serializeUserPrefs,
   stopManagedRuntimeProcesses,
@@ -143,6 +145,53 @@ ZOTERO_PLUGIN_RDP_PORT=64719
     assert.notOk(fs.existsSync(path.join(profilePath, "extensions", `${addonId}.xpi`)));
 
     fs.rmSync(profilePath, { recursive: true, force: true });
+  });
+
+  it("should allow reading addon runtime info before build output exists when requireBuild is false", async () => {
+    const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cleanroom-runtime-info-"));
+    const configDir = path.join(projectRoot, "config");
+    const distDir = path.join(projectRoot, "dist");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.mkdirSync(distDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, "addon.config.json"), JSON.stringify({
+      addonName: "Zotero Cleanroom Template",
+      addonId: "cleanroom-template@example.com",
+      addonRef: "cleanroomtemplate",
+      addonVersion: "0.1.0",
+      description: "A clean-room Zotero plugin template with independent architecture.",
+      author: "Your Team",
+      homepage: "https://github.com/OrlandoZh/AddonTemplate4Z",
+      strictMinVersion: "6.999",
+      strictMaxVersion: "8.*",
+      prefsPrefix: "extensions.zotero.cleanroomtemplate",
+      instanceKey: "CleanroomTemplate",
+      defaultPrefs: {
+        enabled: true,
+        logLevel: "info",
+      },
+    }, null, 2), "utf-8");
+
+    try {
+      let missingBuildError = null;
+      try {
+        await readAddonRuntimeInfo(projectRoot);
+      }
+      catch (error) {
+        missingBuildError = error;
+      }
+
+      assert.ok(missingBuildError);
+      assert.ok(String(missingBuildError.message || "").includes("Build output not found"));
+
+      const runtimeInfo = await readAddonRuntimeInfo(projectRoot, {
+        requireBuild: false,
+      });
+      assert.equal(runtimeInfo.config.addonRef, "cleanroomtemplate");
+      assert.equal(runtimeInfo.buildPath, path.join(projectRoot, "build", "cleanroomtemplate"));
+      assert.equal(runtimeInfo.xpiPath, null);
+    } finally {
+      fs.rmSync(projectRoot, { recursive: true, force: true });
+    }
   });
 
   it("should sanitize managed runtime markers without resetting directories on non-fresh runs", async () => {
@@ -431,6 +480,65 @@ ZOTERO_PLUGIN_RDP_PORT=64719
         message: "ready",
       },
     ]);
+  });
+
+  it("should include label and actor metadata on waitForEvent timeouts", async () => {
+    const client = new RdpClient();
+    let error = null;
+
+    try {
+      await client.waitForEvent(() => false, {
+        timeoutMs: 1,
+        label: "scenario:reader surface smoke",
+        phase: "evaluateInChrome",
+        consoleActor: "server.conn.console",
+        resultID: "result-1",
+      });
+    }
+    catch (caught) {
+      error = caught;
+    }
+
+    assert.ok(error);
+    assert.equal(error.scriptErrorCategory, "timeout");
+    assert.equal(error.failedStage, "chrome-evaluation");
+    assert.equal(error.details?.kind, "chrome-evaluation-timeout");
+    assert.equal(error.details?.label, "scenario:reader surface smoke");
+    assert.equal(error.details?.phase, "evaluateInChrome");
+    assert.equal(error.details?.consoleActor, "server.conn.console");
+    assert.equal(error.details?.resultID, "result-1");
+  });
+
+  it("should surface structured chrome evaluation timeout details", async () => {
+    const client = new RdpClient();
+    client.getParentProcessTarget = async () => ({
+      consoleActor: "server.conn.console",
+    });
+    client.request = async (payload) => {
+      if (payload?.type === "evaluateJSAsync") {
+        return { resultID: "result-42" };
+      }
+      return {};
+    };
+
+    let error = null;
+    try {
+      await client.evaluateInChrome("(() => 1)()", {
+        label: "scenario:menu surface smoke",
+        timeoutMs: 1,
+      });
+    }
+    catch (caught) {
+      error = caught;
+    }
+
+    assert.ok(error);
+    assert.equal(error.scriptErrorCategory, "timeout");
+    assert.equal(error.failedStage, "chrome-evaluation");
+    assert.equal(error.details?.kind, "chrome-evaluation-timeout");
+    assert.equal(error.details?.label, "scenario:menu surface smoke");
+    assert.equal(error.details?.consoleActor, "server.conn.console");
+    assert.equal(error.details?.resultID, "result-42");
   });
 
   it("should unwrap RDP preview objects into plain values", () => {

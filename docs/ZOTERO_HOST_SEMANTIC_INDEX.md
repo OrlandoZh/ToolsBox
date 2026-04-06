@@ -75,6 +75,12 @@
   - `preference pane` / 偏好设置面板
     - Use For: 指代可从 preferences sidebar 打开的宿主 pane surface。
     - Avoid: `偏好页`
+  - `interactive root` / 交互根节点
+    - Use For: 指代 advanced preference pane 中承载 tab/panel 状态的插件自有根节点。
+    - Avoid: -
+  - `tab panel` / 标签面板
+    - Use For: 指代 preference pane 内由 tab 切换出的 active panel surface。
+    - Avoid: -
 - Enums:
   - `builtInPanes sample IDs`: `zotero-prefpane-general`, `zotero-prefpane-sync`, `zotero-prefpane-export`, `zotero-prefpane-cite`, `zotero-prefpane-advanced`
     - Extensible: `false`
@@ -82,15 +88,15 @@
 - Option Schemas:
   - `PreferencePaneOptions`
     - Required: `pluginID`, `src`
-    - Optional: `id`, `parent`, `label`, `image`, `scripts`, `stylesheets`, `helpURL`
-    - Notes: label 缺失时回退插件名；URI 字段按 plugin root 解析。
+    - Optional: `id`, `parent`, `label`, `image`, `scripts`, `stylesheets`, `helpURL`, `onPreferenceLoad`
+    - Notes: label 缺失时回退插件名；URI 字段按 plugin root 解析；模板默认更偏向 onPreferenceLoad bridge，而非 legacy scripts。
 - Surface Semantics:
   - `preference-pane` / `preference-pane`
     - Host Events: -
-    - Surface Terms: `PreferencePanes`, `preference pane`, `preferences sidebar`
-    - Notes: 验证 preference pane 时，需证明 pane 已从侧边栏可打开且核心控件已渲染。
+    - Surface Terms: `PreferencePanes`, `preference pane`, `preferences sidebar`, `interactive root`, `tab panel`
+    - Notes: 验证 preference pane 时，需证明 pane 已从侧边栏可打开且核心控件已渲染。；若 pane 暴露 tab/panel 结构，需进一步证明 interactive root、active tab 与 active panel content 已就绪；单页 pane 仍可按结构/行为签名验证推进。
 - Required Types:
-  - `types/features.d.ts` includes `registerPane(options: PreferencePaneOptions): Promise<string | null>;`, `resolveURI(uri: string): string;`, `label?: string;`
+  - `types/features.d.ts` includes `registerPane(options: PreferencePaneOptions): Promise<string | null>;`, `resolveURI(uri: string): string;`, `label?: string;`, `onPreferenceLoad?: (`
 - Required Tests:
   - `zotero-host-semantic-index-lib.test.js`
   - `zotero-host-semantic-index.test.js`
@@ -125,7 +131,7 @@
   - `SectionOptions`
     - Required: `paneID`, `pluginID`, `header`, `sidenav`, `onRender`
     - Optional: `onInit`, `onDestroy`, `onItemChange`, `onAsyncRender`, `onToggle`, `sectionButtons`
-    - Notes: header.l10nID 与 sidenav.l10nID 对应 FTL key 必须已注入。
+    - Notes: onRender 负责首帧 DOM 构建；header.l10nID 对应 FTL `.label`，sidenav.l10nID 对应 FTL `.tooltiptext`，两者必须已注入。
   - `InfoRowOptions`
     - Required: `rowID`, `pluginID`, `label`, `onGetData`
     - Optional: `position`, `multiline`, `nowrap`, `editable`, `onSetData`, `onItemChange`
@@ -134,13 +140,13 @@
   - `item-pane-section` / `host-wrapper`
     - Host Events: -
     - Surface Terms: `Item Pane`, `section`, `info row`, `header.l10nID`, `sidenav.l10nID`
-    - Notes: Item Pane 是宿主接口包装层，不因文件名命中就默认转成 visual-required。
+    - Notes: Item Pane 是宿主接口包装层，不因文件名命中就默认转成 visual-required。；Section 的初始 DOM 必须在 onRender 建立；onAsyncRender 只补异步数据，不替代首帧结构。
   - `item-pane-sidenav` / `host-visible-surface`
     - Host Events: -
     - Surface Terms: `Item Pane`, `sidenav`, `data-pane`, `scrollToPane`
     - Notes: 当验证 Item Pane sidenav 时，先证明目标 pane 已被切换并 visible，再补局部视觉证据。
 - Required Types:
-  - `types/features.d.ts` includes `registerSection(options: SectionOptions): string | null;`, `registerInfoRow(options: InfoRowOptions): string | null;`, `headerL10nID: string;`, `labelL10nID: string;`
+  - `types/features.d.ts` includes `registerSection(options: SectionOptions): string | null;`, `registerInfoRow(options: InfoRowOptions): string | null;`, `onRender: (props: {`, `headerL10nID: string;`, `labelL10nID: string;`
 - Required Tests:
   - `zotero-host-semantic-index-lib.test.js`
   - `zotero-host-semantic-index.test.js`
@@ -213,6 +219,9 @@
   - `context pane` / 上下文窗格
     - Use For: 描述 Reader 侧由宿主控制的 context pane 语义。
     - Avoid: `Reader 右侧栏按钮`
+  - `sidebarWidth` / 侧栏宽度
+    - Use For: 描述 Reader sidebar 或贴边式 surface 可读取的 live geometry 状态字段。
+    - Avoid: `固定贴边宽度`
 - Enums:
   - `ReaderEventType`: `renderTextSelectionPopup`, `renderSidebarAnnotationHeader`, `renderToolbar`, `createColorContextMenu`, `createViewContextMenu`, `createAnnotationContextMenu`, `createThumbnailContextMenu`, `createSelectorContextMenu`
     - Extensible: `false`
@@ -238,13 +247,13 @@
   - `context-pane` / `context-pane`
     - Host Events: `renderToolbar`
     - Surface Terms: `context pane`, `Sidebar`
-    - Notes: 位置描述可以作为补充，但不能反向替代 context pane 这一宿主术语。
+    - Notes: 位置描述可以作为补充，但不能反向替代 context pane 这一宿主术语。；若 context pane 内 surface 采用贴边模式，优先读取 live pane bounds；stacked 布局优先 inner pane bounds，不要写死固定宽度。
   - `reader-sidebar-view` / `host-visible-surface`
     - Host Events: -
     - Surface Terms: `sidebarView`, `Reader sidebar`, `annotations`
-    - Notes: Reader sidebar view 必须沿用宿主 view id 语义，不要把按钮文案或视觉位置当成稳定接口名。
+    - Notes: Reader sidebar view 必须沿用宿主 view id 语义，不要把按钮文案或视觉位置当成稳定接口名。；sidebarWidth 可作为贴边式 geometry 信号，但它是状态字段，不是新的 surface 名或布局模式名。
 - Required Types:
-  - `types/features.d.ts` includes `export const READER_EVENT_TYPES: {`, `readonly READER_EVENT_TYPES: typeof READER_EVENT_TYPES;`, `waitForReaderReady(target: unknown, options?: { timeoutMs?: number; intervalMs?: number }): Promise<unknown | null>;`, `setContextPaneOpen(target: unknown, open: boolean, options?: { timeoutMs?: number; intervalMs?: number }): Promise<Record<string, unknown> | null>;`, `selectSidebarView(target: unknown, view: string, options?: { timeoutMs?: number; intervalMs?: number }): Promise<{`, `registerEventListener(type: string, handler: (event: ReaderEvent) => void, options?: { pluginID?: string }): (() => void) | null;`, `dispatchSyntheticEvent(target: unknown, options?: {`, `getReaderFrameWindow(target: unknown, options?: { view?: "primary" | "secondary" }): Window | null;`
+  - `types/features.d.ts` includes `export const READER_EVENT_TYPES: {`, `readonly READER_EVENT_TYPES: typeof READER_EVENT_TYPES;`, `waitForReaderReady(target: unknown, options?: { timeoutMs?: number; intervalMs?: number }): Promise<unknown | null>;`, `setContextPaneOpen(target: unknown, open: boolean, options?: { timeoutMs?: number; intervalMs?: number }): Promise<Record<string, unknown> | null>;`, `selectSidebarView(target: unknown, view: string, options?: {`, `registerEventListener(type: string, handler: (event: ReaderEvent) => void, options?: { pluginID?: string }): (() => void) | null;`, `dispatchSyntheticEvent(target: unknown, options?: {`, `getReaderFrameWindow(target: unknown, options?: { view?: "primary" | "secondary" }): Window | null;`
 - Required Tests:
   - `zotero-host-semantic-index-lib.test.js`
   - `zotero-host-semantic-index.test.js`

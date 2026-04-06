@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import {
+  buildAgentContext,
+  loadAgentContextSources,
+  summarizeAgentContextSnapshot,
+} from "./agent-context-lib.mjs";
 import { resolveAgentArtifactPath } from "./agent-artifacts.mjs";
 import { createScriptError } from "./script-runtime-lib.mjs";
 
@@ -30,9 +35,128 @@ const SNAPSHOT_IGNORE_DIRS = new Set([
   "node_modules",
   "reference",
 ]);
+const MAX_RUNTIME_WARNING_LINES = 2;
+const MAX_RUNTIME_EVIDENCE_REFS = 3;
+const PROMPT_ASSEMBLY_DIGEST_LENGTH = 16;
 
 function normalizeString(value) {
   return String(value || "").trim();
+}
+
+function truncateText(value, maxLength = 120) {
+  const text = normalizeString(value);
+  if (!text || text.length <= maxLength) {
+    return text;
+  }
+  return `${text.slice(0, Math.max(0, maxLength - 3)).trim()}...`;
+}
+
+function digestPromptSection(lines, length = PROMPT_ASSEMBLY_DIGEST_LENGTH) {
+  return createHash("sha256")
+    .update((Array.isArray(lines) ? lines : []).join("\n"))
+    .digest("hex")
+    .slice(0, length);
+}
+
+function sanitizeRuntimeContext(runtimeContext) {
+  if (!runtimeContext || typeof runtimeContext !== "object" || runtimeContext.present !== true) {
+    return null;
+  }
+
+  const warnings = uniqueStrings(runtimeContext?.driftRef?.warnings)
+    .map((item) => truncateText(item, 120))
+    .filter(Boolean)
+    .slice(0, MAX_RUNTIME_WARNING_LINES);
+  const evidenceRefs = uniqueStrings(runtimeContext?.evidenceRefs)
+    .map((item) => truncateText(item, 120))
+    .filter(Boolean)
+    .slice(0, MAX_RUNTIME_EVIDENCE_REFS);
+  const warningCount = Number.isFinite(Number(runtimeContext?.driftRef?.warningCount))
+    ? Math.max(0, Math.trunc(Number(runtimeContext.driftRef.warningCount)))
+    : warnings.length;
+
+  return {
+    present: true,
+    truthRef: {
+      activeBatchId: truncateText(runtimeContext?.truthRef?.activeBatchId, 96) || null,
+      currentWaveName: truncateText(runtimeContext?.truthRef?.currentWaveName, 96) || null,
+      validationLevel: truncateText(runtimeContext?.truthRef?.validationLevel, 96) || null,
+    },
+    actionRef: {
+      nextAction: truncateText(runtimeContext?.actionRef?.nextAction, 120) || null,
+      mainBlocker: truncateText(runtimeContext?.actionRef?.mainBlocker, 120) || null,
+    },
+    statusRef: {
+      stableContextKey: truncateText(runtimeContext?.statusRef?.stableContextKey, 80) || null,
+      dynamicFingerprint: truncateText(runtimeContext?.statusRef?.dynamicFingerprint, 80) || null,
+      monitorStatus: truncateText(runtimeContext?.statusRef?.monitorStatus, 80) || null,
+      gateStatus: truncateText(runtimeContext?.statusRef?.gateStatus, 80) || null,
+      memoryFingerprint: truncateText(runtimeContext?.statusRef?.memoryFingerprint, 80)
+        || truncateText(runtimeContext?.statusRef?.memoryStrategyLabel, 80)
+        || null,
+      releaseStatus: truncateText(runtimeContext?.statusRef?.releaseStatus, 80) || null,
+    },
+    driftRef: {
+      status: truncateText(runtimeContext?.driftRef?.status, 48) || "missing",
+      warningCount: Math.min(warningCount, MAX_RUNTIME_WARNING_LINES),
+      warnings,
+    },
+    evidenceRefs,
+    artifactRefs: {
+      currentTruth: truncateText(runtimeContext?.artifactRefs?.currentTruth, 120) || null,
+      monitor: truncateText(runtimeContext?.artifactRefs?.monitor, 120) || null,
+      gate: truncateText(runtimeContext?.artifactRefs?.gate, 120) || null,
+      memory: truncateText(runtimeContext?.artifactRefs?.memory, 120) || null,
+      contextJSON: truncateText(runtimeContext?.artifactRefs?.contextJSON, 120) || null,
+    },
+    budgetMeta: {
+      profile: truncateText(runtimeContext?.budgetMeta?.profile, 64) || null,
+      digest: truncateText(runtimeContext?.budgetMeta?.digest, 96) || null,
+    },
+  };
+}
+
+function resolveLaneLabel(task) {
+  const lane = normalizeString(task?.lane);
+  return normalizeString(task?.laneLabel) || DELEGATION_TASK_LANE_LABELS[lane] || lane || "-";
+}
+
+function splitPromptTemplateIntoClauses(promptTemplate) {
+  const normalized = normalizeString(promptTemplate)
+    .replace(/^该任务仅供 Codex 跟踪。[。；\s]*/u, "")
+    .replace(/\s+/gu, " ");
+  if (!normalized) {
+    return [];
+  }
+  return normalized
+    .split(/[。！？]/u)
+    .map((item) => normalizeString(item))
+    .filter(Boolean);
+}
+
+function buildPromptTemplateDigest(promptTemplate, maxItems = 3) {
+  const clauses = splitPromptTemplateIntoClauses(promptTemplate);
+  if (clauses.length === 0) {
+    return [];
+  }
+
+  const digest = [];
+  for (const clause of clauses) {
+    const compactParts = clause
+      .split(/[；;]/u)
+      .map((item) => truncateText(item, 96))
+      .filter(Boolean);
+    for (const item of compactParts) {
+      if (digest.includes(item)) {
+        continue;
+      }
+      digest.push(item);
+      if (digest.length >= maxItems) {
+        return digest;
+      }
+    }
+  }
+  return digest;
 }
 
 function toPosixRelativePath(value) {
@@ -210,51 +334,92 @@ export async function loadDelegationManifest(projectRoot, options = {}) {
   };
 }
 
-export function buildDelegationPrompt(task) {
-  const lines = [
+export async function loadDelegationRuntimeContext(projectRoot) {
+  const contextPath = resolveAgentArtifactPath(projectRoot, "agent-context.json");
+  try {
+    const content = await fs.readFile(contextPath, "utf-8");
+    const parsed = JSON.parse(content);
+    return summarizeAgentContextSnapshot(parsed);
+  } catch (error) {
+    if (error && (error.code === "ENOENT" || error instanceof SyntaxError)) {
+      const fallbackContext = buildAgentContext(await loadAgentContextSources(projectRoot));
+      return summarizeAgentContextSnapshot(fallbackContext);
+    }
+    throw error;
+  }
+}
+
+function formatRuntimeContextLine(label, values) {
+  const parts = (Array.isArray(values) ? values : [])
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  return parts.length > 0 ? `- ${label}: ${parts.join(" / ")}` : `- ${label}: -`;
+}
+
+function buildDelegationPromptAssembly(task, options = {}) {
+  const manifestPath = normalizeString(options.manifestPath) || DEFAULT_MANIFEST_PATH;
+  const inlineContract = options.inlineContract === true;
+  const contractDigest = buildPromptTemplateDigest(task?.promptTemplate, 3);
+  const runtimeContext = sanitizeRuntimeContext(options.runtimeContext);
+  const promptMode = inlineContract ? "inline-contract" : "manifest-reference";
+  const contractReference = `${manifestPath} -> ${task.taskId}`;
+  const stablePrefixLines = [
     `任务 ID: ${task.taskId}`,
     `任务标题: ${task.title || task.taskId}`,
-    `执行 lane: ${task.laneLabel}`,
+    `执行 lane: ${resolveLaneLabel(task)}`,
+    `完整契约来源: ${contractReference}`,
     "",
     "你是通过 mco 调度的 Opencode worker。",
     "这是一个已冻结契约的低逻辑任务：只能在给定路径范围内做实现、透传、展示、测试或文档同步，不能擅自改变边界、策略、白名单范围或风险模型。",
+    "为减少委托 prompt 的上下文占用，完整 contract 默认不再内联；开始前先读取 manifest 中该任务的完整记录，若当前 prompt 与 manifest 冲突，以 manifest 为准。",
     "",
     "允许修改路径:",
     ...task.scopePaths.map((item) => `- ${item}`),
   ];
 
   if (task.dependsOn.length > 0) {
-    lines.push("", `前置依赖: ${task.dependsOn.join("、")}`);
+    stablePrefixLines.push("", `前置依赖: ${task.dependsOn.join("、")}`);
   }
 
-  lines.push(
-    "",
-    "任务契约:",
-    task.promptTemplate || "-",
-  );
+  if (inlineContract) {
+    stablePrefixLines.push(
+      "",
+      "任务契约（内联）:",
+      task.promptTemplate || "-",
+    );
+  } else {
+    stablePrefixLines.push("", "最小任务摘要:");
+    if (contractDigest.length === 0) {
+      stablePrefixLines.push("- 请读取 manifest 中该任务的 `promptTemplate` 获取完整边界。");
+    } else {
+      contractDigest.forEach((item) => {
+        stablePrefixLines.push(`- ${item}`);
+      });
+    }
+  }
 
   if (task.reviewChecklist.length > 0) {
-    lines.push("", "审查清单:");
+    stablePrefixLines.push("", "审查清单:");
     task.reviewChecklist.forEach((item) => {
-      lines.push(`- ${item}`);
+      stablePrefixLines.push(`- ${item}`);
     });
   }
 
   if (task.testCommands.length > 0) {
-    lines.push("", "完成后请自行运行这些命令:");
+    stablePrefixLines.push("", "完成后请自行运行这些命令:");
     task.testCommands.forEach((item) => {
-      lines.push(`- ${item}`);
+      stablePrefixLines.push(`- ${item}`);
     });
   }
 
   if (task.handoffArtifacts.length > 0) {
-    lines.push("", "交接时需要说明的工件:");
+    stablePrefixLines.push("", "交接时需要说明的工件:");
     task.handoffArtifacts.forEach((item) => {
-      lines.push(`- ${item}`);
+      stablePrefixLines.push(`- ${item}`);
     });
   }
 
-  lines.push(
+  stablePrefixLines.push(
     "",
     "硬约束:",
     "- 不要改 scopePaths 之外的文件。",
@@ -262,7 +427,66 @@ export function buildDelegationPrompt(task) {
     "- 若遇到契约不够或需要改变边界，只在结果里说明，不要越权扩面。",
   );
 
-  return lines.join("\n");
+  const dynamicTailLines = [];
+  if (runtimeContext?.present) {
+    dynamicTailLines.push(
+      "动态运行时上下文（可变部分）:",
+      `当前项目态（${runtimeContext.budgetMeta?.profile || "runtime-compact-v1"}）:`,
+    );
+    dynamicTailLines.push(formatRuntimeContextLine("Truth Ref", [
+      `batch=${runtimeContext.truthRef?.activeBatchId || "-"}`,
+      `wave=${runtimeContext.truthRef?.currentWaveName || "-"}`,
+      `validation=${runtimeContext.truthRef?.validationLevel || "-"}`,
+    ]));
+    dynamicTailLines.push(formatRuntimeContextLine("Action Ref", [
+      `next=${runtimeContext.actionRef?.nextAction || "-"}`,
+      `blocker=${runtimeContext.actionRef?.mainBlocker || "-"}`,
+    ]));
+    dynamicTailLines.push(formatRuntimeContextLine("Status Ref", [
+      `stable=${runtimeContext.statusRef?.stableContextKey || "-"}`,
+      `dynamic=${runtimeContext.statusRef?.dynamicFingerprint || "-"}`,
+      `monitor=${runtimeContext.statusRef?.monitorStatus || "-"}`,
+      `gate=${runtimeContext.statusRef?.gateStatus || "-"}`,
+      `memory=${runtimeContext.statusRef?.memoryFingerprint || runtimeContext.statusRef?.memoryStrategyLabel || "-"}`,
+      `release=${runtimeContext.statusRef?.releaseStatus || "-"}`,
+    ]));
+    dynamicTailLines.push(formatRuntimeContextLine("Drift Ref", [
+      `status=${runtimeContext.driftRef?.status || "missing"}`,
+      `warning=${runtimeContext.driftRef?.warningCount ?? 0}`,
+      (Array.isArray(runtimeContext.driftRef?.warnings) ? runtimeContext.driftRef.warnings : []).join("；"),
+    ]));
+    dynamicTailLines.push(formatRuntimeContextLine("Evidence Refs", runtimeContext.evidenceRefs || []));
+    dynamicTailLines.push(formatRuntimeContextLine("Artifact Refs", [
+      `truth=${runtimeContext.artifactRefs?.currentTruth || "-"}`,
+      `monitor=${runtimeContext.artifactRefs?.monitor || "-"}`,
+      `gate=${runtimeContext.artifactRefs?.gate || "-"}`,
+      `memory=${runtimeContext.artifactRefs?.memory || "-"}`,
+      `context=${runtimeContext.artifactRefs?.contextJSON || "-"}`,
+    ]));
+  }
+
+  const promptLines = dynamicTailLines.length > 0
+    ? [...stablePrefixLines, "", ...dynamicTailLines]
+    : stablePrefixLines;
+  const runtimeContextProfile = runtimeContext?.budgetMeta?.profile || null;
+  const runtimeContextDigest = runtimeContext?.budgetMeta?.digest || null;
+
+  return {
+    prompt: promptLines.join("\n"),
+    promptMode,
+    contractReference,
+    runtimeContextProfile,
+    runtimeContextDigest,
+    budgetProfile: runtimeContextProfile || "task-contract-compact-v1",
+    stablePrefixDigest: digestPromptSection(stablePrefixLines),
+    dynamicTailDigest: digestPromptSection(dynamicTailLines),
+    stablePrefixLineCount: stablePrefixLines.length,
+    dynamicTailLineCount: dynamicTailLines.length,
+  };
+}
+
+export function buildDelegationPrompt(task, options = {}) {
+  return buildDelegationPromptAssembly(task, options).prompt;
 }
 
 export function buildMcoRunInvocation(task, projectRoot, options = {}) {
@@ -273,7 +497,11 @@ export function buildMcoRunInvocation(task, projectRoot, options = {}) {
   }
 
   const artifacts = resolveDelegationTaskArtifacts(projectRoot, task.taskId);
-  const prompt = options.prompt || buildDelegationPrompt(task);
+  const {
+    prompt: assembledPrompt,
+    ...promptAssembly
+  } = buildDelegationPromptAssembly(task, options);
+  const prompt = options.prompt || assembledPrompt;
   const scopeList = task.scopePaths.join(",");
   const command = normalizeString(process.env.MCO_BINARY) || "mco";
   const args = [
@@ -300,6 +528,11 @@ export function buildMcoRunInvocation(task, projectRoot, options = {}) {
     targetPaths: task.scopePaths.slice(),
     allowPaths: task.scopePaths.slice(),
     prompt,
+    promptMode: promptAssembly.promptMode,
+    contractReference: promptAssembly.contractReference,
+    runtimeContextProfile: promptAssembly.runtimeContextProfile,
+    runtimeContextDigest: promptAssembly.runtimeContextDigest,
+    promptAssembly,
   };
 }
 

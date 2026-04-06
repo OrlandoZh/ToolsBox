@@ -34,6 +34,7 @@ function createConfig() {
       enabled: true,
       menuLabel: "",
       logLevel: "info",
+      themeMode: "follow-host",
     },
   };
 }
@@ -318,7 +319,7 @@ describe("Plugin", () => {
     await startPromise;
 
     assert.equal(preferenceRegistrations.length, 1);
-    assert.equal(promptRegistrations.length, 2);
+    assert.equal(promptRegistrations.length, 3);
     assert.equal(menuRegistrations.length, 2);
     assert.equal(itemPaneSections.length, 1);
     assert.equal(itemPaneRows.length, 1);
@@ -347,6 +348,16 @@ describe("Plugin", () => {
       preferenceRegistrations[0].image,
       "chrome://cleanroomtemplate/content/icons/icon-48.png",
     );
+    assert.deepEqual(
+      preferenceRegistrations[0].scripts,
+      [
+        "chrome://cleanroomtemplate/content/preference-pane-load-bridge.js",
+      ],
+    );
+    assert.deepEqual(
+      preferenceRegistrations[0].stylesheets,
+      ["chrome://cleanroomtemplate/content/preferences.css"],
+    );
 
     assert.equal(promptRegistrations[0][0].id, "cleanroomtemplate-primary-action");
     assert.equal(promptRegistrations[0][0].label, "Open Cleanroom Action");
@@ -354,6 +365,8 @@ describe("Plugin", () => {
     assert.equal(promptRegistrations[0][0].when(), true);
     assert.equal(promptRegistrations[1][0].id, "cleanroomtemplate-reader-summary");
     assert.equal(promptRegistrations[1][0].when(), false);
+    assert.equal(promptRegistrations[2][0].id, "cleanroomtemplate-reader-selection-snapshot");
+    assert.equal(promptRegistrations[2][0].when(), false);
 
     assert.equal(menuRegistrations[0].pluginID, "cleanroom-template@example.com");
     assert.equal(menuRegistrations[0].target, "main/library/item");
@@ -379,7 +392,7 @@ describe("Plugin", () => {
     assert.ok(plugin.api.runtime);
     assert.ok(plugin.api.serviceRegistry);
     assert.equal(plugin.api.preferencePanes.getPaneCount(), 1);
-    assert.equal(plugin.api.commandPalette.getCommandCount(), 2);
+    assert.equal(plugin.api.commandPalette.getCommandCount(), 3);
     assert.equal(plugin.api.menuManager.getMenuCount(), 2);
     assert.equal(plugin.api.itemPane.getSectionCount(), 1);
     assert.equal(plugin.api.itemPane.getInfoRowCount(), 1);
@@ -398,6 +411,8 @@ describe("Plugin", () => {
     assert.typeOf(plugin.api.agent.getCapability, "function");
     assert.typeOf(plugin.api.agent.listHostActions, "function");
     assert.typeOf(plugin.api.agent.runHostAction, "function");
+    assert.typeOf(plugin.api.readerSelectionActions.getActionSnapshot, "function");
+    assert.equal(plugin.api.readerSelectionActions.getActionCount(), 1);
     assert.deepEqual(plugin.api.agent.listScenarios(), [
       "baseline-registration",
       "capability-manifest",
@@ -478,9 +493,18 @@ describe("Plugin", () => {
     assert.includes(notifierScenario.lastNotifierEvent, "item:refresh #88");
     const diagnostics = plugin.api.agent.collectDiagnostics();
     assert.includes(diagnostics.lastNotifierEvent, "#88");
-    assert.equal(diagnostics.serviceTotal, 2);
+    assert.equal(diagnostics.serviceTotal, 3);
+    assert.equal(diagnostics.serviceHealthyCount, 2);
     assert.equal(diagnostics.serviceUnhealthyCount, 0);
     assert.equal(diagnostics.serviceHealthOK, true);
+    assert.ok(
+      diagnostics.services.some((entry) => {
+        return entry.id === "cleanroomtemplate.react-ui-demo"
+          && entry.enabled === false
+          && entry.status === "disabled"
+          && entry.health?.status === "disabled";
+      }),
+    );
     assert.equal(diagnostics.runtimeBridgeStatus, "healthy");
     assert.equal(diagnostics.runtimeInjectedCapabilityCount, 4);
     assert.ok(diagnostics.capabilityCount >= 11);
@@ -490,6 +514,7 @@ describe("Plugin", () => {
     assert.ok(diagnostics.readerEventProbeTypeCount >= 7);
     assert.equal(diagnostics.readerEventSyntheticFallbackAvailable, true);
     assert.equal(diagnostics.readerEventReport.syntheticFallbackAvailable, true);
+    assert.ok(diagnostics.commandIDs.includes("cleanroomtemplate-reader-selection-snapshot"));
     assert.typeOf(plugin.api.getMainWindow, "function");
 
     const settingsSnapshot = plugin.api.agent.runScenario("settings-snapshot");
@@ -530,6 +555,18 @@ describe("Plugin", () => {
       itemID: 42,
       tabID: "reader-tab-42",
       annotationItemIDs: [1, 2, 3],
+      _iframeWindow: {
+        getSelection() {
+          return {
+            toString() {
+              return "Selected plugin reader text";
+            },
+          };
+        },
+        document: {
+          defaultView: null,
+        },
+      },
     };
     globalThis.Zotero.Reader._readers = [activeReader];
 
@@ -541,6 +578,7 @@ describe("Plugin", () => {
     await plugin.start();
 
     assert.equal(promptRegistrations[1][0].when(), true);
+    assert.equal(promptRegistrations[2][0].when(), true);
     assert.deepEqual(plugin.api.reader.getActiveSummary(), {
       tabID: "reader-tab-42",
       itemID: 42,
@@ -548,6 +586,22 @@ describe("Plugin", () => {
       annotationIDs: [1, 2, 3],
       annotationCount: 3,
     });
+    assert.deepEqual(plugin.api.reader.getSelectionSnapshot(), {
+      hasSelection: true,
+      sourceKind: "iframe-selection",
+      text: "Selected plugin reader text",
+      textLength: 27,
+      tabID: "reader-tab-42",
+      itemID: 42,
+      readerType: "pdf",
+      selectedAnnotationIDs: [],
+      annotationCount: 3,
+    });
+    const selectionActionExecution = await plugin.api.readerSelectionActions.executeAction(
+      "cleanroomtemplate-reader-selection-snapshot",
+    );
+    assert.equal(selectionActionExecution.ok, true);
+    assert.equal(selectionActionExecution.result.textLength, 27);
 
     let visible = null;
     menuRegistrations[1].menus[0].onShowing(null, {

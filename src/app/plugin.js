@@ -13,7 +13,9 @@ import { createItemTree } from "../features/item-tree.js";
 import { createCommandPalette } from "../features/prompt.js";
 import { createPreferencePanes } from "../features/preference-panes.js";
 import { createReader } from "../features/reader.js";
+import { createReaderSelectionActions } from "../features/reader-selection-actions.js";
 import { createWindowManager } from "../features/window-manager.js";
+import { createThemeManager } from "../features/theme-manager.js";
 import { createZoteroHost } from "../platform/zotero-host.js";
 import { createDialogBuilder } from "../utils/dialog.js";
 import { createProgressNotifier } from "../utils/progress-window.js";
@@ -22,8 +24,10 @@ import { createPluginKernel } from "./kernel.js";
 import { createPluginAPI } from "./plugin-api.js";
 import { createPluginAgent } from "./plugin-agent.js";
 import { createFeatureComposer } from "./feature-composer.js";
+import { createOptionalBundleRuntime } from "./optional-bundles.js";
 import { createRuntimeCapabilityState } from "./runtime-capabilities.js";
 import { createHostActionRunner } from "./host-actions.js";
+import { createReactUIDemoLauncher } from "../features/react-ui-demo.js";
 
 function normalizeLogLevel(input, fallback = "info") {
   const candidate = String(input || "").trim().toLowerCase();
@@ -71,6 +75,10 @@ function cloneLifecycleTelemetrySummary(summary = null) {
 
 export function createPlugin({ globalScope, config }) {
   const runtime = globalScope.__CLEANROOM_TEMPLATE_RUNTIME__ || {};
+  const optionalBundleRegistry = globalScope.__CLEANROOM_TEMPLATE_OPTIONAL_BUNDLES__ || null;
+  const optionalBundles = createOptionalBundleRuntime({
+    registry: optionalBundleRegistry,
+  });
   const runtimeInfo = createRuntimeCapabilityState({ runtime });
   const host = createZoteroHost({ globalScope, rootURI: runtime.rootURI });
   const zotero = globalScope.Zotero;
@@ -147,6 +155,39 @@ export function createPlugin({ globalScope, config }) {
     prefs,
     i18n,
   });
+  const themeManager = createThemeManager({
+    logger,
+    prefs,
+  });
+  const reactUIDemo = createReactUIDemoLauncher({
+    config,
+    logger,
+    host,
+    themeManager,
+    optionalBundles,
+  });
+
+  serviceRegistry.register({
+    id: `${config.addonRef}.react-ui-demo`,
+    label: "Optional React UI Demo",
+    enabledWhen() {
+      return optionalBundles.isEnabled("react-ui");
+    },
+    async start() {},
+    async stop() {
+      reactUIDemo.close();
+    },
+    healthCheck() {
+      return {
+        ok: true,
+        status: optionalBundles.isEnabled("react-ui") ? "ready" : "disabled",
+        details: {
+          enabled: optionalBundles.isEnabled("react-ui"),
+          open: reactUIDemo.isOpen(),
+        },
+      };
+    },
+  });
   const menuManager = createMenuManager({
     logger,
     lifecycle,
@@ -189,6 +230,11 @@ export function createPlugin({ globalScope, config }) {
     lifecycle,
     pluginID: config.addonId,
   });
+  const readerSelectionActions = createReaderSelectionActions({
+    logger,
+    lifecycle,
+    reader,
+  });
 
   const windows = createWindowManager({
     logger,
@@ -206,6 +252,7 @@ export function createPlugin({ globalScope, config }) {
           href: styleHref,
         }),
       );
+      cleanups.push(themeManager.mountWindow(window));
 
       cleanups.push(menuCommand.mount(window));
 
@@ -394,6 +441,59 @@ export function createPlugin({ globalScope, config }) {
     return true;
   }
 
+  async function runReaderSelectionActionDemo(actionId = `${config.addonRef}-reader-selection-snapshot`) {
+    const execution = await readerSelectionActions.executeAction(actionId);
+    const result = execution?.result && typeof execution.result === "object"
+      ? execution.result
+      : {};
+    const itemID = result.itemID ?? execution?.selection?.itemID ?? null;
+    const readerType = result.readerType || execution?.selection?.readerType || "unknown";
+    const textLength = Number(result.textLength || execution?.selection?.textLength || 0);
+    const textPreview = typeof result.textPreview === "string" && result.textPreview.trim()
+      ? result.textPreview.trim()
+      : "";
+
+    if (!execution?.ok) {
+      progress.showToast(
+        i18n.t(
+          "cleanroom-reader-selection-toast-empty",
+          "No reader selection is currently available.",
+        ),
+        "warning",
+        2500,
+        {
+          title: i18n.t(
+            "cleanroom-reader-selection-toast-title",
+            "Reader Selection",
+          ),
+        },
+      );
+      return false;
+    }
+
+    progress.showToast(
+      i18n.t(
+        "cleanroom-reader-selection-toast-body",
+        {
+          type: readerType,
+          itemID,
+          length: textLength,
+          preview: textPreview,
+        },
+        `${readerType} reader #${itemID} selection (${textLength} chars): ${textPreview}`,
+      ),
+      "info",
+      3000,
+      {
+        title: i18n.t(
+          "cleanroom-reader-selection-toast-title",
+          "Reader Selection",
+        ),
+      },
+    );
+    return true;
+  }
+
   function applyLogLevelFromPrefs() {
     const desired = normalizeLogLevel(prefs.get("logLevel"), config.defaultPrefs.logLevel);
     const changed = logger.setLevel(desired);
@@ -402,11 +502,30 @@ export function createPlugin({ globalScope, config }) {
     }
   }
 
+  function applyThemeModeFromPrefs() {
+    const appliedMode = themeManager.syncFromPrefs();
+    logger.debug("prefs.themeMode.applied", {
+      mode: appliedMode,
+      mountedWindowCount: themeManager.getMountedWindowCount(),
+      mountedElementCount: themeManager.getMountedElementCount(),
+    });
+  }
+
+  function applySettingsFromPrefs() {
+    applyLogLevelFromPrefs();
+    applyThemeModeFromPrefs();
+  }
+
   function handlePrefChange(key) {
     logger.debug("settings.changed", { key });
 
     if (key === "logLevel") {
       applyLogLevelFromPrefs();
+      return;
+    }
+
+    if (key === "themeMode") {
+      applyThemeModeFromPrefs();
       return;
     }
 
@@ -456,6 +575,9 @@ export function createPlugin({ globalScope, config }) {
     host,
     reader,
     menuManager,
+    itemPane,
+    optionalBundles,
+    openReactDemoWindow: reactUIDemo.openDemoWindow,
   });
 
   const agent = createPluginAgent({
@@ -496,6 +618,7 @@ export function createPlugin({ globalScope, config }) {
     i18n,
     preferencePanes,
     commandPalette,
+    readerSelectionActions,
     menuManager,
     reader,
     itemTree,
@@ -504,6 +627,7 @@ export function createPlugin({ globalScope, config }) {
     getPrimaryWindow,
     runPrimaryAction,
     runReaderDemo,
+    runReaderSelectionActionDemo,
     getColumnValue,
     getItemSummary,
     createSectionLine,
@@ -514,6 +638,8 @@ export function createPlugin({ globalScope, config }) {
     demoColumnKey,
     demoNotifierID,
     updateDemoNotifierState,
+    optionalBundles,
+    openReactDemoWindow: reactUIDemo.openDemoWindow,
   });
 
   const kernel = createPluginKernel({
@@ -524,7 +650,7 @@ export function createPlugin({ globalScope, config }) {
     windows,
     settings,
     registerBaselineFeatures: featureComposer.registerBaselineFeatures,
-    applySettings: applyLogLevelFromPrefs,
+    applySettings: applySettingsFromPrefs,
     onSettingsChange: handlePrefChange,
     addonName: config.addonName,
     startServices: async () => {
@@ -568,6 +694,7 @@ export function createPlugin({ globalScope, config }) {
     commandPalette,
     preferencePanes,
     reader,
+    readerSelectionActions,
     serviceRegistry,
     getMainWindow: getPrimaryWindow,
     runPrimaryAction,

@@ -97,12 +97,13 @@ npm run zotero:test
 如果一个新的开发 agent 接手这个项目，默认按下面顺序推进：
 
 1. 先读取 `docs/CURRENT_BACKLOG.md` 的“当前单一事实源”，不要直接根据旧 `dist/` 工件、README 历史记录或单次命令输出判断当前主线。
-2. 先执行 `npm run check`，确保源码、配置、文档 truth 与 clean-room 门禁处于一致状态。
-3. 如果 `config/addon.config.json` 仍是模板默认值，例如 `addonId=cleanroom-template@example.com`、`author=Your Team`、模板仓库 `homepage` 或模板专用 `updateURL`，先暂停功能开发，并先向用户确认：`addonName`、`addonId`、`addonRef`、`author`、`homepage`、`updateURL`，以及是否保留完整 agent 工程链还是导出纯项目。
-4. 涉及运行时、UI、场景或宿主集成的改动，优先执行 `npm run agent:zotero:e2e`；只有需要连续热重载观察时再使用 `npm run zotero:watch`。
-5. 每轮改动后都执行 `npm run agent:monitor` 和 `npm run agent:gate`，以 gate 是否通过作为“是否继续推进”的主判据。
-6. 只有当前任务明确属于发布链时，才进入 `npm run release:plan -> npm run release:upload -- --provider <provider> --release-tag <tag> --target-base-url <url> -> 手动上传远端产物 -> npm run release:preflight -- --verify-remote -> npm run release:prepare -> npm run release:matrix -> npm run agent:gate:release`。
-7. 如果只是要导出纯源码或模板交付物，使用 `npm run export:project`，不要直接复制整个工作目录。
+2. 如只需快速定向当前项目态，可先看 `dist/agent-context.json` 的 `runtimeCompact` 视图；一旦涉及 truth、wave、validation 或 scope 判定，仍回到 `docs/CURRENT_BACKLOG.md` 与 project mirror。
+3. 先执行 `npm run check`，确保源码、配置、文档 truth 与 clean-room 门禁处于一致状态。
+4. 如果 `config/addon.config.json` 仍是模板默认值，例如 `addonId=cleanroom-template@example.com`、`author=Your Team`、模板仓库 `homepage` 或模板专用 `updateURL`，先暂停功能开发，并先向用户确认：`addonName`、`addonId`、`addonRef`、`author`、`homepage`、`updateURL`，以及是否保留完整 agent 工程链还是导出纯项目。
+5. 涉及运行时、UI、场景或宿主集成的改动，优先执行 `npm run agent:zotero:e2e`；只有需要连续热重载观察时再使用 `npm run zotero:watch`。
+6. 每轮改动后都执行 `npm run agent:monitor` 和 `npm run agent:gate`，以 gate 是否通过作为“是否继续推进”的主判据。
+7. 只有当前任务明确属于发布链时，才进入 `npm run release:plan -> npm run release:upload -- --provider <provider> --release-tag <tag> --target-base-url <url> -> 手动上传远端产物 -> npm run release:preflight -- --verify-remote -> npm run release:prepare -> npm run release:matrix -> npm run agent:gate:release`。
+8. 如果只是要导出纯源码或模板交付物，使用 `npm run export:project`，不要直接复制整个工作目录。
 
 补充说明：
 
@@ -124,6 +125,7 @@ my-plugin/
 │   ├── app/                 # 应用层
 │   ├── core/                # 核心模块
 │   ├── features/            # 功能模块
+│   ├── services/            # 服务模块
 │   ├── utils/               # 工具模块
 │   └── platform/            # 平台适配
 ├── types/                   # TypeScript 类型
@@ -177,6 +179,73 @@ export function createPlugin(options) {
   };
 }
 ```
+
+### 主题机制
+
+- `themeMode` 公开值使用 `follow-host`、`light`、`dark`；历史 `auto` 输入仍会被接受并归一到 `follow-host`
+- 需要跟随 Zotero 宿主窗口主题时，优先对窗口根节点调用 `themeManager.mountWindow(window)`
+- 需要给插件自定义 HTML / XHTML surface 复用同一套主题语义时，优先对该根节点调用 `themeManager.mountElement(root)`
+- 纯静态 content 页面先加载 `content/theme.js`，再在页面脚本里调用元素级 helper；模板偏好页就是最小参考实现
+- 主题只治理插件自定义 UI，不直接改 Zotero 全局 Appearance
+
+### Preference Pane 约定
+
+- 模板默认推荐 `onPreferenceLoad(context)`，`scripts` 只保留兼容路径
+- 推荐顺序固定为：`loadSubScript(content/theme.js) -> loadSubScript(content/preferences.js) -> window.initCleanroomPreferences(options?)`
+- `PreferencePaneLoadContext` 固定包含 `window`、`paneID`、`pluginID`、`resolveURI(uri)`
+- `addon-static/content/preferences.xhtml` 是 fragment，不保留 XML declaration
+- 偏好页静态控制器只依赖 `addon-static/content/*` helper，不直接 import `src/`
+- 触达偏好页控件行为、pref 写回或 `themeMode` 时，应补 `preferences.setCheckbox`、`preferences.setTextbox`、`preferences.selectMenulist` 这类 live control evidence
+- 细节见 [Preference Pane Guide](./PREFERENCE_PANE_GUIDE.md)
+
+### Standalone Window Shell
+
+- 需要 `openDialog(...)` 管理独立窗口、详情窗口或批处理窗口时，优先使用 `src/utils/window-shell.js`
+- 这层只负责 `openDialog -> ready -> focus/reuse -> cleanup`，窗口内具体 HTML / XUL / VirtualizedTable / embedded widget 仍由业务模块挂载
+- 主窗口挂载仍归 `src/features/window-manager.js`；不要把主窗口生命周期和子窗口壳复用逻辑混成同一个 manager
+- 相关路线与 reference 技术链见：
+  - [UI Creation Paths](./UI_CREATION_PATHS.md)
+  - [Reference Plugin Technical Chains](./REFERENCE_PLUGIN_TECHNICAL_CHAINS.md)
+
+### File-backed Runtime State
+
+- 当状态明显超出 `Prefs` 适用范围时，优先从 `src/services/file-state-store.js` 起步
+- 这层负责内存 cache、文件读写 adapter、debounce save、size limit 与 schema migration envelope，不负责具体目录策略和业务裁剪规则
+- 推荐让业务模块自己决定 `Zotero.DataDirectory.dir` 下的目录布局，再优先用 `src/platform/zotero-file-storage.js` 生成 `readText/writeText` adapter 注入到 store，而不是把宿主路径判断写死在模板原语里
+- 如果目录和文件名已经明确，优先直接用 `src/platform/zotero-json-state-store.js` 完成一步接线；它只负责组合 `zotero-file-storage + file-state-store`，不替你决定业务 schema
+
+```javascript
+import { createZoteroJSONStateStore } from "../src/platform/zotero-json-state-store.js";
+
+const historyStore = createZoteroJSONStateStore({
+  globalScope,
+  id: "history.demo",
+  directorySegments: ["myplugin", "state"],
+  fileName: "history.json",
+  initialState: () => ({ entries: [] }),
+});
+```
+
+### Task Runner Skeleton
+
+- 需要 provider 调度、后台批处理或多类型异步任务时，优先从 `src/services/task-runner.js` 起步
+- 这层负责 `descriptor` 类型分发、handler 注册、结果快照与 `run/submit` 收口，不负责 provider 目录、持久化格式或 UI 展示
+- 典型用法是让业务层先产出 plain descriptor，再交给 runner 把任务送入 queue
+
+### Task Queue Skeleton
+
+- `src/services/task-queue.js` 继续只负责并发、优先级、重试、事件与快照
+- 当你已经有 `descriptor -> handler` 层时，再把具体执行压到 queue；不要反过来让 UI 或窗口模块直接操作并发状态机
+- 推荐按 `descriptor -> runner -> queue` 分层，而不是把任务状态机直接塞进面板或窗口模块
+
+### 贴边式 Surface / Edge Mode
+
+- 只要自定义 surface 实际贴附在 `context pane`、`item pane` 或 Reader sidebar，默认按 edge mode 处理
+- 先读取 live pane bounds 或 `reader.getReaderUIStateSnapshot(target)` 提供的 `sidebarWidth` 等几何信号，不直接写死固定宽度
+- stacked context pane 优先按 inner pane bounds 占位；拿不到 inner pane bounds 时再回退到外层 pane bounds
+- 贴边容器应设最小可显示阈值；过窄时优先降级隐藏、延后挂载或切到非贴边布局，而不是继续硬塞内容
+- tab / pane 切换后要重新解析当前宿主根并重绑 observer，不要继续盯旧的 sidebar DOM
+- 验证时不要只证明“surface 出现了”；还要证明 edge-attached surface 跟随了当前 pane 几何或走了明确降级路径
 
 ### 资源清理
 

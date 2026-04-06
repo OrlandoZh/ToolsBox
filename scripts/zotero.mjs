@@ -45,6 +45,11 @@ import {
   isExecutedAsScript,
   wrapScriptError,
 } from "./script-runtime-lib.mjs";
+import {
+  printScenarioResults as printScenarioBatchResults,
+  runIntegratedScenarios as runIntegratedScenarioBatch,
+  writeScenarioLastRunArtifacts,
+} from "./zotero-scenario-runner-lib.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -107,7 +112,7 @@ function readWatchRecoveryTestOptions(env = process.env) {
 }
 
 function usage() {
-  console.log(`Usage: node scripts/zotero.mjs <dev|console|watch|test|scenario|smoke> [--fresh] [--keep-open] [--watch] [--no-package]
+  console.log(`Usage: node scripts/zotero.mjs <dev|console|watch|test|scenario|smoke> [--fresh] [--keep-open] [--watch] [--no-package] [scenario-flags]
 
 Modes:
   dev      Launch isolated Zotero, install the current add-on, keep the app open
@@ -116,6 +121,11 @@ Modes:
   test     Run zotero-tests/*.test.js inside Zotero's chrome process and exit with a test status
   scenario Run zotero-scenarios/*.scenario.js inside Zotero's chrome process and exit with a scenario status
   smoke    Launch isolated Zotero, install the add-on, verify it through RDP, then exit
+
+Scenario flags:
+  --list-scenarios          Load and list matching scenarios without executing them
+  --scenario <pattern>      Filter by scenario name (substring or glob)
+  --scenario-file <pattern> Filter by scenario file path (substring or glob)
 `);
 }
 
@@ -132,21 +142,68 @@ export function parseCli(argv) {
     });
   }
 
-  const allowedFlags = new Set(["--fresh", "--keep-open", "--watch", "--no-package"]);
-  const invalidFlag = flags.find((flag) => !allowedFlags.has(flag));
-  if (invalidFlag) {
-    throw createScriptError("args", `Unknown option: ${invalidFlag}`, {
-      failedStage: "parse-args",
-    });
+  const parsed = {
+    mode,
+    fresh: MODES[mode].fresh,
+    keepOpen: MODES[mode].keepOpen,
+    watch: MODES[mode].watch,
+    skipPackage: false,
+    listScenarios: false,
+    scenarioPattern: null,
+    scenarioFilePattern: null,
+  };
+
+  for (let index = 0; index < flags.length; index += 1) {
+    const flag = flags[index];
+    switch (flag) {
+      case "--fresh":
+        parsed.fresh = true;
+        break;
+      case "--keep-open":
+        parsed.keepOpen = true;
+        break;
+      case "--watch":
+        parsed.watch = true;
+        break;
+      case "--no-package":
+        parsed.skipPackage = true;
+        break;
+      case "--list-scenarios":
+        if (mode !== "scenario") {
+          throw createScriptError("args", `${flag} is only supported in scenario mode`, {
+            failedStage: "parse-args",
+          });
+        }
+        parsed.listScenarios = true;
+        break;
+      case "--scenario":
+      case "--scenario-file":
+        if (mode !== "scenario") {
+          throw createScriptError("args", `${flag} is only supported in scenario mode`, {
+            failedStage: "parse-args",
+          });
+        }
+        index += 1;
+        if (index >= flags.length) {
+          throw createScriptError("args", `${flag} requires a value`, {
+            failedStage: "parse-args",
+          });
+        }
+        if (flag === "--scenario") {
+          parsed.scenarioPattern = flags[index];
+        }
+        else {
+          parsed.scenarioFilePattern = flags[index];
+        }
+        break;
+      default:
+        throw createScriptError("args", `Unknown option: ${flag}`, {
+          failedStage: "parse-args",
+        });
+    }
   }
 
-  return {
-    mode,
-    fresh: flags.includes("--fresh") || MODES[mode].fresh,
-    keepOpen: flags.includes("--keep-open") || MODES[mode].keepOpen,
-    watch: flags.includes("--watch") || MODES[mode].watch,
-    skipPackage: flags.includes("--no-package"),
-  };
+  return parsed;
 }
 
 function formatChangedFiles(filePaths) {
@@ -162,6 +219,35 @@ function parseChromeEvalResult(rawResult) {
     return JSON.parse(rawResult);
   }
   return rawResult;
+}
+
+function createScenarioLastRunReport({
+  result,
+  generatedAt = new Date().toISOString(),
+}) {
+  const execution = result?.execution && typeof result.execution === "object"
+    ? result.execution
+    : {};
+  return {
+    generatedAt,
+    listedOnly: result?.listedOnly === true,
+    registered: Array.isArray(execution.registered) ? execution.registered : [],
+    selected: Array.isArray(execution.selected) ? execution.selected : [],
+    completed: Array.isArray(execution.completed) ? execution.completed : [],
+    incomplete: execution.incomplete === true,
+    lastStartedScenario: execution.lastStartedScenario || null,
+    lastCompletedScenario: execution.lastCompletedScenario || null,
+    timeoutKind: execution.timeoutKind || null,
+    failedResults: Array.isArray(result?.failedResults) ? result.failedResults : [],
+    filtersApplied: execution.filtersApplied || {
+      scenario: null,
+      scenarioFile: null,
+      listOnly: result?.listedOnly === true,
+    },
+    selectedScenarios: Array.isArray(result?.selectedScenarios) ? result.selectedScenarios : [],
+    registeredScenarios: Array.isArray(result?.registeredScenarios) ? result.registeredScenarios : [],
+    failure: result?.failure || null,
+  };
 }
 
 function appendProcessLogs(processLogs, source, chunk) {
@@ -479,16 +565,6 @@ async function discoverZoteroTests(projectRoot) {
   return files;
 }
 
-async function discoverZoteroScenarios(projectRoot) {
-  const scenarioRoot = path.join(projectRoot, "zotero-scenarios");
-  const files = await findFilesRecursive(
-    scenarioRoot,
-    (filePath) => filePath.endsWith(".scenario.js"),
-  );
-
-  return files;
-}
-
 function printTestResults(testResult) {
   console.log("[zotero:test] Results");
   for (const result of testResult.results) {
@@ -500,20 +576,6 @@ function printTestResults(testResult) {
   }
   console.log(
     `[zotero:test] Summary: ${testResult.summary.passed}/${testResult.summary.total} passed, ${testResult.summary.failed} failed`,
-  );
-}
-
-function printScenarioResults(result) {
-  console.log("[zotero:scenario] Results");
-  for (const item of result.results) {
-    const prefix = item.status === "passed" ? "PASS" : "FAIL";
-    console.log(`[zotero:scenario] ${prefix} ${item.name} (${item.durationMs}ms)`);
-    if (item.status === "failed" && item.error) {
-      console.log(`[zotero:scenario]   ${item.error.message}`);
-    }
-  }
-  console.log(
-    `[zotero:scenario] Summary: ${result.summary.passed}/${result.summary.total} passed, ${result.summary.failed} failed`,
   );
 }
 
@@ -603,52 +665,18 @@ async function runIntegratedTests({
   }
 }
 
-async function runIntegratedScenarios({
-  projectRoot,
-  rdp,
-  config,
-}) {
-  const scenarioFiles = await discoverZoteroScenarios(projectRoot);
-  if (scenarioFiles.length === 0) {
-    throw createScriptError("environment", "No Zotero scenarios found under zotero-scenarios/*.scenario.js", {
-      failedStage: "discover-scenarios",
-    });
-  }
-
-  const harnessHref = toFileHref(path.join(projectRoot, "scripts", "zotero-scenario-runtime.js"));
-  const fileHrefs = scenarioFiles.map((filePath) => toFileHref(filePath));
-  const minimalConfig = {
-    addonId: config.addonId,
-    addonName: config.addonName,
-    addonRef: config.addonRef,
-    instanceKey: config.instanceKey,
-  };
-
-  const expression = `(async () => {
-    const scope = {};
-    Services.scriptloader.loadSubScript(${JSON.stringify(harnessHref)}, scope);
-    return await scope.runCleanroomZoteroScenarios(${JSON.stringify({
-      fileHrefs,
-      addonConfig: minimalConfig,
-    })});
-  })()`;
-
-  const rawResult = await rdp.evaluateInChrome(expression);
-  const parsedResult = parseChromeEvalResult(rawResult);
-  printScenarioResults(parsedResult);
-
-  if (parsedResult.summary.failed > 0) {
-    throw createScriptError("validation", `Zotero scenarios failed: ${parsedResult.summary.failed}`, {
-      failedStage: "run-scenarios",
-      details: {
-        failed: parsedResult.summary.failed,
-      },
-    });
-  }
-}
 
 export async function main() {
-  const { mode, fresh, keepOpen, watch, skipPackage } = parseCli(process.argv.slice(2));
+  const {
+    mode,
+    fresh,
+    keepOpen,
+    watch,
+    skipPackage,
+    listScenarios,
+    scenarioPattern,
+    scenarioFilePattern,
+  } = parseCli(process.argv.slice(2));
   const baseMode = MODES[mode];
 
   if (!skipPackage) {
@@ -826,11 +854,45 @@ export async function main() {
     }
 
     if (mode === "scenario") {
-      await runIntegratedScenarios({
+      const scenarioResult = await runIntegratedScenarioBatch({
         projectRoot,
         rdp: session.rdp,
         config,
+        listOnly: listScenarios,
+        scenarioPattern,
+        scenarioFilePattern,
+        modeLabel: "zotero:scenario",
+        processLogs,
       });
+      printScenarioBatchResults(scenarioResult);
+      const scenarioReport = createScenarioLastRunReport({
+        result: scenarioResult,
+      });
+      const reportPaths = await writeScenarioLastRunArtifacts({
+        projectRoot,
+        report: scenarioReport,
+      });
+      console.log(`[zotero:scenario] Last run report: ${reportPaths.jsonPath}`);
+
+      if (!listScenarios && (scenarioResult.failed > 0 || scenarioResult.execution?.incomplete)) {
+        throw createScriptError(
+          scenarioResult.execution?.timeoutKind === "chrome-evaluation-timeout" ? "timeout" : "validation",
+          scenarioResult.execution?.incomplete
+            ? `Zotero scenarios incomplete: ${scenarioResult.execution.lastStartedScenario || "unknown"}`
+            : `Zotero scenarios failed: ${scenarioResult.failed}`,
+          {
+            failedStage: "run-scenarios",
+            details: {
+              failed: scenarioResult.failed,
+              timeoutKind: scenarioResult.execution?.timeoutKind || null,
+              currentScenario: scenarioResult.execution?.lastStartedScenario || null,
+              completedCount: Array.isArray(scenarioResult.execution?.completed)
+                ? scenarioResult.execution.completed.length
+                : 0,
+            },
+          },
+        );
+      }
     }
 
     if (watch) {

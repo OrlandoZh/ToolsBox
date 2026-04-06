@@ -66,6 +66,223 @@ export const TAB_TYPES = {
   READER_SNAPSHOT: "reader/snapshot",
 };
 
+const RESOLVED_MENU_STATE = Symbol("cleanroom.resolvedMenuState");
+const RESOLVED_MENU_MODEL = Symbol("cleanroom.resolvedMenuModel");
+
+function readObjectValue(target, key) {
+  if (!target || typeof target !== "object") {
+    return null;
+  }
+  try {
+    return target[key];
+  }
+  catch {
+    return null;
+  }
+}
+
+function callIfFunction(target, methodName) {
+  if (!target || typeof target !== "object") {
+    return null;
+  }
+  const method = target[methodName];
+  if (typeof method !== "function") {
+    return null;
+  }
+  try {
+    return method.call(target);
+  }
+  catch {
+    return null;
+  }
+}
+
+function detectMenuItemType(item) {
+  const value = (
+    readObjectValue(item, "itemType")
+    || readObjectValue(item, "type")
+    || callIfFunction(item, "getItemType")
+    || callIfFunction(item, "getType")
+  );
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function detectMenuLibraryType(context, items) {
+  const directCandidates = [
+    readObjectValue(context, "libraryType"),
+    readObjectValue(readObjectValue(context, "library"), "libraryType"),
+    readObjectValue(readObjectValue(context, "library"), "type"),
+    readObjectValue(readObjectValue(context, "libraryRow"), "libraryType"),
+  ];
+  for (const candidate of directCandidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  for (const item of items) {
+    const itemCandidates = [
+      readObjectValue(item, "libraryType"),
+      readObjectValue(readObjectValue(item, "library"), "libraryType"),
+      readObjectValue(readObjectValue(item, "library"), "type"),
+      readObjectValue(callIfFunction(item, "getLibrary"), "libraryType"),
+    ];
+    for (const candidate of itemCandidates) {
+      if (typeof candidate === "string" && candidate.trim()) {
+        return candidate.trim();
+      }
+    }
+  }
+
+  return null;
+}
+
+function hasCollectionRowKind(row, expected) {
+  if (!row || typeof row !== "object") {
+    return false;
+  }
+  const directValue = readObjectValue(row, expected);
+  if (directValue === true) {
+    return true;
+  }
+  const fnName = `is${expected.slice(0, 1).toUpperCase()}${expected.slice(1)}`;
+  if (callIfFunction(row, fnName) === true) {
+    return true;
+  }
+  const rowType = String(readObjectValue(row, "type") || "").trim().toLowerCase();
+  if (!rowType) {
+    return false;
+  }
+  if (expected === "collection") {
+    return rowType.includes("collection");
+  }
+  if (expected === "search") {
+    return rowType.includes("saved") || rowType.includes("search");
+  }
+  return false;
+}
+
+function summarizeMenuItemKinds(items) {
+  const summary = {
+    noteCount: 0,
+    attachmentCount: 0,
+    regularCount: 0,
+    hasNotes: false,
+    hasAttachments: false,
+    hasRegularItems: false,
+    mixed: false,
+  };
+
+  items.forEach((item) => {
+    const detectedType = detectMenuItemType(item);
+    const isNote = callIfFunction(item, "isNote") === true || detectedType === "note";
+    const isAttachment = callIfFunction(item, "isAttachment") === true || detectedType === "attachment";
+
+    if (isNote) {
+      summary.noteCount += 1;
+      summary.hasNotes = true;
+      return;
+    }
+
+    if (isAttachment) {
+      summary.attachmentCount += 1;
+      summary.hasAttachments = true;
+      return;
+    }
+
+    summary.regularCount += 1;
+    summary.hasRegularItems = true;
+  });
+
+  const nonZeroBuckets = [
+    summary.noteCount,
+    summary.attachmentCount,
+    summary.regularCount,
+  ].filter((count) => count > 0);
+  summary.mixed = nonZeroBuckets.length > 1;
+  return summary;
+}
+
+export function createMenuStateResolver(options = {}) {
+  const prefs = options?.prefs && typeof options.prefs.get === "function"
+    ? options.prefs
+    : null;
+  const preferenceKeys = Array.from(new Set(
+    (Array.isArray(options.preferenceKeys) ? options.preferenceKeys : [])
+      .map((key) => String(key || "").trim())
+      .filter(Boolean),
+  ));
+  const extraResolvers = (Array.isArray(options.extraResolvers) ? options.extraResolvers : [])
+    .filter((resolver) => typeof resolver === "function");
+
+  return (context = {}) => {
+    const items = Array.isArray(readObjectValue(context, "items"))
+      ? readObjectValue(context, "items").filter(Boolean)
+      : [];
+    const collectionTreeRow = readObjectValue(context, "collectionTreeRow");
+    const itemTypes = Array.from(new Set(items.map((item) => detectMenuItemType(item)).filter(Boolean)));
+    const selectedType = itemTypes.length === 1
+      ? itemTypes[0]
+      : itemTypes.length > 1
+        ? "mixed"
+        : null;
+    const preferenceFlags = Object.fromEntries(preferenceKeys.map((key) => {
+      let value = null;
+      if (prefs) {
+        try {
+          value = prefs.get(key);
+        }
+        catch {
+          value = null;
+        }
+      }
+      return [key, value];
+    }));
+
+    let state = {
+      itemCount: items.length,
+      hasItems: items.length > 0,
+      selectedType,
+      selectedTypes: itemTypes,
+      editable: typeof readObjectValue(context, "editable") === "boolean"
+        ? readObjectValue(context, "editable")
+        : null,
+      tabID: typeof readObjectValue(context, "tabID") === "string"
+        ? readObjectValue(context, "tabID")
+        : null,
+      tabType: typeof readObjectValue(context, "tabType") === "string"
+        ? readObjectValue(context, "tabType")
+        : null,
+      tabSubType: typeof readObjectValue(context, "tabSubType") === "string"
+        ? readObjectValue(context, "tabSubType")
+        : null,
+      fieldName: typeof readObjectValue(context, "fieldName") === "string"
+        ? readObjectValue(context, "fieldName")
+        : null,
+      libraryType: detectMenuLibraryType(context, items),
+      hasCollectionSelection: hasCollectionRowKind(collectionTreeRow, "collection"),
+      hasSavedSearchSelection: hasCollectionRowKind(collectionTreeRow, "search"),
+      collectionTreeRowType: typeof readObjectValue(collectionTreeRow, "type") === "string"
+        ? readObjectValue(collectionTreeRow, "type")
+        : null,
+      preferenceFlags,
+      itemKinds: summarizeMenuItemKinds(items),
+    };
+
+    extraResolvers.forEach((resolver) => {
+      const extraState = resolver(context, state);
+      if (extraState && typeof extraState === "object" && !Array.isArray(extraState)) {
+        state = {
+          ...state,
+          ...extraState,
+        };
+      }
+    });
+
+    return state;
+  };
+}
+
 /**
  * 创建菜单管理器
  * @param {Object} options - 配置选项
@@ -163,6 +380,16 @@ export function createMenuManager(options) {
     };
   }
 
+  function extractLiveMenuMetadata(context) {
+    if (!context || typeof context !== "object") {
+      return {};
+    }
+    return {
+      resolvedState: clonePlainValue(context[RESOLVED_MENU_STATE] || null),
+      resolvedMenu: clonePlainValue(context[RESOLVED_MENU_MODEL] || null),
+    };
+  }
+
   function makeLiveMenuStateKey(menuId, menuPath) {
     return `${menuId}::${menuPath}`;
   }
@@ -174,9 +401,11 @@ export function createMenuManager(options) {
       menuPath,
     };
     const clonedContext = cloneLiveMenuContext(context);
+    const liveMetadata = extractLiveMenuMetadata(context);
     liveMenuStates.set(key, {
       ...current,
       ...clonedContext,
+      ...liveMetadata,
       phase,
       observedAt: new Date().toISOString(),
     });
@@ -222,11 +451,15 @@ export function createMenuManager(options) {
     }
 
     const wrapHook = (hookName, original) => (event, context) => {
-      recordLiveMenuState(menuId, path, context, hookName);
-      if (typeof original === "function") {
-        return original(event, context);
+      try {
+        if (typeof original === "function") {
+          return original(event, context);
+        }
+        return undefined;
       }
-      return undefined;
+      finally {
+        recordLiveMenuState(menuId, path, context, hookName);
+      }
     };
 
     data.onShowing = wrapHook("onShowing", menuItem.onShowing);
@@ -243,7 +476,8 @@ export function createMenuManager(options) {
       data.onCommand = wrapHook("onCommand", menuItem.onCommand);
     }
 
-    if (menuItem.menuType === MENU_TYPES.SUBMENU && menuItem.menus) {
+    if (menuItem.menuType === MENU_TYPES.SUBMENU && Array.isArray(menuItem.menus)) {
+      menuPaths.push(path);
       data.menus = menuItem.menus.map((child, index) => wrapMenuData(menuId, child, `${path}.${index}`, menuPaths));
     }
     else {
@@ -251,6 +485,309 @@ export function createMenuManager(options) {
     }
 
     return data;
+  }
+
+  function cloneMenuModel(menuItem) {
+    if (!menuItem || typeof menuItem !== "object") {
+      return {
+        menuType: MENU_TYPES.MENUITEM,
+      };
+    }
+    return {
+      ...menuItem,
+      menuType: menuItem.menuType || MENU_TYPES.MENUITEM,
+      menus: Array.isArray(menuItem.menus)
+        ? menuItem.menus.map((child) => cloneMenuModel(child))
+        : undefined,
+    };
+  }
+
+  function mergeMenuModel(baseMenu, overrideMenu) {
+    const normalizedBase = cloneMenuModel(baseMenu);
+    const normalizedOverride = overrideMenu && typeof overrideMenu === "object" && !Array.isArray(overrideMenu)
+      ? {
+        ...overrideMenu,
+        ...(Object.hasOwn(overrideMenu, "menuType")
+          ? { menuType: overrideMenu.menuType || MENU_TYPES.MENUITEM }
+          : {}),
+        ...(Object.hasOwn(overrideMenu, "menus")
+          ? {
+            menus: Array.isArray(overrideMenu.menus)
+              ? overrideMenu.menus.map((child) => cloneMenuModel(child))
+              : [],
+          }
+          : {}),
+      }
+      : {};
+    return {
+      ...normalizedBase,
+      ...normalizedOverride,
+      menuType: Object.hasOwn(normalizedOverride, "menuType")
+        ? normalizedOverride.menuType
+        : normalizedBase.menuType || MENU_TYPES.MENUITEM,
+      menus: Object.hasOwn(normalizedOverride, "menus")
+        ? (Array.isArray(normalizedOverride.menus) ? normalizedOverride.menus : [])
+        : normalizedBase.menus,
+    };
+  }
+
+  function setElementAttribute(element, name, value) {
+    if (!element || typeof element !== "object") {
+      return;
+    }
+    if (value === null || value === undefined || value === false) {
+      if (typeof element.removeAttribute === "function") {
+        element.removeAttribute(name);
+      } else {
+        delete element[name];
+      }
+      return;
+    }
+    const normalized = typeof value === "string" ? value : String(value);
+    if (typeof element.setAttribute === "function") {
+      element.setAttribute(name, normalized);
+    } else {
+      element[name] = normalized;
+    }
+  }
+
+  function applyVisibility(context, visible) {
+    if (typeof visible !== "boolean") {
+      return;
+    }
+    if (typeof context?.setVisible === "function") {
+      context.setVisible(visible);
+    }
+    if (context?.menuElem && typeof context.menuElem === "object") {
+      context.menuElem.hidden = !visible;
+    }
+  }
+
+  function applyEnabledState(context, menuItem) {
+    const enabled = typeof menuItem?.enabled === "boolean"
+      ? menuItem.enabled
+      : typeof menuItem?.disabled === "boolean"
+        ? !menuItem.disabled
+        : null;
+    if (typeof enabled !== "boolean") {
+      return;
+    }
+    if (typeof context?.setEnabled === "function") {
+      context.setEnabled(enabled);
+    }
+    if (context?.menuElem && typeof context.menuElem === "object") {
+      context.menuElem.disabled = !enabled;
+    }
+  }
+
+  function applyMenuIdentity(context, menuItem) {
+    const menuElem = context?.menuElem;
+    if (!menuElem || typeof menuElem !== "object") {
+      return;
+    }
+
+    if (typeof menuItem?.label === "string" && menuItem.label.trim()) {
+      setElementAttribute(menuElem, "label", menuItem.label.trim());
+      menuElem.label = menuItem.label.trim();
+    }
+
+    if (typeof menuItem?.l10nID === "string" && menuItem.l10nID.trim()) {
+      setElementAttribute(menuElem, "data-l10n-id", menuItem.l10nID.trim());
+    }
+
+    if (menuItem?.l10nArgs && typeof context?.setL10nArgs === "function") {
+      context.setL10nArgs(menuItem.l10nArgs);
+    }
+
+    if (typeof menuItem?.icon === "string" && menuItem.icon.trim()) {
+      if (typeof context?.setIcon === "function") {
+        context.setIcon(menuItem.icon, menuItem.darkIcon);
+      } else {
+        setElementAttribute(menuElem, "image", menuItem.icon.trim());
+      }
+    }
+  }
+
+  function resolveSubmenuPopup(menuElem) {
+    if (!menuElem || typeof menuElem !== "object") {
+      return null;
+    }
+    if (menuElem.menupopup) {
+      return menuElem.menupopup;
+    }
+    if (menuElem.popup) {
+      return menuElem.popup;
+    }
+    if (typeof menuElem.querySelector === "function") {
+      const popup = menuElem.querySelector("menupopup");
+      if (popup) {
+        return popup;
+      }
+    }
+    if (Array.isArray(menuElem.childNodes)) {
+      return menuElem.childNodes.find((child) => child?.tagName === "menupopup") || null;
+    }
+    return null;
+  }
+
+  function createFallbackMenuElement(tagName) {
+    return {
+      tagName,
+      attributes: {},
+      childNodes: [],
+      parentNode: null,
+      listeners: {},
+      setAttribute(name, value) {
+        this.attributes[name] = String(value);
+      },
+      removeAttribute(name) {
+        delete this.attributes[name];
+      },
+      appendChild(child) {
+        child.parentNode = this;
+        this.childNodes.push(child);
+        return child;
+      },
+      replaceChildren(...children) {
+        this.childNodes = [];
+        children.forEach((child) => {
+          this.appendChild(child);
+        });
+      },
+      addEventListener(type, listener) {
+        this.listeners[type] = listener;
+      },
+    };
+  }
+
+  function createMenuElementNode(tagName, ownerDocument) {
+    if (ownerDocument && typeof ownerDocument.createXULElement === "function") {
+      return ownerDocument.createXULElement(tagName);
+    }
+    if (ownerDocument && typeof ownerDocument.createElement === "function") {
+      return ownerDocument.createElement(tagName);
+    }
+    return createFallbackMenuElement(tagName);
+  }
+
+  function ensureSubmenuPopup(menuElem) {
+    const existing = resolveSubmenuPopup(menuElem);
+    if (existing) {
+      return existing;
+    }
+    const popup = createMenuElementNode("menupopup", menuElem?.ownerDocument || null);
+    if (typeof menuElem?.appendChild === "function") {
+      menuElem.appendChild(popup);
+    }
+    menuElem.menupopup = popup;
+    menuElem.popup = popup;
+    return popup;
+  }
+
+  function attachMenuCommand(element, menuItem) {
+    if (!element || !menuItem || typeof menuItem.onCommand !== "function") {
+      return;
+    }
+    if (typeof element.addEventListener === "function") {
+      element.addEventListener("command", (event) => {
+        menuItem.onCommand(event, {
+          menuElem: element,
+        });
+      });
+    } else {
+      element.oncommand = (event) => {
+        menuItem.onCommand(event, {
+          menuElem: element,
+        });
+      };
+    }
+  }
+
+  function buildDynamicMenuElement(menuItem, ownerDocument) {
+    if (!menuItem || typeof menuItem !== "object") {
+      return null;
+    }
+    const tagName = menuItem.menuType === MENU_TYPES.SUBMENU
+      ? "menu"
+      : menuItem.menuType === MENU_TYPES.SEPARATOR
+        ? "menuseparator"
+        : "menuitem";
+    const element = createMenuElementNode(tagName, ownerDocument);
+    if (!element) {
+      return null;
+    }
+
+    if (menuItem.menuType !== MENU_TYPES.SEPARATOR) {
+      applyMenuIdentity({ menuElem: element }, menuItem);
+      if (typeof menuItem.visible === "boolean") {
+        element.hidden = !menuItem.visible;
+      }
+      if (typeof menuItem.disabled === "boolean") {
+        element.disabled = menuItem.disabled;
+      } else if (typeof menuItem.enabled === "boolean") {
+        element.disabled = !menuItem.enabled;
+      }
+      attachMenuCommand(element, menuItem);
+    }
+
+    if (menuItem.menuType === MENU_TYPES.SUBMENU) {
+      const popup = ensureSubmenuPopup(element);
+      const childElements = (Array.isArray(menuItem.menus) ? menuItem.menus : [])
+        .map((child) => buildDynamicMenuElement(child, ownerDocument))
+        .filter(Boolean);
+      if (typeof popup.replaceChildren === "function") {
+        popup.replaceChildren(...childElements);
+      } else {
+        popup.childNodes = [];
+        childElements.forEach((child) => {
+          if (typeof popup.appendChild === "function") {
+            popup.appendChild(child);
+          }
+        });
+      }
+    }
+
+    return element;
+  }
+
+  function rebuildDynamicSubmenu(context, menuItem) {
+    if (menuItem?.menuType !== MENU_TYPES.SUBMENU || !context?.menuElem) {
+      return;
+    }
+    const popup = ensureSubmenuPopup(context.menuElem);
+    const childElements = (Array.isArray(menuItem.menus) ? menuItem.menus : [])
+      .map((child) => buildDynamicMenuElement(child, context.menuElem.ownerDocument || popup?.ownerDocument || null))
+      .filter(Boolean);
+    if (typeof popup.replaceChildren === "function") {
+      popup.replaceChildren(...childElements);
+      return;
+    }
+    popup.childNodes = [];
+    childElements.forEach((child) => {
+      if (typeof popup.appendChild === "function") {
+        popup.appendChild(child);
+      }
+    });
+  }
+
+  function applyStateDrivenMenu(context, menuItem) {
+    if (!context || typeof context !== "object" || !menuItem || typeof menuItem !== "object") {
+      return;
+    }
+    applyVisibility(context, menuItem.visible);
+    applyEnabledState(context, menuItem);
+    applyMenuIdentity(context, menuItem);
+    if (menuItem.menuType === MENU_TYPES.SUBMENU) {
+      rebuildDynamicSubmenu(context, menuItem);
+    }
+  }
+
+  function updateResolvedMenuContext(context, state, menuItem) {
+    if (!context || typeof context !== "object") {
+      return;
+    }
+    context[RESOLVED_MENU_STATE] = clonePlainValue(state || {});
+    context[RESOLVED_MENU_MODEL] = clonePlainValue(menuItem || {});
   }
 
   /**
@@ -309,21 +846,25 @@ export function createMenuManager(options) {
         const result = Zotero.MenuManager.registerMenu(options);
 
         if (result) {
+          const registeredMenuID = typeof result === "string" && result.trim()
+            ? result.trim()
+            : menuId;
           const cleanup = () => {
             if (Zotero.MenuManager && typeof Zotero.MenuManager.unregisterMenu === "function") {
-              Zotero.MenuManager.unregisterMenu(menuId);
+              Zotero.MenuManager.unregisterMenu(registeredMenuID);
             }
           };
 
           registeredMenus.set(menuId, {
             id: menuId,
+            registeredMenuID,
             target,
             cleanup,
             useOfficialAPI: true,
             menuPaths,
             menus: clonePlainValue(menus),
           });
-          debug("menuManager.register.created", { menuId, target });
+          debug("menuManager.register.created", { menuId, registeredMenuID, target });
           return menuId;
         }
       } catch (err) {
@@ -472,6 +1013,54 @@ export function createMenuManager(options) {
     });
   }
 
+  function registerStateDrivenMenu(config) {
+    const target = config?.target;
+    const menuId = typeof config?.id === "string" && config.id.trim()
+      ? config.id.trim()
+      : `menu-${++menuCounter}`;
+    const baseMenu = cloneMenuModel(config?.baseMenu || {});
+    const resolveState = typeof config?.resolveState === "function"
+      ? config.resolveState
+      : () => ({});
+    const buildMenu = typeof config?.buildMenu === "function"
+      ? config.buildMenu
+      : ({ baseMenu: defaultMenu }) => defaultMenu;
+
+    if (!target) {
+      error("menuManager.registerStateDrivenMenu.noTarget", {
+        menuId,
+      });
+      return null;
+    }
+
+    const stateDrivenMenu = {
+      ...baseMenu,
+      onShowing(event, context) {
+        const resolvedState = resolveState(context || {}) || {};
+        const builtMenu = mergeMenuModel(baseMenu, buildMenu({
+          state: resolvedState,
+          context: context || {},
+          baseMenu: cloneMenuModel(baseMenu),
+          menuId,
+        }) || {});
+
+        updateResolvedMenuContext(context, resolvedState, builtMenu);
+        applyStateDrivenMenu(context, builtMenu);
+
+        if (typeof builtMenu.onShowing === "function" && builtMenu.onShowing !== stateDrivenMenu.onShowing) {
+          return builtMenu.onShowing(event, context);
+        }
+        return undefined;
+      },
+    };
+
+    return register({
+      id: menuId,
+      target,
+      menus: [stateDrivenMenu],
+    });
+  }
+
   /**
    * 注册分隔符（便捷方法）
    * @param {string} target - 菜单目标
@@ -563,6 +1152,7 @@ export function createMenuManager(options) {
       return registration
         ? clonePlainValue({
           id: registration.id,
+          registeredMenuID: registration.registeredMenuID || registration.id,
           target: registration.target,
           useOfficialAPI: registration.useOfficialAPI,
           menuPaths: registration.menuPaths || [],
@@ -572,6 +1162,7 @@ export function createMenuManager(options) {
     }
     return Array.from(registeredMenus.values()).map((registration) => clonePlainValue({
       id: registration.id,
+      registeredMenuID: registration.registeredMenuID || registration.id,
       target: registration.target,
       useOfficialAPI: registration.useOfficialAPI,
       menuPaths: registration.menuPaths || [],
@@ -615,6 +1206,7 @@ export function createMenuManager(options) {
     registerCollectionMenuItem,
     registerReaderMenuItem,
     registerSubmenu,
+    registerStateDrivenMenu,
     registerSeparator,
 
     // 注销方法

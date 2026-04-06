@@ -20,7 +20,7 @@
 ## C. Source Architecture Layer
 - [ ] Core services implemented in `src/core`.
 - [ ] Feature modules isolated in `src/features`.
-- [ ] Zotero API boundary only in `src/platform/zotero-host.js`.
+- [ ] Zotero API boundary isolated under `src/platform/*`（例如 `zotero-host.js`、`zotero-file-storage.js`）。
 - [ ] Composition logic only in `src/app/plugin.js`.
 - [ ] Entrypoint exported in `src/main.js`.
 - [ ] Runtime phase guard prevents duplicate startup/shutdown transitions.

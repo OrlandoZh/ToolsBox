@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "summary": "Project-local validation overrides for ZOTERO-HOST-WAVE-001. This wave upgrades reusable host actions, host-visible surface smoke, and surface-local evidence to visual-required.",
+  "summary": "Project-local validation overrides for the active ZOTERO-HOST-POLISH-WAVE-001 host-visible polish batch plus the completed OPTIONAL-BUNDLE-WAVE-001 optional bundle baseline.",
   "overrides": [
     {
-      "id": "zotero-host-wave-001",
-      "summary": "Reusable host actions plus host-visible surface smoke and local surface evidence are visual-required in the active Zotero host wave.",
+      "id": "zotero-host-polish-wave-001",
+      "summary": "Host-visible polish work stays visual-required when it touches live interaction consistency, edge-attached geometry, or surface-local evidence on real Zotero surfaces.",
       "pathMatchers": [
         "^src/app/host-action-(?:catalog|actions)\\.js$",
         "^src/app/plugin-(?:agent|api)\\.js$",
@@ -23,12 +23,43 @@
       "decision": "visual-required",
       "requiredChecks": [
         "完成 in-scope Host Actions 的 surface smoke，并输出逐项 readiness 结果。",
+        "对贴边式 surface 同时证明 live geometry 已跟随宿主 bounds，或在过窄时返回显式 degrade 状态。",
         "为成功的 host-visible surface 采集 surface-local evidence；整窗截图仅作为补充。",
         "继续通过 `npm run check`、`agent:host:guard`、`agent:host:semantic:guard` 与 `agent:gate`。"
       ],
       "nonGoals": [
         "modal / destructive / 需要人工确认的入口自动化",
         "只凭整窗截图判断 surface 正常"
+      ]
+    },
+    {
+      "id": "optional-bundle-wave-001",
+      "summary": "Completed optional bundle baseline: keep the JS core green first, and only require bundle-local smoke when the default-disabled react-ui lane is explicitly enabled or its shell changes.",
+      "pathMatchers": [
+        "^config/optional-bundles\\.json$",
+        "^docs/OPTIONAL_BUNDLES\\.md$",
+        "^scripts/(?:optional-bundles-lib|build-react-ui)\\.mjs$",
+        "^src/app/optional-bundles\\.js$",
+        "^src/features/react-ui-demo(?:/|\\.|$)",
+        "^src/react-ui(?:/|\\.|$)",
+        "^addon-static/content/react-ui(?:/|\\.|$)",
+        "^tests/(?:optional-bundles-lib|build-react-ui)\\.test\\.js$",
+        "^tests/(?:feature-composer|host-actions|toolchain|run-all)\\.test\\.js$",
+        "^config/project-expansion-wave\\.json$",
+        "^config/project-validation-overrides\\.json$",
+        "^config/validation-domains\\.json$",
+        "^docs/CURRENT_BACKLOG\\.md$",
+        "^package\\.json$"
+      ],
+      "decision": "visual-recommended",
+      "requiredChecks": [
+        "继续先通过 `npm run check` 的 JS-core 主链，不让 default-disabled bundle 破坏现有 build / verify / gate。",
+        "确认 `config/optional-bundles.json`、`build:react-ui` 与导出脚手架保持同轮同步。",
+        "当 `react-ui` 被启用或其 shell/host action 改动时，至少补一轮 bundle-local build smoke。"
+      ],
+      "nonGoals": [
+        "在 bundle 默认禁用时把 React 依赖升级成主链强依赖",
+        "在 agent-runtime / ai-service 仍为 spec-only 时伪装为已实现"
       ]
     }
   ]

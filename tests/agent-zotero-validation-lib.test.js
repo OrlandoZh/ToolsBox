@@ -6,6 +6,7 @@ import {
   buildVisualCanonicalCoverageSummary,
   buildVisualPrimaryBlockerSummary,
   isPureVisualReaderFailure,
+  pickVisualCaptureSelectionReasonLabel,
   pickPureVisualReaderNextAction,
   summarizeAutofixReport,
   summarizeE2EReport,
@@ -14,6 +15,13 @@ import {
 import { normalizeDiagnosisFingerprint } from "../scripts/agent-zotero-diagnosis-lib.mjs";
 
 describe("Agent Zotero Validation Lib", () => {
+  it("should label baseline-best-match capture selection distinctly", () => {
+    assert.equal(
+      pickVisualCaptureSelectionReasonLabel("baseline-best-match"),
+      "基线最佳匹配",
+    );
+  });
+
   it("should summarize structured diagnoses from E2E report", () => {
     const summary = summarizeE2EReport({
       generatedAt: "2026-03-19T00:00:00.000Z",
@@ -2445,6 +2453,8 @@ describe("Agent Zotero Validation Lib", () => {
     assert.equal(summary.visualEvidenceItems[0].cycleIndex, 1);
     assert.equal(summary.visualEvidenceItems[0].bootMode, "restart");
     assert.equal(summary.visualEvidenceItems[0].kind, "reader");
+    assert.equal(summary.visualEvidenceItems[0].scope, "window-stage");
+    assert.equal(summary.visualEvidenceItems[0].surfaceId, null);
     assert.equal(summary.visualEvidenceItems[0].canonicalTarget, "restart-reader.png");
     assert.equal(summary.visualEvidenceItems[0].capturePath, "/tmp/cycle-1-reader.png");
     assert.equal(summary.visualEvidenceItems[0].baselinePath, "/tmp/restart-reader.png");
@@ -2506,6 +2516,8 @@ describe("Agent Zotero Validation Lib", () => {
     assert.equal(summary.visualEvidenceItemCount, 1);
     assert.equal(summary.visualEvidenceFailingItemCount, 1);
     assert.equal(summary.visualEvidenceItems[0].capturePath, "/tmp/cycle-1-library.png");
+    assert.equal(summary.visualEvidenceItems[0].scope, "window-stage");
+    assert.equal(summary.visualEvidenceItems[0].surfaceId, null);
     assert.equal(summary.visualEvidenceItems[0].baselinePath, null);
     assert.equal(summary.visualEvidenceItems[0].captureStable, null);
     assert.equal(summary.visualEvidenceItems[0].selectedAttempt, null);

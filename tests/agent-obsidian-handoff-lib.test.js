@@ -463,6 +463,56 @@ describe("Agent Obsidian Handoff Lib", () => {
     assert.ok(canvas.nodes.some((item) => String(item.text).includes("人工入口与辅助说明")));
   });
 
+  it("should avoid fallback wording when no blockers remain", () => {
+    const markdown = buildObsidianInterventionMarkdown({
+      generationId: "obsidian-generation-no-blockers",
+      summarySource: "gate",
+      summaryHeadline: "watch、真机验证与恢复回归均已通过，当前闭环状态稳定。",
+      summaryStatusLabel: "可继续",
+      summaryNextAction: "当前已满足 agent 质量闸门，可继续推进后续开发或发布流程。",
+      currentTruthSummary: "当前主阻断已清零；只剩 release-only gap。",
+      blockers: [],
+      commands: ["npm run agent:gate"],
+      candidateFiles: [],
+      evidenceLinks: [],
+      projectContext: {
+        currentTruth: {
+          activeBatchId: "ENG-HIGH-104",
+          summary: "当前主阻断已清零；只剩 release-only gap。",
+          excerpt: ["当前主阻断已清零"],
+        },
+        expansionWave: {
+          currentWaveName: "ZOTERO-HOST-WAVE-001",
+          acceptanceTrack: "host-first -> surface smoke -> surface-local visual evidence",
+          status: "declared",
+          inScopeModules: ["src/features/reader.js"],
+          outOfScopeModules: [],
+          explicitVisualUpgradeModules: [],
+        },
+        validationOverrides: {
+          summary: "项目覆盖 1 条：required=1 / recommended=0 / not-needed=0",
+        },
+        validationDecision: {
+          level: "visual-required",
+          levelLabel: "需要视觉验证",
+          matchedDomain: ["visible-surface"],
+          matchedProjectOverride: ["zotero-host-wave-001"],
+        },
+      },
+      autoChain: {
+        gate: {
+          statusLabel: "可继续",
+          generatedAt: "2026-04-04T10:08:38.722Z",
+          headline: "watch、真机验证与恢复回归均已通过，当前闭环状态稳定。",
+        },
+      },
+      patchSummary: {},
+    });
+
+    assert.ok(markdown.includes("当前已满足 agent 质量闸门，可继续执行推荐命令或进入后续开发 / 发布流程。"));
+    assert.equal(markdown.includes("当前没有明确阻塞项，优先复核 gate 与 loop 是否一致。"), false);
+  });
+
   it("should build shared visual view-model without changing core summary semantics", () => {
     const model = buildObsidianVisualViewModel({
       generatedAt: "2026-03-25T08:00:00.000Z",

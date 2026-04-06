@@ -49,7 +49,7 @@ describe("Agent Validation Decision", () => {
     assert.equal(decision.level, "visual-required");
     assert.equal(decision.decisionSource, "project-override");
     assert.ok(decision.matchedDomain.includes("host-wrapper"));
-    assert.ok(decision.matchedProjectOverride.includes("zotero-host-wave-001"));
+    assert.ok(decision.matchedProjectOverride.includes("zotero-host-polish-wave-001"));
     assert.equal(decision.blocking, true);
     assert.equal(typeof decision.issue, "string");
   });
@@ -225,6 +225,34 @@ describe("Agent Validation Decision", () => {
     assert.equal(decision.level, "visual-required");
     assert.equal(decision.blocking, true);
     assert.equal(typeof decision.issue, "string");
+  });
+
+  it("should ignore non-surface-local visual warnings once surface-local evidence already passed", () => {
+    const decision = buildValidationDecision({
+      projectRoot,
+      changedPaths: ["src/features/reader.js"],
+      e2e: {
+        present: true,
+        status: "passed",
+        visualEvidenceObserved: true,
+        visualEvidenceItemCount: 4,
+        visualEvidenceFailingItemCount: 4,
+        visualEvidenceItems: [
+          {
+            kind: "library",
+            scope: "window-stage",
+          },
+          {
+            kind: "reader",
+            scope: "window-stage",
+          },
+        ],
+      },
+    });
+
+    assert.equal(decision.level, "visual-required");
+    assert.equal(decision.blocking, false);
+    assert.equal(decision.issue, null);
   });
 
   it("should collect recent delegation changed paths and review summary", async () => {

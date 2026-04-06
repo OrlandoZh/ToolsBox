@@ -1879,6 +1879,149 @@
       ]
     },
     {
+      "taskId": "HOST-HIGH-201",
+      "title": "冻结宿主可见 UI polish 与贴边 geometry 批次边界",
+      "lane": "codex-high-logic",
+      "scopePaths": [
+        "config/agent-delegation-tasks.json",
+        "config/project-expansion-wave.json",
+        "config/project-validation-overrides.json",
+        "config/project-validation-surfaces.json",
+        "docs/CURRENT_BACKLOG.md",
+        "README.md",
+        "FRAMEWORK_CHECKLIST.md",
+        "FRAMEWORK_ASSESSMENT.md",
+        "docs/AGENT_AUTONOMY_ROADMAP.md",
+        "tests/agent-delegation.test.js",
+        "tests/docs-consistency.test.js",
+        "tests/toolchain.test.js"
+      ],
+      "dependsOn": [
+        "READER-HIGH-126"
+      ],
+      "promptTemplate": "该任务仅供 Codex 跟踪。当前开发态 `watch -> e2e -> monitor -> gate` 已回到 stable / ready，本轮当前主批次固定为 host-visible polish：只收紧 `preference pane`、`context pane`、`item pane sidenav`、`reader renderToolbar / sidebar view`、`menu item` 与主题 contract 的 live interaction consistency、edge-attached geometry、surface-local evidence 和下游复用体验。实现必须继续复用现有 host action / surface smoke / validation / docs sync / delegation 链，不新开产品 surface，不把 agent-runtime / ai-service / release remote distribution / Reader deeper event points / P1 whitelist expansion 拉回当前主线；正式 truth 必须明确 `HOST-HIGH-201 / HOST-LOW-301~303` 为当前主批次，`ENG-HIGH-104 / ENG-LOW-211~213` 仅为 release-only deferred follow-up。",
+      "reviewChecklist": [
+        "不得把 release-only follow-up 回写成当前主批次",
+        "不得把 optional bundle 的 spec-only lane 伪装成当前实现主线",
+        "不得扩到新的宿主 surface、Reader deeper event points 或 P1 whitelist",
+        "必须保持 surface smoke / surface-local evidence 优先于整窗截图"
+      ],
+      "testCommands": [],
+      "handoffArtifacts": [
+        "dist/agent-context.json",
+        "dist/agent-monitor.json",
+        "dist/agent-gate.json"
+      ]
+    },
+    {
+      "taskId": "HOST-LOW-301",
+      "title": "收紧 host-visible surface geometry 结果形状与显式 degrade 合同",
+      "lane": "opencode-low-logic",
+      "scopePaths": [
+        "src/app/host-actions.js",
+        "src/app/host-action-catalog.js",
+        "tests/host-actions.test.js"
+      ],
+      "dependsOn": [
+        "HOST-HIGH-201"
+      ],
+      "promptTemplate": "该低逻辑任务只负责收紧 host action 的 geometry / result-shape 合同：让 `context pane`、`item pane sidenav`、`reader sidebar view` 等贴边式 surface 返回 live bounds、`edgeMode`、`boundsSource`、`minimumViableWidth` 与显式 `degradedReason`。优先复用 `surfaceTarget.rect` 或明确允许的 host UI state fallback；在 bounds 缺失或宽度过窄时返回结构化 degrade，不得伪装成完整 ready，也不得把 geometry 判定散落到场景脚本或文档层。",
+      "reviewChecklist": [
+        "结果字段必须保持结构化且可被 validation / telemetry 消费",
+        "bounds 缺失或过窄时只能显式 degrade，不得伪装正常",
+        "不得改 unrelated runtime / service 逻辑"
+      ],
+      "testCommands": [],
+      "gitClosure": {
+        "milestone": "module-feature",
+        "summary": "host-visible surface geometry contract",
+        "commitMessage": "feat: 收紧 host-visible surface geometry contract"
+      },
+      "handoffArtifacts": [
+        "dist/agent-zotero-e2e.json",
+        "dist/agent-gate.json"
+      ]
+    },
+    {
+      "taskId": "HOST-LOW-302",
+      "title": "对齐 host-visible polish 的 validation surface 与场景合同",
+      "lane": "opencode-low-logic",
+      "scopePaths": [
+        "config/project-validation-surfaces.json",
+        "config/project-validation-overrides.json",
+        "config/project-expansion-wave.json",
+        "zotero-scenarios/context-pane-surface-smoke.scenario.js",
+        "zotero-scenarios/item-pane-surface-smoke.scenario.js",
+        "zotero-scenarios/menu-surface-smoke.scenario.js",
+        "zotero-scenarios/reader-surface-smoke.scenario.js",
+        "tests/toolchain.test.js",
+        "tests/docs-consistency.test.js"
+      ],
+      "dependsOn": [
+        "HOST-HIGH-201",
+        "HOST-LOW-301"
+      ],
+      "promptTemplate": "该低逻辑任务只负责把 host polish wave 的 validation surface / scenario contract 对齐到当前 truth：对 in-scope surfaces 明确 surface smoke、live geometry 跟随宿主 bounds 或显式窄宽 degrade、以及 surface-local evidence 优先的要求。不得把整窗截图提升为唯一证明，不得扩到未声明 surface，也不得把 optional bundle 或 release-only follow-up 混写成当前 wave 范围。",
+      "reviewChecklist": [
+        "只允许在已声明 in-scope surfaces 内补合同",
+        "surface-local evidence 仍须先于整窗截图",
+        "不得把 release-only / optional bundle 路径混入当前 host wave"
+      ],
+      "testCommands": [],
+      "gitClosure": {
+        "milestone": "module-feature",
+        "summary": "host-visible polish validation contract",
+        "commitMessage": "feat: 对齐 host-visible polish validation contract"
+      },
+      "handoffArtifacts": [
+        "config/project-validation-surfaces.json",
+        "dist/agent-monitor.json"
+      ]
+    },
+    {
+      "taskId": "HOST-LOW-303",
+      "title": "收口 HOST-HIGH-201 truth、manifest 与守卫测试",
+      "lane": "opencode-low-logic",
+      "scopePaths": [
+        "config/agent-delegation-tasks.json",
+        "docs/CURRENT_BACKLOG.md",
+        "README.md",
+        "FRAMEWORK_CHECKLIST.md",
+        "FRAMEWORK_ASSESSMENT.md",
+        "docs/AGENT_AUTONOMY_ROADMAP.md",
+        "tests/agent-delegation.test.js",
+        "tests/docs-consistency.test.js",
+        "tests/toolchain.test.js"
+      ],
+      "dependsOn": [
+        "HOST-HIGH-201",
+        "HOST-LOW-301",
+        "HOST-LOW-302"
+      ],
+      "promptTemplate": "该低逻辑任务只负责 truth、manifest、mirror 与守卫测试收口：把当前主批次写成 `HOST-HIGH-201 / HOST-LOW-301~303`，当前 wave 写成 `ZOTERO-HOST-POLISH-WAVE-001`，并把 `ENG-HIGH-104 / ENG-LOW-211~213` 与 `OPTIONAL-BUNDLE-WAVE-001` 分别保持为 release-only deferred follow-up 与 completed baseline。必须继续使用 `docs/CURRENT_BACKLOG.md` 作为单一事实源并通过 `docs-sync-current-truth` 同步 mirror，不手改多份 competing truth。",
+      "reviewChecklist": [
+        "当前单一事实源必须写清 HOST 为当前主批次、release 为 deferred follow-up",
+        "不得把 OPTIONAL-BUNDLE-WAVE-001 写回 active wave",
+        "守卫测试必须对齐新的 batch / wave / validation 口径"
+      ],
+      "testCommands": [
+        "node --input-type=module -e \"import './tests/agent-delegation.test.js'; import './tests/docs-consistency.test.js'; import './tests/toolchain.test.js'; import { runTests } from './tests/test-framework.js'; await runTests();\""
+      ],
+      "gitClosure": {
+        "milestone": "batch-closure",
+        "summary": "HOST-HIGH-201 truth、manifest 与守卫测试",
+        "commitMessage": "chore: 收口 HOST-HIGH-201 truth、manifest 与守卫测试"
+      },
+      "handoffArtifacts": [
+        "config/agent-delegation-tasks.json",
+        "docs/CURRENT_BACKLOG.md",
+        "README.md",
+        "FRAMEWORK_CHECKLIST.md",
+        "FRAMEWORK_ASSESSMENT.md",
+        "docs/AGENT_AUTONOMY_ROADMAP.md"
+      ]
+    },
+    {
       "taskId": "ENG-HIGH-104",
       "title": "冻结远端发布编排与 updateURL 闭环验证边界",
       "lane": "codex-high-logic",
@@ -1905,9 +2048,9 @@
         "tests/docs-consistency.test.js"
       ],
       "dependsOn": [
-        "READER-HIGH-126"
+        "HOST-HIGH-201"
       ],
-      "promptTemplate": "该任务仅供 Codex 跟踪。当前本地 release matrix、release gate 与 release-plan 已闭环，下一轮默认高逻辑只处理远端发布编排与远端 updateURL 闭环验证。实现必须继续复用现有 `npm run release:plan`、`npm run agent:release`、`npm run agent:gate:release`、`dist/release-plan.json`、`dist/release-preflight.json`、`dist/release-matrix.json`、`dist/update.json` 与 monitor / gate / dashboard 现有消费链，不新开平行 artifact 家族；不得改插件 runtime / UI / Zotero 验证语义，不得回头重开 startup / RDP / Reader / freshness / P1 主线。",
+      "promptTemplate": "该任务仅供 Codex 跟踪。当前本地 release matrix、release gate 与 release-plan 已闭环，但 release 只保留为次级 follow-up；当前主批次仍是 `HOST-HIGH-201 / HOST-LOW-301~303`。本任务只处理远端发布编排与远端 updateURL 闭环验证，必须继续复用现有 `npm run release:plan`、`npm run agent:release`、`npm run agent:gate:release`、`dist/release-plan.json`、`dist/release-preflight.json`、`dist/release-matrix.json`、`dist/update.json` 与 monitor / gate / dashboard 现有消费链，不新开平行 artifact 家族；不得改插件 runtime / UI / Zotero 验证语义，不得回头重开 startup / RDP / Reader / freshness / P1 主线。",
       "reviewChecklist": [
         "远端发布证据只能扩展现有 release artifact 与 consumer 链，不得新开平行报告体系",
         "不得改插件 runtime / UI API、watch / e2e / gate 的既有主语义",
@@ -2016,9 +2159,9 @@
         "ENG-LOW-211",
         "ENG-LOW-212"
       ],
-      "promptTemplate": "该低逻辑任务只负责 manifest、文档与守卫测试同步：把下一轮默认高逻辑任务源写成 `ENG-HIGH-104 / ENG-LOW-211~213`，并明确它只处理远端发布编排与远端 updateURL 闭环验证。它必须继续保持 CURRENT truth 的单一事实源稳定，不把 release / updateURL follow-up 回写成当前主阻断，也不得重新把已完成的 Reader / startup / freshness 批次写成 active。",
+      "promptTemplate": "该低逻辑任务只负责 manifest、文档与守卫测试同步：保持当前主批次为 `HOST-HIGH-201 / HOST-LOW-301~303`，同时把 `ENG-HIGH-104 / ENG-LOW-211~213` 明确写成 release-only follow-up，并说明它只处理远端发布编排与远端 updateURL 闭环验证。它必须继续保持 CURRENT truth 的单一事实源稳定，不把 release / updateURL follow-up 回写成当前主阻断，也不得重新把已完成的 Reader / startup / freshness 批次写成 active。",
       "reviewChecklist": [
-        "正式文档必须明确 `ENG-HIGH-104 / ENG-LOW-211~213` 是下一轮默认高逻辑任务源",
+        "正式文档必须明确 `HOST-HIGH-201 / HOST-LOW-301~303` 是当前主批次，`ENG-HIGH-104 / ENG-LOW-211~213` 是 release-only follow-up",
         "必须继续保持 `READER-HIGH-126` 已完成、当前主阻断已清零的正式口径",
         "不得把 release / updateURL follow-up 回写成当前 blocker 或重开已完成的 Reader 主线"
       ],

@@ -1,3 +1,5 @@
+import { isOptionalBundleEnabled } from "./optional-bundles.js";
+
 export function createFeatureComposer({
   config,
   logger,
@@ -6,6 +8,7 @@ export function createFeatureComposer({
   i18n,
   preferencePanes,
   commandPalette,
+  readerSelectionActions,
   menuManager,
   reader,
   itemTree,
@@ -14,6 +17,7 @@ export function createFeatureComposer({
   getPrimaryWindow,
   runPrimaryAction,
   runReaderDemo,
+  runReaderSelectionActionDemo,
   getColumnValue,
   getItemSummary,
   createSectionLine,
@@ -24,20 +28,68 @@ export function createFeatureComposer({
   demoColumnKey,
   demoNotifierID,
   updateDemoNotifierState,
+  optionalBundles,
+  openReactDemoWindow,
 }) {
   let baselineReady = false;
+
+  function getScriptLoader(targetWindow = null) {
+    const windowServices = targetWindow?.Services;
+    if (windowServices?.scriptloader && typeof windowServices.scriptloader.loadSubScript === "function") {
+      return windowServices.scriptloader;
+    }
+    if (
+      typeof Services !== "undefined"
+      && Services?.scriptloader
+      && typeof Services.scriptloader.loadSubScript === "function"
+    ) {
+      return Services.scriptloader;
+    }
+    return null;
+  }
 
   async function registerBaselineFeatures() {
     if (baselineReady) {
       return;
     }
     baselineReady = true;
+    const readerSelectionCommandID = `${config.addonRef}-reader-selection-snapshot`;
 
     await preferencePanes.registerPane({
       id: `${config.addonRef}-preferences`,
       src: "content/preferences.xhtml",
       label: config.addonName,
       image: config.icons?.["48"] || config.icons?.["96"],
+      stylesheets: ["content/preferences.css"],
+      onPreferenceLoad({ window, paneID, pluginID, resolveURI }) {
+        const scriptLoader = getScriptLoader(window);
+        if (!scriptLoader) {
+          throw new Error("Preference pane scriptloader is unavailable");
+        }
+
+        const bridge = {
+          addonRef: config.addonRef,
+          locale: i18n.locale,
+          pluginID,
+          instanceKey: config.instanceKey,
+          strings: typeof i18n.getBundle === "function" ? i18n.getBundle() : null,
+        };
+        window.__CLEANROOM_PREFERENCE_BRIDGE__ = bridge;
+
+        if (typeof window?.MozXULElement?.insertFTLIfNeeded === "function") {
+          window.MozXULElement.insertFTLIfNeeded("main.ftl");
+        }
+
+        scriptLoader.loadSubScript(resolveURI("content/theme.js"), window);
+        scriptLoader.loadSubScript(resolveURI("content/preferences.js"), window);
+
+        if (typeof window.initCleanroomPreferences !== "function") {
+          throw new Error(`window.initCleanroomPreferences() is unavailable for pane '${paneID}'`);
+        }
+        return window.initCleanroomPreferences({
+          bridge,
+        });
+      },
     });
 
     commandPalette.registerCommand({
@@ -70,6 +122,82 @@ export function createFeatureComposer({
         runReaderDemo();
       },
     });
+
+    readerSelectionActions.registerAction({
+      id: readerSelectionCommandID,
+      label: i18n.t(
+        "cleanroom-reader-selection-command-label",
+        "Show Reader Selection Snapshot",
+      ),
+      description: i18n.t(
+        "cleanroom-reader-selection-command-description",
+        "Inspect the current reader selection.",
+      ),
+      aliases: ["selection snapshot"],
+      keywords: ["reader", "selection", "snapshot"],
+      condition(context = {}) {
+        return Boolean(prefs.get("enabled")) && Boolean(context.selection?.hasSelection);
+      },
+      handler(context = {}) {
+        const selection = context.selection || null;
+        const text = String(selection?.text || "");
+        return {
+          itemID: selection?.itemID || null,
+          readerType: selection?.readerType || null,
+          textLength: selection?.textLength || text.length,
+          textPreview: text.slice(0, 80),
+        };
+      },
+    });
+
+    commandPalette.registerCommand({
+      id: readerSelectionCommandID,
+      label: i18n.t(
+        "cleanroom-reader-selection-command-label",
+        "Show Reader Selection Snapshot",
+      ),
+      category: config.addonName,
+      description: i18n.t(
+        "cleanroom-reader-selection-command-description",
+        "Inspect the current reader selection.",
+      ),
+      aliases: ["selection snapshot"],
+      keywords: ["reader", "selection", "snapshot"],
+      condition: () => Boolean(
+        readerSelectionActions.getActionSnapshot(readerSelectionCommandID)?.enabled,
+      ),
+      handler: () => {
+        Promise.resolve(runReaderSelectionActionDemo(readerSelectionCommandID)).catch((error) => {
+          logger.warn("plugin.readerSelectionActionDemo.failed", {
+            actionId: readerSelectionCommandID,
+            message: String(error?.message || error),
+          });
+        });
+      },
+    });
+
+    if (isOptionalBundleEnabled(optionalBundles, "react-ui") && typeof openReactDemoWindow === "function") {
+      commandPalette.registerCommand({
+        id: `${config.addonRef}-open-react-ui-demo`,
+        label: i18n.t(
+          "cleanroom-react-ui-demo-command-label",
+          "Open Optional React UI Demo",
+        ),
+        category: config.addonName,
+        description: i18n.t(
+          "cleanroom-react-ui-demo-command-description",
+          "Open the default-disabled React UI demo window.",
+        ),
+        condition: () => Boolean(prefs.get("enabled")),
+        handler: () => {
+          Promise.resolve(openReactDemoWindow()).catch((error) => {
+            logger.warn("plugin.reactUIDemo.open.failed", {
+              message: String(error?.message || error),
+            });
+          });
+        },
+      });
+    }
 
     if (menuManager.isOfficialAPIAvailable()) {
       menuManager.registerContextMenuItem({
@@ -113,8 +241,8 @@ export function createFeatureComposer({
       dataProvider: (item) => getColumnValue(item),
       renderCell: itemTree.createConditionalCellRenderer(
         (value) => String(value || "").includes("0"),
-        { color: "#8b5cf6", fontWeight: "600" },
-        { color: "#0f766e", fontWeight: "600" },
+        { color: "var(--cleanroom-status-zero-color, #1d4ed8)", fontWeight: "600" },
+        { color: "var(--cleanroom-status-ready-color, #0f766e)", fontWeight: "600" },
       ),
     });
 

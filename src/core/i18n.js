@@ -26,14 +26,26 @@ const STRINGS = {
     "cleanroom-item-tree-label": "Cleanroom",
     "cleanroom-reader-menu-label": "Show Reader Demo Summary",
     "cleanroom-reader-command-description": "Show the active reader summary.",
+    "cleanroom-reader-selection-command-label": "Show Reader Selection Snapshot",
+    "cleanroom-reader-selection-command-description": "Inspect the current reader selection.",
     "cleanroom-reader-toast-title": "Cleanroom Reader",
     "cleanroom-reader-no-active": "No active reader tab.",
     "cleanroom-reader-toast-body": "{type} reader for item #{itemID} with {annotations} annotations.",
+    "cleanroom-react-ui-demo-command-label": "Open Optional React UI Demo",
+    "cleanroom-react-ui-demo-command-description": "Open the default-disabled React UI demo window.",
     "cleanroom-pref-caption": "Cleanroom Template Preferences",
     "cleanroom-pref-enabled": "Enable plugin",
+    "cleanroom-pref-menu-section": "Menu",
     "cleanroom-pref-menu-label": "Menu label",
     "cleanroom-pref-menu-hint": "Leave empty to use localized default.",
+    "cleanroom-pref-logging-section": "Logging",
     "cleanroom-pref-log-level": "Log level",
+    "cleanroom-pref-theme-section": "Theme",
+    "cleanroom-pref-theme-mode": "Theme mode",
+    "cleanroom-pref-theme-follow-host": "Follow Zotero",
+    "cleanroom-pref-theme-light": "Light",
+    "cleanroom-pref-theme-dark": "Dark",
+    "cleanroom-pref-theme-hint": "Apply only to plugin-owned UI surfaces, including this preference pane, without changing Zotero's global Appearance.",
     // 带变量的示例字符串
     "item-count": "You have {count} items.",
     "greeting": "Hello, {name}!",
@@ -62,19 +74,78 @@ const STRINGS = {
     "cleanroom-item-tree-label": "Cleanroom",
     "cleanroom-reader-menu-label": "显示 Reader 示例摘要",
     "cleanroom-reader-command-description": "显示当前激活 reader 的摘要。",
+    "cleanroom-reader-selection-command-label": "显示 Reader 选区快照",
+    "cleanroom-reader-selection-command-description": "检查当前 reader 选区。",
     "cleanroom-reader-toast-title": "Cleanroom Reader",
     "cleanroom-reader-no-active": "当前没有激活的 reader 标签页。",
     "cleanroom-reader-toast-body": "{type} 阅读器，条目 #{itemID}，包含 {annotations} 条批注。",
+    "cleanroom-react-ui-demo-command-label": "打开可选 React UI 示例",
+    "cleanroom-react-ui-demo-command-description": "打开默认禁用的 React UI 示例窗口。",
     "cleanroom-pref-caption": "Cleanroom 模板首选项",
     "cleanroom-pref-enabled": "启用插件",
+    "cleanroom-pref-menu-section": "菜单",
     "cleanroom-pref-menu-label": "菜单标签",
     "cleanroom-pref-menu-hint": "留空使用默认本地化文案。",
+    "cleanroom-pref-logging-section": "日志",
     "cleanroom-pref-log-level": "日志等级",
+    "cleanroom-pref-theme-section": "主题",
+    "cleanroom-pref-theme-mode": "主题模式",
+    "cleanroom-pref-theme-follow-host": "跟随 Zotero",
+    "cleanroom-pref-theme-light": "浅色",
+    "cleanroom-pref-theme-dark": "深色",
+    "cleanroom-pref-theme-hint": "仅作用于插件拥有的界面，包括当前偏好设置面板，不会改变 Zotero 的全局外观。",
     // 带变量的示例字符串
     "item-count": "你有 {count} 个条目。",
     "greeting": "你好，{name}！",
     "progress-status": "正在处理 {current}/{total}...",
     "items-selected": "已选择 {count} 个条目。",
+  },
+  "zh-TW": {
+    "cleanroom-menu-label": "開啟 Cleanroom 動作",
+    "cleanroom-dialog-title": "Cleanroom 範本",
+    "cleanroom-dialog-body": "外掛命令已成功執行。",
+    "cleanroom-command-label": "開啟 Cleanroom 動作",
+    "cleanroom-command-description": "執行預設的 clean-room 範本動作。",
+    "cleanroom-command-disabled": "外掛目前已停用，請先在偏好設定中重新啟用。",
+    "cleanroom-shortcut-description": "顯示 clean-room 快捷鍵示例提示。",
+    "cleanroom-shortcut-toast-title": "Cleanroom 快捷鍵",
+    "cleanroom-shortcut-toast-body": "已觸發 {shortcut} {count} 次。",
+    "cleanroom-demo-section-title": "Cleanroom 示例",
+    "cleanroom-demo-field-item": "條目",
+    "cleanroom-demo-field-shortcut": "快捷鍵",
+    "cleanroom-demo-field-notifier": "監聽器",
+    "cleanroom-demo-field-status": "狀態",
+    "cleanroom-demo-no-selection": "目前沒有選取條目。",
+    "cleanroom-demo-untitled": "未命名條目",
+    "cleanroom-demo-notifier-idle": "還沒有監聽到事件。",
+    "cleanroom-demo-status-ready": "基線示例已就緒",
+    "cleanroom-item-tree-label": "Cleanroom",
+    "cleanroom-reader-menu-label": "顯示 Reader 示例摘要",
+    "cleanroom-reader-command-description": "顯示目前啟用 reader 的摘要。",
+    "cleanroom-reader-selection-command-label": "顯示 Reader 選區快照",
+    "cleanroom-reader-selection-command-description": "檢查目前 reader 選區。",
+    "cleanroom-reader-toast-title": "Cleanroom Reader",
+    "cleanroom-reader-no-active": "目前沒有啟用的 reader 分頁。",
+    "cleanroom-reader-toast-body": "{type} 閱讀器，條目 #{itemID}，包含 {annotations} 則批註。",
+    "cleanroom-react-ui-demo-command-label": "開啟可選 React UI 示例",
+    "cleanroom-react-ui-demo-command-description": "開啟預設停用的 React UI 示例視窗。",
+    "cleanroom-pref-caption": "Cleanroom 範本偏好設定",
+    "cleanroom-pref-enabled": "啟用外掛",
+    "cleanroom-pref-menu-section": "選單",
+    "cleanroom-pref-menu-label": "選單標籤",
+    "cleanroom-pref-menu-hint": "留空時使用預設本地化文案。",
+    "cleanroom-pref-logging-section": "日誌",
+    "cleanroom-pref-log-level": "日誌等級",
+    "cleanroom-pref-theme-section": "主題",
+    "cleanroom-pref-theme-mode": "主題模式",
+    "cleanroom-pref-theme-follow-host": "跟隨 Zotero",
+    "cleanroom-pref-theme-light": "淺色",
+    "cleanroom-pref-theme-dark": "深色",
+    "cleanroom-pref-theme-hint": "僅作用於外掛擁有的介面，包括目前偏好設定面板，不會改變 Zotero 的全域外觀。",
+    "item-count": "你有 {count} 個條目。",
+    "greeting": "你好，{name}！",
+    "progress-status": "正在處理 {current}/{total}...",
+    "items-selected": "已選取 {count} 個條目。",
   },
 };
 
@@ -118,9 +189,18 @@ function normalizeLocale(locale) {
   }
 
   const normalized = locale.replace("_", "-");
+  const lowered = normalized.toLowerCase();
 
-  // 中文变体统一映射到 zh-CN
-  if (normalized.toLowerCase().startsWith("zh")) {
+  // 中文变体按简繁体优先映射到现有资源包
+  if (lowered.startsWith("zh")) {
+    if (
+      lowered.includes("-tw")
+      || lowered.includes("-hk")
+      || lowered.includes("-mo")
+      || lowered.includes("-hant")
+    ) {
+      return "zh-TW";
+    }
     return "zh-CN";
   }
 

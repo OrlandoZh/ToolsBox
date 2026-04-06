@@ -299,6 +299,42 @@ describe("Release Matrix Lib", () => {
     assert.ok(markdown.includes("待远端验证"));
   });
 
+  it("should keep synthetic remote verification as release attention", () => {
+    const summary = buildReleaseMatrixSummary({
+      ...createConsistentMatrixPayload(),
+      installSmokeReport: createPassedInstallSmokeReport(),
+      remoteVerification: {
+        status: "passed",
+        statusLabel: "通过",
+        summary: "远端 update.json 与 update_link 已校验通过，版本、兼容范围与本地发布工件一致。",
+        effectiveUpdateURL: "data:application/json,%7B%22addons%22%3A%7B%7D%7D",
+        expectedUpdateLink: "data:application/x-xpinstall;base64,ZmFrZS14cGk=",
+        observedUpdateLink: "data:application/x-xpinstall;base64,ZmFrZS14cGk=",
+        checks: [
+          {
+            id: "remote-update-link-match",
+            label: "远端 update_link 与本地一致",
+            passed: true,
+            detail: "远端 update_link 与本地 release-manifest 一致。",
+          },
+        ],
+        issues: [],
+      },
+    });
+
+    const markdown = renderReleaseMatrixMarkdown(summary);
+
+    assert.equal(summary.status, "attention");
+    assert.equal(summary.remoteVerification?.status, "passed");
+    assert.equal(summary.remoteVerification?.evidenceMode, "synthetic");
+    assert.equal(summary.remoteVerification?.releaseReady, false);
+    assert.ok(String(summary.remoteVerification?.summary || "").includes("data: 内联 URL"));
+    assert.ok(summary.attentionIssues.some((item) => String(item).includes("远端发布验证")));
+    assert.ok(markdown.includes("证据模式"));
+    assert.ok(markdown.includes("测试型"));
+    assert.ok(markdown.includes("发布就绪: `否`"));
+  });
+
   it("should keep remote verification failures as release blockers", () => {
     const summary = buildReleaseMatrixSummary({
       ...createConsistentMatrixPayload(),

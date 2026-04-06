@@ -38,6 +38,7 @@ describe("Plugin Agent", () => {
             { key: "enabled", group: "core" },
             { key: "menuLabel", group: "ui" },
             { key: "logLevel", group: "core" },
+            { key: "themeMode", group: "ui" },
           ];
         },
         getMigrationSummary() {
@@ -139,12 +140,13 @@ describe("Plugin Agent", () => {
       },
       commandPalette: {
         getCommandCount() {
-          return 2;
+          return 3;
         },
         getAllCommands() {
           return [
             { id: "cleanroomtemplate-primary-action" },
             { id: "cleanroomtemplate-reader-summary" },
+            { id: "cleanroomtemplate-reader-selection-snapshot" },
           ];
         },
       },
@@ -254,7 +256,7 @@ describe("Plugin Agent", () => {
 
     const diagnostics = agent.collectAgentDiagnostics();
     assert.equal(diagnostics.enabled, true);
-    assert.equal(diagnostics.commandCount, 2);
+    assert.equal(diagnostics.commandCount, 3);
     assert.equal(diagnostics.menuCount, 2);
     assert.equal(diagnostics.officialMenuAPIAvailable, true);
     assert.equal(diagnostics.primaryActionCommandRegistered, true);
@@ -278,6 +280,11 @@ describe("Plugin Agent", () => {
     }]);
     assert.equal(diagnostics.readerEventReport.syntheticFallbackAvailable, true);
     assert.ok(diagnostics.capabilityCount >= 11);
+    assert.deepEqual(diagnostics.commandIDs, [
+      "cleanroomtemplate-primary-action",
+      "cleanroomtemplate-reader-summary",
+      "cleanroomtemplate-reader-selection-snapshot",
+    ]);
     assert.equal(diagnostics.hostReadyDurationMs, 2150);
     assert.equal(diagnostics.startupDurationMs, 3180);
     assert.equal(diagnostics.shutdownDurationMs, 920);
@@ -308,7 +315,7 @@ describe("Plugin Agent", () => {
     );
 
     const settingsSnapshot = agent.runAgentScenario("settings-snapshot");
-    assert.equal(settingsSnapshot.definitionCount, 3);
+    assert.equal(settingsSnapshot.definitionCount, 4);
     assert.equal(settingsSnapshot.preferencePaneCount, 1);
 
     const readerSnapshot = agent.runAgentScenario("reader-current", { itemID: 1 });

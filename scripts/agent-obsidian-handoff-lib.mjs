@@ -1,4 +1,7 @@
 import {
+  summarizeAgentContextSnapshot,
+} from "./agent-context-lib.mjs";
+import {
   buildVisualExhaustedStageSummary,
   buildPureVisualReaderFailureSummary,
   buildVisualPrimaryBlockerSummary,
@@ -265,6 +268,14 @@ function summarizeValidationDecision(decision) {
     requiredEvidence: dedupeList(record.requiredEvidence, 6),
     escalatedByRuntimeSignals: record.escalatedByRuntimeSignals === true,
     deferredEvidenceAction: String(record.deferredEvidenceAction || "").trim() || null,
+  };
+}
+
+function summarizeAgentContext(record) {
+  const summary = summarizeAgentContextSnapshot(record);
+  return {
+    ...summary,
+    missing: !summary.present,
   };
 }
 
@@ -788,6 +799,7 @@ export function summarizeObsidianInterventionContext(reports = {}) {
   const monitor = reports.monitor && typeof reports.monitor === "object" ? reports.monitor : {};
   const e2e = reports.e2e && typeof reports.e2e === "object" ? reports.e2e : {};
   const bootstrapShell = reports.bootstrapShell === true;
+  const agentContext = summarizeAgentContext(reports.agentContext);
 
   const loopState = loop.finalState && typeof loop.finalState === "object"
     ? loop.finalState
@@ -985,6 +997,7 @@ export function summarizeObsidianInterventionContext(reports = {}) {
     candidateFiles,
     commands,
     projectContext,
+    agentContext,
     currentTruthActiveBatchId: projectContext.currentTruth.activeBatchId,
     manualVerdictResolved: String(projectContext.currentTruth.activeBatchId || "").trim() === "READER-HIGH-126",
     autoChain: {
@@ -1077,6 +1090,7 @@ export function summarizeObsidianInterventionContext(reports = {}) {
       "dist/agent-zotero-loop.md",
       "dist/agent-gate.md",
       "dist/agent-monitor.md",
+      ...(agentContext.present ? ["dist/agent-context.md"] : []),
       "dist/agent-zotero-e2e.md",
       "dist/agent-zotero-autofix.md",
       "dist/zotero-watch-recovery-regression.md",
@@ -1394,6 +1408,9 @@ export function buildObsidianInterventionMarkdown(summary) {
   const validationDecision = projectContext.validationDecision && typeof projectContext.validationDecision === "object"
     ? projectContext.validationDecision
     : {};
+  const agentContext = summary.agentContext && typeof summary.agentContext === "object"
+    ? summary.agentContext
+    : {};
   const autoChain = summary.autoChain && typeof summary.autoChain === "object"
     ? summary.autoChain
     : {};
@@ -1459,6 +1476,25 @@ export function buildObsidianInterventionMarkdown(summary) {
   lines.push(`- Validation level：${validationDecision.levelLabel || validationDecision.level || "-"}`);
   lines.push(`- 命中验证域：${truncateList(validationDecision.matchedDomain, 4).join("、") || "-"}`);
   lines.push(`- 命中项目覆盖：${truncateList(validationDecision.matchedProjectOverride, 4).join("、") || "-"}`);
+  lines.push("");
+
+  lines.push("## 当前上下文", "");
+  if (!agentContext.present) {
+    lines.push("- 缺少 `dist/agent-context.json` / `dist/agent-context.md`，当前仍回退到 gate / monitor / truth 汇总。");
+  } else {
+    lines.push(`- Context 生成时间：${agentContext.generatedAt || "-"}`);
+    lines.push(`- Compact Profile：\`${agentContext.budgetMeta?.profile || "-"}\``);
+    lines.push(`- Compact Digest：\`${agentContext.budgetMeta?.digest || "-"}\``);
+    lines.push(`- Truth Ref：batch=\`${agentContext.truthRef?.activeBatchId || "-"}\` / wave=\`${agentContext.truthRef?.currentWaveName || "-"}\` / validation=\`${agentContext.truthRef?.validationLevel || "-"}\``);
+    lines.push(`- Action Ref：next=\`${agentContext.actionRef?.nextAction || "-"}\` / blocker=${agentContext.actionRef?.mainBlocker || "-"}`);
+    lines.push(`- Status Ref：monitor=\`${agentContext.statusRef?.monitorStatus || "-"}\` / gate=\`${agentContext.statusRef?.gateStatus || "-"}\` / memory=\`${agentContext.statusRef?.memoryFingerprint || agentContext.statusRef?.memoryStrategyLabel || "-"}\` / release=\`${agentContext.statusRef?.releaseStatus || "-"}\``);
+    lines.push(`- 建议证据：${truncateList(agentContext.evidenceRefs, 4).join("；") || "-"}`);
+    lines.push(`- Drift 状态：\`${agentContext.driftRef?.status || "missing"}\` / warning \`${agentContext.driftRef?.warningCount ?? 0}\``);
+    lines.push(`- Artifact Refs：truth=\`${agentContext.artifactRefs?.currentTruth || "-"}\` / monitor=\`${agentContext.artifactRefs?.monitor || "-"}\` / gate=\`${agentContext.artifactRefs?.gate || "-"}\` / memory=\`${agentContext.artifactRefs?.memory || "-"}\``);
+    if (Array.isArray(agentContext.driftRef?.warnings) && agentContext.driftRef.warnings.length > 0) {
+      agentContext.driftRef.warnings.forEach((item) => lines.push(`- Drift：${item}`));
+    }
+  }
   lines.push("");
 
   lines.push("## 当前自动链状态", "");
@@ -1543,7 +1579,7 @@ export function buildObsidianInterventionMarkdown(summary) {
 
   lines.push("## 自动阻塞项", "");
   if (blockers.length === 0) {
-    lines.push("- 当前没有明确阻塞项，优先复核 gate 与 loop 是否一致。");
+    lines.push("- 当前已满足 agent 质量闸门，可继续执行推荐命令或进入后续开发 / 发布流程。");
   } else {
     blockers.forEach((item) => lines.push(`- ${item}`));
   }

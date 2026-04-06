@@ -1,0 +1,56 @@
+:root {
+  color-scheme: light dark;
+  --cleanroom-pref-bg: var(--cleanroom-theme-background, var(--material-background, Canvas));
+  --cleanroom-pref-surface: var(--cleanroom-theme-surface, var(--material-sidepane, -moz-dialog));
+  --cleanroom-pref-border: var(--cleanroom-theme-border, var(--stroke-secondary, var(--color-border, #00000026)));
+  --cleanroom-pref-text: var(--cleanroom-theme-text-primary, var(--fill-primary, CanvasText));
+  --cleanroom-pref-muted: var(--cleanroom-theme-text-secondary, var(--fill-secondary, GrayText));
+  --cleanroom-pref-accent: var(--cleanroom-theme-accent, var(--color-accent, var(--accent-blue, #4072e5)));
+  --cleanroom-pref-control-bg: var(--cleanroom-theme-field, Field);
+  --cleanroom-pref-control-text: var(--cleanroom-theme-field-text, FieldText);
+  --cleanroom-pref-control-border: var(--cleanroom-theme-border-soft, var(--color-border50, #00000014));
+  --cleanroom-pref-shadow: var(--cleanroom-theme-shadow, 0 10px 24px rgba(15, 23, 42, 0.08));
+}
+
+.cleanroom-pref-root {
+  padding: 10px;
+  background: var(--cleanroom-pref-bg);
+  color: var(--cleanroom-pref-text);
+}
+
+.cleanroom-pref-root groupbox {
+  margin-block: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--cleanroom-pref-border);
+  border-radius: 6px;
+  background: var(--cleanroom-pref-surface);
+  box-shadow: var(--cleanroom-pref-shadow);
+}
+
+.cleanroom-pref-root caption {
+  color: var(--cleanroom-pref-accent);
+  font-weight: 600;
+}
+
+.cleanroom-pref-root description {
+  margin-top: 4px;
+  color: var(--cleanroom-pref-muted);
+}
+
+.cleanroom-pref-root textbox,
+.cleanroom-pref-root menulist {
+  color: var(--cleanroom-pref-text);
+  background: var(--cleanroom-pref-control-bg);
+  border: 1px solid var(--cleanroom-pref-control-border);
+  border-radius: 4px;
+}
+
+.cleanroom-pref-root textbox::placeholder {
+  color: var(--cleanroom-pref-muted);
+}
+
+.cleanroom-pref-root textbox,
+.cleanroom-pref-root menulist,
+.cleanroom-pref-root menuitem {
+  color: var(--cleanroom-pref-control-text);
+}

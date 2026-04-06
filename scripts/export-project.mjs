@@ -27,9 +27,14 @@ const COPY_PATHS = [
   "types",
   "scripts/build-lock.mjs",
   "scripts/build-injection-lib.mjs",
+  "scripts/build-react-ui.mjs",
   "scripts/build.mjs",
   "scripts/package.mjs",
+  "scripts/optional-bundles-lib.mjs",
+  "scripts/script-runtime-lib.mjs",
   "scripts/static-runtime-baseline-lib.mjs",
+  "scripts/agent-zotero-locale-lib.mjs",
+  "scripts/preference-pane-governance-lib.mjs",
   "scripts/verify.mjs",
   "scripts/lint.mjs",
   "scripts/format-check.mjs",
@@ -73,21 +78,27 @@ async function copyPath(relativePath, targetRoot) {
 }
 
 function buildExportPackageJSON(sourcePackage) {
+  const scripts = {
+    build: "node scripts/build.mjs",
+    package: "node scripts/package.mjs",
+    verify: "node scripts/verify.mjs",
+    lint: "node scripts/lint.mjs",
+    "format:check": "node scripts/format-check.mjs",
+    typecheck: "node scripts/typecheck.mjs",
+    check: "npm run lint && npm run format:check && npm run typecheck && npm run verify",
+  };
+
+  if (typeof sourcePackage?.scripts?.["build:react-ui"] === "string") {
+    scripts["build:react-ui"] = sourcePackage.scripts["build:react-ui"];
+  }
+
   return {
     name: sourcePackage.name,
     private: true,
     version: sourcePackage.version,
     type: sourcePackage.type || "module",
     license: sourcePackage.license || "UNLICENSED",
-    scripts: {
-      build: "node scripts/build.mjs",
-      package: "node scripts/package.mjs",
-      verify: "node scripts/verify.mjs",
-      lint: "node scripts/lint.mjs",
-      "format:check": "node scripts/format-check.mjs",
-      typecheck: "node scripts/typecheck.mjs",
-      check: "npm run lint && npm run format:check && npm run typecheck && npm run verify",
-    },
+    scripts,
   };
 }
 
@@ -103,6 +114,7 @@ function buildExportReadme(config) {
 - \`config/\`
 - \`types/\`
 - 最小构建脚本：\`build/package/verify/lint/format-check/typecheck\`
+- 可选 bundle 构建脚本：\`build:react-ui\`（默认 disabled，不要求主链安装 React）
 
 ## 静态运行时基线
 

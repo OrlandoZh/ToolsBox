@@ -20,5 +20,7 @@ describe("Validation Surfaces", () => {
     assert.ok(source.includes("Host Semantic Domains"));
     assert.ok(source.includes("preference-panes"));
     assert.ok(source.includes("reader-events"));
+    assert.ok(source.includes("live pane bounds"));
+    assert.ok(source.includes("live sidebar bounds"));
   });
 });

@@ -12,8 +12,12 @@ function createDeps() {
     primary: 0,
     readerDemo: 0,
     updateNotifier: 0,
+    reactUIDemo: 0,
   };
   const notifierHandlers = [];
+  const paneRegistrations = [];
+  const commandRegistrations = [];
+  const selectionActions = [];
   const demoState = {
     shortcutLabel: "Ctrl+Shift+Y",
     shortcutTriggerCount: 0,
@@ -28,6 +32,7 @@ function createDeps() {
       config: {
         addonRef: "cleanroomtemplate",
         addonName: "Cleanroom",
+        instanceKey: "CleanroomTemplate",
         icons: {
           "48": "content/icons/icon-48.png",
         },
@@ -49,27 +54,50 @@ function createDeps() {
         },
       },
       i18n: {
+        locale: "en-US",
         t(_key, _paramsOrFallback, fallbackMaybe) {
           if (typeof _paramsOrFallback === "string") {
             return _paramsOrFallback;
           }
           return fallbackMaybe || _key;
         },
+        getBundle() {
+          return {
+            "cleanroom-pref-caption": "Cleanroom Template Preferences",
+          };
+        },
       },
       preferencePanes: {
-        async registerPane() {
+        async registerPane(options) {
           calls.panes += 1;
+          paneRegistrations.push(options);
         },
         getPaneCount() {
           return calls.panes;
         },
       },
       commandPalette: {
-        registerCommand() {
+        registerCommand(options) {
           calls.commands += 1;
+          commandRegistrations.push(options);
         },
         getCommandCount() {
           return calls.commands;
+        },
+      },
+      readerSelectionActions: {
+        registerAction(options) {
+          selectionActions.push(options);
+          return options.id || `reader-selection-action-${selectionActions.length}`;
+        },
+        getActionSnapshot(actionId) {
+          const action = selectionActions.find((entry) => entry.id === actionId);
+          return action
+            ? {
+              id: action.id,
+              enabled: true,
+            }
+            : null;
         },
       },
       menuManager: {
@@ -133,6 +161,20 @@ function createDeps() {
       runReaderDemo() {
         calls.readerDemo += 1;
       },
+      runReaderSelectionActionDemo() {
+        calls.readerSelectionDemo = (calls.readerSelectionDemo || 0) + 1;
+      },
+      optionalBundles: {
+        isEnabled() {
+          return false;
+        },
+      },
+      openReactDemoWindow() {
+        calls.reactUIDemo += 1;
+        return {
+          ready: true,
+        };
+      },
       getColumnValue() {
         return "item · 0";
       },
@@ -152,23 +194,101 @@ function createDeps() {
         calls.updateNotifier += 1;
       },
     },
+    paneRegistrations,
+    commandRegistrations,
+    selectionActions,
   };
 }
 
 describe("Feature Composer", () => {
   it("should register baseline features only once", async () => {
-    const { deps, calls } = createDeps();
+    const { deps, calls, paneRegistrations, commandRegistrations, selectionActions } = createDeps();
     const composer = createFeatureComposer(deps);
 
     await composer.registerBaselineFeatures();
     await composer.registerBaselineFeatures();
 
     assert.equal(calls.panes, 1);
-    assert.equal(calls.commands, 2);
+    assert.equal(calls.commands, 3);
     assert.equal(calls.columns, 1);
     assert.equal(calls.rows, 1);
     assert.equal(calls.sections, 1);
     assert.equal(calls.notifier, 1);
+    assert.equal(typeof paneRegistrations[0]?.onPreferenceLoad, "function");
+    assert.equal(paneRegistrations[0]?.scripts, undefined);
+    assert.deepEqual(paneRegistrations[0]?.stylesheets, ["content/preferences.css"]);
+    assert.equal(selectionActions.length, 1);
+    assert.equal(selectionActions[0].id, "cleanroomtemplate-reader-selection-snapshot");
+    assert.equal(commandRegistrations[2].id, "cleanroomtemplate-reader-selection-snapshot");
+    commandRegistrations[2].handler();
+    assert.equal(calls.readerSelectionDemo, 1);
+  });
+
+  it("should initialize preference panes through onPreferenceLoad", async () => {
+    const { deps, paneRegistrations } = createDeps();
+    const composer = createFeatureComposer(deps);
+
+    await composer.registerBaselineFeatures();
+
+    const loadedScripts = [];
+    const initCalls = [];
+    const insertedFTL = [];
+    const window = {
+      MozXULElement: {
+        insertFTLIfNeeded(resourceID) {
+          insertedFTL.push(resourceID);
+        },
+      },
+      Services: {
+        scriptloader: {
+          loadSubScript(uri, scope) {
+            loadedScripts.push({ uri, scope });
+            if (uri.endsWith("content/preferences.js")) {
+              scope.initCleanroomPreferences = (options) => {
+                initCalls.push(options);
+                return {
+                  ok: true,
+                };
+              };
+            }
+          },
+        },
+      },
+    };
+
+    await paneRegistrations[0].onPreferenceLoad({
+      window,
+      paneID: "cleanroomtemplate-preferences",
+      pluginID: "cleanroom-template@example.com",
+      resolveURI(uri) {
+        return `chrome://cleanroomtemplate/${uri}`;
+      },
+    });
+
+    assert.deepEqual(loadedScripts.map((entry) => entry.uri), [
+      "chrome://cleanroomtemplate/content/theme.js",
+      "chrome://cleanroomtemplate/content/preferences.js",
+    ]);
+    assert.deepEqual(insertedFTL, ["main.ftl"]);
+    assert.equal(window.__CLEANROOM_PREFERENCE_BRIDGE__.addonRef, "cleanroomtemplate");
+    assert.equal(window.__CLEANROOM_PREFERENCE_BRIDGE__.locale, "en-US");
+    assert.equal(window.__CLEANROOM_PREFERENCE_BRIDGE__.instanceKey, "CleanroomTemplate");
+    assert.deepEqual(window.__CLEANROOM_PREFERENCE_BRIDGE__.strings, {
+      "cleanroom-pref-caption": "Cleanroom Template Preferences",
+    });
+    assert.deepEqual(initCalls, [
+      {
+        bridge: {
+          addonRef: "cleanroomtemplate",
+          locale: "en-US",
+          pluginID: "cleanroom-template@example.com",
+          instanceKey: "CleanroomTemplate",
+          strings: {
+            "cleanroom-pref-caption": "Cleanroom Template Preferences",
+          },
+        },
+      },
+    ]);
   });
 
   it("should pass notifier events to updater callback", async () => {
@@ -213,5 +333,23 @@ describe("Feature Composer", () => {
     assert.equal(contextMenus[0].label, undefined);
     assert.equal(readerMenus[0].menuItem.l10nID, "cleanroom-reader-menu-label");
     assert.equal(readerMenus[0].menuItem.label, undefined);
+  });
+
+  it("should register the optional react-ui command only when the bundle is enabled", async () => {
+    const { deps, calls, commandRegistrations } = createDeps();
+    deps.optionalBundles = {
+      isEnabled(bundleID) {
+        return bundleID === "react-ui";
+      },
+    };
+
+    const composer = createFeatureComposer(deps);
+    await composer.registerBaselineFeatures();
+
+    assert.equal(calls.commands, 4);
+    assert.equal(commandRegistrations[3].id, "cleanroomtemplate-open-react-ui-demo");
+
+    await commandRegistrations[3].handler();
+    assert.equal(calls.reactUIDemo, 1);
   });
 });

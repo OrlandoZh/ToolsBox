@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import { createItemPane } from "../src/features/item-pane.js";
 import { createPreferencePanes } from "../src/features/preference-panes.js";
 import { createReader } from "../src/features/reader.js";
+import { createZoteroTextFileStorage } from "../src/platform/zotero-file-storage.js";
+import { createZoteroJSONStateStore } from "../src/platform/zotero-json-state-store.js";
 import { createZoteroHost } from "../src/platform/zotero-host.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -100,6 +102,59 @@ async function main() {
     rootURI: "chrome://cleanroomtemplate/",
   });
 
+  const textFileStorage = createZoteroTextFileStorage({
+    globalScope: {
+      Zotero: {
+        DataDirectory: {
+          dir: "/tmp/cleanroomtemplate",
+        },
+      },
+      PathUtils: {
+        join: (...parts) => parts.join("/"),
+      },
+      IOUtils: {
+        async exists() {
+          return false;
+        },
+        async makeDirectory() {},
+        async readUTF8() {
+          return "";
+        },
+        async writeUTF8() {},
+        async remove() {},
+      },
+    },
+    directorySegments: ["cleanroomtemplate", "state"],
+    fileName: "history.json",
+  });
+
+  const jsonStateStore = createZoteroJSONStateStore({
+    globalScope: {
+      Zotero: {
+        DataDirectory: {
+          dir: "/tmp/cleanroomtemplate",
+        },
+      },
+      PathUtils: {
+        join: (...parts) => parts.join("/"),
+      },
+      IOUtils: {
+        async exists() {
+          return false;
+        },
+        async makeDirectory() {},
+        async readUTF8() {
+          return "";
+        },
+        async writeUTF8() {},
+      },
+    },
+    id: "history.demo",
+    directorySegments: ["cleanroomtemplate", "state"],
+    fileName: "history.json",
+    initialState: () => ({ entries: [] }),
+  });
+
   assert(typeof itemPane.createSimpleSection === "function", "ItemPane runtime is missing createSimpleSection()");
   assert(typeof itemPane.createFieldInfoRow === "function", "ItemPane runtime is missing createFieldInfoRow()");
   assert(typeof itemPane.createConditionalInfoRow === "function", "ItemPane runtime is missing createConditionalInfoRow()");
@@ -107,6 +162,10 @@ async function main() {
   assert(typeof reader.getActiveSummary === "function", "Reader runtime is missing getActiveSummary()");
   assert(typeof preferencePanes.registerPane === "function", "PreferencePanes runtime is missing registerPane()");
   assert(typeof preferencePanes.resolveURI === "function", "PreferencePanes runtime is missing resolveURI()");
+  assert(typeof textFileStorage.readText === "function", "ZoteroTextFileStorage runtime is missing readText()");
+  assert(typeof textFileStorage.writeText === "function", "ZoteroTextFileStorage runtime is missing writeText()");
+  assert(typeof jsonStateStore.init === "function", "ZoteroJSONStateStore runtime is missing init()");
+  assert(typeof jsonStateStore.resolveFilePath === "function", "ZoteroJSONStateStore runtime is missing resolveFilePath()");
   assert(typeof host.insertFTLIfNeeded === "function", "ZoteroHost runtime is missing insertFTLIfNeeded()");
   assert(typeof host.buildSurfaceTarget === "function", "ZoteroHost runtime is missing buildSurfaceTarget()");
 
@@ -121,7 +180,11 @@ async function main() {
   assert(featuresTypes.includes("getActiveSummary(): ReaderSummary | null;"), "types/features.d.ts is missing getActiveSummary()");
   assert(featuresTypes.includes("waitForReaderReady(target: unknown, options?: { timeoutMs?: number; intervalMs?: number }): Promise<unknown | null>;"), "types/features.d.ts is missing waitForReaderReady()");
   assert(featuresTypes.includes("setContextPaneOpen(target: unknown, open: boolean, options?: { timeoutMs?: number; intervalMs?: number }): Promise<Record<string, unknown> | null>;"), "types/features.d.ts is missing setContextPaneOpen()");
-  assert(featuresTypes.includes("selectSidebarView(target: unknown, view: string, options?: { timeoutMs?: number; intervalMs?: number }): Promise<{"), "types/features.d.ts is missing selectSidebarView()");
+  assert(
+    featuresTypes.includes("selectSidebarView(target: unknown, view: string, options?: { timeoutMs?: number; intervalMs?: number }): Promise<{")
+      || featuresTypes.includes("selectSidebarView(target: unknown, view: string, options?: {"),
+    "types/features.d.ts is missing selectSidebarView()",
+  );
   assert(featuresTypes.includes("findToolbarElement(target: unknown, options?: { selector?: string; view?: \"primary\" | \"secondary\" }): Element | null;"), "types/features.d.ts is missing findToolbarElement()");
   assert(featuresTypes.includes("findSidebarViewElements(target: unknown, view: string, options?: { view?: \"primary\" | \"secondary\" }): {"), "types/features.d.ts is missing findSidebarViewElements()");
   assert(featuresTypes.includes("readonly READER_EVENT_TYPES: typeof READER_EVENT_TYPES;"), "types/features.d.ts is missing Reader READER_EVENT_TYPES declaration");
@@ -135,6 +198,10 @@ async function main() {
   assert(featuresTypes.includes("registerPane(options: PreferencePaneOptions): Promise<string | null>;"), "types/features.d.ts is missing PreferencePanes registerPane()");
   assert(featuresTypes.includes("resolveURI(uri: string): string;"), "types/features.d.ts is missing PreferencePanes resolveURI()");
   assert(featuresTypes.includes("label?: string;"), "types/features.d.ts is missing optional PreferencePane label declaration");
+  assert(platformTypes.includes("export interface ZoteroTextFileStorage"), "types/platform.d.ts is missing ZoteroTextFileStorage declaration");
+  assert(platformTypes.includes("export function createZoteroTextFileStorage(options: ZoteroTextFileStorageOptions): ZoteroTextFileStorage;"), "types/platform.d.ts is missing createZoteroTextFileStorage()");
+  assert(platformTypes.includes("export interface ZoteroJSONStateStore"), "types/platform.d.ts is missing ZoteroJSONStateStore declaration");
+  assert(platformTypes.includes("export function createZoteroJSONStateStore<TState = unknown, TContext = unknown>("), "types/platform.d.ts is missing createZoteroJSONStateStore()");
   assert(platformTypes.includes("insertFTLIfNeeded(window: Window, resourceId: string): boolean;"), "types/platform.d.ts is missing insertFTLIfNeeded()");
   assert(platformTypes.includes("buildSurfaceTarget(options: {"), "types/platform.d.ts is missing buildSurfaceTarget()");
   assert(platformTypes.includes("preparePreferencePane(options?: {"), "types/platform.d.ts is missing preparePreferencePane()");

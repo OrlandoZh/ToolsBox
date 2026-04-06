@@ -12,6 +12,10 @@ import {
   resolvePathOption,
   writeJSONArtifact,
 } from "./script-runtime-lib.mjs";
+import {
+  buildReleaseGateContract,
+  buildReleaseNextSteps,
+} from "./release-flow-contract-lib.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -76,7 +80,15 @@ function deriveBaseURL(rawURL, options = {}) {
   return new URL(".", normalizeURL(rawURL, options)).toString();
 }
 
-function buildUploadActions({ projectRoot, provider, releaseTag, xpiName, updateURL, updateLink }) {
+function buildUploadActions({
+  projectRoot,
+  provider,
+  releaseTag,
+  xpiName,
+  updateURL,
+  updateLink,
+  gateContract,
+}) {
   return [
     {
       step: 1,
@@ -103,21 +115,21 @@ function buildUploadActions({ projectRoot, provider, releaseTag, xpiName, update
     {
       step: 3,
       type: "verify-remote",
-      command: "npm run release:preflight -- --verify-remote",
+      command: gateContract?.remoteVerificationCommand || "npm run release:preflight -- --verify-remote",
       required: true,
       manualRequired: true,
     },
     {
       step: 4,
       type: "refresh-release-consumers",
-      command: "npm run release:prepare && npm run release:matrix",
+      command: gateContract?.refreshReleaseConsumersCommand || "npm run release:prepare && npm run release:matrix",
       required: true,
       manualRequired: true,
     },
     {
       step: 5,
       type: "release-gate",
-      command: "npm run agent:gate:release",
+      command: gateContract?.releaseGateCommand || "npm run agent:gate:release",
       required: true,
       manualRequired: true,
     },
@@ -170,6 +182,16 @@ function buildUploadPlanMarkdown(summary) {
     lines.push(`- ${hint}`);
   }
 
+  lines.push(
+    "",
+    "## Release Gate Contract",
+    `- Required telemetry: \`${summary.gateContract?.requiredRunName || "-"}\``,
+    `- Preferred local prep: \`${summary.gateContract?.preferredPreparationCommand || "-"}\``,
+    `- Remote verify: \`${summary.gateContract?.remoteVerificationCommand || "-"}\``,
+    `- Refresh consumers: \`${summary.gateContract?.refreshReleaseConsumersCommand || "-"}\``,
+    `- Final gate: \`${summary.gateContract?.releaseGateCommand || "-"}\``,
+  );
+
   lines.push("", "## Upload Steps");
   for (const action of summary.uploadActions || []) {
     if (action.type === "upload-asset") {
@@ -179,10 +201,16 @@ function buildUploadPlanMarkdown(summary) {
     lines.push(`${action.step}. Run \`${action.command}\`.`);
   }
 
+  if (Array.isArray(summary.nextSteps) && summary.nextSteps.length > 0) {
+    lines.push("", "## Next Steps");
+    summary.nextSteps.forEach((step) => lines.push(`- ${step}`));
+  }
+
   lines.push(
     "",
     "## Notes",
     "- This script is plan-only. It does not perform any network upload, release creation, or asset mutation.",
+    "- This script does not create `release-plan` telemetry; release gate still expects a successful `npm run agent:release` run for the current batch.",
     "- The canonical remote URLs come from `dist/release-manifest.json`; change `config/addon.config.json` first if you need different release URLs.",
     "",
   );
@@ -452,6 +480,7 @@ async function main() {
       expectedUpdateLink: manifestUpdateLink,
     },
   });
+  const gateContract = buildReleaseGateContract();
 
   const summary = {
     generatedAt: new Date().toISOString(),
@@ -503,6 +532,7 @@ async function main() {
       targetBaseURLMatchesManifest: options.targetBaseURL === updateURLBase,
       networkUploadImplemented: false,
     },
+    gateContract,
     providerHints: buildProviderHints(options.provider),
     uploadActions: buildUploadActions({
       projectRoot,
@@ -511,12 +541,9 @@ async function main() {
       xpiName: releaseManifest.xpiName,
       updateURL: manifestUpdateURL,
       updateLink: manifestUpdateLink,
+      gateContract,
     }),
-    nextSteps: [
-      "Manually upload `dist/update.json` and the packaged `.xpi` to the canonical remote URLs above.",
-      "Run `npm run release:preflight -- --verify-remote` after the remote files are live.",
-      "Run `npm run release:prepare && npm run release:matrix`, then confirm `npm run agent:gate:release`.",
-    ],
+    nextSteps: buildReleaseNextSteps(null, gateContract),
     durationMs: Math.max(0, Date.now() - scriptStartedAt),
     errorCategory: null,
     errorCategoryLabel: null,
@@ -558,6 +585,7 @@ main().catch(async (error) => {
       updateLink: null,
       localArtifacts: [],
       checks: {},
+      gateContract: buildReleaseGateContract(),
       providerHints: [],
       uploadActions: [],
       nextSteps: [],

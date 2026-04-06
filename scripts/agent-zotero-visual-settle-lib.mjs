@@ -79,11 +79,13 @@ export function normalizeVisualStageSettleSnapshot(snapshot) {
       stage,
       itemID: normalizeNumber(snapshot.itemID),
       tabID: normalizeString(snapshot.tabID),
+      selectedTabID: normalizeString(snapshot.selectedTabID),
       type: normalizeString(snapshot.type),
       annotationCount: Math.max(0, normalizeNumber(snapshot.annotationCount, 0)),
       selectedAnnotationCount: Math.max(0, normalizeNumber(snapshot.selectedAnnotationCount, 0)),
       annotationDetailCount: Math.max(0, normalizeNumber(snapshot.annotationDetailCount, 0)),
       active: normalizeBoolean(snapshot.active),
+      selectedTabMatched: normalizeBoolean(snapshot.selectedTabMatched),
       hasMatchingWindowState: normalizeBoolean(snapshot.hasMatchingWindowState),
       matchingWindowStateCount: Math.max(0, normalizeNumber(snapshot.matchingWindowStateCount, 0)),
       sidebarView: normalizeString(snapshot.sidebarView),
@@ -127,6 +129,7 @@ export function summarizeVisualStageSettleSnapshot(snapshot) {
       `ann ${normalized.annotationCount ?? 0}`,
       `active ${formatBooleanLabel(normalized.active)}`,
       `window ${formatBooleanLabel(normalized.hasMatchingWindowState)}`,
+      `selected ${formatBooleanLabel(normalized.selectedTabMatched)}`,
       `sidebar ${normalized.sidebarView || "-"}`,
     ].join(" / ");
   }
@@ -150,7 +153,10 @@ export function isVisualStageSettleSnapshotReady(snapshot) {
     return Number.isFinite(normalized.itemID)
       && Boolean(normalized.tabID)
       && normalized.active === true
-      && normalized.hasMatchingWindowState === true;
+      && (
+        normalized.hasMatchingWindowState === true
+        || normalized.selectedTabMatched === true
+      );
   }
 
   return true;

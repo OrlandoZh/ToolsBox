@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   BASELINE_ITEM_PANE_FTL,
   buildBaselineLocaleMainFTLSource,
+  buildFTLMessageBlock,
   buildExpectedFTLLine,
   resolveLocaleMainFTLPath,
 } from "./agent-zotero-locale-lib.mjs";
@@ -860,17 +861,39 @@ function createUnsupportedDiagnosisDescriptor(fingerprint) {
 }
 
 function parseLocaleValueDriftIssue(issue) {
-  const match = String(issue || "").match(
-    /Locale\s+([A-Za-z-]+)\s+FTL\s+key\s+([A-Za-z0-9._-]+)\s+值漂移：期望\s+(.+?)，实际\s+(.+?)(?:。|$)/u,
+  const source = String(issue || "").trim();
+  const prefixMatch = source.match(
+    /^Locale\s+([A-Za-z-]+)\s+FTL\s+key\s+([A-Za-z0-9._-]+)\s+值漂移：期望\s+/u,
   );
-  if (!match) {
+  if (!prefixMatch) {
     return null;
   }
 
-  const locale = String(match[1] || "").trim();
-  const key = String(match[2] || "").trim();
-  const expectedValue = String(match[3] || "").trim();
-  const actualValue = String(match[4] || "").trim();
+  const locale = String(prefixMatch[1] || "").trim();
+  const key = String(prefixMatch[2] || "").trim();
+  const remainder = source.slice(prefixMatch[0].length);
+  const actualSeparator = "，实际 ";
+  const actualIndex = remainder.indexOf(actualSeparator);
+  if (actualIndex < 0) {
+    return null;
+  }
+
+  const expectedValue = remainder.slice(0, actualIndex).trim();
+  const actualStart = actualIndex + actualSeparator.length;
+  const sentenceEnd = remainder.indexOf("。", actualStart);
+  if (sentenceEnd < 0) {
+    return null;
+  }
+
+  const actualValue = remainder.slice(actualStart, sentenceEnd).trim();
+  const actualSnippetLabel = "实际定义片段 [";
+  const actualSnippetStart = source.indexOf(actualSnippetLabel);
+  const actualSnippetEnd = actualSnippetStart >= 0
+    ? source.lastIndexOf("]")
+    : -1;
+  const actualBlock = actualSnippetStart >= 0 && actualSnippetEnd > actualSnippetStart
+    ? decodeIssueSnippet(source.slice(actualSnippetStart + actualSnippetLabel.length, actualSnippetEnd))
+    : null;
   if (!locale || !key || !expectedValue || !actualValue) {
     return null;
   }
@@ -880,7 +903,79 @@ function parseLocaleValueDriftIssue(issue) {
     key,
     expectedValue,
     actualValue,
+    actualBlock,
   };
+}
+
+function decodeIssueSnippet(value) {
+  if (typeof value !== "string" || !value.length) {
+    return null;
+  }
+
+  return value
+    .replaceAll("\\n", "\n")
+    .replaceAll("\\\\", "\\");
+}
+
+function parseLocaleStructureDriftIssue(issue) {
+  const match = String(issue || "").match(
+    /Locale\s+([A-Za-z-]+)\s+FTL\s+key\s+([A-Za-z0-9._-]+)\s+结构漂移：期望定义片段\s+\[(.+?)\]，实际定义片段\s+\[(.+?)\]。?$/u,
+  );
+  if (!match) {
+    return null;
+  }
+
+  const locale = String(match[1] || "").trim();
+  const key = String(match[2] || "").trim();
+  const expectedBlock = decodeIssueSnippet(match[3]);
+  const actualBlock = decodeIssueSnippet(match[4]);
+  if (!locale || !key || !expectedBlock || !actualBlock) {
+    return null;
+  }
+
+  return {
+    locale,
+    key,
+    expectedBlock,
+    actualBlock,
+  };
+}
+
+function buildLocaleFTLReplaceDraft({
+  locale,
+  key,
+  summary,
+  actualBlock,
+  replacementText,
+}) {
+  if (!locale || !key || !summary || !actualBlock || !replacementText) {
+    return [];
+  }
+
+  const actualBlockLines = String(actualBlock).split("\n");
+  const isSingleLineActual = actualBlockLines.length === 1;
+  const operation = isSingleLineActual ? "replace" : "replace-block";
+
+  return [
+    {
+      file: resolveLocaleMainFTLPath(locale),
+      anchor: `${locale} / ${key} locale block`,
+      summary,
+      operation,
+      existsText: replacementText,
+      matchText: isSingleLineActual ? actualBlock : undefined,
+      blockAnchorText: isSingleLineActual ? undefined : `${key} =`,
+      startText: isSingleLineActual ? undefined : actualBlockLines[0],
+      endText: isSingleLineActual ? undefined : actualBlockLines[actualBlockLines.length - 1],
+      beforeContextText: "cleanroom-dialog-body",
+      contextWindowChars: 2000,
+      replacementText,
+      snippet: replacementText,
+      patch: isSingleLineActual
+        ? `@@ ${locale}/main.ftl\n-${actualBlock}\n+${replacementText}`
+        : `@@ ${locale}/main.ftl\n~ replace ${key} locale block with canonical baseline`,
+    },
+  ];
 }
 
 function buildItemPaneL10nReplaceDraft({
@@ -970,31 +1065,47 @@ function buildLocaleFTLValueReplaceDraft({
     return [];
   }
 
-  const baselineValue = BASELINE_ITEM_PANE_FTL?.[parsed.locale]?.[expectedKey];
+  const baselineValue = BASELINE_ITEM_PANE_FTL?.[parsed.locale]?.[expectedKey]?.value;
   if (!baselineValue || baselineValue !== parsed.expectedValue) {
     return [];
   }
 
-  const matchText = `${expectedKey} = ${parsed.actualValue}`;
-  const replacementText = `${expectedKey} = ${parsed.expectedValue}`;
+  const replacementText = buildFTLMessageBlock(parsed.locale, expectedKey, parsed.expectedValue, BASELINE_ITEM_PANE_FTL);
+  if (!replacementText) {
+    return [];
+  }
 
-  return [
-    {
-      file: resolveLocaleMainFTLPath(parsed.locale),
-      anchor: `${parsed.locale} / ${expectedKey} value`,
-      summary,
-      operation: "replace",
-      existsText: replacementText,
-      matchText,
-      beforeContextText: "cleanroom-dialog-body",
-      contextWindowChars: 2000,
-      replacementText,
-      snippet: replacementText,
-      patch: `@@ ${parsed.locale}/main.ftl
--${matchText}
-+${replacementText}`,
-    },
-  ];
+  return buildLocaleFTLReplaceDraft({
+    locale: parsed.locale,
+    key: expectedKey,
+    summary,
+    actualBlock: parsed.actualBlock || `${expectedKey} = ${parsed.actualValue}`,
+    replacementText,
+  });
+}
+
+function buildLocaleFTLStructureReplaceDraft({
+  diagnosis,
+  expectedKey,
+  summary,
+}) {
+  const parsed = parseLocaleStructureDriftIssue(diagnosis?.issue);
+  if (!parsed || parsed.key !== expectedKey) {
+    return [];
+  }
+
+  const replacementText = buildFTLMessageBlock(parsed.locale, expectedKey, null, BASELINE_ITEM_PANE_FTL);
+  if (!replacementText || replacementText !== parsed.expectedBlock) {
+    return [];
+  }
+
+  return buildLocaleFTLReplaceDraft({
+    locale: parsed.locale,
+    key: expectedKey,
+    summary,
+    actualBlock: parsed.actualBlock,
+    replacementText,
+  });
 }
 
 function toProjectRelativePath(projectRoot, filePath) {
@@ -2610,13 +2721,154 @@ const PATCH_WHITELIST_RULES = [
     },
   },
   {
+    id: "localization-item-pane-info-row-ftl-structure",
+    fingerprints: ["localization:item-pane-info-row-ftl-structure-drift"],
+    category: "localization-resource-drift",
+    feature: "localization",
+    featureLabel: "本地化引用修正",
+    mode: "review-only",
+    description: "允许修正 ItemPane InfoRow 的 FTL 结构漂移，但仅限目标 locale 的 `main.ftl` 中该 key 的 canonical block 替换。",
+    allowedTargets: [
+      "addon-static/locale/en-US/main.ftl",
+      "addon-static/locale/zh-CN/main.ftl",
+      "addon-static/locale/zh-TW/main.ftl",
+    ],
+    guardrails: [
+      "只允许替换单条基线 key 的定义块，不允许整份 locale 文件重排或批量重写。",
+      "替换后的定义必须回到模板基线 block 结构，不得混入 reference 工程文案。",
+    ],
+    proposedEdits: [
+      "核对对应 locale 的 `main.ftl` 中 `cleanroom-item-pane-info-row-label` 是否被写成错误结构。",
+      "若 key 仍存在但结构漂移，优先替换该 key 的定义块，而不是重写整份文件。",
+    ],
+    verificationContract: {
+      summary: "补丁后必须确认 locale FTL 结构漂移计数归零。",
+      checks: [
+        {
+          id: "locale-ftl-structure-drift-count",
+          label: "Locale FTL 结构漂移计数",
+          kind: "all-cycle-check",
+          field: "localeFTLStructureDriftCount",
+          operator: "equals",
+          expected: 0,
+          detail: "所有轮次的 E2E checks.localeFTLStructureDriftCount 都应为 0。",
+        },
+        ...buildObservationChecks({
+          cycleFailures: true,
+          errorLogs: true,
+        }),
+      ],
+    },
+    resolveDrafts(diagnosis) {
+      return buildLocaleFTLStructureReplaceDraft({
+        diagnosis,
+        expectedKey: "cleanroom-item-pane-info-row-label",
+        summary: "修正 ItemPane InfoRow 的 FTL 结构漂移。",
+      });
+    },
+  },
+  {
+    id: "localization-item-pane-section-header-ftl-structure",
+    fingerprints: ["localization:item-pane-section-header-ftl-structure-drift"],
+    category: "localization-resource-drift",
+    feature: "localization",
+    featureLabel: "本地化引用修正",
+    mode: "review-only",
+    description: "允许修正 ItemPane Section Header 的 FTL 结构漂移，但仅限目标 locale 的 `main.ftl` 中该 key 的 canonical block 替换。",
+    allowedTargets: [
+      "addon-static/locale/en-US/main.ftl",
+      "addon-static/locale/zh-CN/main.ftl",
+      "addon-static/locale/zh-TW/main.ftl",
+    ],
+    guardrails: [
+      "只允许替换单条基线 key 的定义块，不允许整份 locale 文件重排或批量重写。",
+      "替换后的定义必须回到模板基线 block 结构，不得混入 reference 工程文案。",
+    ],
+    proposedEdits: [
+      "核对对应 locale 的 `main.ftl` 中 `cleanroom-item-pane-section-header` 是否被写成直接值或错误 attribute。",
+      "若 key 仍存在但结构漂移，优先替换该 key 的定义块，而不是重写整份文件。",
+    ],
+    verificationContract: {
+      summary: "补丁后必须确认 locale FTL 结构漂移计数归零。",
+      checks: [
+        {
+          id: "locale-ftl-structure-drift-count",
+          label: "Locale FTL 结构漂移计数",
+          kind: "all-cycle-check",
+          field: "localeFTLStructureDriftCount",
+          operator: "equals",
+          expected: 0,
+          detail: "所有轮次的 E2E checks.localeFTLStructureDriftCount 都应为 0。",
+        },
+        ...buildObservationChecks({
+          cycleFailures: true,
+          errorLogs: true,
+        }),
+      ],
+    },
+    resolveDrafts(diagnosis) {
+      return buildLocaleFTLStructureReplaceDraft({
+        diagnosis,
+        expectedKey: "cleanroom-item-pane-section-header",
+        summary: "修正 ItemPane Section Header 的 FTL 结构漂移。",
+      });
+    },
+  },
+  {
+    id: "localization-item-pane-section-sidenav-ftl-structure",
+    fingerprints: ["localization:item-pane-section-sidenav-ftl-structure-drift"],
+    category: "localization-resource-drift",
+    feature: "localization",
+    featureLabel: "本地化引用修正",
+    mode: "review-only",
+    description: "允许修正 ItemPane Section Sidenav 的 FTL 结构漂移，但仅限目标 locale 的 `main.ftl` 中该 key 的 canonical block 替换。",
+    allowedTargets: [
+      "addon-static/locale/en-US/main.ftl",
+      "addon-static/locale/zh-CN/main.ftl",
+      "addon-static/locale/zh-TW/main.ftl",
+    ],
+    guardrails: [
+      "只允许替换单条基线 key 的定义块，不允许整份 locale 文件重排或批量重写。",
+      "替换后的定义必须回到模板基线 block 结构，不得混入 reference 工程文案。",
+    ],
+    proposedEdits: [
+      "核对对应 locale 的 `main.ftl` 中 `cleanroom-item-pane-section-sidenav` 是否被写成直接值或错误 attribute。",
+      "若 key 仍存在但结构漂移，优先替换该 key 的定义块，而不是重写整份文件。",
+    ],
+    verificationContract: {
+      summary: "补丁后必须确认 locale FTL 结构漂移计数归零。",
+      checks: [
+        {
+          id: "locale-ftl-structure-drift-count",
+          label: "Locale FTL 结构漂移计数",
+          kind: "all-cycle-check",
+          field: "localeFTLStructureDriftCount",
+          operator: "equals",
+          expected: 0,
+          detail: "所有轮次的 E2E checks.localeFTLStructureDriftCount 都应为 0。",
+        },
+        ...buildObservationChecks({
+          cycleFailures: true,
+          errorLogs: true,
+        }),
+      ],
+    },
+    resolveDrafts(diagnosis) {
+      return buildLocaleFTLStructureReplaceDraft({
+        diagnosis,
+        expectedKey: "cleanroom-item-pane-section-sidenav",
+        summary: "修正 ItemPane Section Sidenav 的 FTL 结构漂移。",
+      });
+    },
+  },
+  {
     id: "localization-item-pane-info-row-ftl-value",
     fingerprints: ["localization:item-pane-info-row-ftl-value-drift"],
     category: "localization-resource-drift",
     feature: "localization",
     featureLabel: "本地化引用修正",
     mode: "review-only",
-    description: "允许修正 ItemPane InfoRow 的 FTL value 漂移，但仅限目标 locale 的 `main.ftl` 单行替换。",
+    description: "允许修正 ItemPane InfoRow 的 FTL value 漂移，但仅限目标 locale 的 `main.ftl` 单条定义替换。",
     allowedTargets: [
       "addon-static/locale/en-US/main.ftl",
       "addon-static/locale/zh-CN/main.ftl",
@@ -2628,7 +2880,7 @@ const PATCH_WHITELIST_RULES = [
     ],
     proposedEdits: [
       "核对对应 locale 的 `main.ftl` 中 `cleanroom-item-pane-info-row-label` 的值是否偏离模板基线。",
-      "若只是 value 漂移，优先做单行替换。",
+      "若只是 value 漂移，优先替换该 key 的定义块。",
     ],
     verificationContract: {
       summary: "补丁后必须确认 locale FTL 值漂移计数归零。",
@@ -2663,7 +2915,7 @@ const PATCH_WHITELIST_RULES = [
     feature: "localization",
     featureLabel: "本地化引用修正",
     mode: "review-only",
-    description: "允许修正 ItemPane Section Header 的 FTL value 漂移，但仅限目标 locale 的 `main.ftl` 单行替换。",
+    description: "允许修正 ItemPane Section Header 的 FTL value 漂移，但仅限目标 locale 的 `main.ftl` 单条定义替换。",
     allowedTargets: [
       "addon-static/locale/en-US/main.ftl",
       "addon-static/locale/zh-CN/main.ftl",
@@ -2675,7 +2927,7 @@ const PATCH_WHITELIST_RULES = [
     ],
     proposedEdits: [
       "核对对应 locale 的 `main.ftl` 中 `cleanroom-item-pane-section-header` 的值是否偏离模板基线。",
-      "若只是 value 漂移，优先做单行替换。",
+      "若只是 value 漂移，优先替换该 key 的定义块。",
     ],
     verificationContract: {
       summary: "补丁后必须确认 locale FTL 值漂移计数归零。",
@@ -2710,7 +2962,7 @@ const PATCH_WHITELIST_RULES = [
     feature: "localization",
     featureLabel: "本地化引用修正",
     mode: "review-only",
-    description: "允许修正 ItemPane Section Sidenav 的 FTL value 漂移，但仅限目标 locale 的 `main.ftl` 单行替换。",
+    description: "允许修正 ItemPane Section Sidenav 的 FTL value 漂移，但仅限目标 locale 的 `main.ftl` 单条定义替换。",
     allowedTargets: [
       "addon-static/locale/en-US/main.ftl",
       "addon-static/locale/zh-CN/main.ftl",
@@ -2722,7 +2974,7 @@ const PATCH_WHITELIST_RULES = [
     ],
     proposedEdits: [
       "核对对应 locale 的 `main.ftl` 中 `cleanroom-item-pane-section-sidenav` 的值是否偏离模板基线。",
-      "若只是 value 漂移，优先做单行替换。",
+      "若只是 value 漂移，优先替换该 key 的定义块。",
     ],
     verificationContract: {
       summary: "补丁后必须确认 locale FTL 值漂移计数归零。",
@@ -3747,9 +3999,12 @@ function buildDraftPrecheck(source, draft) {
   if (operation === "replace-block") {
     const bounds = resolveReplaceBlockBounds(source, draft);
     const snippetText = getDraftSnippetText(draft);
-    const exactSnippetPresent = snippetText ? source.includes(String(snippetText).trim()) : false;
+    const matchedBlock = String(bounds.matchedBlock || "");
+    const exactSnippetPresent = snippetText
+      ? matchedBlock === String(snippetText)
+      : false;
     const normalizedSnippetPresent = !exactSnippetPresent && snippetText
-      ? includesNormalized(source, snippetText)
+      ? normalizeForStructuralCompare(matchedBlock) === normalizeForStructuralCompare(snippetText)
       : false;
     const snippetPresent = exactSnippetPresent || normalizedSnippetPresent;
     const context = bounds.startIndex >= 0
@@ -3768,8 +4023,7 @@ function buildDraftPrecheck(source, draft) {
     const blockAnchorMatched = blockAnchorText ? source.includes(blockAnchorText) : true;
     const moduleStructureMatched = allowsImportExportDrift(draft)
       || countModuleBoundaryLines(bounds.matchedBlock) === countModuleBoundaryLines(snippetText);
-    const targetAlreadyPatched = Boolean(draft?.existsText && source.includes(draft.existsText))
-      || snippetPresent;
+    const targetAlreadyPatched = snippetPresent;
     const ok = !targetAlreadyPatched
       && blockAnchorMatched
       && bounds.startCount > 0

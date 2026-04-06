@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "summary": "Default-disabled optional bundle registry. Keep the JS core stable while isolating heavier or product-specific lanes behind explicit contracts and opt-in build steps.",
+  "bundles": [
+    {
+      "id": "react-ui",
+      "enabled": false,
+      "lane": "ts-isolated",
+      "implementationStatus": "implemented",
+      "summary": "Standalone React/TS example window. This bundle stays default-disabled so downstream projects can opt in without forcing React into the template core.",
+      "build": {
+        "scriptName": "build:react-ui",
+        "entry": "src/react-ui/demo-window/entry.tsx",
+        "stylesheet": "src/react-ui/styles/demo.css",
+        "shell": "addon-static/content/react-ui/demo.xhtml",
+        "outputScript": "content/scripts/react-ui-demo.js",
+        "outputStyle": "content/styles/react-ui-demo.css"
+      },
+      "docs": [
+        "docs/OPTIONAL_BUNDLES.md"
+      ]
+    },
+    {
+      "id": "agent-runtime",
+      "enabled": false,
+      "lane": "ts-isolated",
+      "implementationStatus": "planned",
+      "summary": "Planned agent runtime lane for controller/worker orchestration, scoped delegation, and compact context shaping without coupling orchestration to any single provider.",
+      "docs": [
+        "docs/OPTIONAL_BUNDLES.md"
+      ]
+    },
+    {
+      "id": "ai-service",
+      "enabled": false,
+      "lane": "js-core",
+      "implementationStatus": "planned",
+      "summary": "Planned JS-core service lane for provider catalogs, prompt routing, and key-governed degradation that can be reused without importing the agent runtime or React UI.",
+      "docs": [
+        "docs/OPTIONAL_BUNDLES.md"
+      ]
+    }
+  ]
+}

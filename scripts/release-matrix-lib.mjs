@@ -719,6 +719,11 @@ export function buildReleaseMatrixSummary({
   const hostNoiseRuntimeErrors = mergedRuntimeErrors.hostNoiseRuntimeErrors;
   const blockingRuntimeErrorPortrait = formatReleaseRuntimeErrorPortrait(blockingRuntimeErrors);
   const hostNoiseRuntimeErrorPortrait = formatReleaseRuntimeErrorPortrait(hostNoiseRuntimeErrors);
+  const remoteVerificationNeedsLiveRemote = Boolean(
+    normalizedRemoteVerification
+    && normalizedRemoteVerification.status === "passed"
+    && normalizedRemoteVerification.releaseReady !== true
+  );
 
   let status = "passed";
   let statusLabel = "通过";
@@ -739,11 +744,17 @@ export function buildReleaseMatrixSummary({
     summary = "本地元数据与 XPI 完整性已通过，但仍缺少安装态 smoke。";
   } else if (
     normalizedRemoteVerification
-    && (normalizedRemoteVerification.status === "pending" || normalizedRemoteVerification.status === "unconfigured")
+    && (
+      normalizedRemoteVerification.status === "pending"
+      || normalizedRemoteVerification.status === "unconfigured"
+      || remoteVerificationNeedsLiveRemote
+    )
   ) {
     status = "attention";
     statusLabel = "待补验证";
-    summary = normalizedRemoteVerification.summary || "远端发布验证尚未完成。";
+    summary = remoteVerificationNeedsLiveRemote
+      ? (normalizedRemoteVerification.summary || "远端发布验证缺少真实 HTTP(S) 分发证据。")
+      : (normalizedRemoteVerification.summary || "远端发布验证尚未完成。");
   } else if (hostNoiseErrorCount > 0) {
     summary = `本地 stable/beta 发布矩阵已通过；共发现 ${hostNoiseErrorCount} 条宿主噪声，已归类为不阻断发布。`;
   }
@@ -772,7 +783,11 @@ export function buildReleaseMatrixSummary({
   });
   if (
     normalizedRemoteVerification
-    && (normalizedRemoteVerification.status === "pending" || normalizedRemoteVerification.status === "unconfigured")
+    && (
+      normalizedRemoteVerification.status === "pending"
+      || normalizedRemoteVerification.status === "unconfigured"
+      || remoteVerificationNeedsLiveRemote
+    )
   ) {
     attentionIssues.push(`远端发布验证: ${normalizedRemoteVerification.summary || normalizedRemoteVerification.statusLabel}`);
   }
@@ -903,6 +918,8 @@ export function renderReleaseMatrixMarkdown(summary) {
       "",
       `- 状态: \`${summary.remoteVerification.statusLabel || summary.remoteVerification.status || "未知"}\``,
       `- 摘要: ${summary.remoteVerification.summary || "-"}`,
+      `- 证据模式: \`${summary.remoteVerification.evidenceModeLabel || summary.remoteVerification.evidenceMode || "未知"}\``,
+      `- 发布就绪: \`${summary.remoteVerification.releaseReady === true ? "是" : "否"}\``,
       `- update.json: \`${summary.remoteVerification.effectiveUpdateURL || "-"}\``,
       `- 期望 update_link: \`${summary.remoteVerification.expectedUpdateLink || "-"}\``,
       `- 观测 update_link: \`${summary.remoteVerification.observedUpdateLink || "-"}\``,

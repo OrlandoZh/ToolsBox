@@ -1,22 +1,25 @@
 {
   "schemaVersion": 1,
   "status": "active",
-  "summary": "Current project host-visible surfaces for ZOTERO-HOST-WAVE-001. Surface smoke is authoritative for visible host integrations before whole-window screenshots are treated as proof.",
+  "summary": "Current project host-visible surfaces for ZOTERO-HOST-POLISH-WAVE-001. Surface smoke plus live geometry or explicit narrow-width degrade is authoritative before whole-window screenshots are treated as proof.",
   "surfaces": [
     {
       "id": "cleanroom-preferences-pane",
       "contractSurfaceId": "preference-pane",
-      "summary": "Open the cleanroom preference pane from Zotero preferences and verify that the pane root plus core controls render.",
+      "summary": "Open the cleanroom preference pane from Zotero preferences, prove structure smoke, and require at least one live control interaction when pane behavior or pref writeback changes.",
       "ownerPaths": [
         "src/app/host-action-catalog.js",
         "src/app/host-actions.js",
         "src/features/preference-panes.js",
         "src/platform/zotero-host.js",
-        "zotero-scenarios/preferences-surface-smoke.scenario.js"
+        "zotero-scenarios/preferences-surface-smoke.scenario.js",
+        "zotero-scenarios/preferences-control-interaction.scenario.js"
       ],
       "smokeChecks": [
         "Host Action `preferences.openPane` opens the preferences window and selects the requested pane.",
-        "The target preference pane root is visible and at least one core control is ready.",
+        "The target preference pane root is visible and the pane fragment is structurally observable after mounting.",
+        "The target preference pane exposes core controls, preference bindings, or load/localization bridge signals.",
+        "When a change touches preference pane control behavior, pref writeback, or theme mode, at least one live control interaction replays the real control and verifies writeback.",
         "A surface-local evidence target is returned for the selected preference pane."
       ],
       "visualEvidencePolicy": "required"
@@ -33,8 +36,10 @@
         "zotero-scenarios/item-pane-surface-smoke.scenario.js"
       ],
       "smokeChecks": [
-        "Host Action `itemPane.selectPane` scrolls or switches to the requested pane.",
-        "The target pane is visible in the Item Pane container after selection.",
+        "Host Action `itemPane.selectPane` can run in `ui-required` mode and replay the live Item Pane sidenav button action.",
+        "The target pane is visible in the Item Pane container after selection and its fragment is mounted.",
+        "The matching Item Pane sidenav button remains discoverable in the live host.",
+        "If a custom surface is edge-attached inside the Item Pane, it follows live pane bounds or explicitly degrades below a minimum viable width.",
         "A surface-local evidence target is returned for the selected Item Pane surface."
       ],
       "visualEvidencePolicy": "required"
@@ -42,7 +47,7 @@
     {
       "id": "cleanroom-context-pane-sidenav",
       "contractSurfaceId": "context-pane",
-      "summary": "Open the right context pane and switch to the requested context pane section for the active reader tab.",
+      "summary": "Open the right context pane and switch to the requested context pane section for the active reader tab; edge-attached layouts should follow the live pane bounds.",
       "ownerPaths": [
         "src/app/host-action-catalog.js",
         "src/app/host-actions.js",
@@ -52,7 +57,9 @@
       ],
       "smokeChecks": [
         "Host Action `contextPane.setOpen` opens the right context pane.",
-        "Host Action `contextPane.selectPane` makes the requested pane visible in the active context pane container.",
+        "The opened context pane exposes root or sidenav structure plus navigation/content signals.",
+        "Host Action `contextPane.selectPane` can run in `ui-required` mode and replay the live context pane button action before the target pane becomes visible.",
+        "If a custom surface uses edge-mode occupancy inside the context pane, it follows live pane bounds or explicitly degrades when the pane is too narrow.",
         "A surface-local evidence target is returned for the selected context pane surface."
       ],
       "visualEvidencePolicy": "required"
@@ -69,7 +76,8 @@
       ],
       "smokeChecks": [
         "A live reader instance is opened through Host Action `reader.open`.",
-        "The renderToolbar integration becomes visible in the reader toolbar.",
+        "Host Action `reader.toolbar.triggerButton` replays a live renderToolbar button action in the reader.",
+        "The renderToolbar integration becomes visible in the reader toolbar and the post-action result is observable.",
         "A surface-local evidence target is returned for the toolbar surface."
       ],
       "visualEvidencePolicy": "required"
@@ -77,7 +85,7 @@
     {
       "id": "cleanroom-reader-sidebar-view",
       "contractSurfaceId": "reader-sidebar-view",
-      "summary": "Switch the active Reader sidebar view and verify that the requested sidebar surface is selected and ready.",
+      "summary": "Switch the active Reader sidebar view and verify that the requested sidebar surface is selected, ready, and geometry-aware when edge-attached.",
       "ownerPaths": [
         "src/app/host-action-catalog.js",
         "src/app/host-actions.js",
@@ -85,8 +93,10 @@
         "zotero-scenarios/reader-surface-smoke.scenario.js"
       ],
       "smokeChecks": [
-        "Host Action `reader.sidebar.selectView` selects the requested reader sidebar view.",
-        "The selected sidebar view is observed in the live reader state or DOM.",
+        "Host Action `reader.sidebar.selectView` can run in `ui-required` mode and replay the live sidebar button action.",
+        "The selected sidebar view is observed in the live reader state and on a real button or panel surface.",
+        "The active sidebar surface exposes structure or content signals instead of only a state-field match.",
+        "If a custom surface is attached to the sidebar edge, it follows live sidebar bounds or explicitly degrades below a minimum viable size.",
         "A surface-local evidence target is returned for the active reader sidebar view."
       ],
       "visualEvidencePolicy": "required"
@@ -104,8 +114,10 @@
       ],
       "smokeChecks": [
         "Host Action `menu.show` opens the live host menu for the requested target.",
-        "The registered menu item becomes visible in the live menu popup.",
-        "Host Action `menu.trigger` dispatches the live menu command and returns a local evidence target."
+        "The registered menu item becomes visible and actionable in the live menu popup.",
+        "The popup exposes real menu structure or item content once opened.",
+        "Host Action `menu.trigger` replays the live menu action and a follow-up result becomes observable.",
+        "A surface-local evidence target is returned for the triggered menu item."
       ],
       "visualEvidencePolicy": "required"
     }

@@ -23,7 +23,7 @@
 - runner 通过 `consoleActor.evaluateJSAsync + Promise.resolve(...) + Services.tm.spinEventLoopUntil(...)` 在 Zotero chrome 侧同步等待异步表达式完成，避免 RDP 返回 `Promise<pending>` 干扰 agent 判定
 - 已额外在干净 profile 中验证：打包产物 `dist/cleanroomtemplate-0.1.0.xpi` 通过 Zotero “Install Add-on From File” 安装后，会自动进入原生 bootstrap 生命周期，并挂出 `Zotero.CleanroomTemplate.api`
 - `npm run zotero:test` 当前会验证 3 条真机断言：插件实例挂载、baseline API 暴露、默认 `ItemPane / ItemTree / Reader 菜单` demo 已进入 Zotero 原生管理器或注册表
-- `npm run zotero:scenario` 当前会验证 11 条真机场景：baseline 注册、真实条目选择、真实条目修改触发 Notifier、真实 PDF Reader 打开、Reader 交互摘要、Reader 批注回环、Reader renderToolbar 事件桥、Reader 细粒度浮层/上下文菜单探针、settings schema 与偏好设置面板诊断、多窗口挂载、无阻塞 agent 动作
+- `npm run zotero:scenario` 当前会验证 12 条真机场景：baseline 注册、真实条目选择、真实条目修改触发 Notifier、真实 PDF Reader 打开、Reader 交互摘要、Reader 批注回环、Reader renderToolbar 事件桥、Reader 细粒度浮层/上下文菜单探针、settings schema 与偏好设置面板诊断、preference pane live control interaction、多窗口挂载、无阻塞 agent 动作
 - `npm run zotero:watch` 当前已验证：启动健康检查通过；一次真实热重载后会刷新 `dist/zotero-watch-status.json` 与 `dist/zotero-watch-status.md`；一次受控构建失败后会先进入 `runtime-recovery`，并已在强制注入 runtime 恢复失败的情况下实测通过 `session-restart-recovery`
 - `npm run agent:zotero:watch-recovery` 当前已验证：可在真机中自动完成“启动 watch -> 注入一次性 build 失败 -> 注入一次性 runtime 恢复失败 -> 观测 session-restart-recovery 成功”的受控回归，并输出独立恢复报告
 - `agent:monitor` / `agent:dashboard` / `agent:gate` 已接入 `dist/zotero-watch-status.json`：agent 主报告会展示热重载状态、状态时间与简单问题摘要；开发档位门禁会额外识别“健康但已过期”或“时间超前”的旧状态，避免误把陈旧/异常结果当成当前可用结论
@@ -150,7 +150,10 @@ npm run export:project
   - 最终输出 `dist/agent-zotero-autofix.json` 与 `dist/agent-zotero-autofix.md`
 - `npm run zotero:scenario`
   - 单独执行 `zotero-scenarios/*.scenario.js`
+  - 当前采用“注册一次 -> 逐场景执行”的 runner 模型，不再把整包场景当成单次黑盒求值
   - 当前默认场景已经覆盖真实 Zotero 数据路径，而不只是 demo 假数据
+  - 支持 `--list-scenarios`、`--scenario <pattern>`、`--scenario-file <pattern>` 做最小复现
+  - 每次执行会写出 `dist/zotero-scenario-last-run.json` 与 `dist/zotero-scenario-last-run.md`
   - 适合对“插件动作链路”做更细粒度的真机回归，而不必每次都跑完整 E2E
 
 ## 工件隔离
@@ -166,6 +169,7 @@ npm run export:project
 - `agent-zotero-loop.{json,md}`
 - `zotero-watch-recovery-regression.{json,md}`
 - `agent-zotero-autofix.{json,md}`
+- `zotero-scenario-last-run.{json,md}`
 
 另有一组 Obsidian 人工介入工件默认写到独立目录 `obsidian/agent-workbench/`，不放进 `dist/`：
 
@@ -229,6 +233,91 @@ AGENT_OBSIDIAN_DIR=/tmp/addon-template-obsidian npm run agent:zotero:loop:human
 - 正式安装路径目前仅确认到 `Zotero 8.0.2-beta.5+c35d7f21e`，发布前仍应对目标稳定版/目标 beta 版本各回归一次
 - 目前只验证了默认 demo 已注册到原生管理器或菜单注册表，还没有对 `ItemPane`/`ItemTree`/`Reader` 的最终视觉呈现做像素级 UI 回归
 - `Reader` 当前已经覆盖“生成 PDF -> 导入附件 -> 打开真实 reader -> 读取摘要/交互快照/UI 状态 -> 创建/更新/删除批注并回读”的路径，但还没有进入 reader iframe 内部事件或 UI 注入层
+
+## Host Action Replay
+
+当前模板已为 current active host-visible surface 补上一层 source-aligned action replay，用来证明“真实动作被回放”以及“动作后的结果可观察”，但它不是 strict visual 的替代品。
+
+本轮对齐的 Zotero 依据固定来自：
+
+- `reference/zotero-main/test/tests/pluginAPITest.js`
+  - `simulateMenuOpen()`
+  - `simulateMenuClosed()`
+  - `simulateMenuItemClick()`
+- `reference/zotero-main/test/tests/itemPaneTest.js`
+  - `waitForDOMEvent(popup, "popupshown")`
+  - `menu.click()`
+- `reference/zotero-main/test/content/support.js`
+  - `dialog.getButton(button).click()`
+
+当前动作优先级固定为：
+
+- 宿主公开方法 / 已有 host action
+- live `button.click()`
+- synthetic `dispatchEvent(new MouseEvent("click"))`
+- 菜单场景下的 `command` + `popupshown` / `popuphidden` 同构回放
+
+当前覆盖的 active surfaces：
+
+- `preference-pane`（通过 live control interaction 验证 textbox / menulist / checkbox 写回，不再只认 `preferences.openPane`）
+- `menu-item`
+- `render-toolbar`
+- `reader-sidebar-view`
+- `item-pane-sidenav`
+- `context-pane`
+
+当前非目标：
+
+- 不做通用 UI 宏录制
+- 不做全仓任意按钮点击器
+- 不把 `preference-pane` 强行改成按钮动作 surface
+- 不让 action replay 代替 surface smoke、surface-local evidence 或 strict visual
+
+## 场景过滤执行
+
+当前 `zotero:scenario` 已支持按文件和按场景名切分执行：
+
+```bash
+npm run zotero:scenario -- --list-scenarios
+npm run zotero:scenario -- --scenario "menu surface smoke"
+npm run zotero:scenario -- --scenario-file "reader-*"
+npm run zotero:scenario -- --scenario-file "reader-*" --scenario "reader surface smoke"
+```
+
+固定语义：
+
+- `--scenario-file` 先按 `zotero-scenarios/*.scenario.js` 的相对路径或文件名做 substring / glob 过滤
+- `--scenario` 再按 `registerZoteroScenario(name, run)` 的 `name` 做 substring / glob 过滤
+- `--list-scenarios` 只加载并打印 `scenario name -> source file` 映射，不执行场景
+- filtered `zotero:scenario` 只用于调试和最小复现，不替代 full `zotero:scenario` 或 `agent:zotero:e2e` 的 current truth
+
+推荐调试顺序：
+
+1. `npm run zotero:scenario -- --list-scenarios`
+2. `npm run zotero:scenario -- --scenario-file <pattern>` 或 `--scenario <pattern>`
+3. `npm run zotero:scenario`
+4. `npm run agent:zotero:e2e`
+
+## Timeout Taxonomy
+
+当前 runner / scenario 闭环会把“启动前超时”、“Chrome 求值超时”和“scenario helper 自身超时”分开记录：
+
+- `child-exit-before-rdp`
+  - Zotero 子进程在 RDP 建联前退出
+- `rdp-connect-timeout`
+  - Zotero 存活但 RDP 端口未在重试窗口内就绪
+- `chrome-evaluation-timeout`
+  - RDP 已连接，但 `evaluateInChrome(...)` 没在预算内收到 `evaluationResult`
+- `scenario-helper-timeout`
+  - 场景内部 `helpers.waitFor(...)` 或同类 helper 等待超时
+- `scenario-cleanup-failed`
+  - 场景主体已返回或已失败，但 cleanup 阶段仍抛错
+
+当出现 `chrome-evaluation-timeout` 或同等级 runner 级故障时：
+
+- `zotero:scenario` 会保留此前已完成的 partial results
+- `lastStartedScenario` / `lastCompletedScenario` 会写入 `zotero-scenario-last-run.{json,md}`
+- `agent:zotero:e2e` 会把当前 cycle 标成失败，并在场景摘要中保留 `execution.incomplete` 元数据
 
 ## 编写 Zotero 内测试
 

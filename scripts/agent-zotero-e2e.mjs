@@ -61,9 +61,10 @@ import {
   writeJSONArtifact,
 } from "./script-runtime-lib.mjs";
 import { resolveZoteroE2EArtifacts } from "./zotero-agent-artifacts.mjs";
-import { inspectBaselineItemPaneLocaleFiles } from "./agent-zotero-locale-lib.mjs";
+import { inspectBaselineMainLocaleFiles } from "./agent-zotero-locale-lib.mjs";
 import { inspectStaticRuntimeBaselineFiles } from "./static-runtime-baseline-lib.mjs";
 import { summarizeE2EReport } from "./agent-zotero-validation-lib.mjs";
+import { runIntegratedScenarios as runIntegratedScenarioBatch } from "./zotero-scenario-runner-lib.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -102,6 +103,26 @@ const VISUAL_CAPTURE_POLICY = Object.freeze({
     }),
   }),
 });
+const VISUAL_CAPTURE_EVAL_TIMEOUT_MS = Object.freeze({
+  prepareState: 45000,
+  settleStage: 20000,
+  cleanupState: 20000,
+  focusWindow: 20000,
+  hostAction: 30000,
+  toolbarMarker: 20000,
+  surfaceTarget: 20000,
+});
+const VISUAL_LIBRARY_STAGE_TIMEOUTS_MS = Object.freeze({
+  stabilizeHostSurface: 3000,
+  selectLibrary: 5000,
+  waitForItemsLoad: 5000,
+  selectItem: 5000,
+  waitForSelection: 5000,
+  waitForPaint: 2000,
+  inspectItem: 3000,
+});
+const VISUAL_SURFACE_CAPTURE_DELAY_MS = 520;
+const VISUAL_READER_PREPARE_TIMEOUT_MS = 8000;
 const ADDITIVE_E2E_SUMMARY_FIELDS = Object.freeze([
   "status",
   "statusLabel",
@@ -109,6 +130,11 @@ const ADDITIVE_E2E_SUMMARY_FIELDS = Object.freeze([
   "ageText",
   "testFailed",
   "scenarioFailed",
+  "scenarioExecutionObserved",
+  "scenarioIncompleteCycleCount",
+  "scenarioTimeoutKinds",
+  "scenarioLastStartedScenario",
+  "scenarioLastCompletedScenario",
   "logErrorCount",
   "logWarnCount",
   "visualDriftCount",
@@ -197,6 +223,23 @@ function parseChromeEvalResult(rawResult) {
   return rawResult;
 }
 
+async function pathExists(targetPath) {
+  try {
+    await fs.access(targetPath);
+    return true;
+  }
+  catch {
+    return false;
+  }
+}
+
+async function evaluateCaptureInChrome(rdp, expression, options = {}) {
+  return await rdp.evaluateInChrome(expression, {
+    label: options.label,
+    timeoutMs: options.timeoutMs,
+  });
+}
+
 function pickAdditiveE2ESummaryFields(report) {
   const summary = summarizeE2EReport(report);
   const picked = {};
@@ -234,7 +277,10 @@ async function step(name, fn) {
   }
   catch (error) {
     const message = error?.message || String(error);
-    throw new Error(`[${name}] ${message}`);
+    throw wrapScriptError(error, {
+      failedStage: name,
+      message: `[${name}] ${message}`,
+    });
   }
 }
 
@@ -564,14 +610,6 @@ async function discoverZoteroTests() {
   );
 }
 
-async function discoverZoteroScenarios() {
-  const scenarioRoot = path.join(projectRoot, "zotero-scenarios");
-  return await findFilesRecursive(
-    scenarioRoot,
-    (filePath) => filePath.endsWith(".scenario.js"),
-  );
-}
-
 async function runIntegratedTests({ rdp, config }) {
   const testFiles = await discoverZoteroTests();
   if (testFiles.length === 0) {
@@ -597,45 +635,6 @@ async function runIntegratedTests({ rdp, config }) {
     const scope = {};
     Services.scriptloader.loadSubScript(${JSON.stringify(harnessHref)}, scope);
     return await scope.runCleanroomZoteroTests(${JSON.stringify({
-      fileHrefs,
-      addonConfig: minimalConfig,
-    })});
-  })()`;
-
-  const rawResult = await rdp.evaluateInChrome(expression);
-  const parsedResult = parseChromeEvalResult(rawResult);
-  return {
-    ...parsedResult.summary,
-    results: parsedResult.results,
-    skipped: false,
-  };
-}
-
-async function runIntegratedScenarios({ rdp, config }) {
-  const scenarioFiles = await discoverZoteroScenarios();
-  if (scenarioFiles.length === 0) {
-    return {
-      total: 0,
-      passed: 0,
-      failed: 0,
-      results: [],
-      skipped: true,
-    };
-  }
-
-  const harnessHref = toFileHref(path.join(projectRoot, "scripts", "zotero-scenario-runtime.js"));
-  const fileHrefs = scenarioFiles.map((filePath) => toFileHref(filePath));
-  const minimalConfig = {
-    addonId: config.addonId,
-    addonName: config.addonName,
-    addonRef: config.addonRef,
-    instanceKey: config.instanceKey,
-  };
-
-  const expression = `(async () => {
-    const scope = {};
-    Services.scriptloader.loadSubScript(${JSON.stringify(harnessHref)}, scope);
-    return await scope.runCleanroomZoteroScenarios(${JSON.stringify({
       fileHrefs,
       addonConfig: minimalConfig,
     })});
@@ -879,7 +878,7 @@ ${xrefOffset}
 }
 
 async function prepareVisualState({ rdp, config, stage }) {
-  const payload = await rdp.evaluateInChrome(`(async () => {
+  const payload = await evaluateCaptureInChrome(rdp, `(async () => {
     const ensureLibraryVisualStageReady = ${ensureLibraryVisualStageReady.toString()};
     const STATE_KEY = "__CLEANROOM_AGENT_VISUAL_STATE__";
     const plugin = Zotero[${JSON.stringify(config.instanceKey)}];
@@ -958,6 +957,49 @@ async function prepareVisualState({ rdp, config, stage }) {
         await new Promise((resolve) => setTimeout(resolve, intervalMs));
       }
       return lastValue;
+    };
+
+    const runTimedStep = async (label, handler, options = {}) => {
+      const timeoutMs = Number.isFinite(options.timeoutMs)
+        ? Number(options.timeoutMs)
+        : 2000;
+      let timeoutHandle = null;
+      try {
+        return await Promise.race([
+          Promise.resolve()
+            .then(() => handler())
+            .then((value) => ({
+              label,
+              ok: true,
+              timedOut: false,
+              message: null,
+              value,
+            }))
+            .catch((error) => ({
+              label,
+              ok: false,
+              timedOut: false,
+              message: String(error?.message || error),
+              value: null,
+            })),
+          new Promise((resolve) => {
+            timeoutHandle = setTimeout(() => {
+              resolve({
+                label,
+                ok: false,
+                timedOut: true,
+                message: String(label || "step") + " timed out after " + String(timeoutMs) + "ms",
+                value: null,
+              });
+            }, timeoutMs);
+          }),
+        ]);
+      }
+      finally {
+        if (timeoutHandle !== null) {
+          clearTimeout(timeoutHandle);
+        }
+      }
     };
 
     const waitForLibraryViews = async () => {
@@ -1166,17 +1208,23 @@ async function prepareVisualState({ rdp, config, stage }) {
     };
 
     const settleReader = async (reader) => {
-      if (reader?._initPromise && typeof reader._initPromise.then === "function") {
-        await reader._initPromise;
-      }
-      const primaryViewPromise = reader?._internalReader?._primaryView?.initializedPromise;
-      if (primaryViewPromise && typeof primaryViewPromise.then === "function") {
-        await primaryViewPromise;
-      }
+      const readyReader = typeof plugin?.api?.reader?.waitForReaderReady === "function"
+        ? await plugin.api.reader.waitForReaderReady(reader, {
+          timeoutMs: ${VISUAL_READER_PREPARE_TIMEOUT_MS},
+          intervalMs: 50,
+        })
+        : reader;
+      const targetReader = readyReader || reader;
       const readerFrameWindow = await waitFor(() => {
-        return reader?._internalReader?._primaryView?._iframeWindow || reader?._iframeWindow || null;
+        if (typeof plugin?.api?.reader?.getReaderFrameWindow === "function") {
+          const frameWindow = plugin.api.reader.getReaderFrameWindow(targetReader, { view: "primary" });
+          if (frameWindow) {
+            return frameWindow;
+          }
+        }
+        return targetReader?._internalReader?._primaryView?._iframeWindow || targetReader?._iframeWindow || null;
       }, {
-        timeoutMs: 3000,
+        timeoutMs: ${VISUAL_READER_PREPARE_TIMEOUT_MS},
         intervalMs: 50,
       });
       if (readerFrameWindow?.document) {
@@ -1185,7 +1233,7 @@ async function prepareVisualState({ rdp, config, stage }) {
             ? true
             : null;
         }, {
-          timeoutMs: 3000,
+          timeoutMs: ${VISUAL_READER_PREPARE_TIMEOUT_MS},
           intervalMs: 50,
         });
         await new Promise((resolve) => {
@@ -1197,6 +1245,108 @@ async function prepareVisualState({ rdp, config, stage }) {
       }
     };
 
+    const normalizeReaderVisualShell = async () => {
+      if (state.readerVisualShellNormalized === true) {
+        return state.readerVisualShellNormalization || null;
+      }
+
+      const targetWindow = Zotero.getMainWindow();
+      const tabs = targetWindow?.Zotero_Tabs;
+      const normalization = {
+        selectedLibraryTab: false,
+        closedTrackedReader: false,
+        contextPaneClosed: null,
+        stepResults: [],
+      };
+      const recordStep = (outcome) => {
+        if (!outcome || typeof outcome !== "object") {
+          return;
+        }
+        normalization.stepResults.push({
+          label: String(outcome.label || "").trim() || null,
+          ok: outcome.ok === true,
+          timedOut: outcome.timedOut === true,
+          message: typeof outcome.message === "string" && outcome.message
+            ? outcome.message
+            : null,
+        });
+      };
+
+      if (tabs) {
+        const selectLibraryOutcome = await runTimedStep("select-library-tab", async () => {
+          if (typeof tabs.select === "function") {
+            const result = tabs.select("zotero-pane", false, {
+              keepTabFocused: false,
+            });
+            if (result && typeof result.then === "function") {
+              await result;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            return true;
+          }
+          if ("selectedID" in tabs) {
+            tabs.selectedID = "zotero-pane";
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            return true;
+          }
+          return false;
+        }, {
+          timeoutMs: 2000,
+        });
+        recordStep(selectLibraryOutcome);
+        normalization.selectedLibraryTab = selectLibraryOutcome.ok === true
+          && selectLibraryOutcome.timedOut !== true
+          && selectLibraryOutcome.value === true;
+      }
+
+      if (state.attachmentID && typeof plugin?.api?.reader?.closeByItemID === "function") {
+        const closeTrackedReaderOutcome = await runTimedStep("close-tracked-reader", async () => {
+          plugin.api.reader.closeByItemID(state.attachmentID);
+          await waitFor(() => {
+            return plugin.api.reader.getByItemID?.(state.attachmentID)
+              ? null
+              : true;
+          }, {
+            timeoutMs: 2000,
+            intervalMs: 50,
+          });
+          return true;
+        }, {
+          timeoutMs: 2200,
+        });
+        recordStep(closeTrackedReaderOutcome);
+        normalization.closedTrackedReader = closeTrackedReaderOutcome.ok === true
+          && closeTrackedReaderOutcome.timedOut !== true
+          && closeTrackedReaderOutcome.value === true;
+      }
+
+      if (typeof plugin?.api?.host?.setContextPaneOpen === "function") {
+        const contextPaneOutcome = await runTimedStep("close-context-pane", async () => {
+          return await plugin.api.host.setContextPaneOpen(false, {
+            window: targetWindow,
+            timeoutMs: 2000,
+          });
+        }, {
+          timeoutMs: 2200,
+        });
+        recordStep(contextPaneOutcome);
+        if (contextPaneOutcome.ok === true && contextPaneOutcome.timedOut !== true) {
+          normalization.contextPaneClosed = contextPaneOutcome.value?.open === false;
+        }
+      }
+      else if (targetWindow?.ZoteroContextPane) {
+        try {
+          targetWindow.ZoteroContextPane.collapsed = true;
+          normalization.contextPaneClosed = targetWindow.ZoteroContextPane.collapsed === true;
+        }
+        catch {}
+      }
+
+      state.readerVisualShellNormalized = true;
+      state.readerVisualShellNormalization = normalization;
+      return normalization;
+    };
+
     const resolveReadyReaderSummary = () => {
       const summary = typeof plugin.api.agent.describeReader === "function"
         ? plugin.api.agent.describeReader(state.attachmentID)
@@ -1204,6 +1354,10 @@ async function prepareVisualState({ rdp, config, stage }) {
       if (!summary || Number(summary?.itemID || 0) !== Number(state.attachmentID)) {
         return null;
       }
+      const selectedTabID = readSelectedTabID();
+      const selectedTabMatched = summary?.tabID && selectedTabID
+        ? selectedTabID === summary.tabID
+        : null;
       if (typeof plugin.api.agent.inspectReader === "function") {
         const snapshot = plugin.api.agent.inspectReader(state.attachmentID);
         if (!snapshot) {
@@ -1212,11 +1366,22 @@ async function prepareVisualState({ rdp, config, stage }) {
         if (snapshot.active !== true) {
           return null;
         }
-        if (snapshot.hasMatchingWindowState === false) {
+        if (snapshot.hasMatchingWindowState === false && selectedTabMatched !== true) {
           return null;
         }
+        return {
+          summary,
+          snapshot,
+          selectedTabID,
+          selectedTabMatched,
+        };
       }
-      return summary;
+      return {
+        summary,
+        snapshot: null,
+        selectedTabID,
+        selectedTabMatched,
+      };
     };
 
     if (!state.itemID) {
@@ -1240,6 +1405,13 @@ async function prepareVisualState({ rdp, config, stage }) {
         waitForViews: waitForLibraryViews,
         selectLibrary: selectLibraryRoot,
         waitForItemsLoad: waitForItemsViewLoad,
+        stabilizeHostSurfaceTimeoutMs: ${VISUAL_LIBRARY_STAGE_TIMEOUTS_MS.stabilizeHostSurface},
+        selectLibraryTimeoutMs: ${VISUAL_LIBRARY_STAGE_TIMEOUTS_MS.selectLibrary},
+        waitForItemsLoadTimeoutMs: ${VISUAL_LIBRARY_STAGE_TIMEOUTS_MS.waitForItemsLoad},
+        selectItemTimeoutMs: ${VISUAL_LIBRARY_STAGE_TIMEOUTS_MS.selectItem},
+        waitForSelectionTimeoutMs: ${VISUAL_LIBRARY_STAGE_TIMEOUTS_MS.waitForSelection},
+        waitForPaintTimeoutMs: ${VISUAL_LIBRARY_STAGE_TIMEOUTS_MS.waitForPaint},
+        inspectItemTimeoutMs: ${VISUAL_LIBRARY_STAGE_TIMEOUTS_MS.inspectItem},
         selectItem,
         waitForSelection: waitForSingleSelection,
         waitForPaint: waitForMainWindowPaint,
@@ -1279,6 +1451,14 @@ async function prepareVisualState({ rdp, config, stage }) {
       state.attachmentID = attachment.id;
     }
 
+    const readerPreparation = {
+      shellNormalization: await normalizeReaderVisualShell(),
+      openReader: null,
+      activateReaderTab: null,
+      closeContextPane: null,
+      settleReader: null,
+    };
+
     const activeReaderSummary = typeof plugin.api.reader.getActiveSummary === "function"
       ? plugin.api.reader.getActiveSummary()
       : null;
@@ -1286,26 +1466,158 @@ async function prepareVisualState({ rdp, config, stage }) {
       ? plugin.api.reader.getByItemID(state.attachmentID)
       : null;
     const shouldOpenReader = !existingReader || Number(activeReaderSummary?.itemID || 0) !== Number(state.attachmentID);
-    const reader = shouldOpenReader
-      ? await plugin.api.reader.openReader({
-        itemID: state.attachmentID,
-        openInBackground: false,
+    const openReaderOutcome = shouldOpenReader
+      ? await runTimedStep("open-reader", async () => {
+        return await plugin.api.reader.openReader({
+          itemID: state.attachmentID,
+          openInBackground: false,
+        });
+      }, {
+        timeoutMs: ${VISUAL_READER_PREPARE_TIMEOUT_MS},
       })
-      : existingReader;
-    await activateReaderTab(reader);
-    await settleReader(reader);
-    const readyReaderSummary = await waitFor(resolveReadyReaderSummary, {
-      timeoutMs: 3000,
+      : {
+        label: "reuse-reader",
+        ok: true,
+        timedOut: false,
+        message: null,
+        value: existingReader,
+      };
+    readerPreparation.openReader = {
+      label: openReaderOutcome.label,
+      ok: openReaderOutcome.ok === true,
+      timedOut: openReaderOutcome.timedOut === true,
+      message: openReaderOutcome.message || null,
+      reused: shouldOpenReader !== true,
+    };
+    const reader = openReaderOutcome.value || null;
+    if (!reader) {
+      return {
+        ok: false,
+        stage: "reader",
+        reason: openReaderOutcome.timedOut === true
+          ? "reader-open-timeout"
+          : "reader-open-failed",
+        failureKind: openReaderOutcome.timedOut === true
+          ? "reader-open-timeout"
+          : "reader-open-failed",
+        failureStage: "open-reader",
+        failureMessage: openReaderOutcome.message || "Unable to open reader for visual capture",
+        itemID: state.itemID,
+        attachmentID: state.attachmentID,
+        preparationJSON: JSON.stringify(readerPreparation),
+      };
+    }
+
+    const activateReaderOutcome = await runTimedStep("activate-reader-tab", async () => {
+      const activated = await activateReaderTab(reader);
+      await waitForMainWindowPaint();
+      return {
+        activated,
+        selectedTabID: readSelectedTabID(),
+      };
+    }, {
+      timeoutMs: 2500,
+    });
+    const readerTabID = typeof reader?.tabID === "string" && reader.tabID
+      ? reader.tabID
+      : null;
+    const readerTabMatched = readerTabID
+      ? activateReaderOutcome.value?.selectedTabID === readerTabID
+      : false;
+    readerPreparation.activateReaderTab = {
+      ok: activateReaderOutcome.ok === true,
+      timedOut: activateReaderOutcome.timedOut === true,
+      message: activateReaderOutcome.message || null,
+      activated: activateReaderOutcome.value?.activated === true || readerTabMatched,
+      selectedTabID: activateReaderOutcome.value?.selectedTabID || null,
+    };
+    if (
+      activateReaderOutcome.timedOut === true
+      || activateReaderOutcome.ok !== true
+      || (activateReaderOutcome.value?.activated !== true && readerTabMatched !== true)
+    ) {
+      return {
+        ok: false,
+        stage: "reader",
+        reason: activateReaderOutcome.timedOut === true
+          ? "reader-activate-timeout"
+          : "reader-activate-failed",
+        failureKind: activateReaderOutcome.timedOut === true
+          ? "reader-activate-timeout"
+          : "reader-activate-failed",
+        failureStage: "activate-reader-tab",
+        failureMessage: activateReaderOutcome.message || "Unable to activate reader tab for visual capture",
+        itemID: state.itemID,
+        attachmentID: state.attachmentID,
+        preparationJSON: JSON.stringify(readerPreparation),
+      };
+    }
+
+    if (typeof plugin?.api?.host?.setContextPaneOpen === "function") {
+      const closeContextPaneOutcome = await runTimedStep("close-context-pane-after-open", async () => {
+        return await plugin.api.host.setContextPaneOpen(false, {
+          window: Zotero.getMainWindow(),
+          timeoutMs: ${VISUAL_READER_PREPARE_TIMEOUT_MS},
+        });
+      }, {
+        timeoutMs: ${VISUAL_READER_PREPARE_TIMEOUT_MS},
+      });
+      readerPreparation.closeContextPane = {
+        ok: closeContextPaneOutcome.ok === true,
+        timedOut: closeContextPaneOutcome.timedOut === true,
+        message: closeContextPaneOutcome.message || null,
+        open: closeContextPaneOutcome.value?.open ?? null,
+      };
+      if (closeContextPaneOutcome.ok === true && closeContextPaneOutcome.timedOut !== true) {
+        state.readerVisualContextPaneClosed = closeContextPaneOutcome.value?.open === false;
+      }
+    }
+    await waitForMainWindowPaint();
+    const settleReaderOutcome = await runTimedStep("settle-reader", async () => {
+      await settleReader(reader);
+      return true;
+    }, {
+      timeoutMs: ${VISUAL_READER_PREPARE_TIMEOUT_MS + 500},
+    });
+    readerPreparation.settleReader = {
+      ok: settleReaderOutcome.ok === true,
+      timedOut: settleReaderOutcome.timedOut === true,
+      message: settleReaderOutcome.message || null,
+    };
+    if (settleReaderOutcome.timedOut === true || settleReaderOutcome.ok !== true) {
+      return {
+        ok: false,
+        stage: "reader",
+        reason: settleReaderOutcome.timedOut === true
+          ? "reader-settle-timeout"
+          : "reader-settle-failed",
+        failureKind: settleReaderOutcome.timedOut === true
+          ? "reader-settle-timeout"
+          : "reader-settle-failed",
+        failureStage: "settle-reader",
+        failureMessage: settleReaderOutcome.message || "Unable to settle reader for visual capture",
+        itemID: state.itemID,
+        attachmentID: state.attachmentID,
+        preparationJSON: JSON.stringify(readerPreparation),
+      };
+    }
+    const readyReaderState = await waitFor(resolveReadyReaderSummary, {
+      timeoutMs: ${VISUAL_READER_PREPARE_TIMEOUT_MS},
       intervalMs: 100,
     });
 
+    const readyReaderSummary = readyReaderState?.summary || null;
     const readerSummary = readyReaderSummary || plugin.api.agent.describeReader(state.attachmentID);
     const readerSnapshot = typeof plugin.api.agent.inspectReader === "function"
       ? plugin.api.agent.inspectReader(state.attachmentID)
       : null;
-    const readyReaderSnapshot = readyReaderSummary && typeof plugin.api.agent.inspectReader === "function"
-      ? plugin.api.agent.inspectReader(state.attachmentID)
-      : null;
+    const readyReaderSnapshot = readyReaderState?.snapshot || null;
+    const readyReaderSelectedTabID = readyReaderState?.selectedTabID ?? readSelectedTabID() ?? null;
+    const readyReaderSelectedTabMatched = typeof readyReaderState?.selectedTabMatched === "boolean"
+      ? readyReaderState.selectedTabMatched
+      : (readyReaderSummary?.tabID && readyReaderSelectedTabID
+        ? readyReaderSelectedTabID === readyReaderSummary.tabID
+        : null);
     const uiState = readerSnapshot?.uiState && typeof readerSnapshot.uiState === "object"
       ? readerSnapshot.uiState
       : null;
@@ -1317,6 +1629,7 @@ async function prepareVisualState({ rdp, config, stage }) {
       stage: "reader",
       itemID: state.itemID,
       attachmentID: state.attachmentID,
+      preparationJSON: JSON.stringify(readerPreparation),
       readerJSON: JSON.stringify(readerSummary),
       readerSnapshotJSON: JSON.stringify(readerSnapshot),
       ...(readyReaderSummary
@@ -1328,6 +1641,8 @@ async function prepareVisualState({ rdp, config, stage }) {
             type: readyReaderSummary?.type ?? null,
             annotationCount: Number(readyReaderSummary?.annotationCount || 0),
             active: readyReaderSnapshot?.active ?? null,
+            selectedTabID: readyReaderSelectedTabID,
+            selectedTabMatched: readyReaderSelectedTabMatched,
             hasMatchingWindowState: readyReaderSnapshot?.hasMatchingWindowState ?? null,
             matchingWindowStateCount: Number(readyReaderSnapshot?.matchingWindowStateCount || 0),
             selectedAnnotationCount: Number(readyReaderSnapshot?.selectedAnnotationCount || 0),
@@ -1344,11 +1659,11 @@ async function prepareVisualState({ rdp, config, stage }) {
         }
         : {}),
     };
-  })()`);
+  })()`, {
+    label: `visual:prepare-state:${stage}`,
+    timeoutMs: VISUAL_CAPTURE_EVAL_TIMEOUT_MS.prepareState,
+  });
 
-  if (!payload?.ok) {
-    throw new Error(payload?.reason || `Unable to prepare visual state for ${stage}`);
-  }
   if (typeof payload.summaryJSON === "string") {
     payload.summary = JSON.parse(payload.summaryJSON);
     delete payload.summaryJSON;
@@ -1373,6 +1688,26 @@ async function prepareVisualState({ rdp, config, stage }) {
     payload.settleSnapshot = JSON.parse(payload.settleSnapshotJSON);
     delete payload.settleSnapshotJSON;
   }
+  if (!payload?.ok) {
+    const failureMessage = normalizeMaybeString(payload?.failureMessage)
+      || normalizeMaybeString(payload?.reason)
+      || `Unable to prepare visual state for ${stage}`;
+    const error = attachVisualCaptureFailure(new Error(failureMessage), {
+      failureKind: normalizeMaybeString(payload?.failureKind) || "capture-stage-failed",
+      failureStage: normalizeMaybeString(payload?.failureStage) || `prepare-${stage}`,
+      failureMessage,
+    });
+    error.visualStageState = {
+      stage: normalizeMaybeString(payload?.stage) || stage,
+      itemID: Number(payload?.itemID || 0) || null,
+      attachmentID: Number(payload?.attachmentID || 0) || null,
+      preparation: payload.preparation || null,
+      reader: payload.reader || null,
+      readerSnapshot: payload.readerSnapshot || null,
+      settleSnapshot: payload.settleSnapshot || null,
+    };
+    throw error;
+  }
   return payload;
 }
 
@@ -1382,7 +1717,7 @@ async function settleVisualStageAfterReady({
   stage,
   delayMs,
 }) {
-  const rawResult = await rdp.evaluateInChrome(`(async () => {
+  const rawResult = await evaluateCaptureInChrome(rdp, `(async () => {
     const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     const waitDoubleFrame = async (targetWindow) => {
       const boundRAF = typeof targetWindow?.requestAnimationFrame === "function"
@@ -1415,16 +1750,33 @@ async function settleVisualStageAfterReady({
       ok: true,
       target: "main-window",
     };
-  })()`);
+  })()`, {
+    label: `visual:settle-stage:${stage}`,
+    timeoutMs: VISUAL_CAPTURE_EVAL_TIMEOUT_MS.settleStage,
+  });
 
   return parseChromeEvalResult(rawResult);
 }
 
 async function cleanupVisualState({ rdp, config }) {
-  await rdp.evaluateInChrome(`(async () => {
+  await evaluateCaptureInChrome(rdp, `(async () => {
     const STATE_KEY = "__CLEANROOM_AGENT_VISUAL_STATE__";
     const state = globalThis[STATE_KEY];
     const plugin = Zotero[${JSON.stringify(config.instanceKey)}];
+    const waitFor = async (predicate, options = {}) => {
+      const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : 2000;
+      const intervalMs = Number.isFinite(options.intervalMs) ? options.intervalMs : 50;
+      const startedAt = Date.now();
+      let lastValue = null;
+      while ((Date.now() - startedAt) <= timeoutMs) {
+        lastValue = await predicate();
+        if (lastValue) {
+          return lastValue;
+        }
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      }
+      return lastValue;
+    };
     const toolbarCapture = globalThis.__CLEANROOM_AGENT_READER_TOOLBAR_CAPTURE__;
     if (toolbarCapture?.unregister) {
       try {
@@ -1440,6 +1792,14 @@ async function cleanupVisualState({ rdp, config }) {
     if (state.attachmentID && plugin?.api?.reader?.closeByItemID) {
       try {
         plugin.api.reader.closeByItemID(state.attachmentID);
+        await waitFor(() => {
+          return plugin.api.reader.getByItemID?.(state.attachmentID)
+            ? null
+            : true;
+        }, {
+          timeoutMs: 2000,
+          intervalMs: 50,
+        });
       }
       catch {}
     }
@@ -1465,7 +1825,156 @@ async function cleanupVisualState({ rdp, config }) {
 
     delete globalThis[STATE_KEY];
     return true;
-  })()`);
+  })()`, {
+    label: "visual:cleanup-state",
+    timeoutMs: VISUAL_CAPTURE_EVAL_TIMEOUT_MS.cleanupState,
+  });
+}
+
+async function cleanupVisualShell({ rdp, config }) {
+  const rawResult = await evaluateCaptureInChrome(rdp, `(async () => {
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const waitDoubleFrame = async (targetWindow) => {
+      const boundRAF = typeof targetWindow?.requestAnimationFrame === "function"
+        ? targetWindow.requestAnimationFrame.bind(targetWindow)
+        : ((callback) => setTimeout(callback, 0));
+      await new Promise((resolve) => boundRAF(() => boundRAF(resolve)));
+    };
+    const getAllWindows = () => {
+      const windows = [];
+      const enumerator = Services?.wm?.getEnumerator?.(null);
+      while (enumerator && enumerator.hasMoreElements()) {
+        const candidate = enumerator.getNext();
+        if (candidate && candidate.closed !== true) {
+          windows.push(candidate);
+        }
+      }
+      return windows;
+    };
+    const listPreferenceWindows = () => {
+      const windows = [];
+      const enumerator = Services?.wm?.getEnumerator?.("zotero:pref");
+      while (enumerator && enumerator.hasMoreElements()) {
+        const candidate = enumerator.getNext();
+        if (candidate && candidate.closed !== true) {
+          windows.push(candidate);
+        }
+      }
+      return windows;
+    };
+    const dismissPopup = (popup) => {
+      if (!popup || typeof popup !== "object") {
+        return false;
+      }
+      let touched = false;
+      try {
+        if (typeof popup.hidePopup === "function") {
+          popup.hidePopup();
+          touched = true;
+        }
+      } catch {}
+      try {
+        if ("open" in popup) {
+          popup.open = false;
+          touched = true;
+        }
+      } catch {}
+      try {
+        if (typeof popup.hide === "function") {
+          popup.hide();
+          touched = true;
+        }
+      } catch {}
+      return touched;
+    };
+    const isPopupOpen = (popup) => {
+      if (!popup || typeof popup !== "object") {
+        return false;
+      }
+      const state = String(popup.state || popup.getAttribute?.("state") || "").trim().toLowerCase();
+      if (popup.open === true || state === "open" || state === "showing") {
+        return true;
+      }
+      try {
+        return popup.hasAttribute?.("open") === true;
+      } catch {
+        return false;
+      }
+    };
+
+    const plugin = Zotero[${JSON.stringify(config.instanceKey)}];
+    const mainWindow = typeof Zotero?.getMainWindow === "function"
+      ? Zotero.getMainWindow()
+      : null;
+    let dismissedPopupCount = 0;
+    const seenPopups = new Set();
+
+    for (const window of getAllWindows()) {
+      const doc = window?.document;
+      if (!doc || typeof doc.querySelectorAll !== "function") {
+        continue;
+      }
+      const popups = Array.from(doc.querySelectorAll("menupopup, panel"));
+      for (const popup of popups) {
+        if (!popup || seenPopups.has(popup) || !isPopupOpen(popup)) {
+          continue;
+        }
+        seenPopups.add(popup);
+        if (dismissPopup(popup)) {
+          dismissedPopupCount += 1;
+        }
+      }
+    }
+
+    let closedPreferenceWindowCount = 0;
+    for (const prefWindow of listPreferenceWindows()) {
+      try {
+        prefWindow.close();
+        closedPreferenceWindowCount += 1;
+      }
+      catch {}
+    }
+
+    let contextPaneClosed = null;
+    if (plugin?.api?.host?.setContextPaneOpen && mainWindow) {
+      try {
+        const contextPaneState = await plugin.api.host.setContextPaneOpen(false, {
+          window: mainWindow,
+          timeoutMs: 1500,
+        });
+        contextPaneClosed = contextPaneState?.open === false;
+      }
+      catch {}
+    }
+    else if (mainWindow?.ZoteroContextPane) {
+      try {
+        mainWindow.ZoteroContextPane.collapsed = true;
+        contextPaneClosed = mainWindow.ZoteroContextPane.collapsed === true;
+      }
+      catch {}
+    }
+
+    if (mainWindow && typeof mainWindow.focus === "function") {
+      try {
+        mainWindow.focus();
+      }
+      catch {}
+    }
+    await wait(80);
+    await waitDoubleFrame(mainWindow);
+
+    return {
+      ok: true,
+      dismissedPopupCount,
+      closedPreferenceWindowCount,
+      contextPaneClosed,
+    };
+  })()`, {
+    label: "visual:cleanup-shell",
+    timeoutMs: VISUAL_CAPTURE_EVAL_TIMEOUT_MS.cleanupState,
+  });
+
+  return parseChromeEvalResult(rawResult);
 }
 
 async function getZoteroWindowBounds() {
@@ -1473,8 +1982,12 @@ async function getZoteroWindowBounds() {
     'tell application "Zotero" to activate',
     'tell application "System Events" to tell process "Zotero"',
     'set frontmost to true',
-    'set {xPos, yPos} to position of first window',
-    'set {winWidth, winHeight} to size of first window',
+    'set targetWindow to first window',
+    'try',
+    'perform action "AXRaise" of targetWindow',
+    'end try',
+    'set {xPos, yPos} to position of targetWindow',
+    'set {winWidth, winHeight} to size of targetWindow',
     'return (xPos as string) & "," & (yPos as string) & "," & (winWidth as string) & "," & (winHeight as string)',
     'end tell',
   ];
@@ -1498,6 +2011,41 @@ async function activateZoteroWindowForCapture(activationDelayMs = VISUAL_CAPTURE
   await sleep(Math.max(0, Number(activationDelayMs || 0)));
 }
 
+async function getZoteroQuartzWindowBounds(title = null) {
+  const rawTitle = normalizeMaybeString(title) || "";
+  const script = `
+ObjC.import('CoreGraphics');
+const targetTitle = ${JSON.stringify(rawTitle)};
+const windows = ObjC.deepUnwrap($.CGWindowListCopyWindowInfo($.kCGWindowListOptionOnScreenOnly, $.kCGNullWindowID)) || [];
+const matches = windows
+  .filter((entry) => {
+    const ownerName = String(entry.kCGWindowOwnerName || "");
+    const layer = Number(entry.kCGWindowLayer || 0);
+    const windowTitle = String(entry.kCGWindowName || "");
+    return ownerName === "Zotero" && layer === 0 && (!targetTitle || windowTitle === targetTitle);
+  })
+  .sort((left, right) => {
+    const leftArea = Number(left.kCGWindowBounds?.Width || 0) * Number(left.kCGWindowBounds?.Height || 0);
+    const rightArea = Number(right.kCGWindowBounds?.Width || 0) * Number(right.kCGWindowBounds?.Height || 0);
+    return rightArea - leftArea;
+  });
+const chosen = matches[0] || null;
+JSON.stringify(chosen ? {
+  x: Number(chosen.kCGWindowBounds?.X || 0),
+  y: Number(chosen.kCGWindowBounds?.Y || 0),
+  width: Number(chosen.kCGWindowBounds?.Width || 0),
+  height: Number(chosen.kCGWindowBounds?.Height || 0),
+  title: String(chosen.kCGWindowName || targetTitle || ""),
+  source: "cg-window",
+  windowNumber: Number(chosen.kCGWindowNumber || 0),
+} : null);
+`.trim();
+
+  const { stdout } = await execFileText("osascript", ["-l", "JavaScript", "-e", script]);
+  const payload = JSON.parse(stdout.trim() || "null");
+  return normalizeCaptureWindowBounds(payload);
+}
+
 async function focusChromeCaptureWindow({ rdp, geometry = VISUAL_CAPTURE_WINDOW_GEOMETRY }) {
   if (!rdp) {
     return null;
@@ -1505,7 +2053,7 @@ async function focusChromeCaptureWindow({ rdp, geometry = VISUAL_CAPTURE_WINDOW_
 
   const width = Number.parseInt(String(geometry?.width || VISUAL_CAPTURE_WINDOW_GEOMETRY.width), 10);
   const height = Number.parseInt(String(geometry?.height || VISUAL_CAPTURE_WINDOW_GEOMETRY.height), 10);
-  const rawResult = await rdp.evaluateInChrome(`(() => {
+  const rawResult = await evaluateCaptureInChrome(rdp, `(() => {
     const targetWindow = typeof Zotero?.getMainWindow === "function"
       ? Zotero.getMainWindow()
       : null;
@@ -1532,7 +2080,10 @@ async function focusChromeCaptureWindow({ rdp, geometry = VISUAL_CAPTURE_WINDOW_
       title: String(chromeWindow.document?.title || targetWindow.document?.title || ""),
       source: "chrome-target",
     };
-  })()`);
+  })()`, {
+    label: "visual:focus-window",
+    timeoutMs: VISUAL_CAPTURE_EVAL_TIMEOUT_MS.focusWindow,
+  });
 
   return normalizeCaptureWindowBounds(parseChromeEvalResult(rawResult));
 }
@@ -1547,9 +2098,13 @@ async function setZoteroWindowGeometry(geometry = VISUAL_CAPTURE_WINDOW_GEOMETRY
   const lines = [
     "tell application \"System Events\" to tell process \"Zotero\"",
     "set frontmost to true",
-    `set size of first window to {${width}, ${height}}`,
-    "set {xPos, yPos} to position of first window",
-    "set {winWidth, winHeight} to size of first window",
+    "set targetWindow to first window",
+    `set size of targetWindow to {${width}, ${height}}`,
+    "try",
+    "perform action \"AXRaise\" of targetWindow",
+    "end try",
+    "set {xPos, yPos} to position of targetWindow",
+    "set {winWidth, winHeight} to size of targetWindow",
     "return (xPos as string) & \",\" & (yPos as string) & \",\" & (winWidth as string) & \",\" & (winHeight as string)",
     "end tell",
   ];
@@ -1594,11 +2149,18 @@ async function ensureZoteroWindowReadyForCapture(options = {}) {
     rdp: options.rdp,
     geometry,
   }).catch(() => null);
+  const preferredTitle = normalizeMaybeString(refreshedChromeBounds?.title)
+    || normalizeMaybeString(initialChromeBounds?.title)
+    || null;
+  const quartzBounds = await getZoteroQuartzWindowBounds(preferredTitle).catch(() => null);
+  const genericQuartzBounds = quartzBounds
+    ? null
+    : await getZoteroQuartzWindowBounds().catch(() => null);
   let bounds = null;
   try {
     bounds = await resolveCaptureWindowBounds({
-      preferred: async () => refreshedChromeBounds || initialChromeBounds,
-      fallback: async () => fallbackBounds,
+      preferred: async () => quartzBounds || refreshedChromeBounds || initialChromeBounds,
+      fallback: async () => genericQuartzBounds || fallbackBounds,
     });
   }
   catch (error) {
@@ -1606,7 +2168,7 @@ async function ensureZoteroWindowReadyForCapture(options = {}) {
       failureKind: "window-bounds-unavailable",
       failureCategory: "capture-command-failed",
       failureStage: "resolve-window",
-      bounds: refreshedChromeBounds || initialChromeBounds || fallbackBounds || null,
+      bounds: quartzBounds || genericQuartzBounds || refreshedChromeBounds || initialChromeBounds || fallbackBounds || null,
     });
   }
   await sleep(settleDelayMs);
@@ -1629,9 +2191,13 @@ async function captureZoteroWindow(filePath, options = {}) {
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       let captureBounds = bounds;
+      const captureGeometry = {
+        width: captureBounds?.width || options.geometry?.width || VISUAL_CAPTURE_WINDOW_GEOMETRY.width,
+        height: captureBounds?.height || options.geometry?.height || VISUAL_CAPTURE_WINDOW_GEOMETRY.height,
+      };
       if (!captureBounds) {
         try {
-          captureBounds = await setZoteroWindowGeometry(options.geometry || VISUAL_CAPTURE_WINDOW_GEOMETRY);
+          captureBounds = await setZoteroWindowGeometry(captureGeometry);
         }
         catch (error) {
           throw attachVisualCaptureFailure(error, {
@@ -1641,9 +2207,35 @@ async function captureZoteroWindow(filePath, options = {}) {
           });
         }
       }
+      else {
+        const refreshedBounds = await setZoteroWindowGeometry(captureGeometry).catch(() => null);
+        if (refreshedBounds) {
+          captureBounds = {
+            ...captureBounds,
+            ...refreshedBounds,
+            title: captureBounds.title || refreshedBounds.title || null,
+            source: captureBounds.source || refreshedBounds.source || null,
+          };
+        }
+      }
+      await activateZoteroWindowForCapture(40);
+      const quartzBounds = await getZoteroQuartzWindowBounds(captureBounds?.title || null).catch(() => null);
+      if (quartzBounds) {
+        captureBounds = {
+          ...captureBounds,
+          ...quartzBounds,
+          title: quartzBounds.title || captureBounds?.title || null,
+          source: quartzBounds.source || captureBounds?.source || null,
+        };
+      }
       const rect = `${captureBounds.x},${captureBounds.y},${captureBounds.width},${captureBounds.height}`;
       try {
-        await execFileText("screencapture", ["-x", "-R", rect, filePath]);
+        if (Number.isFinite(captureBounds?.windowNumber) && captureBounds.windowNumber > 0) {
+          await execFileText("screencapture", ["-x", "-o", "-l", String(captureBounds.windowNumber), filePath]);
+        }
+        else {
+          await execFileText("screencapture", ["-x", "-R", rect, filePath]);
+        }
       }
       catch (error) {
         throw attachVisualCaptureFailure(error, {
@@ -1693,7 +2285,7 @@ async function runHostActionInChrome({
   actionId,
   payload = {},
 }) {
-  const rawResult = await rdp.evaluateInChrome(`(async () => {
+  const rawResult = await evaluateCaptureInChrome(rdp, `(async () => {
     const plugin = Zotero[${JSON.stringify(config.instanceKey)}];
     if (!plugin?.api?.agent?.runHostAction) {
       return JSON.stringify({
@@ -1717,12 +2309,15 @@ async function runHostActionInChrome({
       ${JSON.stringify(payload)},
     );
     return JSON.stringify(result);
-  })()`);
+  })()`, {
+    label: `visual:host-action:${actionId}`,
+    timeoutMs: VISUAL_CAPTURE_EVAL_TIMEOUT_MS.hostAction,
+  });
   return parseChromeEvalResult(rawResult);
 }
 
 async function registerReaderToolbarCaptureMarker({ rdp, config }) {
-  const rawResult = await rdp.evaluateInChrome(`(() => {
+  const rawResult = await evaluateCaptureInChrome(rdp, `(() => {
     const key = "__CLEANROOM_AGENT_READER_TOOLBAR_CAPTURE__";
     if (globalThis[key]) {
       return true;
@@ -1751,19 +2346,34 @@ async function registerReaderToolbarCaptureMarker({ rdp, config }) {
     );
     globalThis[key] = { unregister };
     return true;
-  })()`);
+  })()`, {
+    label: "visual:register-toolbar-marker",
+    timeoutMs: VISUAL_CAPTURE_EVAL_TIMEOUT_MS.toolbarMarker,
+  });
   return parseChromeEvalResult(rawResult) === true;
 }
 
 async function resolveReaderToolbarSurfaceTarget({ rdp, config }) {
-  const rawResult = await rdp.evaluateInChrome(`(() => {
+  const rawResult = await evaluateCaptureInChrome(rdp, `(() => {
     const state = globalThis.__CLEANROOM_AGENT_VISUAL_STATE__ || {};
     const plugin = Zotero[${JSON.stringify(config.instanceKey)}];
     const attachmentID = Number(state?.attachmentID || 0);
     if (!attachmentID || !plugin?.api?.reader || !plugin?.api?.host) {
       return JSON.stringify(null);
     }
-    const element = plugin.api.reader.findToolbarElement(attachmentID);
+    const element = plugin.api.reader.findToolbarElement(attachmentID, {
+      selector: "[data-cleanroom-reader-toolbar-marker]",
+    })
+      || plugin.api.reader.findToolbarElement(attachmentID, {
+        selector: "#sidebarToggleButton",
+      })
+      || plugin.api.reader.findToolbarElement(attachmentID, {
+        selector: "#viewFindButton",
+      })
+      || plugin.api.reader.findToolbarElement(attachmentID, {
+        selector: "#toolbarContainer .toolbarButton",
+      })
+      || plugin.api.reader.findToolbarElement(attachmentID);
     if (!element) {
       return JSON.stringify(null);
     }
@@ -1775,10 +2385,20 @@ async function resolveReaderToolbarSurfaceTarget({ rdp, config }) {
       window: element.ownerGlobal || element.ownerDocument?.defaultView || null,
       details: {
         itemID: attachmentID,
+        surfaceEvidenceElement: element.dataset?.cleanroomReaderToolbarMarker === "true"
+          ? "toolbar-marker"
+          : typeof element.id === "string" && element.id.trim()
+            ? element.id.trim()
+            : typeof element.localName === "string" && element.localName.trim()
+              ? element.localName.trim()
+              : null,
       },
     });
     return JSON.stringify(target);
-  })()`);
+  })()`, {
+    label: "visual:resolve-toolbar-target",
+    timeoutMs: VISUAL_CAPTURE_EVAL_TIMEOUT_MS.surfaceTarget,
+  });
   return parseChromeEvalResult(rawResult);
 }
 
@@ -1797,6 +2417,7 @@ async function captureSurfaceEvidenceTarget({
   }
 
   await activateZoteroWindowForCapture(120);
+  await sleep(VISUAL_SURFACE_CAPTURE_DELAY_MS);
   const kind = String(surfaceTarget?.captureKind || actionId || "surface").trim() || "surface";
   const filePath = path.join(captureDir, `cycle-${cycle}-${kind}.png`);
   await captureScreenRect(filePath, bounds);
@@ -1880,8 +2501,22 @@ async function captureSurfaceLocalVisuals({
     "itemPane.selectPane",
   );
 
-  await registerReaderToolbarCaptureMarker({ rdp, config });
-  const readerState = await prepareVisualState({ rdp, config, stage: "reader" });
+  try {
+    await registerReaderToolbarCaptureMarker({ rdp, config });
+  }
+  catch (error) {
+    result.warnings.push(`render-toolbar 标记注册失败：${String(error?.message || error)}`);
+  }
+
+  let readerState = null;
+  try {
+    readerState = await prepareVisualState({ rdp, config, stage: "reader" });
+  }
+  catch (error) {
+    result.warnings.push(`reader 局部截图准备失败：${String(error?.message || error)}`);
+    return result;
+  }
+
   await pushCaptureFromResult(
     await runHostActionInChrome({
       rdp,
@@ -1901,7 +2536,8 @@ async function captureSurfaceLocalVisuals({
       actionId: "reader.sidebar.selectView",
       payload: {
         itemID: readerState.attachmentID,
-        view: "annotations",
+        view: "thumbnails",
+        activationPolicy: "ui-required",
       },
     }),
     "reader.sidebar.selectView",
@@ -2021,12 +2657,121 @@ async function evaluateStableLowDriftAttemptPair({
   }
 }
 
+async function pickBestAttemptAgainstVisualBaseline({
+  attempts,
+  kind,
+  bootMode,
+  baselineDir,
+}) {
+  const normalizedKind = normalizeMaybeString(kind);
+  const normalizedBootMode = normalizeMaybeString(bootMode);
+  const normalizedBaselineDir = normalizeMaybeString(baselineDir);
+  if (!normalizedKind || !normalizedBootMode || !normalizedBaselineDir || !Array.isArray(attempts) || attempts.length === 0) {
+    return null;
+  }
+
+  const baselinePath = path.join(
+    normalizedBaselineDir,
+    getVisualBaselineFilename({
+      bootMode: normalizedBootMode,
+      kind: normalizedKind,
+    }),
+  );
+  if (!await pathExists(baselinePath)) {
+    return null;
+  }
+
+  const thresholds = getVisualBaselineThreshold(normalizedKind);
+  const scoredAttempts = [];
+
+  for (const attempt of attempts) {
+    const attemptPath = normalizeMaybeString(attempt?.path);
+    if (!attemptPath) {
+      continue;
+    }
+    try {
+      const metrics = await comparePNGImagesWithSips({
+        actualPath: attemptPath,
+        baselinePath,
+        pixelDiffTolerance: Number(thresholds?.pixelDiffTolerance || 0),
+      });
+      const comparison = evaluateVisualBaselineComparison({
+        kind: normalizedKind,
+        metrics,
+        thresholds,
+      });
+      scoredAttempts.push({
+        attempt,
+        baselinePath,
+        metrics,
+        comparison,
+        stabilityMetrics: {
+          sameDimensions: typeof metrics?.sameDimensions === "boolean"
+            ? metrics.sameDimensions
+            : null,
+          changedRatio: Number.isFinite(Number(metrics?.changedRatio))
+            ? Number(metrics.changedRatio)
+            : null,
+          meanChannelDiff: Number.isFinite(Number(metrics?.meanChannelDiff))
+            ? Number(metrics.meanChannelDiff)
+            : null,
+          thresholdChangedRatio: Number.isFinite(Number(thresholds?.changedRatio))
+            ? Number(thresholds.changedRatio)
+            : null,
+          thresholdMeanChannelDiff: Number.isFinite(Number(thresholds?.meanChannelDiff))
+            ? Number(thresholds.meanChannelDiff)
+            : null,
+        },
+      });
+    }
+    catch {}
+  }
+
+  if (scoredAttempts.length === 0) {
+    return null;
+  }
+
+  scoredAttempts.sort((left, right) => {
+    if (left.comparison.ok !== right.comparison.ok) {
+      return left.comparison.ok ? -1 : 1;
+    }
+    const leftIssueCount = Array.isArray(left.comparison.issues) ? left.comparison.issues.length : 0;
+    const rightIssueCount = Array.isArray(right.comparison.issues) ? right.comparison.issues.length : 0;
+    if (leftIssueCount !== rightIssueCount) {
+      return leftIssueCount - rightIssueCount;
+    }
+    const leftChangedRatio = Number.isFinite(Number(left.metrics?.changedRatio))
+      ? Number(left.metrics.changedRatio)
+      : Number.POSITIVE_INFINITY;
+    const rightChangedRatio = Number.isFinite(Number(right.metrics?.changedRatio))
+      ? Number(right.metrics.changedRatio)
+      : Number.POSITIVE_INFINITY;
+    if (leftChangedRatio !== rightChangedRatio) {
+      return leftChangedRatio - rightChangedRatio;
+    }
+    const leftMeanChannelDiff = Number.isFinite(Number(left.metrics?.meanChannelDiff))
+      ? Number(left.metrics.meanChannelDiff)
+      : Number.POSITIVE_INFINITY;
+    const rightMeanChannelDiff = Number.isFinite(Number(right.metrics?.meanChannelDiff))
+      ? Number(right.metrics.meanChannelDiff)
+      : Number.POSITIVE_INFINITY;
+    if (leftMeanChannelDiff !== rightMeanChannelDiff) {
+      return leftMeanChannelDiff - rightMeanChannelDiff;
+    }
+    return Number(left.attempt?.index || 0) - Number(right.attempt?.index || 0);
+  });
+
+  return scoredAttempts[0] || null;
+}
+
 async function captureStableVisualStage({
   rdp,
   config,
   stage,
   cycle,
+  bootMode,
   captureDir,
+  visualBaselineDir,
 }) {
   const policy = summarizeVisualCapturePolicy();
   const warmupMs = getVisualStageWarmupMs(stage);
@@ -2083,6 +2828,9 @@ async function captureStableVisualStage({
       }
     }
     catch (error) {
+      if (!state && error?.visualStageState) {
+        state = error.visualStageState;
+      }
       lastFailure = error;
       if (attempt < maxAttempts) {
         await sleep(Math.max(0, Number(policy.betweenAttemptsMs || 0)));
@@ -2096,7 +2844,7 @@ async function captureStableVisualStage({
     && Number(stageAttemptCount || 0) > 0
     && Number(latestSuccessfulAttempt?.index || 0) !== Number(stageAttemptCount || 0),
   );
-  if (finalAttemptFailed || attempts.length === 0) {
+  if (attempts.length === 0) {
     return buildFailedVisualStageResult({
       stage,
       warmupMs,
@@ -2113,15 +2861,17 @@ async function captureStableVisualStage({
     });
   }
 
-  if (attempts.length === 0) {
-    throw new Error(`No visual capture attempts recorded for stage '${stage}'.`);
-  }
-
   const previousAttempt = attempts.length >= 2 ? attempts[attempts.length - 2] : null;
   const currentAttempt = attempts[attempts.length - 1] || null;
   const stableHashPair = previousAttempt && currentAttempt
     ? isStableVisualAttemptPair(previousAttempt, currentAttempt)
     : false;
+  const fallbackFailure = finalAttemptFailed
+    ? inferVisualStageFailure(lastFailure, {
+      failureKind: "capture-stage-failed",
+      failureStage: "capture-stage",
+    })
+    : null;
   let stable = stableHashPair;
   let selectionReason = stableHashPair ? "stable-hash-pair" : "max-attempt-reached";
   let stabilityMetrics = null;
@@ -2137,7 +2887,23 @@ async function captureStableVisualStage({
       selectionReason = "stable-low-drift-pair";
     }
   }
-  const selected = attempts[attempts.length - 1];
+  let selected = attempts[attempts.length - 1];
+  if (!stableHashPair && stable !== true) {
+    const baselineBestAttempt = await pickBestAttemptAgainstVisualBaseline({
+      attempts,
+      kind: stage,
+      bootMode,
+      baselineDir: visualBaselineDir,
+    });
+    if (baselineBestAttempt?.attempt) {
+      selected = baselineBestAttempt.attempt;
+      if (baselineBestAttempt.comparison?.ok === true) {
+        stable = true;
+        selectionReason = "baseline-best-match";
+        stabilityMetrics = baselineBestAttempt.stabilityMetrics;
+      }
+    }
+  }
   const finalPath = path.join(captureDir, `cycle-${cycle}-${stage}.png`);
   if (selected.path !== finalPath) {
     await fs.copyFile(selected.path, finalPath);
@@ -2157,7 +2923,10 @@ async function captureStableVisualStage({
       warmupMs,
       maxAttempts,
       preCaptureSettle,
-      attemptCount: attempts.length,
+      attemptCount: Math.max(
+        attempts.length,
+        Number(stageAttemptCount || 0),
+      ),
       selectedAttempt: selected.index,
       selectedPath: finalPath,
       selectedHash: selected.analysis?.sha256 || null,
@@ -2172,7 +2941,20 @@ async function captureStableVisualStage({
         sizeBytes: Number(entry.analysis?.sizeBytes || 0) || null,
         sha256: entry.analysis?.sha256 || null,
       })),
+      failureKind: fallbackFailure?.failureKind || null,
+      failureCategory: fallbackFailure?.failureCategory || null,
+      failureStage: fallbackFailure?.failureStage || null,
+      failureMessage: fallbackFailure?.failureMessage || null,
+      bounds: fallbackFailure?.bounds || null,
+      boundsSource: fallbackFailure?.boundsSource || null,
+      windowTitle: fallbackFailure?.windowTitle || null,
+      command: fallbackFailure?.command || null,
+      commandExitCode: fallbackFailure?.commandExitCode ?? null,
+      stderr: fallbackFailure?.stderr || null,
+      stdout: fallbackFailure?.stdout || null,
+      rect: fallbackFailure?.rect || null,
     },
+    warning: null,
   };
 }
 
@@ -2201,13 +2983,23 @@ async function captureCycleVisuals({
   await fs.mkdir(captureDir, { recursive: true });
 
   try {
+    try {
+      await cleanupVisualShell({ rdp, config });
+    }
+    catch (error) {
+      visuals.warnings.push(`pre-capture shell cleanup failed: ${String(error?.message || error)}`);
+    }
+
+    let skipSurfaceLocal = false;
     for (const stage of VISUAL_CAPTURE_POLICY.stageOrder || []) {
       const stageCapture = await captureStableVisualStage({
         rdp,
         config,
         stage,
         cycle,
+        bootMode,
         captureDir,
+        visualBaselineDir,
       });
       if (stageCapture.capture) {
         visuals.captures.push(stageCapture.capture);
@@ -2218,19 +3010,27 @@ async function captureCycleVisuals({
       if (stageCapture.warning) {
         visuals.warnings.push(stageCapture.warning);
       }
+      if (stage === "reader" && !stageCapture.capture) {
+        skipSurfaceLocal = true;
+      }
     }
 
-    const surfaceLocal = await captureSurfaceLocalVisuals({
-      rdp,
-      config,
-      cycle,
-      captureDir,
-    });
-    if (Array.isArray(surfaceLocal?.captures) && surfaceLocal.captures.length > 0) {
-      visuals.captures.push(...surfaceLocal.captures);
+    if (skipSurfaceLocal) {
+      visuals.warnings.push("surface-local capture skipped because reader stage did not yield a stable base capture");
     }
-    if (Array.isArray(surfaceLocal?.warnings) && surfaceLocal.warnings.length > 0) {
-      visuals.warnings.push(...surfaceLocal.warnings);
+    else {
+      const surfaceLocal = await captureSurfaceLocalVisuals({
+        rdp,
+        config,
+        cycle,
+        captureDir,
+      });
+      if (Array.isArray(surfaceLocal?.captures) && surfaceLocal.captures.length > 0) {
+        visuals.captures.push(...surfaceLocal.captures);
+      }
+      if (Array.isArray(surfaceLocal?.warnings) && surfaceLocal.warnings.length > 0) {
+        visuals.warnings.push(...surfaceLocal.warnings);
+      }
     }
   } finally {
     try {
@@ -2238,6 +3038,12 @@ async function captureCycleVisuals({
     }
     catch (error) {
       visuals.warnings.push(`cleanup failed: ${String(error?.message || error)}`);
+    }
+    try {
+      await cleanupVisualShell({ rdp, config });
+    }
+    catch (error) {
+      visuals.warnings.push(`post-capture shell cleanup failed: ${String(error?.message || error)}`);
     }
   }
 
@@ -2345,11 +3151,24 @@ async function teardownSession(session) {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const runnerConfig = await readRunnerConfig({ projectRoot, mode: "agent" });
-  const { config, buildPath } = await readAddonRuntimeInfo(projectRoot);
-  const rdpPort = runnerConfig.rdpPort || await findFreePort();
   const buildLock = await acquireBuildLock({ owner: "agent-zotero-e2e.mjs" });
 
   try {
+    const { config, buildPath } = await readAddonRuntimeInfo(projectRoot, {
+      requireBuild: false,
+    });
+    if (!options.skipBuild && !await pathExists(buildPath)) {
+      buildAddon(projectRoot, {
+        env: {
+          CLEANROOM_BUILD_LOCK_HELD: "1",
+        },
+      });
+    }
+    if (!await pathExists(buildPath)) {
+      throw new Error(`Build output not found: ${buildPath}`);
+    }
+
+    const rdpPort = runnerConfig.rdpPort || await findFreePort();
     const runtimeSanitization = await prepareRuntime({
       projectRoot,
       profilePath: runnerConfig.profilePath,
@@ -2439,15 +3258,19 @@ async function main() {
         checks.staticRuntimeDriftEntries = Array.isArray(staticRuntimeHealth.driftEntries)
           ? staticRuntimeHealth.driftEntries
           : [];
-        const localeHealth = await step("check-locale-files", async () => inspectBaselineItemPaneLocaleFiles(projectRoot));
+        const localeHealth = await step("check-locale-files", async () => inspectBaselineMainLocaleFiles(projectRoot));
         checks.localeFTLOK = localeHealth.ok;
         checks.localeFTLMissingCount = Number(localeHealth.missingCount || 0);
         checks.localeFTLMissingEntries = Array.isArray(localeHealth.missingEntries)
           ? localeHealth.missingEntries
           : [];
-        checks.localeFTLValueDriftCount = Number(localeHealth.driftCount || 0);
-        checks.localeFTLValueDriftEntries = Array.isArray(localeHealth.driftEntries)
-          ? localeHealth.driftEntries
+        checks.localeFTLValueDriftCount = Number(localeHealth.valueDriftCount || 0);
+        checks.localeFTLValueDriftEntries = Array.isArray(localeHealth.valueDriftEntries)
+          ? localeHealth.valueDriftEntries
+          : [];
+        checks.localeFTLStructureDriftCount = Number(localeHealth.structureDriftCount || 0);
+        checks.localeFTLStructureDriftEntries = Array.isArray(localeHealth.structureDriftEntries)
+          ? localeHealth.structureDriftEntries
           : [];
         const tests = options.skipTests
           ? null
@@ -2455,9 +3278,12 @@ async function main() {
             rdp: session.rdp,
             config,
           }));
-        const scenarios = await step("run-scenarios", async () => runIntegratedScenarios({
+        const scenarios = await step("run-scenarios", async () => runIntegratedScenarioBatch({
+          projectRoot,
           rdp: session.rdp,
           config,
+          modeLabel: "agent:zotero:e2e",
+          processLogs: session.processLogs.slice(processLogStart),
         }));
         const scenarioResults = Array.isArray(scenarios?.results) ? scenarios.results : [];
         const readerHookScenario = scenarioResults.find((item) => item?.name === "reader event hook diagnostics") || null;
@@ -2481,8 +3307,20 @@ async function main() {
         checks.readerEventHostObservedTypes = readerEventHostObservedTypes;
         checks.readerEventHostObservedTypeCount = readerEventHostObservedTypes.length;
         checks.readerEventToolbarHookObserved = readerEventHostObservedTypes.includes("renderToolbar");
-        const runtimeLogSummary = await step("read-logs", async () => readCapturedLogs(session.rdp));
-        const visuals = options.captureUI
+        const scenarioBatchIncomplete = scenarios?.execution?.incomplete === true;
+        const runtimeLogSummary = scenarioBatchIncomplete
+          ? {
+            total: 0,
+            errorCount: 0,
+            warnCount: 0,
+            infoCount: 0,
+            errorBoundaryHitCount: 0,
+            errorBoundaryEvents: [],
+            recentErrors: [],
+            recentWarnings: [],
+          }
+          : await step("read-logs", async () => readCapturedLogs(session.rdp));
+        const visuals = options.captureUI && !scenarioBatchIncomplete
           ? await step("capture-ui", async () => captureCycleVisuals({
             rdp: session.rdp,
             config,
@@ -2495,7 +3333,11 @@ async function main() {
           : {
             attempted: false,
             captures: [],
-            warnings: ["UI capture skipped by --no-ui-capture"],
+            warnings: [
+              scenarioBatchIncomplete
+                ? "UI capture skipped because scenario execution ended in an incomplete runner state"
+                : "UI capture skipped by --no-ui-capture",
+            ],
           };
         const nativeLogs = session.processLogs.slice(processLogStart);
         const nativeLogSummary = summarizeLogs(nativeLogs);

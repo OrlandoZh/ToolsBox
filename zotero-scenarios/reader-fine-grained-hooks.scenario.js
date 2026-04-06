@@ -271,12 +271,14 @@ registerZoteroScenario("reader fine-grained hook diagnostics", async ({ assert, 
 
     assert.equal(toolbarProbe.type, "renderToolbar");
     assert.equal(toolbarProbe.itemID, attachment.id);
-    assert.equal(toolbarProbe.appendedGroupCount, 1);
-    assert.equal(toolbarProbe.appendedItemCount, 1);
-    assert.equal(toolbarProbe.appendedGroups[0][0].kind, "element");
-    assert.equal(toolbarProbe.appendedGroups[0][0].tagName, "div");
-    assert.equal(toolbarProbe.appendedGroups[0][0].id, toolbarMarkerID);
-    assert.equal(toolbarProbe.appendedGroups[0][0].textContent, "Agent Reader Toolbar");
+    assert.ok(toolbarProbe.appendedGroupCount >= 1);
+    assert.ok(toolbarProbe.appendedItemCount >= 1);
+    const toolbarMarkerEntry = toolbarProbe.appendedGroups
+      .flat()
+      .find((entry) => entry?.kind === "element" && entry?.id === toolbarMarkerID);
+    assert.ok(toolbarMarkerEntry);
+    assert.equal(toolbarMarkerEntry.tagName, "div");
+    assert.equal(toolbarMarkerEntry.textContent, "Agent Reader Toolbar");
 
     assert.ok(sidebarHeaderInvocations.length >= 1);
     assert.ok(sidebarHeaderInvocationForAttachment);

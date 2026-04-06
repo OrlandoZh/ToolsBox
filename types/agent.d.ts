@@ -24,6 +24,35 @@ export interface HostActionPayloadMap {
     scrollTo?: string;
     timeoutMs?: number;
   };
+  "preferences.selectTab": {
+    paneID?: string;
+    tabID: string;
+    timeoutMs?: number;
+  };
+  "preferences.setCheckbox": {
+    paneID?: string;
+    controlID?: string;
+    preferenceID?: string;
+    selector?: string;
+    checked: boolean;
+    timeoutMs?: number;
+  };
+  "preferences.setTextbox": {
+    paneID?: string;
+    controlID?: string;
+    preferenceID?: string;
+    selector?: string;
+    value: string;
+    timeoutMs?: number;
+  };
+  "preferences.selectMenulist": {
+    paneID?: string;
+    controlID?: string;
+    preferenceID?: string;
+    selector?: string;
+    value: string;
+    timeoutMs?: number;
+  };
   "contextPane.setOpen": {
     open?: boolean;
     timeoutMs?: number;
@@ -31,12 +60,14 @@ export interface HostActionPayloadMap {
   "itemPane.selectPane": {
     paneID: string;
     behavior?: string;
+    activationPolicy?: "host-first" | "ui-required";
     timeoutMs?: number;
   };
   "contextPane.selectPane": {
     paneID: string;
     tabID?: string;
     behavior?: string;
+    activationPolicy?: "host-first" | "ui-required";
     timeoutMs?: number;
   };
   "reader.open": {
@@ -59,6 +90,14 @@ export interface HostActionPayloadMap {
     itemID?: number;
     tabID?: string;
     view: string;
+    activationPolicy?: "host-first" | "ui-required";
+    timeoutMs?: number;
+  };
+  "reader.toolbar.triggerButton": {
+    target?: unknown;
+    itemID?: number;
+    tabID?: string;
+    selector: string;
     timeoutMs?: number;
   };
   "menu.show": {

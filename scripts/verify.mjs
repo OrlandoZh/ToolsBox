@@ -2,6 +2,9 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { inspectBaselineMainLocaleFiles } from "./agent-zotero-locale-lib.mjs";
+import { inspectOptionalBundleContracts } from "./optional-bundles-lib.mjs";
+import { inspectDefaultPreferencePaneBridge } from "./preference-pane-governance-lib.mjs";
 import { inspectStaticRuntimeBaselineFiles } from "./static-runtime-baseline-lib.mjs";
 import {
   assertNonEmptyString,
@@ -28,6 +31,7 @@ async function exists(targetPath) {
 export async function verifyWorkspace(projectRoot = root) {
   const required = [
     "config/addon.config.json",
+    "config/optional-bundles.json",
     "addon-static/locale/en-US/main.ftl",
     "addon-static/locale/zh-CN/main.ftl",
     "addon-static/locale/zh-TW/main.ftl",
@@ -83,11 +87,46 @@ export async function verifyWorkspace(projectRoot = root) {
     });
   }
 
+  const localeContract = await inspectBaselineMainLocaleFiles(projectRoot);
+  if (!localeContract.ok) {
+    throw createScriptError("validation", "Locale main FTL baseline contract drifted", {
+      failedStage: "inspect-locale-contract",
+      details: {
+        missingEntries: localeContract.missingEntries,
+        valueDriftEntries: localeContract.valueDriftEntries,
+        structureDriftEntries: localeContract.structureDriftEntries,
+      },
+    });
+  }
+
+  const preferencePaneBridge = await inspectDefaultPreferencePaneBridge(projectRoot);
+  if (!preferencePaneBridge.ok) {
+    throw createScriptError("validation", "Default preference pane bridge contract drifted", {
+      failedStage: "inspect-preference-pane-bridge",
+      details: {
+        issues: preferencePaneBridge.issues,
+      },
+    });
+  }
+
+  const optionalBundles = inspectOptionalBundleContracts(projectRoot);
+  if (!optionalBundles.ok) {
+    throw createScriptError("validation", "Optional bundle contract drifted", {
+      failedStage: "inspect-optional-bundles",
+      details: {
+        issues: optionalBundles.issues,
+      },
+    });
+  }
+
   return {
     projectRoot,
     status: "passed",
     config,
     staticRuntime,
+    localeContract,
+    preferencePaneBridge,
+    optionalBundles,
   };
 }
 

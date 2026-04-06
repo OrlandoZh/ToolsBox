@@ -40,10 +40,10 @@
 - Reference Sources:
   - `chrome/content/zotero/xpcom/pluginAPI/itemPaneManager.js` includes `Zotero.ItemPaneManager.registerSection({`, `registerSection(options) {`, `Zotero.ItemPaneManager.registerInfoRow({`, `refreshInfoRow(rowID) {`
 - Exported Surface:
-  - section registration bridge: `src/features/item-pane.js` includes `function registerSection(sectionOptions) {`, `config.header.l10nID = header.l10nID;`, `config.sidenav.l10nID = sidenav.l10nID;`, `const registeredPaneID = Zotero.ItemPaneManager.registerSection(config);`
+  - section registration bridge: `src/features/item-pane.js` includes `function registerSection(sectionOptions) {`, `error("itemPane.registerSection.noOnRender", { paneID });`, `config.header.l10nID = header.l10nID;`, `config.sidenav.l10nID = sidenav.l10nID;`, `const registeredPaneID = Zotero.ItemPaneManager.registerSection(config);`
   - info row registration bridge: `src/features/item-pane.js` includes `function registerInfoRow(rowOptions) {`, `const registeredRowID = Zotero.ItemPaneManager.registerInfoRow(config);`, `function refreshInfoRow(rowID) {`
 - Required Types:
-  - `types/features.d.ts` includes `registerSection(options: SectionOptions): string | null;`, `registerInfoRow(options: InfoRowOptions): string | null;`, `headerL10nID: string;`, `labelL10nID: string;`
+  - `types/features.d.ts` includes `registerSection(options: SectionOptions): string | null;`, `registerInfoRow(options: InfoRowOptions): string | null;`, `onRender: (props: {`, `headerL10nID: string;`, `labelL10nID: string;`
 - Required Tests:
   - `item-pane.test.js`
   - `plugin.test.js`
@@ -83,9 +83,9 @@
 - Reference Sources:
   - `chrome/content/zotero/xpcom/preferencePanes.js` includes `Zotero.PreferencePanes.register({`, `throw new Error('pluginID and src must be provided');`, `src: await Zotero.Plugins.resolveURI(options.pluginID, options.src)`, `unregister: function (id) {`
 - Exported Surface:
-  - preference pane registration bridge: `src/features/preference-panes.js` includes `function resolveURI(uri) {`, `async function registerPane(paneOptions) {`, `const resolvedSrc = resolveURI(src);`, `const paneId = await Zotero.PreferencePanes.register(registerOptions);`, `Zotero.PreferencePanes.unregister(paneId);`
+  - preference pane registration bridge: `src/features/preference-panes.js` includes `function resolveURI(uri) {`, `async function registerPane(paneOptions) {`, `const resolvedSrc = resolveURI(src);`, `const useOnPreferenceLoad = typeof onPreferenceLoad === "function";`, `registerPreferencePaneLoadHandler(paneId, onPreferenceLoad);`, `const paneId = await Zotero.PreferencePanes.register(registerOptions);`, `Zotero.PreferencePanes.unregister(paneId);`
 - Required Types:
-  - `types/features.d.ts` includes `registerPane(options: PreferencePaneOptions): Promise<string | null>;`, `resolveURI(uri: string): string;`, `label?: string;`
+  - `types/features.d.ts` includes `registerPane(options: PreferencePaneOptions): Promise<string | null>;`, `resolveURI(uri: string): string;`, `label?: string;`, `onPreferenceLoad?: (`
 - Required Tests:
   - `plugin.test.js`
   - `toolchain.test.js`
@@ -106,7 +106,7 @@
   - reader event constants: `src/features/reader.js` includes `export const READER_EVENT_TYPES = {`, `RENDER_TOOLBAR: "renderToolbar"`, `CREATE_SELECTOR_CONTEXT_MENU: "createSelectorContextMenu"`, `export const READER_EVENT_KNOWN_TYPES = Object.freeze([`, `export const READER_EVENT_SYNTHETIC_FALLBACK_TYPES = Object.freeze([`
   - reader event bridge: `src/features/reader.js` includes `function isEventAPIAvailable() {`, `async function waitForReaderReady(target, options = {}) {`, `function findToolbarElement(target, options = {}) {`, `function findSidebarViewElements(target, view, options = {}) {`, `async function setContextPaneOpen(target, open, options = {}) {`, `async function selectSidebarView(target, view, options = {}) {`, `function getKnownEventTypes() {`, `function getProbeCompatibleEventTypes() {`, `function dispatchSyntheticEvent(target, options = {}) {`, `function getEventAPIReport() {`, `function registerEventListener(type, handler, options = {}) {`, `function unregisterEventListener(type, handler) {`
 - Required Types:
-  - `types/features.d.ts` includes `export const READER_EVENT_TYPES: {`, `readonly READER_EVENT_TYPES: typeof READER_EVENT_TYPES;`, `isEventAPIAvailable(): boolean;`, `waitForReaderReady(target: unknown, options?: { timeoutMs?: number; intervalMs?: number }): Promise<unknown | null>;`, `setContextPaneOpen(target: unknown, open: boolean, options?: { timeoutMs?: number; intervalMs?: number }): Promise<Record<string, unknown> | null>;`, `selectSidebarView(target: unknown, view: string, options?: { timeoutMs?: number; intervalMs?: number }): Promise<{`, `findToolbarElement(target: unknown, options?: { selector?: string; view?: "primary" | "secondary" }): Element | null;`, `findSidebarViewElements(target: unknown, view: string, options?: { view?: "primary" | "secondary" }): {`, `registerEventListener(type: string, handler: (event: ReaderEvent) => void, options?: { pluginID?: string }): (() => void) | null;`, `getKnownEventTypes(): string[];`, `getProbeCompatibleEventTypes(): string[];`, `getEventAPIReport(): ReaderEventAPIReport;`, `dispatchSyntheticEvent(target: unknown, options?: {`, `getReaderFrameWindow(target: unknown, options?: { view?: "primary" | "secondary" }): Window | null;`
+  - `types/features.d.ts` includes `export const READER_EVENT_TYPES: {`, `readonly READER_EVENT_TYPES: typeof READER_EVENT_TYPES;`, `isEventAPIAvailable(): boolean;`, `waitForReaderReady(target: unknown, options?: { timeoutMs?: number; intervalMs?: number }): Promise<unknown | null>;`, `setContextPaneOpen(target: unknown, open: boolean, options?: { timeoutMs?: number; intervalMs?: number }): Promise<Record<string, unknown> | null>;`, `selectSidebarView(target: unknown, view: string, options?: {`, `findToolbarElement(target: unknown, options?: { selector?: string; view?: "primary" | "secondary" }): Element | null;`, `findSidebarViewElements(target: unknown, view: string, options?: { view?: "primary" | "secondary" }): {`, `registerEventListener(type: string, handler: (event: ReaderEvent) => void, options?: { pluginID?: string }): (() => void) | null;`, `getKnownEventTypes(): string[];`, `getProbeCompatibleEventTypes(): string[];`, `getEventAPIReport(): ReaderEventAPIReport;`, `dispatchSyntheticEvent(target: unknown, options?: {`, `getReaderFrameWindow(target: unknown, options?: { view?: "primary" | "secondary" }): Window | null;`
 - Required Tests:
   - `reader.test.js`
   - `agent-zotero-e2e-lib.test.js`

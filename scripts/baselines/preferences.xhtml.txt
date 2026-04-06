@@ -1,29 +1,41 @@
-<?xml version="1.0"?>
-<vbox xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" flex="1">
+<vbox xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" flex="1" class="cleanroom-pref-root">
   <preferences id="cleanroom-preferences">
     <preference id="pref-enabled" name="__PREFS_PREFIX__.enabled" type="bool" />
     <preference id="pref-menuLabel" name="__PREFS_PREFIX__.menuLabel" type="string" />
     <preference id="pref-logLevel" name="__PREFS_PREFIX__.logLevel" type="string" />
+    <preference id="pref-themeMode" name="__PREFS_PREFIX__.themeMode" type="string" />
   </preferences>
 
   <groupbox>
-    <caption label="Cleanroom Template Preferences" />
-    <checkbox id="cleanroom-enabled" label="Enable plugin" preference="pref-enabled" />
+    <caption id="cleanroom-pref-caption" data-l10n-id="cleanroom-pref-caption" />
+    <checkbox
+      id="cleanroom-enabled"
+      data-l10n-id="cleanroom-pref-enabled"
+      preference="pref-enabled"
+    />
   </groupbox>
 
   <groupbox>
-    <caption label="Menu" />
+    <caption id="cleanroom-pref-menu-section" data-l10n-id="cleanroom-pref-menu-section" />
     <hbox align="center">
-      <label value="Menu label" control="cleanroom-menu-label" />
+      <label
+        id="cleanroom-pref-menu-label-text"
+        data-l10n-id="cleanroom-pref-menu-label"
+        control="cleanroom-menu-label"
+      />
       <textbox id="cleanroom-menu-label" preference="pref-menuLabel" flex="1" />
     </hbox>
-    <description>Leave empty to use localized default.</description>
+    <description id="cleanroom-pref-menu-hint" data-l10n-id="cleanroom-pref-menu-hint" />
   </groupbox>
 
   <groupbox>
-    <caption label="Logging" />
+    <caption id="cleanroom-pref-logging-section" data-l10n-id="cleanroom-pref-logging-section" />
     <hbox align="center">
-      <label value="Log level" control="cleanroom-log-level" />
+      <label
+        id="cleanroom-pref-log-level-text"
+        data-l10n-id="cleanroom-pref-log-level"
+        control="cleanroom-log-level"
+      />
       <menulist id="cleanroom-log-level" preference="pref-logLevel">
         <menupopup>
           <menuitem label="debug" value="debug" />
@@ -33,5 +45,36 @@
         </menupopup>
       </menulist>
     </hbox>
+  </groupbox>
+
+  <groupbox>
+    <caption id="cleanroom-pref-theme-section" data-l10n-id="cleanroom-pref-theme-section" />
+    <hbox align="center">
+      <label
+        id="cleanroom-pref-theme-mode-text"
+        data-l10n-id="cleanroom-pref-theme-mode"
+        control="cleanroom-theme-mode"
+      />
+      <menulist id="cleanroom-theme-mode" preference="pref-themeMode">
+        <menupopup>
+          <menuitem
+            id="cleanroom-pref-theme-follow-host"
+            data-l10n-id="cleanroom-pref-theme-follow-host"
+            value="follow-host"
+          />
+          <menuitem
+            id="cleanroom-pref-theme-light"
+            data-l10n-id="cleanroom-pref-theme-light"
+            value="light"
+          />
+          <menuitem
+            id="cleanroom-pref-theme-dark"
+            data-l10n-id="cleanroom-pref-theme-dark"
+            value="dark"
+          />
+        </menupopup>
+      </menulist>
+    </hbox>
+    <description id="cleanroom-pref-theme-hint" data-l10n-id="cleanroom-pref-theme-hint" />
   </groupbox>
 </vbox>

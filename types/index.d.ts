@@ -9,6 +9,8 @@ export * from "./core";
 export * from "./features";
 // Utils 模块类型
 export * from "./utils";
+// Services 模块类型
+export * from "./services";
 // Platform 模块类型
 export * from "./platform";
 // Agent 模块类型

@@ -12,6 +12,7 @@ export function normalizeCaptureWindowBounds(value) {
   const y = toFiniteInteger(value.y);
   const width = toFiniteInteger(value.width);
   const height = toFiniteInteger(value.height);
+  const windowNumber = toFiniteInteger(value.windowNumber);
 
   if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) {
     return null;
@@ -30,6 +31,9 @@ export function normalizeCaptureWindowBounds(value) {
     height,
     title: title || null,
     source: source || null,
+    ...(Number.isFinite(windowNumber) && windowNumber > 0
+      ? { windowNumber }
+      : {}),
   };
 }
 
