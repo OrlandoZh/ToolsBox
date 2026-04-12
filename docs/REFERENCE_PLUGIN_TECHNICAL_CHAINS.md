@@ -1,6 +1,6 @@
 # Reference Plugin Technical Chains
 
-本文把 `reference/plugin/` 中多个参考项目反复出现的实现套路，抽象成可复用的 clean-room 技术链。
+本文把 `reference/plugin/*` 与 `reference/lajiplugin/*` 中多个参考项目反复出现的实现套路，抽象成可复用的 clean-room 技术链。
 
 它不回答“某个 UI 该挂在哪个 surface”，那是 [UI Creation Paths](./UI_CREATION_PATHS.md) 的职责；它回答的是：
 
@@ -12,6 +12,7 @@
 
 - 先判断 UI 路线：看 [docs/UI_CREATION_PATHS.md](./UI_CREATION_PATHS.md)
 - 需要追溯“某个 reference 为什么被映射到这条 UI 路线”：看 [docs/REFERENCE_PLUGIN_UI_ANALYSIS.md](./REFERENCE_PLUGIN_UI_ANALYSIS.md)
+- 需要按应用场景抽取 `item / collection / field / reader` 的右键菜单、子菜单、`popupshowing` 或 repair 技术链：看 [docs/REFERENCE_PLUGIN_MENU_PATTERNS.md](./REFERENCE_PLUGIN_MENU_PATTERNS.md)
 - 需要抽取窗口、服务、队列、嵌入 viewer、重资源等跨项目技术链：看本文
 
 ## Clean-room 边界
@@ -25,7 +26,7 @@
 
 这一批新增目录里，不值得逐个“项目功能复述”。更有价值的是区分哪些目录提供了新的技术链信息，哪些只提供边界提醒：
 
-- 本轮重点吸收的来源：
+- 本轮重点吸收的来源（当前主要位于 `reference/plugin/`）：
   - `Zotero-Exitem-main`
   - `Zotero-add-items-from-text-main`
   - `paper-chat-for-zotero-master`
@@ -37,7 +38,7 @@
   - `pdf-ai-bookmarks-main`
   - `zotero-ai-collection-bootstrap`
   - `zotero-citation-bootstrap`
-- 主要提供“边界/风险认知”，不适合作为模板默认能力来源：
+- 主要提供“边界/风险认知”的补充样本（当前统一归到 `reference/lajiplugin/`）：
   - `zotero-magic-for-user`
   - `ZotLink-main`
   - `Zotero-One-v6.8.2`
@@ -52,7 +53,7 @@
 
 ## 第三批 legacy / companion-heavy 参考项目摘录
 
-这一批项目更偏“老牌大而全插件”“companion-heavy 工具”“工具包型聚合 runtime”。它们不适合直接当模板骨架，但里面仍然能抽出几条很有价值的通用技术链：
+这一批 `reference/lajiplugin/` 样本更偏“老牌大而全插件”“companion-heavy 工具”“工具包型聚合 runtime”。它们不适合直接当模板骨架，但里面仍然能抽出几条很有价值的通用技术链：
 
 - `zotero-magic-for-user`
   - 主要价值：插件间 bridge contract、共享 `Prefs` 配置发现、`Prefs + 文件缓存 + note + attachment` 的分层存储思路
@@ -189,7 +190,7 @@
 - [zotero-addons-main/src/modules/addonTable.ts](../reference/plugin/zotero-addons-main/src/modules/addonTable.ts)
 - [zotero-addons-main/src/modules/addonDetail.ts](../reference/plugin/zotero-addons-main/src/modules/addonDetail.ts)
 - [zotero-AI-Butler-main/src/modules/libraryScannerDialog.ts](../reference/plugin/zotero-AI-Butler-main/src/modules/libraryScannerDialog.ts)
-- [garden_v0.0.14/content/scripts/garden.js](../reference/plugin/garden_v0.0.14/content/scripts/garden.js)
+- [garden_v0.0.14/content/scripts/garden.js](../reference/lajiplugin/garden_v0.0.14/content/scripts/garden.js)
 
 可复用结构：
 
@@ -210,6 +211,42 @@
 - `src/features/window-manager.js` 继续负责主窗口挂载
 - 新增的 `src/utils/window-shell.js` 负责 Path 9 的子窗口壳语义：`openDialog -> ready -> focus/reuse -> cleanup`
 - 轻量 prompt/confirm 仍走 `src/utils/dialog.js`，不要把它误当成完整 window shell manager
+
+## Chain 4A. Host-mounted React Surface Bridge
+
+适用场景：
+
+- 已经明确要继续使用宿主 surface，而不是独立 iframe/app
+- HTML micro-app 已接近组件化前端复杂度
+- 希望复用同一套组件树到 `docked / floating / standalone` 等不同 shell
+- 仍想把宿主 lifecycle、geometry 和 evidence 判定留在 JS core
+
+来源索引：
+
+- `AIAssistant` 的 `src/features/reader-chat-ui/react-surface.js`
+- `AIAssistant` 的 `src/react-ui/reader-chat-window/entry.tsx`
+- `AIAssistant` 的 `docs/AGENT_REACT_ARCHITECTURE_BLUEPRINT.md`
+
+可复用结构：
+
+- JS host 侧只负责 root/container、`loadSubScript(...)`、样式单次注入和 mount lifecycle
+- React bundle 只暴露全局 renderer bridge：`mount / update / unmount`
+- 全局 bridge 需要同时兼容 `window / wrappedJSObject / globalThis`
+- 同一组件树可挂到多个 shell，但 `preferred/effective/fallbackReason` 这类窗口模式语义仍应由 JS host 侧掌握
+
+当前模板落点：
+
+- `src/utils/react-surface-bridge.js`
+- `src/utils/surface-window-mode.js`
+- `src/react-ui/shared/renderer-bridge.tsx`
+- `src/react-ui/surface-bridge/entry.tsx`
+- `docs/REFERENCE_AIASSISTANT_REACT_PANEL_PATTERNS.md`
+
+模板当前结论：
+
+- 这条链已进入 default-disabled `react-ui` optional bundle 的 implemented baseline
+- 模板只吸收了 bridge contract 和 mode normalization，不吸收产品型 dock geometry controller
+- 若只是普通 HTML panel，仍优先 Path 3 的 micro-app；不要因为“想用 React”就把 host-visible surface 全部升级到 heavier lane
 
 ## Chain 5. Embedded Viewer / Iframe Message Bridge
 
@@ -290,7 +327,7 @@
 
 - [gemini-zotero-main/src/modules/storage/historyStorage.ts](../reference/plugin/gemini-zotero-main/src/modules/storage/historyStorage.ts)
 - [llm-for-zotero-main/src/hooks.ts](../reference/plugin/llm-for-zotero-main/src/hooks.ts)
-- [zotero-magic-for-user/docs/DATA_STORAGE_MODULE.md](../reference/plugin/zotero-magic-for-user/docs/DATA_STORAGE_MODULE.md)
+- [zotero-magic-for-user/docs/DATA_STORAGE_MODULE.md](../reference/lajiplugin/zotero-magic-for-user/docs/DATA_STORAGE_MODULE.md)
 
 可复用结构：
 
@@ -320,7 +357,7 @@
 
 代表参考：
 
-- [bibgenie-0.5.7/content/modules/mupdf-loader.mjs](../reference/plugin/bibgenie-0.5.7/content/modules/mupdf-loader.mjs)
+- [bibgenie-0.5.7/content/modules/mupdf-loader.mjs](../reference/lajiplugin/bibgenie-0.5.7/content/modules/mupdf-loader.mjs)
 
 可复用结构：
 
@@ -383,7 +420,7 @@
 
 - [Zotero-Exitem-main/src/modules/reviewConfig.ts](../reference/plugin/Zotero-Exitem-main/src/modules/reviewConfig.ts)
 - [Zotero-Exitem-main/src/modules/reviewAI.ts](../reference/plugin/Zotero-Exitem-main/src/modules/reviewAI.ts)
-- [zotero-magic-for-user/PLUGIN_COMMUNICATION.md](../reference/plugin/zotero-magic-for-user/PLUGIN_COMMUNICATION.md)
+- [zotero-magic-for-user/PLUGIN_COMMUNICATION.md](../reference/lajiplugin/zotero-magic-for-user/PLUGIN_COMMUNICATION.md)
 - [zotero-mcp-main/zotero-mcp-plugin/src/modules/httpServer.ts](../reference/plugin/zotero-mcp-main/zotero-mcp-plugin/src/modules/httpServer.ts)
 - [zotero-mcp-main/zotero-mcp-plugin/src/modules/streamableMCPServer.ts](../reference/plugin/zotero-mcp-main/zotero-mcp-plugin/src/modules/streamableMCPServer.ts)
 - [mcp-server-zotero-dev-main/ARCHITECTURE.md](../reference/plugin/mcp-server-zotero-dev-main/ARCHITECTURE.md)
@@ -429,7 +466,7 @@
 - [marginalia-main/src/modules/storageManager.ts](../reference/plugin/marginalia-main/src/modules/storageManager.ts)
 - [zotero-mcp-main/zotero-mcp-plugin/src/hooks.ts](../reference/plugin/zotero-mcp-main/zotero-mcp-plugin/src/hooks.ts)
 - [zotero-mcp-main/zotero-mcp-plugin/src/modules/semanticIndexColumn.ts](../reference/plugin/zotero-mcp-main/zotero-mcp-plugin/src/modules/semanticIndexColumn.ts)
-- [zotero-box/content/scripts/zoterobox.js](../reference/plugin/zotero-box/content/scripts/zoterobox.js)
+- [zotero-box/content/scripts/zoterobox.js](../reference/lajiplugin/zotero-box/content/scripts/zoterobox.js)
 
 可复用结构：
 
@@ -601,9 +638,9 @@
 
 代表参考：
 
-- [Zotero-One-v6.8.2/Zotero-One-v6.8.2-deobfuscated/ui/ui.js](../reference/plugin/Zotero-One-v6.8.2/Zotero-One-v6.8.2-deobfuscated/ui/ui.js)
-- [zotero-box/content/prefs.xhtml](../reference/plugin/zotero-box/content/prefs.xhtml)
-- [zotero-box/content/scripts/zoterobox.js](../reference/plugin/zotero-box/content/scripts/zoterobox.js)
+- [Zotero-One-v6.8.2/Zotero-One-v6.8.2-deobfuscated/ui/ui.js](../reference/lajiplugin/Zotero-One-v6.8.2/Zotero-One-v6.8.2-deobfuscated/ui/ui.js)
+- [zotero-box/content/prefs.xhtml](../reference/lajiplugin/zotero-box/content/prefs.xhtml)
+- [zotero-box/content/scripts/zoterobox.js](../reference/lajiplugin/zotero-box/content/scripts/zoterobox.js)
 
 可复用结构：
 
@@ -628,8 +665,8 @@
 
 模板当前结论：
 
-- 这条链非常值得继续补强模板，因为它直接改善 host-visible surface 的一致性
-- 下一步更值得补的是 `menu-state-resolver + submenu-builder` 级别原语，而不是继续堆散落的 imperative toggle
+- 这条链现已进入模板基线：`createMenuStateResolver()`、`registerStateDrivenMenu()` 与 `menu.show / menu.trigger` 的 `menuPath` 验证链已把 dynamic submenu builder 收到 host-visible surface 主链
+- 当前继续补强的重点不再是“是否吸收这条链”，而是围绕 collection scene、submenu path 与 surface-local evidence 细化验证
 
 ## Chain 16. Hosted Static HTML Utility App
 
@@ -641,10 +678,10 @@
 
 代表参考：
 
-- [papersgpt-v0.4.5/bootstrap.js](../reference/plugin/papersgpt-v0.4.5/bootstrap.js)
-- [papersgpt-v0.4.5/chrome/content/autopilot.html](../reference/plugin/papersgpt-v0.4.5/chrome/content/autopilot.html)
-- [papersgpt-v0.4.5/chrome/content/selectpapers.html](../reference/plugin/papersgpt-v0.4.5/chrome/content/selectpapers.html)
-- [papersgpt-v0.4.5/chrome/content/addons.xhtml](../reference/plugin/papersgpt-v0.4.5/chrome/content/addons.xhtml)
+- [papersgpt-v0.4.5/bootstrap.js](../reference/lajiplugin/papersgpt-v0.4.5/bootstrap.js)
+- [papersgpt-v0.4.5/chrome/content/autopilot.html](../reference/lajiplugin/papersgpt-v0.4.5/chrome/content/autopilot.html)
+- [papersgpt-v0.4.5/chrome/content/selectpapers.html](../reference/lajiplugin/papersgpt-v0.4.5/chrome/content/selectpapers.html)
+- [papersgpt-v0.4.5/chrome/content/addons.xhtml](../reference/lajiplugin/papersgpt-v0.4.5/chrome/content/addons.xhtml)
 
 可复用结构：
 
@@ -676,7 +713,7 @@
 
 代表参考：
 
-- [garden_v0.0.14/content/scripts/garden.js](../reference/plugin/garden_v0.0.14/content/scripts/garden.js)
+- [garden_v0.0.14/content/scripts/garden.js](../reference/lajiplugin/garden_v0.0.14/content/scripts/garden.js)
 
 可复用结构：
 
@@ -705,7 +742,7 @@
 代表参考：
 
 - [actions-and-tags-for-zotero/content/scripts/zoterotag.js](../reference/plugin/actions-and-tags-for-zotero/content/scripts/zoterotag.js)
-- [garden_v0.0.14/content/scripts/garden.js](../reference/plugin/garden_v0.0.14/content/scripts/garden.js)
+- [garden_v0.0.14/content/scripts/garden.js](../reference/lajiplugin/garden_v0.0.14/content/scripts/garden.js)
 
 观察结论：
 

@@ -78,6 +78,9 @@ function buildSummaryLine(summary) {
   parts.push(`慢操作 ${summary.httpSlowOperationCount} 次`);
   parts.push(`生命周期慢操作 ${summary.lifecycleSlowOperationCount} 次`);
   parts.push(`时序 ${summary.hostReadyDurationMs}/${summary.startupDurationMs}/${summary.shutdownDurationMs}ms`);
+  if (summary.performanceBudget?.present) {
+    parts.push(`性能预算 ${summary.performanceBudget.statusLabel || summary.performanceBudget.status || "未知"} / 超预算 ${summary.performanceBudget.violationCount ?? 0} 项`);
+  }
   return parts.join("；");
 }
 
@@ -130,6 +133,19 @@ export function summarizeEngineeringHardening({ e2e = null, autofix = null, gate
       && e2e.lifecycleLastSlowStage.trim()
       ? e2e.lifecycleLastSlowStage
       : null,
+    performanceBudget: e2e?.performanceBudget && typeof e2e.performanceBudget === "object"
+      ? e2e.performanceBudget
+      : {
+        present: false,
+        observed: false,
+        status: "missing",
+        statusLabel: "缺失",
+        summary: "当前未采集 dev-only performance budget",
+        violationCount: 0,
+        measuredActivityCount: 0,
+        expectedActivityCount: 0,
+        violationSummary: null,
+      },
   };
   summary.summary = buildSummaryLine(summary);
   return summary;

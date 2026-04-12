@@ -159,6 +159,57 @@
       ]
     },
     {
+      "id": "collection-menu",
+      "version": 1,
+      "summary": "A host-visible collection menu action aligned with Zotero collection selection semantics and main/library/collection target behavior.",
+      "kind": "collection-menu",
+      "entryMatchers": [
+        "^src/app/host-action-(?:catalog|actions)(?:/|\\.|$)",
+        "^src/features/menu-manager(?:/|\\.|$)",
+        "^src/platform/zotero-host(?:/|\\.|$)"
+      ],
+      "hostSemanticDomains": [
+        "menu-manager"
+      ],
+      "requiredHostAssertions": [
+        "The collection menu registration is attached to main/library/collection rather than item selection semantics.",
+        "The collection context is established in the live host before the menu is shown.",
+        "The collection menu item or submenu becomes visible in the live host popup.",
+        "The collection menu action can be replayed and the post-action result is observable.",
+        "A surface-local evidence target can be returned for the live collection menu or submenu surface."
+      ],
+      "supportsVisualEvidence": true,
+      "nonGoals": [
+        "Assuming item selection state proves the collection menu target is active.",
+        "Treating registration against main/library/collection as sufficient without live popup evidence."
+      ]
+    },
+    {
+      "id": "menu-submenu",
+      "version": 1,
+      "summary": "A host-visible submenu surface whose visibility, structure, or child actions may depend on live menu state and `menuPath` resolution.",
+      "kind": "menu-submenu",
+      "entryMatchers": [
+        "^src/app/host-action-(?:catalog|actions)(?:/|\\.|$)",
+        "^src/features/menu-manager(?:/|\\.|$)"
+      ],
+      "hostSemanticDomains": [
+        "menu-manager"
+      ],
+      "requiredHostAssertions": [
+        "The submenu root is registered against an expected host menu target.",
+        "The submenu root or submenu popup becomes visible in the live host.",
+        "Dynamic submenu children are rebuilt or observed from live state before child actions are asserted.",
+        "A submenu child can be addressed through `menuPath` and replayed without relying on generic DOM guesses.",
+        "A surface-local evidence target can be returned for the submenu root or submenu popup."
+      ],
+      "supportsVisualEvidence": true,
+      "nonGoals": [
+        "Assuming a submenu label alone proves its children were rebuilt from live state.",
+        "Treating popup repair or direct DOM fallback as the default submenu verification path."
+      ]
+    },
+    {
       "id": "reader-sidebar-view",
       "version": 1,
       "summary": "A Reader sidebar view surface aligned with Zotero Reader sidebarView semantics and live sidebar buttons or panels, with edge-attached layouts following live sidebar geometry.",

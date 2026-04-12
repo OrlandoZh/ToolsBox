@@ -578,7 +578,7 @@ describe("Agent Zotero Patch Lib", () => {
     assert.ok(plan.allowedTargets.includes("src/app/feature-composer.js"));
     assert.equal(plan.patchDrafts[0].operation, "insert");
     assert.equal(plan.verificationContract.checks[0].kind, "all-cycle-check");
-    assert.ok(String(plan.patchDrafts[0].patch).includes("registerReaderMenuItem"));
+    assert.ok(String(plan.patchDrafts[0].patch).includes("registerReaderMenubarViewMenuItem"));
     assert.equal(plan.verificationContract.checks.some((check) => check.id === "reader-summary-menu-registered"), true);
   });
 
@@ -1209,7 +1209,7 @@ describe("Agent Zotero Patch Lib", () => {
     });
 
     if (menuManager.isOfficialAPIAvailable()) {
-      menuManager.registerContextMenuItem({
+      menuManager.registerItemMenuItem({
         id: \`${"${"}config.addonRef}-context-action\`,
       });
     }
@@ -1322,7 +1322,7 @@ describe("Agent Zotero Patch Lib", () => {
     });
 
     if (menuManager.isOfficialAPIAvailable()) {
-      menuManager.registerContextMenuItem({
+      menuManager.registerItemMenuItem({
         id: \`${"${"}config.addonRef}-context-action\`,
         l10nID: "cleanroom-menu-label",
       });
@@ -1351,8 +1351,8 @@ describe("Agent Zotero Patch Lib", () => {
     assert.equal(result.attempted, true);
     assert.equal(result.ok, true);
     assert.equal(result.status, "applied");
-    assert.ok(updated.includes("menuManager.registerReaderMenuItem("));
-    assert.ok(updated.includes("menuManager.MENU_TARGETS.READER_MENU_VIEW"));
+    assert.ok(updated.includes("menuManager.registerReaderMenubarViewMenuItem("));
+    assert.ok(updated.includes('id: `${config.addonRef}-reader-summary`,'));
   });
 
   it("should apply a reader event synthetic fallback patch when fallback declarations drift", async () => {
@@ -1434,18 +1434,13 @@ describe("Agent Zotero Patch Lib", () => {
     });
 
     if (menuManager.isOfficialAPIAvailable()) {
-      menuManager.registerContextMenuItem({
+      menuManager.registerItemMenuItem({
         id: \`${"${"}config.addonRef}-context-action\`,
       });
-      menuManager.registerReaderMenuItem(
-        {
-          target: menuManager.MENU_TARGETS.READER_MENU_VIEW,
-        },
-        {
-          id: \`${"${"}config.addonRef}-reader-summary\`,
-          l10nID: "cleanroom-reader-menu-label",
-        },
-      );
+      menuManager.registerReaderMenubarViewMenuItem({
+        id: \`${"${"}config.addonRef}-reader-summary\`,
+        l10nID: "cleanroom-reader-menu-label",
+      });
     }
 
     itemTree.registerColumn({
@@ -1533,15 +1528,10 @@ describe("Agent Zotero Patch Lib", () => {
     });
 
     if (menuManager.isOfficialAPIAvailable()) {
-      menuManager.registerReaderMenuItem(
-        {
-          target: menuManager.MENU_TARGETS.READER_MENU_VIEW,
-        },
-        {
-          id: \`${"${"}config.addonRef}-reader-summary\`,
-          l10nID: "cleanroom-reader-menu-label",
-        },
-      );
+      menuManager.registerReaderMenubarViewMenuItem({
+        id: \`${"${"}config.addonRef}-reader-summary\`,
+        l10nID: "cleanroom-reader-menu-label",
+      });
     }
 
     itemTree.registerColumn({
@@ -1567,7 +1557,7 @@ describe("Agent Zotero Patch Lib", () => {
     assert.equal(result.attempted, true);
     assert.equal(result.ok, true);
     assert.equal(result.status, "applied");
-    assert.ok(updated.includes("menuManager.registerContextMenuItem("));
+    assert.ok(updated.includes("menuManager.registerItemMenuItem("));
     assert.ok(updated.includes('id: `${config.addonRef}-context-action`,'));
   });
 
@@ -1627,19 +1617,14 @@ describe("Agent Zotero Patch Lib", () => {
     });
 
     if (menuManager.isOfficialAPIAvailable()) {
-      menuManager.registerContextMenuItem({
+      menuManager.registerItemMenuItem({
         id: \`${"${"}config.addonRef}-context-action\`,
         l10nID: "cleanroom-menu-label",
       });
-      menuManager.registerReaderMenuItem(
-        {
-          target: menuManager.MENU_TARGETS.READER_MENU_VIEW,
-        },
-        {
-          id: \`${"${"}config.addonRef}-reader-summary\`,
-          l10nID: "cleanroom-reader-menu-label",
-        },
-      );
+      menuManager.registerReaderMenubarViewMenuItem({
+        id: \`${"${"}config.addonRef}-reader-summary\`,
+        l10nID: "cleanroom-reader-menu-label",
+      });
     }
 
     itemTree.registerColumn({

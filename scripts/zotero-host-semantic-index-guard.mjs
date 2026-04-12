@@ -15,6 +15,7 @@ import {
 const defaultProjectRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const TERMINOLOGY_SCAN_DOCS = [
   "AGENTS.md",
+  "CLAUDE.md",
   "config/validation-surfaces.json",
   "docs/VALIDATION_SURFACES.md",
   "docs/ZOTERO_HOST_INTERFACE_CONTRACTS.md",

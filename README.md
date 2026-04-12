@@ -83,6 +83,7 @@
 - release / toolchain 测试不要把现有 `build/` / `dist/` 当成稳定夹具；凡是要断言 `release:preflight`、`release:prepare`、`release:matrix`、`release:upload` 结果的测试，都应先重置或重新生成本地工件
 - 如果要交付纯源码或纯模板工程，不要直接压缩整个工作目录；使用 `npm run export:project` 生成剔除运行时工件与 agent 附件的最小工程
 - reference 材料仅作为可选本地研究输入，不进入主历史；如需本地复核，见 [本地 Reference 快照说明](docs/REFERENCE_SNAPSHOTS.md)
+- 中国法口径下，当前主风险优先级是“第三方开发者著作权 / 开源许可 / 商业交付权利瑕疵”，而不是单纯的宿主 API 接触事实；对应留档见 [中国法优先法务策略](docs/LEGAL_CN_STRATEGY.md)
 - 触达 `src/features/menu-manager.js`、`item-pane.js`、`item-tree.js`、`preference-panes.js`、`reader.js` 这类宿主接口包装层时，先对齐 [Zotero Host Interface Contracts](docs/ZOTERO_HOST_INTERFACE_CONTRACTS.md)，再运行 `npm run agent:host:guard`
 - `validationDecision` 只决定是否需要视觉证据；如果 `watch`、`watch-recovery`、workspace/host/provenance guard 已给出更具体的恢复动作，优先处理这些独立严格阻断，不要被泛化视觉建议带偏
 
@@ -184,6 +185,26 @@ src/
 | **Zotero Host** | Zotero 宿主 API 适配 | `src/platform/zotero-host.js` |
 | **Zotero Text File Storage** | `Zotero.DataDirectory.dir` 文本文件 adapter | `src/platform/zotero-file-storage.js` |
 | **Zotero JSON State Store** | `zotero-file-storage + file-state-store` 一步接线 helper | `src/platform/zotero-json-state-store.js` |
+
+## Menu Scene Helpers
+
+- `menu-manager` 只覆盖 Zotero `MenuManager` 官方 target，例如 `main/library/item`、`main/library/collection`、`itemPane/info/row`、`reader/menubar/view`
+- 新代码、模板片段和 agent 自动修复默认优先使用 scene helper：
+  - `registerItemMenuItem()`
+  - `registerCollectionMenuItem()`
+  - `registerItemPaneInfoRowMenuItem()`
+  - `registerReaderMenubarViewMenuItem()`
+- 如果同一 scene 下需要多个相关动作，优先使用 `registerItemSubmenu()`、`registerCollectionSubmenu()`、`registerReaderMenubarViewSubmenu()`
+- 如果菜单是否出现、是否禁用、或 submenu children 取决于 live host state，优先使用 `createMenuStateResolver()` + `registerStateDrivenMenu()`，不要回退成散落的 `popupshowing` imperative toggle
+- collection scene 的动态判断应优先消费 `hasCollectionSelection`、`collectionTreeRowID`、`collectionTreeRowType`，不要把 item selection 语义混进 `main/library/collection`
+- Reader `createViewContextMenu` / `createAnnotationContextMenu` 不属于 `menu-manager`，应走 `reader.registerViewContextMenuItem()` / `reader.registerAnnotationContextMenuItem()`
+- `registerContextMenuItem()`、`registerReaderMenuItem()` 与 `registerSubmenu()` 继续保留为兼容 helper，但默认不再作为模板推荐写法
+- 迁移建议：
+  - `registerContextMenuItem(...)` 且 target 固定为 `main/library/item` 时，直接迁到 `registerItemMenuItem(...)`
+  - `registerReaderMenuItem({ target: MENU_TARGETS.READER_MENU_VIEW }, ...)` 时，直接迁到 `registerReaderMenubarViewMenuItem(...)`
+  - `registerSubmenu({ target: MENU_TARGETS.LIBRARY_ITEM | LIBRARY_COLLECTION | READER_MENU_VIEW, ... })` 时，优先直接迁到对应的 scene submenu helper
+  - 只有确实需要跨多个 `reader/menubar/*` target 复用时，再继续保留 `registerReaderMenuItem(...)`
+  - 只有确实需要跨 target 做通用子菜单装配时，再继续保留 `registerSubmenu(...)`
 
 ## 运行时逻辑
 
@@ -313,7 +334,7 @@ npm run zotero:scenario # 在 Zotero 内执行 zotero-scenarios/*.scenario.js
 
 ## Codex / Opencode 分工脚手架
 
-当前仓库已落地一套 Codex / Opencode 委托分工脚手架，用于区分高逻辑任务与低逻辑任务的执行与审查：
+当前仓库已落地一套 Codex / Opencode 委托分工脚手架，用于区分“架构与规划”任务和“实施与交付”任务的执行与审查：
 
 默认协作口径：
 
@@ -324,8 +345,8 @@ npm run zotero:scenario # 在 Zotero 内执行 zotero-scenarios/*.scenario.js
 
 ### 任务分类
 
-- **Codex 高逻辑 lane** (`codex-high-logic`)：负责冻结契约、修改 patch 语义、扩大白名单边界等高风险改动
-- **Opencode 低逻辑 lane** (`opencode-low-logic`)：负责文档同步、测试补齐、展示收口等受限改动
+- **Codex 架构与规划 lane** (`codex-architecture-planning`)：负责冻结契约、修改 patch 语义、扩大白名单边界等需要先做边界裁决的改动
+- **Opencode 实施与交付 lane** (`opencode-implementation-delivery`)：负责文档同步、测试补齐、展示收口和已明确方案下的受限实现
 
 ### 核心文件
 
@@ -398,7 +419,7 @@ node scripts/agent-delegation.mjs close <taskId> --message "feat: 基本实现 x
 - 审查工件见 `dist/agent-delegation/DOC-LOW-001/review.json`
 - `ENG-LOW-102`（真实剩余主线与 delegation 状态文档同步）已于 `2026-03-23` 被 Codex 审查为 `accepted`
 - 审查工件见 `dist/agent-delegation/ENG-LOW-102/review.json`
-- 当前 manifest 已按 `2026-03-30` 的最新工作树完成 rebaseline：`ENG-HIGH-103` 的启动诊断 + runtime 清理 + `pre-capture settle`、`READER-HIGH-124 / READER-LOW-261~263` 的 capture failure 结构化 / `capture-command-failed` blocker / freshest-valid artifact 消费、`READER-HIGH-125` 的 library-only 根因边界冻结，以及 `READER-HIGH-126` 的 library host-noise 修复均已完成独立收口并转为历史契约 / review artifact；当前不再保留 active 的 library-only 高逻辑回归修复批次
+- 当前 manifest 已按 `2026-03-30` 的最新工作树完成 rebaseline：`ENG-HIGH-103` 的启动诊断 + runtime 清理 + `pre-capture settle`、`READER-HIGH-124 / READER-LOW-261~263` 的 capture failure 结构化 / `capture-command-failed` blocker / freshest-valid artifact 消费、`READER-HIGH-125` 的 library-only 根因边界冻结，以及 `READER-HIGH-126` 的 library host-noise 修复均已完成独立收口并转为历史契约 / review artifact；当前不再保留 active 的 library-only 架构与规划回归修复批次
 - `ENG-LOW-201`、`ENG-LOW-202`、`ENG-LOW-203` 已于 `2026-03-24` 以 `reworked-by-codex` 方式收口，并转入历史 review artifact
 - `READER-LOW-201`、`READER-LOW-202`、`READER-LOW-203` 已于 `2026-03-24` 收口并转入历史 review artifact，不再作为 active low-task
 - `READER-HIGH-102` 与 `READER-LOW-204`、`READER-LOW-205`、`READER-LOW-206` 已于 `2026-03-24` 收口并转入历史 review artifact，不再作为当前 active batch
@@ -413,40 +434,48 @@ node scripts/agent-delegation.mjs close <taskId> --message "feat: 基本实现 x
 - `READER-HIGH-120 / READER-LOW-255~257` 已完成并转入历史契约 / review artifact：refresh-first 与单分支选择语义只保留为历史工件
 - `READER-HIGH-121 / READER-LOW-258~260` 已完成并转入历史契约 / review artifact：reader stage 的最小 prepare/open/settle 收紧与 gate headline 对齐已落地，并把 fresh truth 拉回 `ui-regression-candidate + complete`
 - `ENG-HIGH-102 / ENG-LOW-204~206` 已完成并转入历史契约 / review artifact：watch startup health 的 bounded settle 与 truth alignment 已落地，并把 fresh watch truth 拉回 `healthy`
-- Obsidian visual enhancement 已完成并转入历史契约 / review artifact：当前默认工作台继续保持 Markdown + Canvas + 人工指令窗口，`OBSIDIAN-HIGH-101` 只保留为历史高逻辑契约源，不再挂新的 active low-task
-- `AGENT_OBSIDIAN_VISUALS=1` 作为可选增强层启用：在现有 Markdown 状态页、证据页、Quickstart、Advanced Guide、人工指令窗口、`.canvas` 白板之外，额外生成 `05-Zotero-Agent-闭环流程图.md` 与 `06-Zotero-Agent-人工复核决策.excalidraw.md`
+- Obsidian visual enhancement 已完成并转入历史契约 / review artifact：当前默认工作台继续保持 Markdown + Canvas + 人工指令窗口，`OBSIDIAN-HIGH-101` 只保留为历史架构与规划契约源，不再挂新的 active low-task
+- `AGENT_OBSIDIAN_VISUALS=1` 作为可选增强层启用：在现有插件状态页、证据页、模板协作指南、人工指令窗口、`.canvas` 白板与默认 UI 概念图之外，额外生成 `12-当前Zotero插件-交互流转图.md` 与 `13-当前Zotero插件-功能版图.excalidraw.md`
 - 当前约束固定为：`watch stale` 先于 Reader 症状引导下一步动作；`agent:zotero:e2e` / `agent:gate` 的 `exitCode=2` 继续视为“验证失败但工件有效”
-- 当前约束固定为：`READER-HIGH-123` 已按单分支收口完成，不重复第二次 baseline refresh；`READER-HIGH-124 / READER-LOW-261~263`、`READER-HIGH-125` 与 `READER-HIGH-126` 也都已完成独立收口，后续如 future fresh evidence 再次出现新的真实回归，再单开新的高逻辑批次
-- 默认下一轮高逻辑任务源切到 `ENG-HIGH-104 / ENG-LOW-211~213`：只沿现有 `release:plan` / `agent:release` / `agent:gate:release` 链推进远端发布编排与远端 `updateURL` 闭环验证，不改插件 runtime，不回头混写 Reader / startup / freshness
+- 当前约束固定为：`READER-HIGH-123` 已按单分支收口完成，不重复第二次 baseline refresh；`READER-HIGH-124 / READER-LOW-261~263`、`READER-HIGH-125` 与 `READER-HIGH-126` 也都已完成独立收口，后续如 future fresh evidence 再次出现新的真实回归，再单开新的架构与规划批次
+- 默认下一轮架构与规划任务源切到 `ENG-HIGH-104 / ENG-LOW-211~213`：只沿现有 `release:plan` / `agent:release` / `agent:gate:release` 链推进远端发布编排与远端 `updateURL` 闭环验证，不改插件 runtime，不回头混写 Reader / startup / freshness
 - 当前约束固定为：Obsidian 工作台继续保留三模板人工 verdict 机制，但当前默认主路径是否重新进入 `npm run agent:obsidian`，统一以 fresh `watch -> e2e -> monitor -> gate` 为准
 - 当前“完成度 / 当前主线 / 当前剩余项”只认 [docs/CURRENT_BACKLOG.md](docs/CURRENT_BACKLOG.md) 的“当前单一事实源”；README 只保留下面这块自动同步摘要，不再手写第二套 current truth。
 
 <!-- CURRENT-TRUTH-SUMMARY:START -->
-- 当前真实完成度仍约为 `99%`；`ENG-HIGH-103` 的启动诊断 + runtime 清理 + `pre-capture settle`、`READER-HIGH-124 / READER-LOW-261~263` 的 capture / freshness 收口、`READER-HIGH-125` 的 library-only 根因边界冻结、以及 `READER-HIGH-126` 的 library host-noise 修复继续保留为历史契约 / review artifact；`2026-04-06` 这轮前台 `npm run check` 继续通过，fresh `watch -> e2e -> monitor -> gate` 已把当前开发态重新拉回 `stable / ready`
-- 当前 active 高逻辑已切到 `HOST-HIGH-201`：本轮只收紧 `preference pane`、`context pane`、`item pane sidenav`、`reader renderToolbar / sidebar view` 与 `menu item` 的交互一致性、贴边式 geometry 与 surface-local evidence；release-only 的 `ENG-HIGH-104 / ENG-LOW-211~213` 继续保留为次级 follow-up，不回写为当前主阻断
-- latest live rerun 现已刷新到 `2026-04-06T02:55:03.754Z` 的 `agent:zotero:e2e:update-baseline`：本轮在确认 `preference pane` 文案随 Zotero 语言切换属于预期 UI 变化后，受控刷新了一次 preference-pane / Reader canonical baseline；fresh compare 模式 E2E 继续稳定生成完整 `dist/agent-zotero-e2e.{json,md}`，`restart` 与 `hot-reload` 两轮均通过，`tests/scenarios` 继续保持 `0` 失败，`visualEvidenceSummary` 已回到 `library / reader / surface-preference-cleanroomtemplate-preferences / surface-item-pane-cleanroomtemplate-details` 全部对齐
+- 当前真实完成度仍约为 `99%`；`ENG-HIGH-103` 的启动诊断 + runtime 清理 + `pre-capture settle`、`READER-HIGH-124 / READER-LOW-261~263` 的 capture / freshness 收口、`READER-HIGH-125` 的 library-only 根因边界冻结、以及 `READER-HIGH-126` 的 library host-noise 修复继续保留为历史契约 / review artifact；`2026-04-08` fresh `watch -> e2e -> monitor -> gate` 已把当前开发态重新拉回 `stable / ready`
+- `HOST-HIGH-201 / HOST-LOW-301~303` 已在 `2026-04-08T01:26:26.211Z` 的 fresh compare 模式 `agent:zotero:e2e` 与 `2026-04-08T01:29:27.786Z` 的 `agent:gate` 中收口：当前 `preference pane`、`context pane`、`item pane sidenav`、`reader renderToolbar / sidebar view`、`menu item / collection menu / dynamic submenu` 的 live geometry、surface-local evidence 与基线比对均已通过，不再作为开发态 blocker
+- 当前唯一未收口主线已切到 release-only 的 `ENG-HIGH-104 / ENG-LOW-211~213`：继续沿 `release:plan -> release:upload 计划壳 -> 手动远端上传 -> release:preflight --verify-remote -> release:prepare -> release:matrix -> agent:gate:release` 推进远端发布编排与远端 `updateURL` 闭环验证，不回写插件 runtime 或 host-visible polish 主线
+- 当前 active wave 已切到 `ZOTERO-DOM-CONTRACT-WAVE-001`：仅覆盖 `preference pane / item pane / reader` 三条既有宿主面，新增 `domContractReport` route-aware 摘要接入 `agent:zotero:e2e -> agent:monitor / dashboard / gate`，用于在测试后直接读取结构化操作日志；当前保持 advisory + non-blocking，不重开旧的 host-polish blocker
+- 当前 `preference pane` 窄宽度 hardening 与右侧 host-visible surface capture 链已全部对齐：以 Zotero 偏好设置宿主窗口最小尺寸 `800x600` 为 host boundary，当前接受“geometry ready + root width observed + no horizontal overflow”的稳定证据，不再把短暂的 geometry settle 超时单独抬成 blocker
+- latest live rerun 现已刷新到 `2026-04-08T01:24:38.171Z` 的 `agent:zotero:e2e:update-baseline` 与 `2026-04-08T01:26:26.211Z` 的 fresh compare 模式 `agent:zotero:e2e`：本轮在确认 host-visible polish 行为链稳定后，受控刷新了一次 surface-local baseline；`restart` 与 `hot-reload` 两轮均通过，`tests/scenarios` 保持 `0` 失败，`visualEvidenceFailingItemCount` 已回到 `0`
 - 当前 `visual-required` host-polish 判据已回到“blocking `surface-local` evidence 优先”：whole-window `library / reader` 漂移继续保留为 supplemental `capture-unstable` 诊断与归档样本，不再单独阻断 `HOST-HIGH-201 / HOST-LOW-301~303` 这轮 gate
 - 当前插件可见文案已统一跟随 Zotero 语言：`menu item`、Reader View 菜单项、`preference pane` 与 `item pane` 基线现统一复用 `main.ftl + i18n bridge`，内置 locale 覆盖 `en-US / zh-CN / zh-TW`
-- 最新 bounded foreground `zotero:watch` 已在 `2026-04-06T02:56:31.821Z` 刷新为 `healthy`：startup health 通过、`latestPassed=true`，当前不再把过期 watch 工件视为开发态主阻断
-- 最新开发态 `agent:monitor` / `agent:gate` 已在 `2026-04-06T02:57:08.129Z` / `2026-04-06T02:57:08.402Z` 消费 fresh E2E + watch 工件并回到 `stable / ready`；当前 `gatePassed=true`，frontpage headline 已重新固定为“watch、真机验证与恢复回归均已通过，当前闭环状态稳定”
+- 最新 bounded foreground `zotero:watch` 已在 `2026-04-06T06:37:05.164Z` 刷新为 `healthy`：startup health 通过、`latestPassed=true`，当前不再把过期 watch 工件视为开发态主阻断
+- 最新开发态 `agent:monitor` / `agent:gate` 已在 `2026-04-06T06:37:56.329Z` / `2026-04-06T06:37:56.574Z` 消费 fresh E2E + watch 工件并回到 `stable / ready`；当前 `gatePassed=true`，frontpage headline 已重新固定为“watch、真机验证与恢复回归均已通过，当前闭环状态稳定”
+- 当前已新增 dev-only `performanceBudget` advisory：latest direct E2E `2026-04-06T06:35:06.375Z` 已把 lifecycle/http 与代表性 host actions 的预算结果写入 `agent-zotero-e2e / monitor / gate`；当前预算状态已回到 `passed`，`preferences.openPane` 已降到 `1113ms / 1600ms`，活动 `4/4` 全部通过，同时继续保持非阻断，不向下游项目注入额外 runtime profiler 开销
 - 最新 focused live probe `reader surface smoke` 已在 `2026-04-04T10:03:46.084Z` 通过，说明 Reader surface smoke 不只停留在历史 E2E 工件，而是继续可在真机单场景复现
 - `agent:context` 已新增统一只读上下文层：当前会输出 `dist/agent-context.{json,md}`，汇总 stable / dynamic context、decision hints 与 drift signals；本轮已新增 `runtime-compact-v1` 只读派生视图，默认只暴露 truth/action/status/drift/evidence/artifact refs + freshness/budget，并已接入 gate、Obsidian 工作台、dashboard 与 delegation runtime prompt；`agent:context:guard` 当前继续保持 warning-only
-- 当前已显式进入 `ZOTERO-HOST-POLISH-WAVE-001`：以 `config/project-validation-surfaces.json` 与现有 host action / surface smoke 为主轴，优先收紧 live interaction consistency、edge-attached geometry 和 surface-local evidence；上一轮 `OPTIONAL-BUNDLE-WAVE-001` 继续视为已完成基线
-- 当前 wave 验收主线：`host-first -> live geometry / interaction consistency -> surface smoke -> surface-local evidence -> full gate`
+- `ZOTERO-HOST-POLISH-WAVE-001` 已在 `2026-04-08` 收口完成：以 `config/project-validation-surfaces.json` 与现有 host action / surface smoke 为主轴的 live interaction consistency、edge-attached geometry 与 surface-local evidence 已完成模板级闭环；当前 active `ZOTERO-DOM-CONTRACT-WAVE-001` 则在这个完成基线之上追加 route-aware DOM contract advisory，不把上一轮已完成结论重新拉回 blocker
+- 已完成的 host polish baseline 验收主线仍固定为 `host-first -> live geometry / interaction consistency -> surface smoke -> surface-local evidence -> full gate`，当前只把这条完成链当作 DOM contract wave 的上游稳定基线，不重开 strict visual 争论
+- `OPTIONAL-BUNDLE-WAVE-001` 继续视为已完成基线：`react-ui` 仍保持 implemented + default-disabled，`agent-runtime` / `ai-service` 继续保持 spec-only，不把 optional bundle lane 回灌到当前 DOM contract 主线
+- 当前 active wave 验收主线：`host-first -> action replay -> route-aware dom contract -> advisory summary`
 - 当前唯一 optional bundle registry 仍是 `config/optional-bundles.json`；`react-ui` 当前固定为 `ts-isolated + implemented + enabled=false`，`agent-runtime` 固定为 `ts-isolated + planned + enabled=false`，`ai-service` 固定为 `js-core + planned + enabled=false`，本轮不把它们重新拉回当前扩波主线
-- 当前模板已把 Lisianthus 抽出的 `file-state-store`、`task-runner`、`task-queue`、`zotero-file-storage`、`zotero-json-state-store` 与 `window-shell + theme-manager + host action gating` 视为已入基线的 JS-core 能力；`build:react-ui` 继续只服务默认禁用的 demo lane，不把 React/TS 依赖回灌进模板核心
-- 本 wave 当前 in-scope surfaces 继续写入 `config/project-validation-surfaces.json`：覆盖 `preference pane`、`context pane`、`item pane sidenav`、`reader renderToolbar`、`reader sidebar view` 与 `menu item`，当前批次只补这些已声明 surface 的 polish，不新开产品 surface
-- 当前宿主可见 UI 主链已基本实现：`preference pane`、`context pane`、`item pane sidenav`、`reader renderToolbar`、`reader sidebar view`、`menu item` 与窗口级 + 元素级主题 contract 已具备模板级基线、host action / surface smoke / surface-local evidence；当前批次默认转向交互一致性、贴边布局和复用细节，不把这一轮描述成“UI 已完全封板”
+- 当前模板已把 Lisianthus 抽出的 `file-state-store`、`task-runner`、`task-queue`、`zotero-file-storage`、`zotero-json-state-store` 与 `window-shell + theme-manager + host action gating` 视为已入基线的 JS-core 能力；同时把 default-disabled `react surface bridge + surface-window-mode` 收到 optional bundle 基线里；`build:react-ui` 当前继续只服务默认禁用的 demo lane + host-mounted surface bridge lane，并已由主仓 / pure-project 显式声明 `esbuild + react + react-dom` 作为 optional-lane devDependencies，不把 React/TS 依赖回灌进模板核心
+- 本 wave 当前 in-scope surfaces 继续写入 `config/project-validation-surfaces.json`：覆盖 `preference pane`、`context pane`、`item pane sidenav`、`reader renderToolbar`、`reader sidebar view`、`menu item`、`collection menu` 与 `menu submenu`，当前批次只补这些已声明 surface 的 polish，不新开产品 surface
+- 当前宿主可见 UI 主链已基本实现：`preference pane`、`context pane`、`item pane sidenav`、`reader renderToolbar`、`reader sidebar view`、`menu item / collection menu / menu submenu` 与窗口级 + 元素级主题 contract 已具备模板级基线、host action / surface smoke / surface-local evidence；当前批次默认转向交互一致性、贴边布局和复用细节，不把这一轮描述成“UI 已完全封板”
 - `details.runtimeSanitization` 已稳定透传到 direct E2E / monitor / gate：本轮 direct E2E 记录了 `exclusiveProjectRuntime=true`，并在启动前终止了 project-managed `watch` `zotero` / `plugin-container`；旧的 startup/RDP bring-up timeout 口径继续只保留为已收口的诊断能力
 - 最新 library `pre-capture settle` 继续收敛到 `visibleBannerIDs=[mac-word-plugin-install-container]`；`sync-reminder-container`、`post-upgrade-container`、`file-renaming-banner-container`、`retracted-items-container` 与 `architecture-warning-container` 会在 capture 前被压平，当前 `library / reader` 几何继续保持 `2000x1200`
 - `reader` pre-capture settle 本轮已不再被 `hasMatchingWindowState=false` 卡死：当前 direct E2E 会接受 `selectedTabMatched=true` 作为 Reader ready 的等价信号，并在 settle snapshot 中显式记录 `selectedTabID / selectedTabMatched`
 - `preference pane`、`context pane` 与 `menu item` 的 surface-local evidence 已在本轮重新对齐到当前语义：`preference pane` 现按 descendant content root + bounded geometry settle 取样，`context pane` baseline 已刷新到 pane fragment，`menu item`/popup 则新增 windowless screen-metrics fallback；`reader sidebar view` 在 live `rect` 缺失时也会按 `windowBounds + sidebarWidth` 合成本地 capture rect，当前 host polish 批次继续把 `item pane sidenav` 与 `reader sidebar view` 的 edge-mode geometry 和显式 degrade contract 收到同一套结果链里
+- 当前 `preference pane` 的 host-polish 次批次进一步固定为“窄窗不横向溢出”：`preferences.openPane` 与相关 control actions 会在 `800x600` 宿主边界下回传 root 宽度、layout bucket 与 horizontal overflow 诊断；scenario 主断言改为 `geometry + interaction gate`，不再把 whole-window screenshot 当作 preference pane 正常的首要证据
 - `READER-LOW-261` 已把 stage-scoped capture failure 结构化落进既有 E2E / validation 展示链；`READER-LOW-262` 已引入 `capture-command-failed` / `visualPrimaryBlockerKind=capture-command-failed` 并同步 consumer；`READER-LOW-263` 在本轮进一步把 visual screenshot capture 链收口到“优先按 Zotero on-screen window id 采集、避免抓到桌面或重叠窗”的状态，当前主结论已更新为“surface-local evidence fully aligned，whole-window drift 只作为 supplemental `capture-unstable` 诊断保留”
 - 最新 release live acceptance 已在 `2026-04-04` 重新补齐 stable / beta 正式安装态 smoke：`release-install-smoke-beta` / `release-install-smoke-stable` 分别在 `2026-04-04T11:51:00.836Z` / `2026-04-04T11:51:01.248Z` 记录 `readinessMode=native`、`apiReady=true`，且剩余 `loading.svg` / `remote-settings.sys.mjs` 已归类为宿主噪声
 - 最新 `release-preflight` / `release-plan` / `release-matrix` 已在 `2026-04-04T11:53:52.789Z` / `2026-04-04T11:54:00.719Z` / `2026-04-04T11:54:09.269Z` 刷新为 `远端验证失败 / failed`；`release-plan` 现已显式写入 `workflowState`、`gateContract` 与 `nextSteps`，并要求通过 `npm run agent:release` 记录 `release-plan` 遥测，单独的 `dist/release-plan.json` 不再视为充分 gate 证据
 - 最新 `agent:monitor` / `agent:gate:release` 已在 `2026-04-04T11:54:15.771Z` / `2026-04-04T11:54:15.996Z` 消费最新 release artifacts；当前 `gatePassed=false` 的唯一原因是远端 `https://gitee.com/zouser/user/releases/download/1.1/update.json` 虽然 `updateURLHTTPStatus=200`，但未包含 `cleanroom-template@example.com` 首条更新记录，且未提供有效 `update_link`，而不是安装态 smoke 或插件运行时回归
 - 当前 Gitee `updateURL` 仅用于这个模板仓库自身的远端发布验收与测试，不作为基于本模板开发的其他插件默认发布地址；下游项目仍需在各自 `config/addon.config.json` 中替换自己的 `addonId` / `homepage` / `updateURL`
-- 当前 active 开发阻断已清零；fresh `watch -> e2e -> monitor -> gate` 证据链现已闭环通过，当前主批次为 `HOST-HIGH-201 / HOST-LOW-301~303` 的 host-visible polish，而 release-only 工程 gap（`ENG-HIGH-104 / ENG-LOW-211~213`）与 Reader deeper event / `P1` 扩面继续只保留为次级 follow-up
+- 当前中国法商业交付治理已接入 release-only 门禁：`LEGAL_RISK_CHECKLIST.md` 现新增 China Commercial Delivery Gate，`CODE_PROVENANCE.md`、`THIRD_PARTY_NOTICES.md` 与 `COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md` 已作为模板与 pure-project 导出的默认骨架；开发态 `cleanroom:audit` 继续 advisory，`release:preflight` 才会严格阻断第三方表达污染与交付权利缺口
+- 当前 active 开发阻断已清零；fresh `watch -> e2e -> monitor -> gate` 证据链继续闭环通过，`HOST-HIGH-201 / HOST-LOW-301~303` 已转为已收口批次，而 release-only 工程 gap（`ENG-HIGH-104 / ENG-LOW-211~213`）与 Reader deeper event / `P1` 扩面继续只保留为当前剩余 follow-up
 <!-- CURRENT-TRUTH-SUMMARY:END -->
 
 - `READER-HIGH-109 / READER-LOW-225~227` 的逐目标视觉证据导航已完成，并转入历史 review artifact；当前直接复用这些既有证据，不再把证据导航继续挂成 active 开发批次
@@ -475,7 +504,7 @@ node scripts/agent-delegation.mjs close <taskId> --message "feat: 基本实现 x
 - 初始化语义：`init:workspace` 只生成带 `bootstrap_shell=true` 的初始化占位工作台；若需要给人类查看当前项目态，请继续执行 `npm run agent:sync`
 - 可选视觉层：当设置 `AGENT_OBSIDIAN_VISUALS=1` 时，`agent:obsidian` 会额外生成 Mermaid 闭环流程图与 Excalidraw 人工复核决策图；这两份仅是 companion 视图，不参与任何 gate / loop 判定，也不替代现有人工窗口
 - 人工工作台位置：默认目录为 `obsidian/agent-workbench/`；如需统一放进单独的 Obsidian 管理空间，可设置 `AGENT_OBSIDIAN_DIR=/path/to/vault-folder`
-- 人工介入窗口：`agent:zotero:loop:human` 会先刷新 Obsidian 工作台，再打开一个短暂人工窗口；若无人修改 `10-Zotero-Agent-人工指令窗口.md`，当前回合继续按自动路径推进；若人工填写“下一步指令”或改为 `hold`，本回合会按人工意图改写路径或暂停
+- 人工介入窗口：`agent:zotero:loop:human` 会先刷新 Obsidian 工作台，再打开一个短暂人工窗口；若无人修改 `10-模板协作-人工指令窗口.md`，当前回合继续按自动路径推进；若人工填写“下一步指令”或改为 `hold`，本回合会按人工意图改写路径或暂停
 - 质量闸门：`agent:gate` / `agent:gate:release` 产出 `dist/agent-gate.json` 与 `dist/agent-gate.md`；开发档位下若 `watch` 状态异常、最近 Zotero E2E 未通过、服务健康异常、Reader 事件桥退化、E2E 结果已过期、能力地图存在未覆盖能力，或失败后的 `autofix` 记录仍未跟进到最新失败轮次，会直接阻断通过；发布档位下若 `release-matrix` 缺失、失败或仍停留在“待补验证”，也会直接阻断通过；新增的工程化硬化信号只做非阻断摘要，不改变既有 `nextAction` 语义
 - 一键推进：`agent:pipeline` 将“执行 -> 汇总 -> 可视化 -> 闸门”串成闭环
 - 开发态热重载闭环：`zotero:watch` 会在每次重建/reload 后自动执行宿主健康检查、汇总日志；若热重载失败，会先尝试 runtime 恢复，再必要时重启 Zotero 会话，并把全过程写到 `dist/zotero-watch-status.json` 与 `dist/zotero-watch-status.md`
@@ -492,27 +521,30 @@ node scripts/agent-delegation.mjs close <taskId> --message "feat: 基本实现 x
 - 自动恢复：`agent:zotero:autofix` 会先跑 E2E；若失败，则按报告中的故障模式尝试 `check`、`fresh+restart`、`zotero:test` 等受控恢复动作；若当前仅剩库视图/Reader 视觉漂移，则会先自动刷新视觉基线，再回到 compare 模式复验；若显式带上 `--apply-whitelisted-patch` 且命中 `reader-ui:reader-visual-drift`，则还可把最新 E2E 截图安全复制回 `tests/visual-baselines/agent-zotero-e2e/` 并复验，最终输出 `dist/agent-zotero-autofix.json` 与 `dist/agent-zotero-autofix.md`
 - 注册入口补丁：`agent:zotero:e2e` 现已直接观测 `主命令 command palette`、`主窗口上下文菜单项`、`偏好设置面板` 是否注册；命中对应诊断时，`agent:zotero:autofix -- --apply-whitelisted-patch` 可在 `src/app/feature-composer.js` 中受控补回这些基线注册块，并按各自 `verification contract` 复验
 - 运行时桥接诊断：`bootstrap` 现会生成能力白名单报告，`plugin.api.runtime` 可按需读取完整报告，agent 默认只采集压缩后的 `runtimeBridge*` 摘要字段，避免上下文被大块日志淹没
-- 当前边界：这套链路已具备“自动验证 + 自动恢复 + 上下文感知历史推荐 + 重点指纹时间序列 + 多信号趋势归档”；`READER-HIGH-124 / READER-LOW-261~263`、`READER-HIGH-125` 与 `READER-HIGH-126` 已全部转入历史契约 / review artifact，当前主阻断已清零。远端发布编排、远端 `updateURL` 验证、下一轮 Reader 更深事件点与 `P1` 扩面继续作为非阻断延后项；如 future fresh `watch -> e2e -> monitor -> gate` 再次出现新的真实回归，再单独冻结新的高逻辑批次，详见 [Agent 自主开发路线图](docs/AGENT_AUTONOMY_ROADMAP.md)
-- 当前默认下一轮高逻辑任务源为 `ENG-HIGH-104 / ENG-LOW-211~213`：只负责远端发布编排与远端 `updateURL` 闭环验证，继续复用现有 release 工件与 release gate，不回头重开已完成的 Reader / startup / freshness 批次
+- 当前边界：这套链路已具备“自动验证 + 自动恢复 + 上下文感知历史推荐 + 重点指纹时间序列 + 多信号趋势归档”；`READER-HIGH-124 / READER-LOW-261~263`、`READER-HIGH-125` 与 `READER-HIGH-126` 已全部转入历史契约 / review artifact，当前主阻断已清零。远端发布编排、远端 `updateURL` 验证、下一轮 Reader 更深事件点与 `P1` 扩面继续作为非阻断延后项；如 future fresh `watch -> e2e -> monitor -> gate` 再次出现新的真实回归，再单独冻结新的架构与规划批次，详见 [Agent 自主开发路线图](docs/AGENT_AUTONOMY_ROADMAP.md)
+- 当前默认下一轮架构与规划任务源为 `ENG-HIGH-104 / ENG-LOW-211~213`：只负责远端发布编排与远端 `updateURL` 闭环验证，继续复用现有 release 工件与 release gate，不回头重开已完成的 Reader / startup / freshness 批次
 - 当前新增一类 clean-room 静态资源恢复：agent 可以把“偏好设置面板未注册”进一步分流为“注册缺口”与“`preferences.xhtml` 资源缺失”，避免错误修复方向
 - 当前新增一类运行时资源恢复：agent 可以把“仅剩 error 日志”的一部分问题继续下钻为 `main.css` 样式资源缺失，而不是停在笼统的 runtime log 层
 
 ## 合规工作流
 
 1. 先在 `SPEC.md` 冻结当前模板的黑盒行为声明
-2. 维护 `LEGAL_RISK_CHECKLIST.md`，确保 Development Gate 全部可勾选且带 Evidence
+2. 维护 `LEGAL_RISK_CHECKLIST.md`，确保 Development Gate 全部可勾选且带 Evidence，并把 China Commercial Delivery Gate 作为 release-only 交付门禁
 3. 日常开发运行 `npm run cleanroom:audit` 输出 `dist/cleanroom-audit.{json,md}`
 4. 本地挂载可选 `reference/` 快照后运行 `npm run cleanroom:sim` 输出 `dist/cleanroom-similarity.{json,md}`
-5. 发布前执行 `npm run release:preflight`，要求发布态 clean-room audit 与 similarity 都通过
+5. 同步维护 `CODE_PROVENANCE.md`、`THIRD_PARTY_NOTICES.md` 与 `COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md`，把第三方表达隔离与商业交付边界写成可审计文档
+6. 发布前执行 `npm run release:preflight`，要求发布态 clean-room audit、similarity 与 China Commercial Delivery Gate 都通过
 
 ## 文档
 
 - [Agent 入口](AGENTS.md)
+- [Claude Code 入口](CLAUDE.md)
 - [API 参考](docs/API.md)
 - [架构说明](docs/ARCHITECTURE.md)
 - [使用指南](docs/GUIDE.md)
 - [Zotero 测试与调试](docs/ZOTERO_TESTING.md)
 - [Obsidian 人工介入](docs/OBSIDIAN_INTERVENTION.md)
+- [中国法优先法务策略](docs/LEGAL_CN_STRATEGY.md)
 - [Reference 对比与修复路线](docs/REFERENCE_COMPARISON.md)
 - [Reference Plugin 技术链抽象](docs/REFERENCE_PLUGIN_TECHNICAL_CHAINS.md)
 - [UI 创建路径](docs/UI_CREATION_PATHS.md)
@@ -528,6 +560,9 @@ node scripts/agent-delegation.mjs close <taskId> --message "feat: 基本实现 x
 - [框架完整性检查](FRAMEWORK_CHECKLIST.md)
 - [类型覆盖率报告](TYPES_COVERAGE_REPORT.md)
 - [框架综合评估](FRAMEWORK_ASSESSMENT.md)
+- [代码来源留档](CODE_PROVENANCE.md)
+- [第三方 Notices](THIRD_PARTY_NOTICES.md)
+- [商业交付权利说明](COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md)
 
 ## 示例
 

@@ -262,6 +262,95 @@ function createScenarioHelpers(baseContext) {
       .map((entry) => cloneValue(entry));
   }
 
+  function pickDomContractStatusLabel(status) {
+    switch (String(status || "").trim()) {
+      case "passed":
+        return "通过";
+      case "failed":
+        return "异常";
+      case "missing":
+        return "缺失";
+      default:
+        return "未知";
+    }
+  }
+
+  function createDomContractCheck(id, ok, options = {}) {
+    const normalizedID = String(id || "").trim() || "check";
+    return {
+      id: normalizedID,
+      label: String(options.label || normalizedID).trim() || normalizedID,
+      ok: Boolean(ok),
+      actual: cloneValue(options.actual),
+      expected: cloneValue(options.expected),
+      note: typeof options.note === "string" && options.note.trim()
+        ? options.note.trim()
+        : null,
+    };
+  }
+
+  function normalizeDomContractChecks(value) {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+    return value
+      .filter((entry) => entry && typeof entry === "object")
+      .map((entry) => createDomContractCheck(
+        entry.id || entry.label || "check",
+        entry.ok === true,
+        {
+          label: entry.label,
+          actual: entry.actual,
+          expected: entry.expected,
+          note: entry.note,
+        },
+      ));
+  }
+
+  function toDomContractResult(result) {
+    const normalized = result && typeof result === "object"
+      ? cloneValue(result)
+      : {};
+    const routeId = typeof normalized.routeId === "string" && normalized.routeId.trim()
+      ? normalized.routeId.trim()
+      : null;
+    const adapter = typeof normalized.adapter === "string" && normalized.adapter.trim()
+      ? normalized.adapter.trim()
+      : routeId;
+    const checks = normalizeDomContractChecks(normalized.checks);
+    const failedChecks = checks
+      .filter((entry) => entry.ok !== true)
+      .map((entry) => cloneValue(entry));
+    const status = checks.length === 0
+      ? "missing"
+      : (failedChecks.length > 0 ? "failed" : "passed");
+
+    let summary = typeof normalized.summary === "string" && normalized.summary.trim()
+      ? normalized.summary.trim()
+      : null;
+    if (!summary) {
+      if (status === "missing") {
+        summary = "当前场景未返回 DOM contract 检查。";
+      } else if (status === "failed") {
+        summary = `存在 ${failedChecks.length}/${checks.length} 项 DOM contract 异常。`;
+      } else {
+        summary = `DOM contract ${checks.length}/${checks.length} 项通过。`;
+      }
+    }
+
+    return {
+      routeId,
+      adapter,
+      status,
+      statusLabel: pickDomContractStatusLabel(status),
+      checkCount: checks.length,
+      failedCheckCount: failedChecks.length,
+      failedChecks,
+      summary,
+      checks,
+    };
+  }
+
   function toSurfaceSmokeResult(result) {
     const normalized = result && typeof result === "object"
       ? cloneValue(result)
@@ -434,6 +523,30 @@ function createScenarioHelpers(baseContext) {
     return item;
   }
 
+  async function createCollection(options = {}) {
+    const collection = new Zotero.Collection();
+    collection.name = String(options.name || `Agent Scenario Collection ${Date.now()}`);
+    collection.libraryID = typeof options.libraryID === "number"
+      ? options.libraryID
+      : typeof Zotero?.Libraries?.userLibraryID === "number"
+        ? Zotero.Libraries.userLibraryID
+        : null;
+    if (typeof options.parentID === "number") {
+      collection.parentID = options.parentID;
+    }
+
+    await collection.saveTx();
+
+    addCleanup(async () => {
+      const currentCollection = Zotero.Collections.get(collection.id);
+      if (currentCollection) {
+        await currentCollection.eraseTx();
+      }
+    });
+
+    return collection;
+  }
+
   async function selectItem(itemID, options = {}) {
     const pane = getZoteroPane();
     const item = Zotero?.Items && typeof Zotero.Items.get === "function"
@@ -501,6 +614,81 @@ function createScenarioHelpers(baseContext) {
       selectionSingleItem: selectedIDs.length === 1 && selectedIDs[0] === itemID,
       selectedIDs,
       selectedCount: selectedIDs.length,
+    };
+  }
+
+  async function selectCollection(collectionID, options = {}) {
+    const pane = getZoteroPane();
+    const collection = Zotero?.Collections && typeof Zotero.Collections.get === "function"
+      ? Zotero.Collections.get(collectionID)
+      : null;
+    const libraryID = typeof collection?.libraryID === "number"
+      ? collection.libraryID
+      : typeof Zotero?.Libraries?.userLibraryID === "number"
+        ? Zotero.Libraries.userLibraryID
+        : null;
+
+    await waitFor(
+      () => Boolean(pane.collectionsView && pane.itemsView),
+      {
+        timeoutMs: options.timeoutMs ?? 5000,
+        intervalMs: options.intervalMs ?? 100,
+        message: "Timed out waiting for ZoteroPane collections/items views to load",
+      },
+    );
+
+    if (pane.collectionsView && typeof pane.collectionsView.selectCollection === "function") {
+      await pane.collectionsView.selectCollection(collectionID);
+    }
+    else if (pane.collectionsView && typeof pane.collectionsView.selectByID === "function") {
+      await pane.collectionsView.selectByID(`C${collectionID}`);
+    }
+    else {
+      throw new Error("Neither collectionsView.selectCollection() nor collectionsView.selectByID() is available");
+    }
+
+    if (pane.itemsView && typeof pane.itemsView.waitForLoad === "function") {
+      await pane.itemsView.waitForLoad();
+    }
+
+    await waitFor(
+      () => {
+        if (typeof pane.collectionsView?.getSelectedCollection === "function") {
+          const selectedCollection = pane.collectionsView.getSelectedCollection();
+          return selectedCollection?.id === collectionID ? selectedCollection : null;
+        }
+        return true;
+      },
+      {
+        timeoutMs: options.timeoutMs ?? 5000,
+        intervalMs: options.intervalMs ?? 100,
+        message: `Timed out waiting for collection #${collectionID} to become selected`,
+      },
+    );
+
+    const collectionTreeRow = typeof pane.getCollectionTreeRow === "function"
+      ? pane.getCollectionTreeRow()
+      : pane.collectionsView
+        && typeof pane.collectionsView.getRow === "function"
+        && typeof pane.collectionsView.selection?.focused === "number"
+        ? pane.collectionsView.getRow(pane.collectionsView.selection.focused)
+        : null;
+    const collectionTreeRowID = collectionTreeRow && typeof collectionTreeRow === "object"
+      ? collectionTreeRow.id ?? collectionTreeRow.ref ?? collectionID
+      : collectionID;
+    const collectionTreeRowType = typeof collectionTreeRow?.type === "string"
+      ? collectionTreeRow.type
+      : typeof collectionTreeRow?.isCollection === "function" && collectionTreeRow.isCollection()
+        ? "collection"
+        : typeof collectionTreeRow?.isSearch === "function" && collectionTreeRow.isSearch()
+          ? "search"
+          : "collection";
+
+    return {
+      collectionID,
+      libraryID,
+      collectionTreeRowID,
+      collectionTreeRowType,
     };
   }
 
@@ -840,7 +1028,9 @@ function createScenarioHelpers(baseContext) {
       getZoteroPane,
       getSelectedItemIDs,
       createItem,
+      createCollection,
       selectItem,
+      selectCollection,
       writeTempFile,
       createPDF,
       openReader,
@@ -849,12 +1039,14 @@ function createScenarioHelpers(baseContext) {
           ? cloneValue(plugin.api.agent.listHostActions())
           : [];
       },
+      createDomContractCheck,
       async runHostAction(actionId, payload = {}) {
         if (typeof plugin?.api?.agent?.runHostAction !== "function") {
           throw new Error("plugin.api.agent.runHostAction() is unavailable");
         }
         return await plugin.api.agent.runHostAction(actionId, payload);
       },
+      toDomContractResult,
       toSurfaceSmokeResult,
       normalizeSurfaceEvidenceTargets,
       getReaderFrameWindow,
@@ -879,7 +1071,13 @@ async function runScenarioCase(scenario, baseContext, runtimeState) {
 
   try {
     resetScenarioReaderEnvironment(baseContext.plugin);
-    const details = await scenario.run(scenarioContext);
+    const rawDetails = await scenario.run(scenarioContext);
+    const details = rawDetails && typeof rawDetails === "object"
+      ? JSON.parse(JSON.stringify(rawDetails))
+      : rawDetails;
+    if (details && typeof details === "object" && details.domContract && typeof details.domContract === "object") {
+      details.domContract = runtime.helpers.toDomContractResult(details.domContract);
+    }
     await runtime.cleanup();
     if (execution) {
       execution.currentScenario = null;

@@ -52,3 +52,39 @@ export function resolveAgentContextArtifacts(projectRoot) {
     latestMD: path.join(archiveDir, "latest.md"),
   };
 }
+
+export function resolveAgentReferenceIntakeArtifacts(projectRoot) {
+  const artifactsDir = resolveAgentArtifactsDir(projectRoot);
+  const archiveDir = path.join(artifactsDir, "agent-reference-intake");
+
+  return {
+    artifactsDir,
+    archiveDir,
+    indexJSON: path.join(archiveDir, "index.json"),
+    latestJSON: path.join(archiveDir, "latest.json"),
+  };
+}
+
+export function resolveAgentReferenceDistillArtifacts(projectRoot) {
+  const artifactsDir = resolveAgentArtifactsDir(projectRoot);
+  const archiveDir = path.join(artifactsDir, "agent-reference-distill");
+
+  return {
+    artifactsDir,
+    archiveDir,
+    indexJSON: path.join(archiveDir, "index.json"),
+    latestJSON: path.join(archiveDir, "latest.json"),
+    latestMD: path.join(archiveDir, "latest.md"),
+  };
+}
+
+export function resolveAgentReferenceUpdateArtifacts(projectRoot) {
+  const artifactsDir = resolveAgentArtifactsDir(projectRoot);
+  const archiveDir = path.join(artifactsDir, "agent-reference-update");
+
+  return {
+    artifactsDir,
+    archiveDir,
+    latestJSON: path.join(archiveDir, "latest.json"),
+  };
+}

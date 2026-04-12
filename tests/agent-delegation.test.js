@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { describe, it, assert } from "./test-framework.js";
 import {
@@ -5,10 +7,15 @@ import {
   buildDelegationPrompt,
   buildDelegationReview,
   buildMcoRunInvocation,
+  captureProjectSnapshot,
   loadDelegationManifest,
+  normalizeDelegationLane,
+  reviewEphemeralDelegationTask,
   renderDelegationReviewMarkdown,
   resolveDelegationManifestPath,
   resolveDelegationTaskArtifacts,
+  runEphemeralDelegationTask,
+  summarizeDelegationRuntimePreflight,
 } from "../scripts/agent-delegation-lib.mjs";
 
 const projectRoot = path.resolve(".");
@@ -141,52 +148,52 @@ describe("Agent Delegation", () => {
     assert.equal(Boolean(manifest.taskMap["ENG-LOW-102"]), false);
     assert.equal(Boolean(manifest.taskMap["DOC-LOW-001"]), false);
     assert.equal(Boolean(manifest.taskMap["DOC-LOW-201"]), false);
-    assert.equal(manifest.taskMap["P1-HIGH-001"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["READER-HIGH-106"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["READER-HIGH-109"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["READER-HIGH-110"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["READER-HIGH-111"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["READER-HIGH-112"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["READER-HIGH-113"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["READER-HIGH-114"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["READER-HIGH-118"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["READER-HIGH-119"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["READER-HIGH-120"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["READER-HIGH-121"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["READER-HIGH-122"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["READER-HIGH-123"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["READER-HIGH-124"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["READER-HIGH-125"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["READER-HIGH-126"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["ENG-HIGH-102"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["ENG-HIGH-103"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["HOST-HIGH-201"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["ENG-HIGH-104"].lane, "codex-high-logic");
-    assert.equal(manifest.taskMap["ENG-LOW-204"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["ENG-LOW-205"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["ENG-LOW-206"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["ENG-LOW-207"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["ENG-LOW-208"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["ENG-LOW-209"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["ENG-LOW-210"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["HOST-LOW-301"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["HOST-LOW-302"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["HOST-LOW-303"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["ENG-LOW-211"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["ENG-LOW-212"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["ENG-LOW-213"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["READER-LOW-252"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["READER-LOW-253"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["READER-LOW-254"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["READER-LOW-255"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["READER-LOW-256"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["READER-LOW-257"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["READER-LOW-258"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["READER-LOW-259"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["READER-LOW-260"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["READER-LOW-261"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["READER-LOW-262"].lane, "opencode-low-logic");
-    assert.equal(manifest.taskMap["READER-LOW-263"].lane, "opencode-low-logic");
+    assert.equal(manifest.taskMap["P1-HIGH-001"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["READER-HIGH-106"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["READER-HIGH-109"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["READER-HIGH-110"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["READER-HIGH-111"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["READER-HIGH-112"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["READER-HIGH-113"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["READER-HIGH-114"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["READER-HIGH-118"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["READER-HIGH-119"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["READER-HIGH-120"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["READER-HIGH-121"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["READER-HIGH-122"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["READER-HIGH-123"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["READER-HIGH-124"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["READER-HIGH-125"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["READER-HIGH-126"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["ENG-HIGH-102"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["ENG-HIGH-103"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["HOST-HIGH-201"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["ENG-HIGH-104"].lane, "codex-architecture-planning");
+    assert.equal(manifest.taskMap["ENG-LOW-204"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["ENG-LOW-205"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["ENG-LOW-206"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["ENG-LOW-207"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["ENG-LOW-208"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["ENG-LOW-209"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["ENG-LOW-210"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["HOST-LOW-301"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["HOST-LOW-302"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["HOST-LOW-303"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["ENG-LOW-211"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["ENG-LOW-212"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["ENG-LOW-213"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["READER-LOW-252"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["READER-LOW-253"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["READER-LOW-254"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["READER-LOW-255"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["READER-LOW-256"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["READER-LOW-257"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["READER-LOW-258"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["READER-LOW-259"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["READER-LOW-260"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["READER-LOW-261"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["READER-LOW-262"].lane, "opencode-implementation-delivery");
+    assert.equal(manifest.taskMap["READER-LOW-263"].lane, "opencode-implementation-delivery");
     assert.ok(manifest.taskMap["READER-HIGH-114"].title.includes("历史契约源"));
     assert.ok(manifest.taskMap["READER-HIGH-118"].title.includes("历史契约源"));
     assert.ok(manifest.taskMap["READER-HIGH-119"].title.includes("历史契约源"));
@@ -254,8 +261,8 @@ describe("Agent Delegation", () => {
     assert.equal(manifest.taskMap["ENG-LOW-212"].gitClosure.milestone, "module-feature");
     assert.equal(manifest.taskMap["ENG-LOW-213"].gitClosure.milestone, "batch-closure");
     assert.equal(manifest.taskMap["ENG-LOW-213"].gitClosure.commitMessage, "chore: 收口 ENG-HIGH-104 manifest、文档与守卫测试");
-    assert.equal(manifest.taskMap["OBSIDIAN-HIGH-101"].lane, "codex-high-logic");
-    assert.equal(manifest.tasks.some((task) => task.lane === "opencode-low-logic"), true);
+    assert.equal(manifest.taskMap["OBSIDIAN-HIGH-101"].lane, "codex-architecture-planning");
+    assert.equal(manifest.tasks.some((task) => task.lane === "opencode-implementation-delivery"), true);
   });
 
   it("should resolve delegation manifest and artifact paths under dist", () => {
@@ -268,13 +275,20 @@ describe("Agent Delegation", () => {
     assert.equal(artifacts.gitClosureJSON, path.join(projectRoot, "dist", "agent-delegation", "READER-LOW-216", "git-closure.json"));
   });
 
+  it("should normalize legacy lane aliases to the scenario-based lane ids", () => {
+    assert.equal(normalizeDelegationLane("codex-high-logic"), "codex-architecture-planning");
+    assert.equal(normalizeDelegationLane("opencode-low-logic"), "opencode-implementation-delivery");
+    assert.equal(normalizeDelegationLane("codex-architecture-planning"), "codex-architecture-planning");
+    assert.equal(normalizeDelegationLane("opencode-implementation-delivery"), "opencode-implementation-delivery");
+  });
+
   it("should build strict mco invocation for opencode tasks", async () => {
     const previous = process.env.MCO_BINARY;
     delete process.env.MCO_BINARY;
     try {
       const task = {
         taskId: "DOC-LOW-SAMPLE",
-        lane: "opencode-low-logic",
+        lane: "opencode-implementation-delivery",
         scopePaths: ["README.md", "docs/CURRENT_BACKLOG.md"],
         dependsOn: ["READER-HIGH-106"],
         promptTemplate: "该任务仅供 Codex 跟踪。本轮只负责同步 README 与 current truth 摘要，不得扩 scope，不得新建平行文档。",
@@ -288,6 +302,12 @@ describe("Agent Delegation", () => {
           activeBatchId: "HOST-HIGH-201",
           currentWaveName: "ZOTERO-HOST-POLISH-WAVE-001",
           validationLevel: "需要视觉验证",
+        },
+        alignmentRef: {
+          status: "repair-required",
+          generationStage: "standalone",
+          preferredRepairCommand: "npm run agent:gate",
+          warningKinds: ["freshness-mismatch"],
         },
         actionRef: {
           nextAction: "npm run agent:gate",
@@ -341,6 +361,7 @@ describe("Agent Delegation", () => {
       assert.ok(invocation.prompt.includes("完整契约来源: config/agent-delegation-tasks.json -> DOC-LOW-SAMPLE"));
       assert.ok(invocation.prompt.includes("当前项目态（runtime-compact-v1）"));
       assert.ok(invocation.prompt.includes("Truth Ref: batch=HOST-HIGH-201 / wave=ZOTERO-HOST-POLISH-WAVE-001 / validation=需要视觉验证"));
+      assert.ok(invocation.prompt.includes("Alignment Ref: status=repair-required / stage=standalone / repair=npm run agent:gate / freshness-mismatch"));
       assert.ok(invocation.prompt.includes("最小任务摘要:"));
       assert.equal(invocation.prompt.includes(task.promptTemplate), false);
       assert.includes(invocation.args, "run");
@@ -364,12 +385,156 @@ describe("Agent Delegation", () => {
     }
   });
 
+  it("should allow snapshot callers to override ignored directories for reference-sensitive checks", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "addon-template-delegation-snapshot-root-"));
+    try {
+      fs.mkdirSync(path.join(root, "docs"), { recursive: true });
+      fs.mkdirSync(path.join(root, "reference", "plugin", "demo-scope"), { recursive: true });
+      fs.writeFileSync(path.join(root, "docs", "REFERENCE_INDEX.md"), "# Reference 路由\n", "utf-8");
+      fs.writeFileSync(path.join(root, "reference", "plugin", "demo-scope", "menu.js"), "popupshowing\n", "utf-8");
+
+      const defaultSnapshot = await captureProjectSnapshot(root);
+      const referenceAwareSnapshot = await captureProjectSnapshot(root, {
+        ignoreDirs: [".git", "build", "dist", "node_modules"],
+      });
+
+      assert.equal(defaultSnapshot.files.some((entry) => entry.path === "reference/plugin/demo-scope/menu.js"), false);
+      assert.equal(referenceAwareSnapshot.files.some((entry) => entry.path === "reference/plugin/demo-scope/menu.js"), true);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("should run and review a manifest-free ephemeral delegation task with strict artifacts", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "addon-template-ephemeral-delegation-root-"));
+    const artifactsDir = fs.mkdtempSync(path.join(os.tmpdir(), "addon-template-ephemeral-delegation-artifacts-"));
+    const previousArtifactsDir = process.env.AGENT_ARTIFACTS_DIR;
+    try {
+      process.env.AGENT_ARTIFACTS_DIR = artifactsDir;
+      fs.mkdirSync(path.join(root, "docs"), { recursive: true });
+      fs.writeFileSync(path.join(root, "docs", "REFERENCE_INDEX.md"), "# Reference 路由\n", "utf-8");
+      const task = {
+        taskId: "REFERENCE-DISTILL-EPHEMERAL-TEST",
+        title: "Reference distillation / Ephemeral",
+        lane: "opencode-implementation-delivery",
+        scopePaths: [
+          "docs/REFERENCE_INDEX.md",
+          "docs/REFERENCE_EPHEMERAL_TEST.md",
+        ],
+        dependsOn: [],
+        promptTemplate: "只允许更新 docs/REFERENCE_*.md 与 docs/REFERENCE_INDEX.md，最终输出单个 JSON brief。",
+        reviewChecklist: [],
+        testCommands: [],
+        handoffArtifacts: [],
+      };
+
+      const runRecord = await runEphemeralDelegationTask(root, task, {
+        manifestPath: "ephemeral://reference-distillation",
+        inlineContract: true,
+        executeCommand: async () => {
+          fs.writeFileSync(path.join(root, "docs", "REFERENCE_EPHEMERAL_TEST.md"), "# Ephemeral\n", "utf-8");
+          return {
+            exitCode: 0,
+            signal: null,
+            stdout: JSON.stringify({
+              status: "completed",
+              owner_role: "reference-distill-worker",
+              summary: "updated reference topic",
+              changed_files: ["docs/REFERENCE_EPHEMERAL_TEST.md"],
+              checks_run: [],
+              risks: [],
+              blockers: [],
+              next_action: "none",
+            }),
+            stderr: "",
+          };
+        },
+      });
+      const review = await reviewEphemeralDelegationTask(root, task, {
+        reviewer: "reference-distill-controller",
+      });
+      const artifacts = resolveDelegationTaskArtifacts(root, task.taskId);
+
+      assert.equal(runRecord.exitCode, 0);
+      assert.equal(runRecord.providerResultPresent, true);
+      assert.deepEqual(runRecord.changedFiles.map((entry) => entry.path), ["docs/REFERENCE_EPHEMERAL_TEST.md"]);
+      assert.equal(review.reviewStatus, "accepted");
+      assert.equal(fs.existsSync(artifacts.taskJSON), true);
+      assert.equal(fs.existsSync(artifacts.invocationJSON), true);
+      assert.equal(fs.existsSync(artifacts.runJSON), true);
+      assert.equal(fs.existsSync(artifacts.reviewJSON), true);
+    } finally {
+      if (previousArtifactsDir === undefined) {
+        delete process.env.AGENT_ARTIFACTS_DIR;
+      } else {
+        process.env.AGENT_ARTIFACTS_DIR = previousArtifactsDir;
+      }
+      fs.rmSync(root, { recursive: true, force: true });
+      fs.rmSync(artifactsDir, { recursive: true, force: true });
+    }
+  });
+
+  it("should reject an ephemeral delegation task that writes outside scope", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "addon-template-ephemeral-delegation-reject-root-"));
+    const artifactsDir = fs.mkdtempSync(path.join(os.tmpdir(), "addon-template-ephemeral-delegation-reject-artifacts-"));
+    const previousArtifactsDir = process.env.AGENT_ARTIFACTS_DIR;
+    try {
+      process.env.AGENT_ARTIFACTS_DIR = artifactsDir;
+      fs.mkdirSync(path.join(root, "docs"), { recursive: true });
+      fs.writeFileSync(path.join(root, "docs", "REFERENCE_INDEX.md"), "# Reference 路由\n", "utf-8");
+      fs.writeFileSync(path.join(root, "docs", "CURRENT_BACKLOG.md"), "# Truth\n", "utf-8");
+      const task = {
+        taskId: "REFERENCE-DISTILL-EPHEMERAL-REJECT",
+        title: "Reference distillation / Reject",
+        lane: "opencode-implementation-delivery",
+        scopePaths: [
+          "docs/REFERENCE_INDEX.md",
+          "docs/REFERENCE_EPHEMERAL_REJECT.md",
+        ],
+        dependsOn: [],
+        promptTemplate: "只允许更新 docs/REFERENCE_*.md 与 docs/REFERENCE_INDEX.md。",
+        reviewChecklist: [],
+        testCommands: [],
+        handoffArtifacts: [],
+      };
+
+      await runEphemeralDelegationTask(root, task, {
+        manifestPath: "ephemeral://reference-distillation",
+        inlineContract: true,
+        executeCommand: async () => {
+          fs.writeFileSync(path.join(root, "docs", "REFERENCE_EPHEMERAL_REJECT.md"), "# Reject\n", "utf-8");
+          fs.writeFileSync(path.join(root, "docs", "CURRENT_BACKLOG.md"), "# drifted truth\n", "utf-8");
+          return {
+            exitCode: 0,
+            signal: null,
+            stdout: "{}",
+            stderr: "",
+          };
+        },
+      });
+      const review = await reviewEphemeralDelegationTask(root, task, {
+        reviewer: "reference-distill-controller",
+      });
+
+      assert.equal(review.reviewStatus, "rejected");
+      assert.deepEqual(review.rejectedFiles, ["docs/CURRENT_BACKLOG.md"]);
+    } finally {
+      if (previousArtifactsDir === undefined) {
+        delete process.env.AGENT_ARTIFACTS_DIR;
+      } else {
+        process.env.AGENT_ARTIFACTS_DIR = previousArtifactsDir;
+      }
+      fs.rmSync(root, { recursive: true, force: true });
+      fs.rmSync(artifactsDir, { recursive: true, force: true });
+    }
+  });
+
   it("should build compact delegation prompts by default and keep full contract in manifest", () => {
     const promptTemplate = "该任务仅供 Codex 跟踪。本轮只负责把最小上下文摘要接到既有消费链，不新增平行 artifact 家族；保持 current truth 为单一事实源；不得把 dashboard / obsidian / gate 的摘要再各写一套长文本。";
     const prompt = buildDelegationPrompt({
       taskId: "ENG-LOW-CONTEXT",
       title: "压缩 delegation 上下文占用",
-      lane: "opencode-low-logic",
+      lane: "opencode-implementation-delivery",
       scopePaths: ["scripts/agent-context-lib.mjs"],
       dependsOn: [],
       promptTemplate,
@@ -391,7 +556,7 @@ describe("Agent Delegation", () => {
     const prompt = buildDelegationPrompt({
       taskId: "ENG-LOW-RUNTIME",
       title: "收口运行时上下文",
-      lane: "opencode-low-logic",
+      lane: "opencode-implementation-delivery",
       scopePaths: ["scripts/agent-delegation-lib.mjs"],
       dependsOn: [],
       promptTemplate: "该任务仅供 Codex 跟踪。本轮只负责消费 compact context，不得内联长 truth。",
@@ -405,6 +570,12 @@ describe("Agent Delegation", () => {
           activeBatchId: "HOST-HIGH-201",
           currentWaveName: "ZOTERO-HOST-POLISH-WAVE-001",
           validationLevel: "需要视觉验证",
+        },
+        alignmentRef: {
+          status: "repair-required",
+          generationStage: "standalone",
+          preferredRepairCommand: "npm run agent:gate",
+          warningKinds: ["freshness-mismatch", "scope-mismatch"],
         },
         actionRef: {
           nextAction: "npm run agent:gate",
@@ -439,6 +610,7 @@ describe("Agent Delegation", () => {
 
     assert.ok(prompt.includes("当前项目态（runtime-compact-v1）"));
     assert.ok(prompt.includes("动态运行时上下文（可变部分）:"));
+    assert.ok(prompt.includes("Alignment Ref: status=repair-required / stage=standalone / repair=npm run agent:gate / freshness-mismatch；scope-mismatch"));
     assert.ok(prompt.includes("Artifact Refs: truth=docs/CURRENT_BACKLOG.md / monitor=dist/agent-monitor.json / gate=dist/agent-gate.json / memory=dist/agent-memory.json / context=dist/agent-context.json"));
     assert.ok(prompt.includes("gate 早于 monitor；monitor 早于 memory"));
     assert.equal(prompt.includes("不应进入 prompt 的第三条 warning"), false);
@@ -448,12 +620,58 @@ describe("Agent Delegation", () => {
     assert.equal(prompt.includes("当前 monitor 结论稳定"), false);
   });
 
+  it("should block delegation only on freshness/scope/missing context warnings", () => {
+    const blocking = summarizeDelegationRuntimePreflight({
+      present: true,
+      alignmentRef: {
+        status: "repair-required",
+        generationStage: "standalone",
+        preferredRepairCommand: "npm run agent:gate",
+        warningKinds: ["freshness-mismatch", "budget-exceeded"],
+      },
+      driftRef: {
+        status: "warning",
+        warningCount: 1,
+        warnings: ["gate 早于 monitor"],
+      },
+    }, {
+      warnings: [
+        { kind: "freshness-mismatch" },
+        { kind: "budget-exceeded" },
+      ],
+      recommendation: "执行 `npm run agent:gate`。",
+    });
+    const nonBlocking = summarizeDelegationRuntimePreflight({
+      present: true,
+      alignmentRef: {
+        status: "repair-required",
+        generationStage: "standalone",
+        preferredRepairCommand: "npm run agent:gate",
+        warningKinds: ["budget-exceeded"],
+      },
+      driftRef: {
+        status: "warning",
+        warningCount: 1,
+        warnings: ["compact 超预算"],
+      },
+    }, {
+      warnings: [
+        { kind: "budget-exceeded" },
+      ],
+      recommendation: "收紧 compact budget。",
+    });
+
+    assert.equal(blocking.blocking, true);
+    assert.deepEqual(blocking.blockingKinds, ["freshness-mismatch"]);
+    assert.equal(nonBlocking.blocking, false);
+  });
+
   it("should allow explicitly inlining the full contract for debugging", () => {
     const promptTemplate = "该任务仅供 Codex 跟踪。只允许改既有脚本，不得扩 scope。";
     const prompt = buildDelegationPrompt({
       taskId: "ENG-LOW-INLINE",
       title: "内联 contract 调试",
-      lane: "opencode-low-logic",
+      lane: "opencode-implementation-delivery",
       scopePaths: ["scripts/agent-delegation-lib.mjs"],
       dependsOn: [],
       promptTemplate,
@@ -472,7 +690,7 @@ describe("Agent Delegation", () => {
     const invocation = buildMcoRunInvocation({
       taskId: "ENG-LOW-INLINE",
       title: "内联 contract 调试",
-      lane: "opencode-low-logic",
+      lane: "opencode-implementation-delivery",
       scopePaths: ["scripts/agent-delegation-lib.mjs"],
       dependsOn: [],
       promptTemplate: "该任务仅供 Codex 跟踪。只允许改既有脚本，不得扩 scope。",
@@ -494,12 +712,12 @@ describe("Agent Delegation", () => {
       assertDelegationBatchSafe([
         {
           taskId: "A",
-          lane: "opencode-low-logic",
+          lane: "opencode-implementation-delivery",
           scopePaths: ["scripts"],
         },
         {
           taskId: "B",
-          lane: "opencode-low-logic",
+          lane: "opencode-implementation-delivery",
           scopePaths: ["scripts/agent-monitor.mjs"],
         },
       ]);

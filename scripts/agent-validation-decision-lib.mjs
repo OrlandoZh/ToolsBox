@@ -8,6 +8,7 @@ import { isPureVisualReaderFailure } from "./agent-zotero-validation-lib.mjs";
 const VISUAL_POLICY_OVERRIDE_ENV = "AGENT_VISUAL_POLICY_OVERRIDE";
 const DEFAULT_VALIDATION_DOMAINS_RELATIVE_PATH = path.join("config", "validation-domains.json");
 const DEFAULT_PROJECT_VALIDATION_OVERRIDES_RELATIVE_PATH = path.join("config", "project-validation-overrides.json");
+const DEFAULT_PROJECT_EXPANSION_WAVE_RELATIVE_PATH = path.join("config", "project-expansion-wave.json");
 
 const VISUAL_LEVEL = Object.freeze({
   required: "visual-required",
@@ -314,6 +315,25 @@ function matcherPatternToPathHint(pattern) {
   return hint || null;
 }
 
+function normalizeWaveOverrideId(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, "-")
+    .replace(/^-+|-+$/gu, "") || null;
+}
+
+function loadActiveWaveOverrideId(projectRoot) {
+  const parsed = safeReadJSON(path.join(projectRoot, DEFAULT_PROJECT_EXPANSION_WAVE_RELATIVE_PATH));
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+  if (String(parsed.status || "").trim() === "not-entered") {
+    return null;
+  }
+  return normalizeWaveOverrideId(parsed.currentWaveName);
+}
+
 function loadExpansionWaveHintPaths(projectRoot) {
   const parsed = safeReadJSON(path.join(projectRoot, "config", "project-expansion-wave.json"));
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
@@ -532,6 +552,7 @@ export function buildValidationDecision(options = {}) {
   const projectOverrides = options.projectValidationOverrides
     ? { overrides: options.projectValidationOverrides.map((entry, index) => normalizeProjectOverride(entry, index)) }
     : loadProjectValidationOverrides(projectRoot, options).registry;
+  const activeWaveOverrideId = options.activeWaveOverrideId || loadActiveWaveOverrideId(projectRoot);
 
   const overrideLevel = normalizeOverride(env);
   const signalDecision = classifyBySignals(e2e);
@@ -540,6 +561,12 @@ export function buildValidationDecision(options = {}) {
     validationDomains.domains,
     projectOverrides.overrides,
   );
+  const effectivePathClassifications = activeWaveOverrideId
+    ? (() => {
+      const matched = pathClassifications.filter((entry) => entry.matchedOverride?.id === activeWaveOverrideId);
+      return matched.length > 0 ? matched : pathClassifications;
+    })()
+    : pathClassifications;
 
   let level = VISUAL_LEVEL.recommended;
   let decisionSource = "fallback-unknown";
@@ -560,17 +587,17 @@ export function buildValidationDecision(options = {}) {
     decisionSource = "fallback-unknown";
     reasons = ["当前缺少稳定的变更域信息，默认先非阻断并补证视觉验证。"];
   } else {
-    level = pickHighestPriorityLevel(pathClassifications);
-    decisionSource = pathClassifications.some((entry) => entry.matchedOverride)
+    level = pickHighestPriorityLevel(effectivePathClassifications);
+    decisionSource = effectivePathClassifications.some((entry) => entry.matchedOverride)
       ? "project-override"
-      : pathClassifications.some((entry) => entry.matchedDomain)
+      : effectivePathClassifications.some((entry) => entry.matchedDomain)
         ? "validation-domain"
         : "fallback-unknown";
-    reasons = buildLevelReasons(level, pathClassifications);
+    reasons = buildLevelReasons(level, effectivePathClassifications);
   }
 
   const evidence = evaluateVisualEvidence(level, e2e);
-  const requiredChecks = buildLevelRequiredChecks(level, pathClassifications);
+  const requiredChecks = buildLevelRequiredChecks(level, effectivePathClassifications);
   let deferredEvidenceAction = null;
   let blocking = false;
   let issue = null;
@@ -599,8 +626,8 @@ export function buildValidationDecision(options = {}) {
     reasons: uniqueStrings(reasons),
     requiredChecks,
     requiredEvidence: requiredChecks,
-    matchedDomain: uniqueStrings(pathClassifications.map((entry) => entry.matchedDomain?.id).filter(Boolean)),
-    matchedProjectOverride: uniqueStrings(pathClassifications.map((entry) => entry.matchedOverride?.id).filter(Boolean)),
+    matchedDomain: uniqueStrings(effectivePathClassifications.map((entry) => entry.matchedDomain?.id).filter(Boolean)),
+    matchedProjectOverride: uniqueStrings(effectivePathClassifications.map((entry) => entry.matchedOverride?.id).filter(Boolean)),
     escalatedByRuntimeSignals,
     deferredEvidenceAction,
     evidence,

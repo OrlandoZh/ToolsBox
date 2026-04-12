@@ -11,6 +11,7 @@ import {
   buildUserPrefs,
   connectRdpWithLaunchDiagnostics,
   diffWatchSnapshots,
+  findFreePort,
   findManagedRuntimeProcesses,
   formatProcessLogTail,
   getDefaultWatchRoots,
@@ -78,6 +79,82 @@ ZOTERO_PLUGIN_RDP_PORT=64719
       "64719",
       "--jsdebugger",
     ]);
+  });
+
+  it("should fall back to default local bind when loopback port probing is denied", async () => {
+    const attempts = [];
+    const port = await findFreePort({
+      hosts: ["127.0.0.1", null],
+      createServer: () => {
+        const listeners = new Map();
+        return {
+          on(event, handler) {
+            listeners.set(event, handler);
+          },
+          listen(options, callback) {
+            attempts.push(options?.host ?? null);
+            if (options?.host === "127.0.0.1") {
+              const error = new Error("listen EPERM: operation not permitted 127.0.0.1");
+              error.code = "EPERM";
+              listeners.get("error")?.(error);
+              return;
+            }
+            callback();
+          },
+          address() {
+            return {
+              address: attempts[attempts.length - 1] || "::",
+              family: attempts[attempts.length - 1] ? "IPv4" : "IPv6",
+              port: 43123,
+            };
+          },
+          close(callback) {
+            callback?.();
+          },
+        };
+      },
+    });
+
+    assert.equal(port, 43123);
+    assert.deepEqual(attempts, ["127.0.0.1", null]);
+  });
+
+  it("should keep non-retryable free port probe failures visible", async () => {
+    const attempts = [];
+    let error = null;
+
+    try {
+      await findFreePort({
+        hosts: ["127.0.0.1", null],
+        createServer: () => {
+          const listeners = new Map();
+          return {
+            on(event, handler) {
+              listeners.set(event, handler);
+            },
+            listen(options) {
+              attempts.push(options?.host ?? null);
+              const probeError = new Error("listen EADDRINUSE: address already in use 127.0.0.1");
+              probeError.code = "EADDRINUSE";
+              listeners.get("error")?.(probeError);
+            },
+            address() {
+              return null;
+            },
+            close(callback) {
+              callback?.();
+            },
+          };
+        },
+      });
+    }
+    catch (caught) {
+      error = caught;
+    }
+
+    assert.ok(error);
+    assert.equal(error.code, "EADDRINUSE");
+    assert.deepEqual(attempts, ["127.0.0.1"]);
   });
 
   it("should resolve default runtime paths inside the workspace", () => {

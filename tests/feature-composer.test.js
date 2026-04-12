@@ -18,6 +18,7 @@ function createDeps() {
   const paneRegistrations = [];
   const commandRegistrations = [];
   const selectionActions = [];
+  const sectionRegistrations = [];
   const demoState = {
     shortcutLabel: "Ctrl+Shift+Y",
     shortcutTriggerCount: 0,
@@ -107,8 +108,8 @@ function createDeps() {
         isOfficialAPIAvailable() {
           return false;
         },
-        registerContextMenuItem() {},
-        registerReaderMenuItem() {},
+        registerItemMenuItem() {},
+        registerReaderMenubarViewMenuItem() {},
         getMenuCount() {
           return 0;
         },
@@ -133,8 +134,9 @@ function createDeps() {
         registerInfoRow() {
           calls.rows += 1;
         },
-        registerSection() {
+        registerSection(options) {
           calls.sections += 1;
+          sectionRegistrations.push(options);
         },
         getInfoRowCount() {
           return calls.rows;
@@ -175,6 +177,15 @@ function createDeps() {
           ready: true,
         };
       },
+      presentReactSurface() {
+        calls.reactSurfacePresent = (calls.reactSurfacePresent || 0) + 1;
+      },
+      renderReactItemPaneSurface() {
+        calls.reactSurfaceRender = (calls.reactSurfaceRender || 0) + 1;
+      },
+      unmountReactItemPaneSurface() {
+        calls.reactSurfaceUnmount = (calls.reactSurfaceUnmount || 0) + 1;
+      },
       getColumnValue() {
         return "item · 0";
       },
@@ -197,7 +208,45 @@ function createDeps() {
     paneRegistrations,
     commandRegistrations,
     selectionActions,
+    sectionRegistrations,
   };
+}
+
+function createFakeSectionRenderContext() {
+  const doc = {
+    createElement(tagName) {
+      return {
+        tagName: String(tagName || "").toUpperCase(),
+        textContent: "",
+        children: [],
+        appendChild(child) {
+          this.children.push(child);
+          child.parentNode = this;
+          return child;
+        },
+      };
+    },
+  };
+
+  const body = {
+    ownerDocument: doc,
+    children: [],
+    appendChild(child) {
+      this.children.push(child);
+      child.parentNode = this;
+      return child;
+    },
+    replaceChildren(...children) {
+      this.children = children;
+      children.forEach((child) => {
+        if (child && typeof child === "object") {
+          child.parentNode = this;
+        }
+      });
+    },
+  };
+
+  return { doc, body };
 }
 
 describe("Feature Composer", () => {
@@ -313,11 +362,11 @@ describe("Feature Composer", () => {
       isOfficialAPIAvailable() {
         return true;
       },
-      registerContextMenuItem(menuItem) {
+      registerItemMenuItem(menuItem) {
         contextMenus.push(menuItem);
       },
-      registerReaderMenuItem(config, menuItem) {
-        readerMenus.push({ config, menuItem });
+      registerReaderMenubarViewMenuItem(menuItem) {
+        readerMenus.push(menuItem);
       },
       getMenuCount() {
         return contextMenus.length + readerMenus.length;
@@ -331,12 +380,12 @@ describe("Feature Composer", () => {
     assert.equal(readerMenus.length, 1);
     assert.equal(contextMenus[0].l10nID, "cleanroom-menu-label");
     assert.equal(contextMenus[0].label, undefined);
-    assert.equal(readerMenus[0].menuItem.l10nID, "cleanroom-reader-menu-label");
-    assert.equal(readerMenus[0].menuItem.label, undefined);
+    assert.equal(readerMenus[0].l10nID, "cleanroom-reader-menu-label");
+    assert.equal(readerMenus[0].label, undefined);
   });
 
   it("should register the optional react-ui command only when the bundle is enabled", async () => {
-    const { deps, calls, commandRegistrations } = createDeps();
+    const { deps, calls, commandRegistrations, sectionRegistrations } = createDeps();
     deps.optionalBundles = {
       isEnabled(bundleID) {
         return bundleID === "react-ui";
@@ -351,5 +400,24 @@ describe("Feature Composer", () => {
 
     await commandRegistrations[3].handler();
     assert.equal(calls.reactUIDemo, 1);
+
+    const { doc, body } = createFakeSectionRenderContext();
+    sectionRegistrations[0].onRender({
+      doc,
+      body,
+      item: {
+        id: 77,
+      },
+      setSectionSummary() {},
+    });
+    assert.equal(body.children.length, 1);
+    assert.equal(body.children[0].id, "demo-section-root");
+    assert.equal(body.children[0].dataset.cleanroomItemPaneRoot, "true");
+    assert.equal(body.children[0].dataset.cleanroomPaneID, "demo-section");
+    assert.equal(calls.reactSurfacePresent, 1);
+    assert.equal(calls.reactSurfaceRender || 0, 0);
+
+    sectionRegistrations[0].onDestroy({ body });
+    assert.equal(calls.reactSurfaceUnmount, 1);
   });
 });

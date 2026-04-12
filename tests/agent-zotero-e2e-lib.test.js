@@ -347,6 +347,24 @@ describe("Agent Zotero E2E Lib", () => {
           results: [
             { name: "baseline registration diagnostics", status: "passed" },
             { name: "settings schema and preference pane diagnostics", status: "passed" },
+            {
+              name: "reader interaction diagnostics",
+              status: "passed",
+              details: {
+                toolbarDispatchMode: "customEvent",
+                toolbarAppendedItemCount: 2,
+                selectionPopupAppendedItemCount: 1,
+                sidebarHeaderAppendedItemCount: 3,
+                contextMenuProbeCount: 2,
+                contextMenuObservedTypes: [
+                  "createViewContextMenu",
+                  "createAnnotationContextMenu",
+                ],
+                contextMenuSyntheticFallbackTypes: [
+                  "createViewContextMenu",
+                ],
+              },
+            },
           ],
         },
         logs: {
@@ -453,6 +471,13 @@ describe("Agent Zotero E2E Lib", () => {
     assert.ok(markdown.includes("[library.png](/tmp/library.png)"));
     assert.ok(markdown.includes("[hot-reload-library.png](/tmp/hot-reload-library.png)"));
     assert.ok(markdown.includes("## Reader 视觉主阻断"));
+    assert.ok(markdown.includes("## Reader 深层事件点"));
+    assert.ok(markdown.includes("工具栏分发"));
+    assert.ok(markdown.includes("工具栏追加项"));
+    assert.ok(markdown.includes("文本浮层追加项"));
+    assert.ok(markdown.includes("侧栏批注头追加项"));
+    assert.ok(markdown.includes("上下文菜单探针数"));
+    assert.ok(markdown.includes("createViewContextMenu"));
     assert.ok(markdown.includes("采集未稳定"));
     assert.ok(markdown.includes("Canonical 覆盖"));
     assert.ok(markdown.includes("| 轮次 | 库视图截图 | Reader 截图 | 校验 | 备注 |"));
@@ -1279,6 +1304,7 @@ describe("Agent Zotero E2E Lib", () => {
     assert.ok(result.issues.includes("Reader View 菜单项未注册。"));
     assert.equal(result.primaryDiagnosis?.fingerprint, "reader-entry:declarative-reader-mapping-drift");
     assert.ok(result.hints.some((item) => String(item).includes("feature-composer.js")));
+    assert.ok(result.hints.some((item) => String(item).includes("registerReaderMenubarViewMenuItem")));
   });
 
   it("should diagnose reader event bridge registration drift when hook scenario fails", () => {
@@ -1566,7 +1592,7 @@ describe("Agent Zotero E2E Lib", () => {
     assert.equal(result.passed, false);
     assert.ok(result.issues.includes("主窗口上下文菜单项未注册。"));
     assert.equal(result.primaryDiagnosis?.fingerprint, "menu-action:context-menu-missing");
-    assert.ok(result.hints.some((item) => String(item).includes("registerContextMenuItem")));
+    assert.ok(result.hints.some((item) => String(item).includes("registerItemMenuItem")));
   });
 
   it("should prioritize preference pane diagnosis when preference pane registration is missing", () => {

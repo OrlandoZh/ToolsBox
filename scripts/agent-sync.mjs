@@ -2,9 +2,11 @@ import { execFile } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { refreshGateObsidianGuardSnapshot } from "./agent-gate.mjs";
 import {
   buildScriptFailureInfo,
   createScriptError,
+  isExecutedAsScript,
 } from "./script-runtime-lib.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -46,10 +48,24 @@ function runNpmScript(scriptName, { allowFailure = false } = {}) {
   });
 }
 
+export async function synchronizeGateAfterObsidian(targetProjectRoot = projectRoot) {
+  return await refreshGateObsidianGuardSnapshot(targetProjectRoot, {
+    env: process.env,
+  });
+}
+
 async function main() {
   const gateResult = await runNpmScript("agent:gate", { allowFailure: true });
+  const contextGuardResult = await runNpmScript("agent:context:guard:strict", { allowFailure: true });
+  if (contextGuardResult.code !== 0) {
+    process.exit(contextGuardResult.code);
+  }
   await runNpmScript("agent:obsidian");
   const guardResult = await runNpmScript("agent:obsidian:guard:strict", { allowFailure: true });
+  await synchronizeGateAfterObsidian(projectRoot);
+  const referenceDrainResult = guardResult.code === 0
+    ? await runNpmScript("agent:reference:drain", { allowFailure: true })
+    : { code: 0, stdout: "", stderr: "" };
 
   if (guardResult.code !== 0) {
     process.exit(guardResult.code);
@@ -58,13 +74,19 @@ async function main() {
     console.log("Agent sync completed with a blocked gate; Obsidian workspace has still been refreshed to the latest project state.");
     process.exit(gateResult.code);
   }
+  if (referenceDrainResult.code !== 0) {
+    console.log("Agent sync completed, but reference distillation drain did not finish cleanly; the main gate/context/obsidian chain remains aligned.");
+    return;
+  }
   console.log("Agent sync completed: gate chain, agent-context, obsidian handoff, and strict Obsidian guard are aligned.");
 }
 
-main().catch((error) => {
-  const failureInfo = buildScriptFailureInfo(error, {
-    durationMs: Math.max(0, Date.now() - scriptStartedAt),
+if (isExecutedAsScript(import.meta.url)) {
+  main().catch((error) => {
+    const failureInfo = buildScriptFailureInfo(error, {
+      durationMs: Math.max(0, Date.now() - scriptStartedAt),
+    });
+    console.error(`[agent-sync] ${failureInfo.errorCategoryLabel}: ${failureInfo.errorMessage}`);
+    process.exit(1);
   });
-  console.error(`[agent-sync] ${failureInfo.errorCategoryLabel}: ${failureInfo.errorMessage}`);
-  process.exit(1);
-});
+}

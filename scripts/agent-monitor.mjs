@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { listRunRecords } from "./agent-telemetry-lib.mjs";
 import { resolveAgentArtifactPath, resolveAgentArtifactsDir } from "./agent-artifacts.mjs";
 import { buildMonitorFrontpageSummary } from "./agent-frontpage-summary-lib.mjs";
+import { loadReferenceDistillationState } from "./agent-reference-intake-lib.mjs";
 import {
   buildValidationDecision,
   collectValidationContext,
@@ -324,6 +325,7 @@ function buildMarkdown(summary) {
     `- 真机验证: \`${summary.frontpageSummary?.e2e?.statusLabel || "缺失"}\` / ${summary.frontpageSummary?.e2e?.ageText || "-"}`,
     `- 自动修复: \`${summary.frontpageSummary?.autofix?.statusLabel || "缺失"}\` / ${summary.frontpageSummary?.autofix?.ageText || "-"}`,
     `- 恢复回归: \`${summary.frontpageSummary?.watchRecovery?.statusLabel || "缺失"}\` / ${summary.frontpageSummary?.watchRecovery?.ageText || "-"}`,
+    `- Reference Distillation: \`${summary.frontpageSummary?.referenceDistillation?.statusLabel || "缺失"}\` / pending \`${summary.frontpageSummary?.referenceDistillation?.pendingCount ?? 0}\` / topic \`${summary.frontpageSummary?.referenceDistillation?.lastTopic || "-"}\``,
     "",
     "## 验证策略判定",
     "",
@@ -361,6 +363,12 @@ function buildMarkdown(summary) {
   if (Array.isArray(summary.frontpageSummary?.primarySignals) && summary.frontpageSummary.primarySignals.length > 0) {
     lines.push("### 关键信号", "");
     summary.frontpageSummary.primarySignals.forEach((item) => lines.push(`- ${item}`));
+    lines.push("");
+  }
+
+  if (Array.isArray(summary.frontpageSummary?.advisorySignals) && summary.frontpageSummary.advisorySignals.length > 0) {
+    lines.push("### Advisory", "");
+    summary.frontpageSummary.advisorySignals.forEach((item) => lines.push(`- ${item}`));
     lines.push("");
   }
 
@@ -474,6 +482,23 @@ function buildMarkdown(summary) {
     }
     lines.push("");
   }
+  const domContract = summary.zoteroValidation?.e2e?.domContractReport || null;
+  if (domContract) {
+    lines.push("### DOM Contract", "");
+    lines.push(`- 状态: \`${domContract.statusLabel || domContract.status || "缺失"}\``);
+    lines.push(`- Advisory: \`${domContract.advisory ? "是" : "否"}\``);
+    lines.push(`- Route 覆盖: \`${domContract.passedRouteCount ?? 0}/${domContract.routeCount ?? 0}\``);
+    lines.push(`- 异常 Route: \`${domContract.failedRouteCount ?? 0}\``);
+    lines.push(`- 缺失 Route: \`${domContract.missingRouteCount ?? 0}\``);
+    lines.push(`- 摘要: ${domContract.summary || "-"}`);
+    const domContractRoutes = Array.isArray(domContract.routes) ? domContract.routes : [];
+    domContractRoutes.forEach((route) => {
+      lines.push(`- Route ${route.routeId || route.adapter || "-"}: \`${route.statusLabel || route.status || "-"}\` / 场景 ${(route.scenarioNames || []).join("、") || "-"}`);
+      lines.push(`- Route 摘要: ${route.summary || "-"}`);
+      lines.push(`- 失败检查: ${(route.failedChecks || []).join("；") || "-"}`);
+    });
+    lines.push("");
+  }
   const readerEvent = summary.zoteroValidation?.e2e?.readerEventReport || null;
   if (readerEvent) {
     const e2e = summary.zoteroValidation.e2e;
@@ -531,10 +556,27 @@ function buildMarkdown(summary) {
     lines.push(`- 上下文面板: \`${summary.zoteroValidation.e2e.readerContextPaneOpen === null ? "-" : (summary.zoteroValidation.e2e.readerContextPaneOpen ? "打开" : "关闭")}\``);
     lines.push(`- 第二视图状态: \`${summary.zoteroValidation.e2e.readerHasSecondViewState === null ? "-" : (summary.zoteroValidation.e2e.readerHasSecondViewState ? "存在" : "无")}\``);
     lines.push(`- 备注: ${summary.zoteroValidation.e2e.readerHostStateNote || "-"}`, "");
-    if (summary.zoteroValidation.e2e.readerDispatchSummary || summary.zoteroValidation.e2e.contextMenuSummary) {
+    if (
+      summary.zoteroValidation.e2e.readerDispatchSummary
+      || summary.zoteroValidation.e2e.contextMenuSummary
+      || summary.zoteroValidation.e2e.toolbarDispatchMode
+      || summary.zoteroValidation.e2e.toolbarAppendedItemCount !== null
+      || summary.zoteroValidation.e2e.selectionPopupAppendedItemCount !== null
+      || summary.zoteroValidation.e2e.sidebarHeaderAppendedItemCount !== null
+      || summary.zoteroValidation.e2e.contextMenuProbeCount !== null
+      || (summary.zoteroValidation.e2e.contextMenuObservedTypes || []).length > 0
+      || (summary.zoteroValidation.e2e.contextMenuSyntheticFallbackTypes || []).length > 0
+    ) {
       lines.push("### Reader 深层事件点摘要", "");
+      lines.push(`- 工具栏分发: \`${summary.zoteroValidation.e2e.toolbarDispatchMode ?? "-"}\``);
+      lines.push(`- 工具栏追加项: \`${summary.zoteroValidation.e2e.toolbarAppendedItemCount ?? "-"}\``);
+      lines.push(`- 文本浮层追加项: \`${summary.zoteroValidation.e2e.selectionPopupAppendedItemCount ?? "-"}\``);
+      lines.push(`- 侧栏批注头追加项: \`${summary.zoteroValidation.e2e.sidebarHeaderAppendedItemCount ?? "-"}\``);
+      lines.push(`- 上下文菜单探针数: \`${summary.zoteroValidation.e2e.contextMenuProbeCount ?? "-"}\``);
       lines.push(`- 分发摘要: ${summary.zoteroValidation.e2e.readerDispatchSummary || "-"}`);
       lines.push(`- 上下文菜单: ${summary.zoteroValidation.e2e.contextMenuSummary || "-"}`, "");
+      lines.push(`- 上下文菜单已观测类型: ${(summary.zoteroValidation.e2e.contextMenuObservedTypes || []).join("、") || "-"}`);
+      lines.push(`- 上下文菜单 fallback 类型: ${(summary.zoteroValidation.e2e.contextMenuSyntheticFallbackTypes || []).join("、") || "-"}`, "");
     }
   }
   if (summary.zoteroValidation?.autofix?.note) {
@@ -565,6 +607,11 @@ function buildMarkdown(summary) {
     lines.push(`- 最近生命周期慢阶段: \`${summary.engineeringHardening.lifecycleLastSlowStage || "-"}\``);
     lines.push(`- 边界事件: \`${(summary.engineeringHardening.errorBoundaryEvents || []).map((item) => `${item.event} x${item.count}`).join("；") || "-"}\``);
     lines.push(`- 最近 HTTP 错误: \`${summary.engineeringHardening.httpLastErrorKind || "-"}\` / ${summary.engineeringHardening.httpLastErrorMessage || "-"}`);
+    lines.push(`- 性能预算: \`${summary.engineeringHardening.performanceBudget?.statusLabel || summary.engineeringHardening.performanceBudget?.status || "-"} / ${summary.engineeringHardening.performanceBudget?.budgetMode || "-"}\``);
+    lines.push(`- 预算摘要: ${summary.engineeringHardening.performanceBudget?.summary || "-"}`);
+    lines.push(`- 预算活动: \`${summary.engineeringHardening.performanceBudget?.measuredActivityCount ?? 0}/${summary.engineeringHardening.performanceBudget?.expectedActivityCount ?? 0}\``);
+    lines.push(`- 超预算项: \`${summary.engineeringHardening.performanceBudget?.violationCount ?? 0}\``);
+    lines.push(`- 预算告警: \`${summary.engineeringHardening.performanceBudget?.violationSummary || "-"}\``);
     lines.push("");
   }
   if (summary.zoteroValidation?.watchRecovery?.summaryNote) {
@@ -796,13 +843,14 @@ function buildMarkdown(summary) {
 async function main() {
   const runs = await listRunRecords();
   const summary = summarizeRuns(runs);
-  const [watchStatus, zoteroValidation, gateReport, releaseMatrix, validationContext, provenance] = await Promise.all([
+  const [watchStatus, zoteroValidation, gateReport, releaseMatrix, validationContext, provenance, referenceDistillation] = await Promise.all([
     loadWatchStatusSummary(),
     loadZoteroValidationSummary(),
     loadJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-gate.json")),
     loadReleaseMatrixSummary(),
     collectValidationContext(projectRoot),
     evaluateArtifactProvenance(projectRoot, runs, { env: process.env }),
+    loadReferenceDistillationState(projectRoot),
   ]);
   const signalTrends = await archiveAgentSignalHistory(projectRoot, {
     watch: watchStatus,
@@ -825,6 +873,7 @@ async function main() {
     env: process.env,
   });
   summary.provenance = provenance;
+  summary.referenceDistillation = referenceDistillation;
   summary.engineeringHardening = summarizeEngineeringHardening({
     e2e: zoteroValidation.e2e,
     autofix: zoteroValidation.autofix,

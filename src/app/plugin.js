@@ -165,6 +165,8 @@ export function createPlugin({ globalScope, config }) {
     host,
     themeManager,
     optionalBundles,
+    services: globalScope.Services,
+    rootURI: runtime.rootURI,
   });
 
   serviceRegistry.register({
@@ -184,6 +186,7 @@ export function createPlugin({ globalScope, config }) {
         details: {
           enabled: optionalBundles.isEnabled("react-ui"),
           open: reactUIDemo.isOpen(),
+          hostSurfaceCount: reactUIDemo.getHostSurfaceCount(),
         },
       };
     },
@@ -640,6 +643,9 @@ export function createPlugin({ globalScope, config }) {
     updateDemoNotifierState,
     optionalBundles,
     openReactDemoWindow: reactUIDemo.openDemoWindow,
+    presentReactSurface: reactUIDemo.presentSurface,
+    renderReactItemPaneSurface: reactUIDemo.renderItemPaneSurface,
+    unmountReactItemPaneSurface: reactUIDemo.unmountItemPaneSurface,
   });
 
   const kernel = createPluginKernel({

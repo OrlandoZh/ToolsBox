@@ -9,7 +9,7 @@ import {
 
 const projectRoot = "/tmp/addon-template";
 
-describe("Zotero Agent Artifacts", () => {
+describe("Zotero Artifact Paths", () => {
   it("should resolve default artifact paths under dist", () => {
     const previous = process.env.AGENT_ARTIFACTS_DIR;
     delete process.env.AGENT_ARTIFACTS_DIR;

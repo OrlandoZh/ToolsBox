@@ -1,0 +1,369 @@
+{
+  "version": 1,
+  "projects": [
+    {
+      "id": "zotero-main",
+      "label": "Zotero Main",
+      "enabled": true,
+      "targetPath": "reference/zotero-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/zotero/zotero.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "authoritative source rolling snapshot"
+    },
+    {
+      "id": "zotero-exitem-main",
+      "label": "Zotero Exitem",
+      "enabled": true,
+      "targetPath": "reference/plugin/Zotero-Exitem-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/alansirius/Zotero-Exitem.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "zotero-add-items-from-text-main",
+      "label": "Zotero Add Items From Text",
+      "enabled": true,
+      "targetPath": "reference/plugin/Zotero-add-items-from-text-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/jmiba/Zotero-add-items-from-text.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "aidea-zotero-master",
+      "label": "Aidea Zotero",
+      "enabled": true,
+      "targetPath": "reference/plugin/aidea-zotero-master",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/Visterainer/aidea-zotero.git",
+        "ref": "master",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "gemini-zotero-main",
+      "label": "Gemini Zotero",
+      "enabled": true,
+      "targetPath": "reference/plugin/gemini-zotero-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/aben/gemini-zotero.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "jasminum-main",
+      "label": "Jasminum",
+      "enabled": true,
+      "targetPath": "reference/plugin/jasminum-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/l0o0/jasminum.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "llm-for-zotero-main",
+      "label": "LLM For Zotero",
+      "enabled": true,
+      "targetPath": "reference/plugin/llm-for-zotero-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/yilewang/llm-for-zotero.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "marginalia-main",
+      "label": "Marginalia",
+      "enabled": true,
+      "targetPath": "reference/plugin/marginalia-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/sheny-bio/marginalia.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "mcp-server-zotero-dev-main",
+      "label": "MCP Server Zotero Dev",
+      "enabled": true,
+      "targetPath": "reference/plugin/mcp-server-zotero-dev-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/introfini/mcp-server-zotero-dev.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin-adjacent rolling snapshot"
+    },
+    {
+      "id": "paper-chat-for-zotero-master",
+      "label": "Paper Chat For Zotero",
+      "enabled": true,
+      "targetPath": "reference/plugin/paper-chat-for-zotero-master",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/syt2/paper-chat-for-zotero.git",
+        "ref": "master",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "pdf-ai-bookmarks-main",
+      "label": "PDF AI Bookmarks",
+      "enabled": true,
+      "targetPath": "reference/plugin/pdf-ai-bookmarks-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/edwintuan/pdf-ai-bookmarks.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "zoplicate-main",
+      "label": "Zoplicate",
+      "enabled": true,
+      "targetPath": "reference/plugin/zoplicate",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/ChenglongMa/zoplicate.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "zotero-ai-butler-main",
+      "label": "Zotero AI Butler",
+      "enabled": true,
+      "targetPath": "reference/plugin/zotero-AI-Butler-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/steven-jianhao-li/zotero-AI-Butler.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "zotero-addons-main",
+      "label": "Zotero Addons",
+      "enabled": true,
+      "targetPath": "reference/plugin/zotero-addons-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/syt2/zotero-addons.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "zotero-ai-assistant-main",
+      "label": "Zotero AI Assistant",
+      "enabled": true,
+      "targetPath": "reference/plugin/zotero-ai-assistant-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/jetxa/zotero-ai-assistant.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "zotero-ai-bar-main",
+      "label": "Zotero AI Bar",
+      "enabled": true,
+      "targetPath": "reference/plugin/zotero-ai-bar-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/swcxito/zotero-ai-bar.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "zotero-ai-collection-bootstrap",
+      "label": "Zotero AI Collection",
+      "enabled": true,
+      "targetPath": "reference/plugin/zotero-ai-collection-bootstrap",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/justinfjx/zotero-ai-collection.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "zotero-ainote-main",
+      "label": "Zotero AINote",
+      "enabled": true,
+      "targetPath": "reference/plugin/zotero-ainote-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/BlueBlueKitty/zotero-ainote.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "zotero-attanger-main",
+      "label": "Zotero Attanger",
+      "enabled": true,
+      "targetPath": "reference/plugin/zotero-attanger-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/muisedestiny/zotero-attanger.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "zotero-better-bibtex-master",
+      "label": "Zotero Better BibTeX",
+      "enabled": true,
+      "targetPath": "reference/plugin/zotero-better-bibtex-master",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/retorquere/zotero-better-bibtex.git",
+        "ref": "master",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "zotero-better-notes-master",
+      "label": "Zotero Better Notes",
+      "enabled": true,
+      "targetPath": "reference/plugin/zotero-better-notes-master",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/windingwind/zotero-better-notes.git",
+        "ref": "master",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "zotero-citation-bootstrap",
+      "label": "Zotero Citation",
+      "enabled": true,
+      "targetPath": "reference/plugin/zotero-citation-bootstrap",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/muisedestiny/zotero-citation.git",
+        "ref": "master",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "zotero-format-metadata-main",
+      "label": "Zotero Format Metadata",
+      "enabled": true,
+      "targetPath": "reference/plugin/zotero-format-metadata-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/northword/zotero-format-metadata.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "zotero-gpt-master",
+      "label": "Zotero GPT",
+      "enabled": true,
+      "targetPath": "reference/plugin/zotero-gpt",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/MuiseDestiny/zotero-gpt.git",
+        "ref": "master",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "zotero-mcp-main",
+      "label": "Zotero MCP",
+      "enabled": true,
+      "targetPath": "reference/plugin/zotero-mcp-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/cookjohn/zotero-mcp.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin-adjacent rolling snapshot"
+    },
+    {
+      "id": "zotero-pdf-translate-main",
+      "label": "Zotero PDF Translate",
+      "enabled": true,
+      "targetPath": "reference/plugin/zotero-pdf-translate-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/windingwind/zotero-pdf-translate.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "zotero-pdf2zh-main",
+      "label": "Zotero PDF2ZH",
+      "enabled": true,
+      "targetPath": "reference/plugin/zotero-pdf2zh-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/guaguastandup/zotero-pdf2zh.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "zotero-smart-highlighter-master",
+      "label": "Zotero Smart Highlighter",
+      "enabled": true,
+      "targetPath": "reference/plugin/zotero-smart-highlighter-master",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/MemorushB/zotero-smart-highlighter.git",
+        "ref": "master",
+        "refType": "branch"
+      },
+      "notes": "plugin rolling snapshot"
+    }
+  ]
+}

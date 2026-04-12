@@ -20,6 +20,14 @@ describe("Optional Bundles Lib", () => {
     assert.ok(registry.bundles.some((entry) => entry.id === "ai-service"));
     assert.equal(getOptionalBundle(registry, "react-ui")?.lane, "ts-isolated");
     assert.equal(getOptionalBundle(registry, "react-ui")?.implementationStatus, "implemented");
+    assert.deepEqual(getOptionalBundle(registry, "react-ui")?.build?.requiredPackages, [
+      "esbuild",
+      "react",
+      "react-dom",
+    ]);
+    assert.equal(getOptionalBundle(registry, "react-ui")?.build?.artifacts?.length, 2);
+    assert.equal(getOptionalBundle(registry, "react-ui")?.build?.artifacts?.[0]?.kind, "window-shell");
+    assert.equal(getOptionalBundle(registry, "react-ui")?.build?.artifacts?.[1]?.kind, "surface-bridge");
     assert.equal(isOptionalBundleEnabled(registry, "react-ui"), false);
   });
 
@@ -36,11 +44,19 @@ describe("Optional Bundles Lib", () => {
           summary: "broken",
           build: {
             scriptName: "build:broken",
-            entry: "src/broken.tsx",
-            stylesheet: "src/broken.css",
-            shell: "addon-static/broken.xhtml",
-            outputScript: "content/scripts/broken.js",
-            outputStyle: "content/styles/broken.css",
+            requiredPackages: ["react"],
+            artifacts: [
+              {
+                id: "default",
+                kind: "window-shell",
+                summary: "broken",
+                entry: "src/broken.tsx",
+                stylesheet: "src/broken.css",
+                shell: "addon-static/broken.xhtml",
+                outputScript: "content/scripts/broken.js",
+                outputStyle: "content/styles/broken.css",
+              },
+            ],
           },
         },
       ],

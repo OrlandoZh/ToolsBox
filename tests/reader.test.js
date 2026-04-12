@@ -463,6 +463,54 @@ describe("Reader", () => {
     assert.deepEqual(readerAPI.getRegisteredEventListeners(), []);
   });
 
+  it("should register scene-oriented reader context menu helpers with the expected event types", () => {
+    const appendedViewGroups = [];
+    const appendedAnnotationGroups = [];
+
+    const cleanupView = readerAPI.registerViewContextMenuItem((event) => ({
+      label: `Inspect ${event.params?.targetID || "view"}`,
+      onCommand() {},
+    }));
+    const cleanupAnnotation = readerAPI.registerAnnotationContextMenuItem({
+      label: "Annotate",
+      onCommand() {},
+    });
+
+    assert.typeOf(cleanupView, "function");
+    assert.typeOf(cleanupAnnotation, "function");
+    assert.equal(eventRegistrations.length, 2);
+    assert.equal(eventRegistrations[0].type, "createViewContextMenu");
+    assert.equal(eventRegistrations[1].type, "createAnnotationContextMenu");
+
+    eventRegistrations[0].handler({
+      type: "createViewContextMenu",
+      params: {
+        targetID: "page-1",
+      },
+      append(...args) {
+        appendedViewGroups.push(args);
+      },
+    });
+    eventRegistrations[1].handler({
+      type: "createAnnotationContextMenu",
+      append(...args) {
+        appendedAnnotationGroups.push(args);
+      },
+    });
+
+    assert.equal(appendedViewGroups.length, 1);
+    assert.equal(appendedViewGroups[0][0].label, "Inspect page-1");
+    assert.equal(appendedAnnotationGroups.length, 1);
+    assert.equal(appendedAnnotationGroups[0][0].label, "Annotate");
+
+    cleanupView();
+    cleanupAnnotation();
+
+    assert.equal(eventUnregistrations.length, 2);
+    assert.equal(eventUnregistrations[0].type, "createViewContextMenu");
+    assert.equal(eventUnregistrations[1].type, "createAnnotationContextMenu");
+  });
+
   it("should unregister all event listeners and allow lifecycle cleanup to be idempotent", () => {
     const firstHandler = () => {};
     const secondHandler = () => {};

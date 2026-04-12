@@ -44,6 +44,18 @@ async function assertFileExists(filePath, label) {
   }
 }
 
+function resolveArtifactInputPaths(bundle, projectRoot, buildRoot) {
+  const artifacts = Array.isArray(bundle?.build?.artifacts) ? bundle.build.artifacts : [];
+  return artifacts.map((artifact) => ({
+    ...artifact,
+    entryPath: path.join(projectRoot, artifact.entry),
+    stylesheetPath: path.join(projectRoot, artifact.stylesheet),
+    shellPath: artifact.shell ? path.join(projectRoot, artifact.shell) : null,
+    scriptPath: toPathFromBuildRoot(buildRoot, artifact.outputScript),
+    stylePath: toPathFromBuildRoot(buildRoot, artifact.outputStyle),
+  }));
+}
+
 async function loadReactUIBuildDependencies(options = {}) {
   if (typeof options.loadDependencies === "function") {
     return await options.loadDependencies();
@@ -93,6 +105,7 @@ export async function buildReactUI(options = {}) {
       implementationStatus: bundle.implementationStatus,
       status: "skipped",
       reason: "disabled",
+      artifacts: [],
     };
   }
 
@@ -105,72 +118,92 @@ export async function buildReactUI(options = {}) {
     });
   }
 
-  const entryPath = path.join(projectRoot, bundle.build.entry);
-  const stylesheetPath = path.join(projectRoot, bundle.build.stylesheet);
-  const shellPath = path.join(projectRoot, bundle.build.shell);
   const buildRoot = options.buildRoot || path.join(projectRoot, "build", config.addonRef);
-  const scriptPath = toPathFromBuildRoot(buildRoot, bundle.build.outputScript);
-  const stylePath = toPathFromBuildRoot(buildRoot, bundle.build.outputStyle);
+  const artifactInputs = resolveArtifactInputPaths(bundle, projectRoot, buildRoot);
 
-  await assertFileExists(entryPath, "React UI entry");
-  await assertFileExists(stylesheetPath, "React UI stylesheet");
-  await assertFileExists(shellPath, "React UI shell");
+  for (const artifact of artifactInputs) {
+    await assertFileExists(artifact.entryPath, `React UI entry (${artifact.id})`);
+    await assertFileExists(artifact.stylesheetPath, `React UI stylesheet (${artifact.id})`);
+    if (artifact.shellPath) {
+      await assertFileExists(artifact.shellPath, `React UI shell (${artifact.id})`);
+    }
+  }
 
   const { esbuild } = await loadReactUIBuildDependencies(options);
 
   try {
-    await ensureDir(path.dirname(scriptPath));
-    await ensureDir(path.dirname(stylePath));
+    for (const artifact of artifactInputs) {
+      await ensureDir(path.dirname(artifact.scriptPath));
+      await ensureDir(path.dirname(artifact.stylePath));
+    }
   } catch (error) {
     throw wrapScriptError(error, {
       failedStage: "prepare-react-ui-build-root",
       details: {
         buildRoot,
-        scriptPath,
-        stylePath,
+        artifacts: artifactInputs.map((artifact) => ({
+          id: artifact.id,
+          scriptPath: artifact.scriptPath,
+          stylePath: artifact.stylePath,
+        })),
       },
     });
   }
 
-  try {
-    await esbuild.build({
-      entryPoints: [entryPath],
-      outfile: scriptPath,
-      bundle: true,
-      format: "iife",
-      platform: "browser",
-      target: ["firefox115"],
-      jsx: "automatic",
-      sourcemap: false,
-      minify: false,
-      legalComments: "none",
-      define: {
-        "process.env.NODE_ENV": JSON.stringify("production"),
-      },
-    });
-  } catch (error) {
-    throw wrapScriptError(error, {
-      failedStage: "bundle-react-ui-entry",
-      details: {
-        entryPath,
-        scriptPath,
-      },
-    });
-  }
-
-  try {
-    if (typeof options.copyStyle === "function") {
-      await options.copyStyle(stylesheetPath, stylePath);
-    } else {
-      await fs.copyFile(stylesheetPath, stylePath);
+  const builtArtifacts = [];
+  for (const artifact of artifactInputs) {
+    try {
+      await esbuild.build({
+        entryPoints: [artifact.entryPath],
+        outfile: artifact.scriptPath,
+        bundle: true,
+        format: "iife",
+        platform: "browser",
+        target: ["firefox115"],
+        jsx: "automatic",
+        sourcemap: false,
+        minify: false,
+        legalComments: "none",
+        define: {
+          "process.env.NODE_ENV": JSON.stringify("production"),
+        },
+      });
+    } catch (error) {
+      throw wrapScriptError(error, {
+        failedStage: "bundle-react-ui-entry",
+        details: {
+          artifactId: artifact.id,
+          entryPath: artifact.entryPath,
+          scriptPath: artifact.scriptPath,
+        },
+      });
     }
-  } catch (error) {
-    throw wrapScriptError(error, {
-      failedStage: "copy-react-ui-stylesheet",
-      details: {
-        stylesheetPath,
-        stylePath,
-      },
+
+    try {
+      if (typeof options.copyStyle === "function") {
+        await options.copyStyle(artifact.stylesheetPath, artifact.stylePath, artifact);
+      } else {
+        await fs.copyFile(artifact.stylesheetPath, artifact.stylePath);
+      }
+    } catch (error) {
+      throw wrapScriptError(error, {
+        failedStage: "copy-react-ui-stylesheet",
+        details: {
+          artifactId: artifact.id,
+          stylesheetPath: artifact.stylesheetPath,
+          stylePath: artifact.stylePath,
+        },
+      });
+    }
+
+    builtArtifacts.push({
+      artifactId: artifact.id,
+      kind: artifact.kind,
+      summary: artifact.summary,
+      globalKey: artifact.globalKey || null,
+      scriptPath: artifact.scriptPath,
+      stylePath: artifact.stylePath,
+      shellPath: artifact.shellPath,
     });
   }
 
@@ -181,8 +214,9 @@ export async function buildReactUI(options = {}) {
     implementationStatus: bundle.implementationStatus,
     status: "built",
     buildRoot,
-    scriptPath,
-    stylePath,
+    artifacts: builtArtifacts,
+    scriptPath: builtArtifacts[0]?.scriptPath || null,
+    stylePath: builtArtifacts[0]?.stylePath || null,
   };
 }
 
@@ -192,8 +226,10 @@ export async function main() {
     console.log("React UI build skipped: bundle disabled");
     return;
   }
-  console.log(`React UI build complete: ${result.scriptPath}`);
-  console.log(`React UI stylesheet complete: ${result.stylePath}`);
+  result.artifacts.forEach((artifact) => {
+    console.log(`React UI artifact built [${artifact.artifactId}/${artifact.kind}]: ${artifact.scriptPath}`);
+    console.log(`React UI stylesheet complete [${artifact.artifactId}]: ${artifact.stylePath}`);
+  });
 }
 
 if (isExecutedAsScript(import.meta.url)) {

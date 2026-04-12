@@ -53,24 +53,51 @@ function loadContentScript(relativePath) {
   return fs.readFileSync(path.join(projectRoot, relativePath), "utf-8");
 }
 
-function createHarness({ themeMode = "follow-host", hostDark = false } = {}) {
+function createHarness({
+  themeMode = "follow-host",
+  hostDark = false,
+  rootClientWidth = 720,
+  rootScrollWidth = rootClientWidth,
+} = {}) {
   const prefName = "extensions.zotero.cleanroomtemplate.themeMode";
   const prefValues = new Map([[prefName, themeMode]]);
   const observers = new Map();
   const listeners = new Map();
+  const resizeObservers = new Set();
   let addObserverCount = 0;
   let removeObserverCount = 0;
+  let resizeObserverObserveCount = 0;
+  let resizeObserverDisconnectCount = 0;
+
+  const fieldRows = [
+    createFakeElement("field-row-1"),
+    createFakeElement("field-row-2"),
+    createFakeElement("field-row-3"),
+  ];
 
   const root = {
     className: "cleanroom-pref-root",
     dataset: {},
     attributes: {},
     style: createFakeStyle(),
+    clientWidth: rootClientWidth,
+    scrollWidth: rootScrollWidth,
     setAttribute(name, value) {
       this.attributes[name] = String(value);
     },
     removeAttribute(name) {
       delete this.attributes[name];
+    },
+    querySelectorAll(selector) {
+      return selector === ".cleanroom-pref-field-row" ? fieldRows : [];
+    },
+    getBoundingClientRect() {
+      return {
+        left: 0,
+        top: 0,
+        width: this.clientWidth,
+        height: 320,
+      };
     },
   };
   const prefElement = {
@@ -127,6 +154,29 @@ function createHarness({ themeMode = "follow-host", hostDark = false } = {}) {
 
   context.globalThis = context;
   context.window = context;
+  context.ResizeObserver = class FakeResizeObserver {
+    constructor(callback) {
+      this.callback = callback;
+      this.targets = new Set();
+      resizeObservers.add(this);
+    }
+
+    observe(target) {
+      resizeObserverObserveCount += 1;
+      this.targets.add(target);
+    }
+
+    disconnect() {
+      resizeObserverDisconnectCount += 1;
+      this.targets.clear();
+      resizeObservers.delete(this);
+    }
+  };
+  context.requestAnimationFrame = function requestAnimationFrame(callback) {
+    callback();
+    return 1;
+  };
+  context.cancelAnimationFrame = function cancelAnimationFrame() {};
   context.document = {
     readyState: "complete",
     documentElement: {
@@ -214,8 +264,30 @@ function createHarness({ themeMode = "follow-host", hostDark = false } = {}) {
     get removeObserverCount() {
       return removeObserverCount;
     },
+    get resizeObserverObserveCount() {
+      return resizeObserverObserveCount;
+    },
+    get resizeObserverDisconnectCount() {
+      return resizeObserverDisconnectCount;
+    },
     get unloadListenerCount() {
       return (listeners.get("unload") || []).length;
+    },
+    get resizeListenerCount() {
+      return (listeners.get("resize") || []).length;
+    },
+    get fieldRows() {
+      return fieldRows;
+    },
+    setRootMetrics(clientWidth, scrollWidth = clientWidth) {
+      root.clientWidth = clientWidth;
+      root.scrollWidth = scrollWidth;
+    },
+    emitResize() {
+      resizeObservers.forEach((observer) => {
+        observer.callback([{ target: root }], observer);
+      });
+      (listeners.get("resize") || []).slice().forEach((listener) => listener());
     },
     emitUnload() {
       (listeners.get("unload") || []).slice().forEach((listener) => listener());
@@ -237,6 +309,31 @@ describe("Preference Theme Script", () => {
     assert.equal(harness.root.dataset.cleanroomThemeMode, "follow-host");
     assert.equal(harness.root.dataset.cleanroomTheme, "light");
     assert.equal(harness.root.style.getPropertyValue("color-scheme"), "light dark");
+  });
+
+  it("should initialize stacked-first compact layout when the preference root is narrow", () => {
+    const harness = createHarness({
+      themeMode: "follow-host",
+      hostDark: false,
+      rootClientWidth: 580,
+      rootScrollWidth: 580,
+    });
+
+    const result = harness.context.initCleanroomPreferences();
+
+    assert.equal(result.ok, true);
+    assert.equal(result.layoutMode, "stacked");
+    assert.equal(result.widthBucket, "compact");
+    assert.equal(result.rootClientWidth, 580);
+    assert.equal(result.hasHorizontalOverflow, false);
+    assert.equal(harness.root.dataset.prefLayout, "stacked");
+    assert.equal(harness.root.dataset.prefWidthBucket, "compact");
+    assert.equal(harness.root.attributes["data-pref-horizontal-overflow"], "false");
+    assert.equal(
+      harness.fieldRows.every((row) => row.attributes.orient === "vertical" && row.attributes.align === "stretch"),
+      true,
+    );
+    harness.emitUnload();
   });
 
   it("should apply forced dark tokens for explicit dark mode", () => {
@@ -288,8 +385,52 @@ describe("Preference Theme Script", () => {
 
     assert.equal(harness.addObserverCount, 2);
     assert.equal(harness.removeObserverCount, 1);
+    assert.equal(harness.resizeObserverObserveCount, 2);
+    assert.equal(harness.resizeObserverDisconnectCount, 1);
     assert.equal(firstUnloadCount, 1);
     assert.equal(harness.unloadListenerCount, 1);
+    assert.equal(harness.resizeListenerCount, 1);
+    harness.emitUnload();
+    assert.equal(harness.resizeObserverDisconnectCount, 2);
+  });
+
+  it("should transition between inline and stacked layout when the root width changes", () => {
+    const harness = createHarness({
+      themeMode: "follow-host",
+      hostDark: false,
+      rootClientWidth: 760,
+      rootScrollWidth: 760,
+    });
+
+    const result = harness.context.initCleanroomPreferences();
+
+    assert.equal(result.layoutMode, "inline");
+    assert.equal(harness.root.dataset.prefLayout, "inline");
+    assert.equal(
+      harness.fieldRows.every((row) => row.attributes.orient === "horizontal" && row.attributes.align === "center"),
+      true,
+    );
+
+    harness.setRootMetrics(580, 580);
+    harness.emitResize();
+
+    assert.equal(harness.root.dataset.prefLayout, "stacked");
+    assert.equal(harness.root.dataset.prefWidthBucket, "compact");
+    assert.equal(
+      harness.fieldRows.every((row) => row.attributes.orient === "vertical" && row.attributes.align === "stretch"),
+      true,
+    );
+
+    harness.setRootMetrics(760, 760);
+    harness.emitResize();
+
+    assert.equal(harness.root.dataset.prefLayout, "inline");
+    assert.equal(harness.root.dataset.prefWidthBucket, "regular");
+    assert.equal(
+      harness.fieldRows.every((row) => row.attributes.orient === "horizontal" && row.attributes.align === "center"),
+      true,
+    );
+    harness.emitUnload();
   });
 
   it("should prefer explicit bridge input and not scan Zotero globals", () => {

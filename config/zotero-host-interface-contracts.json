@@ -5,7 +5,7 @@
     {
       "id": "menu-manager",
       "version": 1,
-      "summary": "冻结 MenuManager 包装层与 Zotero 官方菜单目标、菜单类型和注册入口的对齐关系。",
+      "summary": "冻结 MenuManager 包装层与 Zotero 官方菜单目标、菜单类型、state-driven submenu 路径和注册入口的对齐关系，仅覆盖 official MenuManager surfaces，不覆盖 Reader createViewContextMenu/createAnnotationContextMenu。",
       "ownerFiles": [
         "src/features/menu-manager.js"
       ],
@@ -61,15 +61,57 @@
             "function getMenuRegistrationSnapshot(menuId = null) {",
             "function getLiveMenuState(menuId, menuPath = null) {"
           ]
+        },
+        {
+          "label": "scene helper registration",
+          "file": "src/features/menu-manager.js",
+          "snippets": [
+            "function registerItemMenuItem(menuItem) {",
+            "function registerItemPaneInfoRowMenuItem(menuItem) {",
+            "function registerReaderMenubarViewMenuItem(menuItem) {",
+            "function registerItemSubmenu(config) {",
+            "function registerCollectionSubmenu(config) {",
+            "function registerReaderMenubarViewSubmenu(config) {"
+          ]
+        },
+        {
+          "label": "compat helper registration",
+          "file": "src/features/menu-manager.js",
+          "snippets": [
+            "function registerContextMenuItem(menuItem) {",
+            "function registerReaderMenuItem(config, menuItem) {",
+            "function registerSubmenu(config) {"
+          ]
+        },
+        {
+          "label": "state-driven menu helpers",
+          "file": "src/features/menu-manager.js",
+          "snippets": [
+            "export function createMenuStateResolver(options = {}) {",
+            "collectionTreeRowID: collectionTreeRow && typeof collectionTreeRow === \"object\"",
+            "function rebuildDynamicSubmenu(context, menuItem) {",
+            "function registerStateDrivenMenu(config) {"
+          ]
         }
       ],
       "requiredTypes": [
         {
           "file": "types/features.d.ts",
           "snippets": [
+            "collectionTreeRowID: unknown;",
             "readonly MENU_TARGETS: typeof MENU_TARGETS;",
             "readonly MENU_TYPES: typeof MENU_TYPES;",
+            "createMenuStateResolver(options?: MenuStateResolverOptions): (context?: MenuContext) => MenuResolvedState;",
+            "registerItemMenuItem(",
+            "registerItemPaneInfoRowMenuItem(",
+            "registerReaderMenubarViewMenuItem(",
+            "registerItemSubmenu(",
+            "registerCollectionSubmenu(",
+            "registerReaderMenubarViewSubmenu(",
+            "registerContextMenuItem(",
             "registerReaderMenuItem(",
+            "registerSubmenu(",
+            "registerStateDrivenMenu(options: StateDrivenMenuOptions): string | null;",
             "getMenuRegistrationSnapshot(menuId?: string | null): MenuRegistrationSnapshot[] | MenuRegistrationSnapshot | null;",
             "getLiveMenuState(menuId: string, menuPath?: string | null): LiveMenuState | null;",
             "isOfficialAPIAvailable(): boolean;"
@@ -262,7 +304,7 @@
     {
       "id": "reader-events",
       "version": 1,
-      "summary": "冻结 Reader 事件包装层与 Zotero 官方事件类型、注册入口和 synthetic fallback 边界的对齐关系。",
+      "summary": "冻结 Reader 事件包装层与 Zotero 官方事件类型、注册入口和 synthetic fallback 边界的对齐关系，覆盖 Reader context menu 与 renderToolbar surface。",
       "ownerFiles": [
         "src/features/reader.js"
       ],
@@ -283,6 +325,8 @@
           "snippets": [
             "export const READER_EVENT_TYPES = {",
             "RENDER_TOOLBAR: \"renderToolbar\"",
+            "CREATE_VIEW_CONTEXT_MENU: \"createViewContextMenu\"",
+            "CREATE_ANNOTATION_CONTEXT_MENU: \"createAnnotationContextMenu\"",
             "CREATE_SELECTOR_CONTEXT_MENU: \"createSelectorContextMenu\"",
             "export const READER_EVENT_KNOWN_TYPES = Object.freeze([",
             "export const READER_EVENT_SYNTHETIC_FALLBACK_TYPES = Object.freeze(["
@@ -305,6 +349,16 @@
             "function registerEventListener(type, handler, options = {}) {",
             "function unregisterEventListener(type, handler) {"
           ]
+        },
+        {
+          "label": "reader context menu helpers",
+          "file": "src/features/reader.js",
+          "snippets": [
+            "function registerViewContextMenuItem(menuItemOrFactory, options = {}) {",
+            "READER_EVENT_TYPES.CREATE_VIEW_CONTEXT_MENU,",
+            "function registerAnnotationContextMenuItem(menuItemOrFactory, options = {}) {",
+            "READER_EVENT_TYPES.CREATE_ANNOTATION_CONTEXT_MENU,"
+          ]
         }
       ],
       "requiredTypes": [
@@ -319,6 +373,8 @@
             "selectSidebarView(target: unknown, view: string, options?: {",
             "findToolbarElement(target: unknown, options?: { selector?: string; view?: \"primary\" | \"secondary\" }): Element | null;",
             "findSidebarViewElements(target: unknown, view: string, options?: { view?: \"primary\" | \"secondary\" }): {",
+            "registerViewContextMenuItem(menuItemOrFactory: ReaderContextMenuItemSource, options?: { pluginID?: string }): (() => void) | null;",
+            "registerAnnotationContextMenuItem(menuItemOrFactory: ReaderContextMenuItemSource, options?: { pluginID?: string }): (() => void) | null;",
             "registerEventListener(type: string, handler: (event: ReaderEvent) => void, options?: { pluginID?: string }): (() => void) | null;",
             "getKnownEventTypes(): string[];",
             "getProbeCompatibleEventTypes(): string[];",

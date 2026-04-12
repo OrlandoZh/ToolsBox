@@ -14,8 +14,12 @@ describe("Validation Surfaces", () => {
     assert.ok(source.includes("annotation-context-menu"));
     assert.ok(source.includes("render-toolbar"));
     assert.ok(source.includes("menu-item"));
+    assert.ok(source.includes("collection-menu"));
+    assert.ok(source.includes("menu-submenu"));
     assert.ok(source.includes("renderToolbar"));
     assert.ok(source.includes("menu item"));
+    assert.ok(source.includes("collection menu"));
+    assert.ok(source.includes("menuPath"));
     assert.ok(source.includes("createAnnotationContextMenu"));
     assert.ok(source.includes("Host Semantic Domains"));
     assert.ok(source.includes("preference-panes"));

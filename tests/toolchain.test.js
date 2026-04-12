@@ -310,6 +310,9 @@ describe("Toolchain Scripts", () => {
     assert.equal(preflightReport.cleanroomAuditStatus, "passed");
     assert.equal(preflightReport.cleanroomAuditMode, "release");
     assert.equal(preflightReport.cleanroomSimilarityStatus, "available");
+    assert.equal(preflightReport.chinaLegalStatus, "ready");
+    assert.equal(preflightReport.chinaCommercialDeliveryGateOK, true);
+    assert.deepEqual(preflightReport.chinaLegalMissingDocs, []);
   });
 
   it("should generate release upload plan and notes", () => {
@@ -613,10 +616,14 @@ describe("Toolchain Scripts", () => {
     assert.equal(packageJSON.scripts["framework:governance:check"], "node scripts/framework-governance-check.mjs");
     assert.equal(packageJSON.scripts["framework:bundle:audit"], "node scripts/framework-bundle-audit.mjs");
     assert.equal(packageJSON.scripts["build:react-ui"], "node scripts/build-react-ui.mjs");
+    assert.equal(packageJSON.devDependencies.esbuild, "^0.21.5");
+    assert.equal(packageJSON.devDependencies.react, "^18.3.1");
+    assert.equal(packageJSON.devDependencies["react-dom"], "^18.3.1");
     assert.equal(packageJSON.scripts["agent:workspace:guard"], "node scripts/agent-workspace-guard.mjs");
     assert.equal(packageJSON.scripts["agent:workspace:guard:strict"], "node scripts/agent-workspace-guard.mjs --strict");
     assert.equal(packageJSON.scripts["agent:context"], "node scripts/agent-context.mjs");
     assert.equal(packageJSON.scripts["agent:context:guard"], "node scripts/agent-context-guard.mjs");
+    assert.equal(packageJSON.scripts["agent:context:guard:strict"], "node scripts/agent-context-guard.mjs --strict");
     assert.equal(packageJSON.scripts["agent:obsidian:guard"], "node scripts/agent-obsidian-guard.mjs");
     assert.equal(packageJSON.scripts["agent:obsidian:guard:strict"], "node scripts/agent-obsidian-guard.mjs --strict");
     assert.equal(packageJSON.scripts["agent:host:guard"], "node scripts/zotero-host-interface-guard.mjs");
@@ -629,11 +636,13 @@ describe("Toolchain Scripts", () => {
     assert.ok(String(packageJSON.scripts["agent:gate"] || "").includes("agent:workspace:guard:strict"));
     assert.ok(String(packageJSON.scripts["agent:gate"] || "").includes("agent:host:guard:strict"));
     assert.ok(String(packageJSON.scripts["agent:gate"] || "").includes("agent:host:semantic:guard:strict"));
-    assert.ok(String(packageJSON.scripts["agent:gate"] || "").includes("agent:context"));
+    assert.ok(String(packageJSON.scripts["agent:gate"] || "").includes("agent:monitor"));
+    assert.equal(String(packageJSON.scripts["agent:gate"] || "").includes("npm run agent:context &&"), false);
     assert.ok(String(packageJSON.scripts["agent:gate:release"] || "").includes("agent:workspace:guard:strict"));
     assert.ok(String(packageJSON.scripts["agent:gate:release"] || "").includes("agent:host:guard:strict"));
     assert.ok(String(packageJSON.scripts["agent:gate:release"] || "").includes("agent:host:semantic:guard:strict"));
-    assert.ok(String(packageJSON.scripts["agent:gate:release"] || "").includes("agent:context"));
+    assert.ok(String(packageJSON.scripts["agent:gate:release"] || "").includes("agent:monitor"));
+    assert.equal(String(packageJSON.scripts["agent:gate:release"] || "").includes("npm run agent:context &&"), false);
     assert.ok(String(packageJSON.scripts.check || "").includes("agent:workspace:guard"));
     assert.ok(String(packageJSON.scripts.check || "").includes("agent:obsidian:guard"));
     assert.ok(String(packageJSON.scripts.check || "").includes("agent:host:guard"));
@@ -678,7 +687,7 @@ describe("Toolchain Scripts", () => {
       const expansionWaveBundle = auditJSON.bundles.find((bundle) => bundle.id === "expansion-wave-scaffold-v1");
       assert.ok(expansionWaveBundle);
       assert.equal(expansionWaveBundle.expansionWaveDetails.projectWaveStatus, "active");
-      assert.ok(result.stdout.includes("expansion-wave: active / generic-expansion-wave-v1 / ZOTERO-HOST-POLISH-WAVE-001 / host-first -> live geometry / interaction consistency -> surface smoke -> surface-local evidence -> full gate"));
+      assert.ok(result.stdout.includes("expansion-wave: active / generic-expansion-wave-v1 / ZOTERO-DOM-CONTRACT-WAVE-001 / host-first -> action replay -> route-aware dom contract -> advisory summary"));
       assert.ok(auditMarkdown.includes("Framework Backfill Audit"));
       assert.ok(auditMarkdown.includes("Expansion Wave Overview"));
       assert.ok(auditMarkdown.includes("Surface Verification Overview"));
@@ -902,16 +911,29 @@ describe("Toolchain Scripts", () => {
     assert.ok(fs.existsSync(path.join(exportRoot, "src", "main.js")));
     assert.ok(fs.existsSync(path.join(exportRoot, "types", "index.d.ts")));
     assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "static-runtime-baseline-lib.mjs")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "LEGAL_RISK_CHECKLIST.md")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "CODE_PROVENANCE.md")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "THIRD_PARTY_NOTICES.md")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md")));
     EXPORTED_STATIC_RUNTIME_BASELINE.forEach((relativePath) => {
       assert.ok(fs.existsSync(path.join(exportRoot, relativePath)), `missing exported baseline file: ${relativePath}`);
       assert.ok(exportManifest.staticRuntimeBaselineFiles.includes(relativePath), `missing baseline manifest entry: ${relativePath}`);
     });
+    assert.ok(exportManifest.includedPaths.includes("CODE_PROVENANCE.md"));
+    assert.ok(exportManifest.includedPaths.includes("THIRD_PARTY_NOTICES.md"));
+    assert.ok(exportManifest.includedPaths.includes("COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md"));
     assert.equal(exportPackage.scripts.build, "node scripts/build.mjs");
     assert.equal(exportPackage.scripts["build:react-ui"], "node scripts/build-react-ui.mjs");
+    assert.equal(exportPackage.devDependencies.esbuild, "^0.21.5");
+    assert.equal(exportPackage.devDependencies.react, "^18.3.1");
+    assert.equal(exportPackage.devDependencies["react-dom"], "^18.3.1");
     assert.ok(!("agent:gate" in exportPackage.scripts));
     assert.ok(exportReadme.includes("纯项目"));
     assert.ok(exportReadme.includes("静态运行时基线"));
+    assert.ok(exportReadme.includes("中国法商业交付骨架"));
+    assert.ok(exportReadme.includes("UNLICENSED"));
     assert.ok(exportReadme.includes("build:react-ui"));
+    assert.ok(exportReadme.includes("react-dom"));
     assert.ok(exportReadme.includes("addon-static/content/style/main.css"));
     assert.ok(exportReadme.includes("addon-static/locale/zh-CN/main.ftl"));
     assert.ok(fs.existsSync(path.join(projectRoot, "dist", "cleanroomtemplate-0.1.0-pure-project.zip")));

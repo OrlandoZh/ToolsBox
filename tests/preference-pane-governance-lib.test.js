@@ -152,4 +152,89 @@ export function registerPane(scriptLoader, resolveURI, window, bridge, i18n) {
 
     fs.rmSync(tempRoot, { recursive: true, force: true });
   });
+
+  it("should reject preference pane templates that skip the narrow-layout root contract", async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "addontemplate4z-pref-guard-layout-"));
+    fs.mkdirSync(path.join(tempRoot, "addon-static", "content"), { recursive: true });
+    fs.mkdirSync(path.join(tempRoot, "src", "app"), { recursive: true });
+
+    fs.writeFileSync(path.join(tempRoot, "addon-static", "content", "preferences.js"), `
+const WINDOW_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
+function applyBridgeLocalization() {
+  const bridge = window[WINDOW_BRIDGE_KEY];
+  return { bridge };
+}
+function requestFluentTranslation() {
+  return true;
+}
+function initCleanroomPreferences(root) {
+  const bridgeLocalization = applyBridgeLocalization({
+    root,
+  });
+  const fluentTranslationRequested = requestFluentTranslation(root);
+  return { bridgeLocalization, fluentTranslationRequested };
+}
+window.initCleanroomPreferences = initCleanroomPreferences;
+`, "utf-8");
+    fs.writeFileSync(path.join(tempRoot, "src", "app", "feature-composer.js"), `
+export function registerPane({ window, resolveURI, scriptLoader, i18n, pluginID }) {
+  window.__CLEANROOM_PREFERENCE_BRIDGE__ = {
+    locale: i18n.locale,
+    strings: typeof i18n.getBundle === "function" ? i18n.getBundle() : null,
+    pluginID,
+  };
+  if (typeof window?.MozXULElement?.insertFTLIfNeeded === "function") {
+    window.MozXULElement.insertFTLIfNeeded("main.ftl");
+  }
+  scriptLoader.loadSubScript(resolveURI("content/theme.js"), window);
+  scriptLoader.loadSubScript(resolveURI("content/preferences.js"), window);
+  if (typeof window.initCleanroomPreferences !== "function") {
+    throw new Error("missing init");
+  }
+  return window.initCleanroomPreferences({
+    window,
+    paneID: "cleanroomtemplate-preferences",
+    pluginID,
+    resolveURI,
+  });
+}
+`, "utf-8");
+    fs.writeFileSync(path.join(tempRoot, "addon-static", "content", "preferences.xhtml"), `
+<vbox class="cleanroom-pref-root">
+  <groupbox>
+    <caption id="cleanroom-pref-caption" data-l10n-id="cleanroom-pref-caption" />
+    <checkbox id="cleanroom-enabled" data-l10n-id="cleanroom-pref-enabled" />
+  </groupbox>
+  <groupbox>
+    <caption id="cleanroom-pref-menu-section" data-l10n-id="cleanroom-pref-menu-section" />
+    <label id="cleanroom-pref-menu-label-text" data-l10n-id="cleanroom-pref-menu-label" />
+  </groupbox>
+  <groupbox>
+    <caption id="cleanroom-pref-logging-section" data-l10n-id="cleanroom-pref-logging-section" />
+  </groupbox>
+  <groupbox>
+    <caption id="cleanroom-pref-theme-section" data-l10n-id="cleanroom-pref-theme-section" />
+    <menuitem id="cleanroom-pref-theme-follow-host" data-l10n-id="cleanroom-pref-theme-follow-host" />
+  </groupbox>
+</vbox>
+`, "utf-8");
+
+    const result = await inspectDefaultPreferencePaneBridge(tempRoot);
+
+    assert.equal(result.ok, false);
+    assert.equal(
+      result.issues.some((issue) => issue.file === "addon-static/content/preferences.xhtml" && issue.label === "preference root marker"),
+      true,
+    );
+    assert.equal(
+      result.issues.some((issue) => issue.file === "addon-static/content/preferences.xhtml" && issue.label === "field row class"),
+      true,
+    );
+    assert.equal(
+      result.issues.some((issue) => issue.file === "addon-static/content/preferences.xhtml" && issue.label === "control wrap class"),
+      true,
+    );
+
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
 });

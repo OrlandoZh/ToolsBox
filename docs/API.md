@@ -235,6 +235,19 @@ keyboard.getAllShortcuts();
 
 菜单系统，使用 Zotero.MenuManager 官方 API。
 
+`menu-manager` 只覆盖 Zotero `MenuManager` 官方 target，不负责 Reader context menu 事件。按场景使用：
+
+- `main/library/item`：`registerItemMenuItem()` 或 `register({ target: MENU_TARGETS.LIBRARY_ITEM, ... })`
+- `main/library/collection`：`registerCollectionMenuItem()`
+- `itemPane/info/row`：`registerItemPaneInfoRowMenuItem()`
+- `reader/menubar/view`：`registerReaderMenubarViewMenuItem()`
+
+如果一个入口下需要 2 个以上相关动作，优先按 scene helper 选择 `registerItemSubmenu()`、`registerCollectionSubmenu()`、`registerReaderMenubarViewSubmenu()`；只有确实需要跨 target 通用装配时再退回 `menuType: MENU_TYPES.SUBMENU` 或 `registerSubmenu()`，不要平铺多个无关顶层菜单项。
+
+`createViewContextMenu` / `createAnnotationContextMenu` 不属于 `menu-manager`；它们属于 Reader event API，见 [Reader](#reader)。
+
+如果菜单是否可见、是否可用、或 submenu children 需要按 live host state 重建，优先使用 `createMenuStateResolver()` + `registerStateDrivenMenu()`。collection scene 的动态判断应优先消费 `hasCollectionSelection`、`collectionTreeRowID`、`collectionTreeRowType`，不要把 item selection 语义误当成 collection context。
+
 ```javascript
 import {
   createMenuManager,
@@ -261,15 +274,34 @@ menu.register({
   }]
 });
 
-// 便捷方法：工具菜单
+// main/menubar/tools
 menu.registerToolsMenuItem({
   label: "My Tool",
   onCommand: (event, context) => {}
 });
 
-// 便捷方法：右键菜单
-menu.registerContextMenuItem({
+// main/library/item
+menu.registerItemMenuItem({
   label: "My Action",
+  onCommand: (event, context) => {}
+});
+
+// main/library/collection
+menu.registerCollectionMenuItem({
+  label: "Rebuild Collection Index",
+  onCommand: (event, context) => {}
+});
+
+// itemPane/info/row
+menu.registerItemPaneInfoRowMenuItem({
+  id: "field-actions",
+  label: "Normalize Field Value",
+  onCommand: (event, context) => {}
+});
+
+// reader/menubar/view
+menu.registerReaderMenubarViewMenuItem({
+  label: "Toggle Context Pane",
   onCommand: (event, context) => {}
 });
 
@@ -277,6 +309,66 @@ menu.registerContextMenuItem({
 menu.unregister(menuId);
 menu.unregisterAll();
 menu.isOfficialAPIAvailable();
+```
+
+当前推荐优先使用 scene helper。`registerContextMenuItem()` 仍保留为 `main/library/item` 的兼容别名；`registerReaderMenuItem()` 仍保留为 `reader/menubar/*` 的通用 target helper；`registerSubmenu()` 仍保留为跨 target 的通用子菜单 helper，不对应 Reader `createViewContextMenu` / `createAnnotationContextMenu`。
+
+迁移建议：
+
+- 新代码、模板片段和 agent 自动修复默认使用 scene helper，不再优先生成旧 helper 调用。
+- 已有 `registerContextMenuItem(...)` 且 target 固定为 `main/library/item` 时，优先直接迁到 `registerItemMenuItem(...)`。
+- 已有 `registerReaderMenuItem({ target: MENU_TARGETS.READER_MENU_VIEW }, ...)` 时，优先直接迁到 `registerReaderMenubarViewMenuItem(...)`。
+- 已有 `registerSubmenu({ target: MENU_TARGETS.LIBRARY_ITEM | LIBRARY_COLLECTION | READER_MENU_VIEW, ... })` 时，优先直接迁到对应的 scene submenu helper。
+- 只有确实需要跨 `reader/menubar/*` 多个 target 复用一套注册入口时，再继续保留 `registerReaderMenuItem(...)`。
+- 只有确实需要跨 target 做通用子菜单装配时，再继续保留 `registerSubmenu(...)`。
+- Reader `createViewContextMenu` / `createAnnotationContextMenu` 一律不要继续挂在 `menu-manager` 兼容 helper 上，应迁到 `reader.registerViewContextMenuItem(...)` / `reader.registerAnnotationContextMenuItem(...)`。
+
+高级动态菜单示例：
+
+```javascript
+import {
+  createMenuManager,
+  createMenuStateResolver,
+  MENU_TARGETS,
+  MENU_TYPES,
+} from "./features/menu-manager.js";
+
+const menu = createMenuManager({ logger, lifecycle, pluginID });
+const resolveState = createMenuStateResolver({
+  prefs,
+  preferenceKeys: ["feature.enabled"],
+});
+
+menu.registerStateDrivenMenu({
+  id: "collection-actions",
+  target: MENU_TARGETS.LIBRARY_COLLECTION,
+  baseMenu: {
+    menuType: MENU_TYPES.SUBMENU,
+    label: "Collection Actions",
+    menus: [{
+      menuType: MENU_TYPES.MENUITEM,
+      label: "Placeholder",
+    }],
+  },
+  resolveState,
+  buildMenu({ state }) {
+    return {
+      visible: state.hasCollectionSelection,
+      menus: [
+        {
+          menuType: MENU_TYPES.MENUITEM,
+          label: "Rebuild Collection Index",
+          onCommand: () => {},
+        },
+        {
+          menuType: MENU_TYPES.MENUITEM,
+          label: `Inspect ${state.collectionTreeRowType || "selection"}`,
+          onCommand: () => {},
+        },
+      ],
+    };
+  },
+});
 ```
 
 **菜单目标（MENU_TARGETS）**：见类型定义文件
@@ -416,10 +508,14 @@ prompt.isAvailable();
 
 ### Reader
 
-PDF/EPUB/Snapshot 阅读器工具和注解操作。
+PDF/EPUB/Snapshot 阅读器工具、注解操作与官方 Reader event surface，覆盖 Reader context menu 与 renderToolbar surface。
 
 ```javascript
-import { createReader, READER_TYPES, ANNOTATION_TYPES } from "./features/reader.js";
+import {
+  createReader,
+  READER_TYPES,
+  ANNOTATION_TYPES,
+} from "./features/reader.js";
 
 const reader = createReader({ logger });
 
@@ -446,6 +542,16 @@ await reader.createAnnotation(attachmentID, {
 
 await reader.updateAnnotation(annotationID, { comment: "My note" });
 await reader.deleteAnnotation(annotationID);
+
+reader.registerViewContextMenuItem({
+  label: "Inspect Reader View",
+  onCommand() {},
+});
+
+reader.registerAnnotationContextMenuItem({
+  label: "Process Annotation",
+  onCommand() {},
+});
 
 reader.isAvailable();
 reader.isAnnotationsAvailable();
@@ -476,6 +582,8 @@ reader.isAnnotationsAvailable();
 - `matchingWindowStates` / `matchingWindowStateCount`
 
 它更适合给 agent 或真机调试链路读取当前 Reader 的“可稳定观测交互状态”。
+
+`registerViewContextMenuItem()` / `registerAnnotationContextMenuItem()` 是 Reader 上下文菜单的首选 helper。若需要直接处理更底层事件，再使用 `registerEventListener()`；无论哪条路径，它们都不属于 `menu-manager` 的 `reader/menubar/*` target。
 
 **阅读器类型（READER_TYPES）**：`PDF`, `EPUB`, `SNAPSHOT`
 

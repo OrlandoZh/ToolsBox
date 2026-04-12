@@ -70,6 +70,73 @@ const INVALID_LEGAL = `# Clean-Room Legal Risk Checklist
   Evidence: dist/cleanroom-similarity.json
 `;
 
+const VALID_CODE_PROVENANCE = `# Code Provenance Record
+
+## 模块来源摘要
+
+- fixture provenance
+
+## reference 使用边界
+
+- fixture boundary
+
+## 发布包排除项
+
+- fixture excludes
+`;
+
+const VALID_THIRD_PARTY_NOTICES = `# Third-Party Notices
+
+## 当前发布包内第三方项
+
+- none
+
+## 当前未进入发布包的研究材料
+
+- reference only
+
+## 维护要求
+
+- keep updated
+`;
+
+const VALID_COMMERCIAL_RIGHTS_NOTICE = `# 商业交付权利说明
+
+## 权利边界
+
+- UNLICENSED
+
+## 商业交付提示
+
+- review before shipping
+`;
+
+const VALID_LEGAL_WITH_CHINA_GATE = `# Clean-Room Legal Risk Checklist
+
+## Development Gate (must pass now)
+
+- [x] SPEC frozen
+  Evidence: SPEC.md
+- [x] No reference imports
+  Evidence: npm run cleanroom:audit
+
+## Release Gate (release-only)
+
+- [ ] Similarity reviewed
+  Evidence: dist/cleanroom-similarity.json
+- [ ] Final legal review completed before shipping.
+  Evidence: release approval record
+
+## China Commercial Delivery Gate (release-only)
+
+- [x] CODE provenance ready
+  Evidence: CODE_PROVENANCE.md
+- [x] Third-party notices ready
+  Evidence: THIRD_PARTY_NOTICES.md
+- [x] Commercial delivery rights notice ready
+  Evidence: COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md
+`;
+
 function createTempRoot(prefix) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   tempRoots.push(root);
@@ -85,6 +152,12 @@ function writeText(root, relativePath, content) {
 
 function writeJSON(root, relativePath, payload) {
   writeText(root, relativePath, `${JSON.stringify(payload, null, 2)}\n`);
+}
+
+function writeChinaLegalDocs(root) {
+  writeText(root, "CODE_PROVENANCE.md", VALID_CODE_PROVENANCE);
+  writeText(root, "THIRD_PARTY_NOTICES.md", VALID_THIRD_PARTY_NOTICES);
+  writeText(root, "COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md", VALID_COMMERCIAL_RIGHTS_NOTICE);
 }
 
 function initGitBaseline(root) {
@@ -121,12 +194,19 @@ function createAuditFixture(options = {}) {
   if (options.withReference === true) {
     writeText(root, "reference/demo.md", "Reference snapshot fixture.\n");
   }
+  if (options.withChinaDocs === true) {
+    writeChinaLegalDocs(root);
+  }
   initGitBaseline(root);
   return root;
 }
 
-function createReleaseFixture() {
-  const root = createAuditFixture();
+function createReleaseFixture(options = {}) {
+  const root = createAuditFixture({
+    withReference: options.withReference === true,
+    withChinaDocs: options.withChinaDocs === true,
+    legalContent: options.legalContent,
+  });
   const config = {
     addonName: "Zotero Cleanroom Template",
     addonId: "cleanroom-template@example.com",
@@ -234,6 +314,50 @@ describe("Cleanroom Audit", () => {
     assert.ok(fs.existsSync(path.join(root, "dist", "cleanroom-similarity.md")));
   });
 
+  it("should keep China commercial delivery findings advisory in dev mode", async () => {
+    const root = createAuditFixture();
+
+    const report = await runCleanroomAudit({
+      projectRoot: root,
+      reportDir: path.join(root, "dist"),
+    });
+
+    assert.equal(report.status, "passed");
+    assert.equal(report.chinaLegal.status, "advisory");
+    assert.ok(report.chinaLegal.missingDocs.includes("CODE_PROVENANCE.md"));
+    assert.ok(report.chinaLegal.gateIssues.some((item) => item.includes("China Commercial Delivery Gate")));
+  });
+
+  it("should allow the managed reference manifest to point at reference snapshots without failing source isolation", async () => {
+    const root = createAuditFixture();
+    writeJSON(root, "config/reference-projects.json", {
+      version: 1,
+      projects: [
+        {
+          id: "demo-reference",
+          label: "Demo Reference",
+          enabled: true,
+          targetPath: "reference/plugin/demo-reference",
+          source: {
+            type: "git",
+            url: "https://github.com/example/demo-reference.git",
+            ref: "main",
+            refType: "branch",
+          },
+        },
+      ],
+    });
+
+    const report = await runCleanroomAudit({
+      projectRoot: root,
+      reportDir: path.join(root, "dist"),
+    });
+
+    assert.equal(report.status, "passed");
+    const sourceIsolation = report.checks.find((item) => item.id === "source-isolation-scan");
+    assert.equal(sourceIsolation?.ok, true);
+  });
+
   it("should fail release preflight when release-mode similarity is unavailable", () => {
     const root = createReleaseFixture();
     let capturedError = null;
@@ -254,5 +378,48 @@ describe("Cleanroom Audit", () => {
     assert.equal(preflightReport.status, "failed");
     assert.equal(preflightReport.errorCategory, "validation");
     assert.equal(preflightReport.failedStage, "cleanroom-audit");
+  });
+
+  it("should fail release preflight when China commercial delivery pack is missing", () => {
+    const root = createReleaseFixture({
+      withReference: true,
+    });
+    let capturedError = null;
+
+    try {
+      execFileSync("node", [path.join(projectRoot, "scripts", "release-preflight.mjs"), "--project-root", root], {
+        cwd: projectRoot,
+        stdio: "pipe",
+      });
+    } catch (error) {
+      capturedError = error;
+    }
+
+    assert.ok(capturedError, "Expected release-preflight to fail without China commercial delivery docs");
+    const preflightReport = readJSON(root, "dist/release-preflight.json");
+    assert.equal(preflightReport.status, "failed");
+    assert.equal(preflightReport.failedStage, "cleanroom-audit");
+    assert.equal(preflightReport.chinaLegalStatus, "blocking");
+    assert.equal(preflightReport.chinaCommercialDeliveryGateOK, false);
+    assert.ok(preflightReport.chinaLegalMissingDocs.includes("CODE_PROVENANCE.md"));
+  });
+
+  it("should pass release-mode cleanroom audit when China commercial delivery pack is ready", async () => {
+    const root = createReleaseFixture({
+      withReference: true,
+      withChinaDocs: true,
+      legalContent: VALID_LEGAL_WITH_CHINA_GATE,
+    });
+
+    const report = await runCleanroomAudit({
+      mode: "release",
+      projectRoot: root,
+      reportDir: path.join(root, "dist"),
+    });
+
+    assert.equal(report.status, "passed");
+    assert.equal(report.chinaLegal.status, "ready");
+    assert.equal(report.chinaLegal.docPackReady, true);
+    assert.equal(report.chinaLegal.deliveryGateOK, true);
   });
 });

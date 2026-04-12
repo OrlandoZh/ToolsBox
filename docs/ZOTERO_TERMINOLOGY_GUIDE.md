@@ -18,8 +18,9 @@
 | `context pane` | 上下文窗格 | Reader 侧触发的 context pane surface | Reader 右侧栏面板 |
 | `renderToolbar` | `renderToolbar` 工具栏注入 | Reader 官方事件类型与对应 UI 注入点 | toolbar entry |
 | `menu item` | 菜单项 | MenuManager 注册结果与真实菜单 surface | menu entry |
+| `view context menu` / `createViewContextMenu` | 视图区上下文菜单 | Reader 视图区菜单 surface 与相关事件 | Reader 右键菜单 / 空白区右键 |
 | `Sidebar` | 侧边栏 | Reader 或主界面的侧边导航/侧栏状态 | 右侧栏 |
-| `annotation context menu` / `createAnnotationContextMenu` | 批注上下文菜单 | Reader 批注菜单 surface 与相关事件 | 注释右键入口 |
+| `annotation context menu` / `createAnnotationContextMenu` | 批注上下文菜单 | Reader 批注菜单 surface 与相关事件 | 注释右键入口 / Reader 右键菜单 |
 
 ## Naming Rules
 
@@ -29,6 +30,9 @@
 - 当 surface 名称比产品化描述更稳定时，优先使用 surface 名称。
   例如：使用 `context pane`，不要只写“Reader 右侧栏面板”。
 - 当需要描述菜单类注入时，优先使用 `menu item`，因为这与 Zotero `MenuData.menuType` 一致。
+- 当需要描述 Reader 菜单时，先区分 `reader/menubar/view` 与 `createViewContextMenu` / `createAnnotationContextMenu`。
+  前者是 `MenuManager` target，后者是 `Reader.registerEventListener(...)` 事件 surface。
+- 不要用笼统的 `reader menu` 同时指代 menubar、view context menu 和 annotation context menu。
 
 ## Scope
 

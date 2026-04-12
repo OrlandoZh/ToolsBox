@@ -61,6 +61,7 @@ npm run package
 说明：`updateURL` 在 Zotero 7/8 的实际安装链路中应视为必填。留空时，构建虽然可能完成，但 Zotero 会把生成的包判为无效。
 说明：当前仓库 `config/addon.config.json` 中落地的 Gitee `updateURL` 仅用于这个模板项目自身的远端发布验收与测试；如果你是基于模板开发自己的插件，必须先替换 `addonId`、`homepage` 和 `updateURL`，不能继续沿用模板仓库的发布地址。
 说明：`build/` 与 `dist/` 都是本地可再生工件，已被 `.gitignore` 忽略；正常 `git push` 不会上传这些产物。若要交付纯源码，请使用 `npm run export:project`，不要直接压缩整个工作目录。
+说明：`npm run export:project` 现在会一并导出 `LEGAL_RISK_CHECKLIST.md`、`CODE_PROVENANCE.md`、`THIRD_PARTY_NOTICES.md` 与 `COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md`，作为中国法商业交付骨架。
 说明：如果你在补 release / toolchain 测试，不要把仓库里已有的 `build/` / `dist/` 当稳定输入；需要先在测试里准备 fresh 工件，或改用临时 fixture。
 
 ### 4. Zotero 真机测试
@@ -96,19 +97,25 @@ npm run zotero:test
 
 如果一个新的开发 agent 接手这个项目，默认按下面顺序推进：
 
-1. 先读取 `docs/CURRENT_BACKLOG.md` 的“当前单一事实源”，不要直接根据旧 `dist/` 工件、README 历史记录或单次命令输出判断当前主线。
-2. 如只需快速定向当前项目态，可先看 `dist/agent-context.json` 的 `runtimeCompact` 视图；一旦涉及 truth、wave、validation 或 scope 判定，仍回到 `docs/CURRENT_BACKLOG.md` 与 project mirror。
-3. 先执行 `npm run check`，确保源码、配置、文档 truth 与 clean-room 门禁处于一致状态。
-4. 如果 `config/addon.config.json` 仍是模板默认值，例如 `addonId=cleanroom-template@example.com`、`author=Your Team`、模板仓库 `homepage` 或模板专用 `updateURL`，先暂停功能开发，并先向用户确认：`addonName`、`addonId`、`addonRef`、`author`、`homepage`、`updateURL`，以及是否保留完整 agent 工程链还是导出纯项目。
-5. 涉及运行时、UI、场景或宿主集成的改动，优先执行 `npm run agent:zotero:e2e`；只有需要连续热重载观察时再使用 `npm run zotero:watch`。
-6. 每轮改动后都执行 `npm run agent:monitor` 和 `npm run agent:gate`，以 gate 是否通过作为“是否继续推进”的主判据。
-7. 只有当前任务明确属于发布链时，才进入 `npm run release:plan -> npm run release:upload -- --provider <provider> --release-tag <tag> --target-base-url <url> -> 手动上传远端产物 -> npm run release:preflight -- --verify-remote -> npm run release:prepare -> npm run release:matrix -> npm run agent:gate:release`。
-8. 如果只是要导出纯源码或模板交付物，使用 `npm run export:project`，不要直接复制整个工作目录。
+1. 先看 `docs/AGENT_INDEX.md` 的路由说明；它只负责导航，当前 truth 仍只认 `docs/CURRENT_BACKLOG.md`。
+2. 先读取 `docs/CURRENT_BACKLOG.md` 的“当前单一事实源”，不要直接根据旧 `dist/` 工件、README 历史记录或单次命令输出判断当前主线。
+3. 如只需快速定向当前项目态，可先看 `dist/agent-context.json` 的 `runtimeCompact` 视图；一旦涉及 truth、wave、validation 或 scope 判定，仍回到 `docs/CURRENT_BACKLOG.md` 与 project mirror。
+4. 先执行 `npm run check`，确保源码、配置、文档 truth 与 clean-room 门禁处于一致状态。
+5. 如果 `config/addon.config.json` 仍是模板默认值，例如 `addonId=cleanroom-template@example.com`、`author=Your Team`、模板仓库 `homepage` 或模板专用 `updateURL`，先暂停功能开发，并先向用户确认：`addonName`、`addonId`、`addonRef`、`author`、`homepage`、`updateURL`，以及是否保留完整 agent 工程链还是导出纯项目。
+6. 涉及运行时、UI、场景或宿主集成的改动，优先执行 `npm run agent:zotero:e2e`；只有需要连续热重载观察时再使用 `npm run zotero:watch`。
+7. 每轮改动后都执行 `npm run agent:monitor` 和 `npm run agent:gate`，以 gate 是否通过作为“是否继续推进”的主判据。
+8. 只有当前任务明确属于发布链时，才进入 `npm run release:plan -> npm run release:upload -- --provider <provider> --release-tag <tag> --target-base-url <url> -> 手动上传远端产物 -> npm run release:preflight -- --verify-remote -> npm run release:prepare -> npm run release:matrix -> npm run agent:gate:release`。
+9. 如果只是要导出纯源码或模板交付物，使用 `npm run export:project`，不要直接复制整个工作目录。
+10. 如果这轮需要刷新本地 `reference/` 中受管的 git-backed 快照，不要直接手改 `reference/` 目录；先执行 `npm run agent:reference:update -- list` 查看受管项目，再用 `npm run agent:reference:update -- update --project <id>` 或 `--all`。
+11. 如果需要人工触发一轮“产品整体 UI 设计 / 更新”草图，不要直接改自动生成的 `07~11` UI 概念图；先执行 `npm run agent:ui:design -- list`，再用 `npm run agent:ui:design -- run product-ui-design-update --goal "<你的设计目标>"`，让子 agent 只更新 `obsidian/agent-workbench/20-当前Zotero插件-产品整体 UI 设计与更新流程.excalidraw.md`。
 
 补充说明：
 
 - 如果你调整了 `config/project-validation-overrides.json` 或 `config/project-expansion-wave.json`，同时也要更新 `docs/CURRENT_BACKLOG.md`，让机器可读 mirror 和人类可读 truth 保持同轮一致。
 - mirror 负责表达当前批次的验证/扩展判定，truth 负责表达当前阶段结论；不要让两者分别记录不同 scope 或不同 acceptanceTrack。
+- `config/reference-projects.json` 里声明的是可人工更新的 rolling git 快照；像 `reference/lajiplugin/bibgenie-0.5.7` 这类版本号直接写在目录名里的 release/archive 快照，继续人工新建版本目录，不走 `agent:reference:update`。
+- `agent:reference:update` 默认会阻断脏 worktree、非 git 目录或 origin 不匹配的目标；只有明确接受覆盖时，才用 `--allow-dirty` 或 `--replace-existing`。
+- `agent:ui:design` 这条人工链只允许把 UI 设计呈现写到 Obsidian Excalidraw `.md`，不顺手改业务源码、当前 truth 或默认 `07~11` 自动概念图；真正改变执行路径，仍只改 `10-模板协作-人工指令窗口.md`。
 
 ---
 
@@ -344,46 +351,128 @@ keyboard.registerShortcut({
 });
 ```
 
-### Menu Manager - 菜单管理
+### Menu Surfaces - 菜单场景
+
+先按宿主 surface 选 API，不要把所有入口都混成一个“右键菜单”：
+
+- `menu-manager` 只覆盖 Zotero `MenuManager` 官方 target，例如 `main/library/item`、`main/library/collection`、`itemPane/info/row`、`reader/menubar/view`
+- Reader `createViewContextMenu` / `createAnnotationContextMenu` 不属于 `menu-manager`，而属于 `reader.registerEventListener(...)`
+- 需要按应用场景回看参考项目时，先看 [Reference Plugin Menu Patterns](./REFERENCE_PLUGIN_MENU_PATTERNS.md)
 
 ```javascript
-import { createMenuManager, MENU_TARGETS } from "./features/menu-manager.js";
+import {
+  createMenuManager,
+} from "./features/menu-manager.js";
+import {
+  createReader,
+} from "./features/reader.js";
 
 const menu = createMenuManager({ logger, lifecycle, pluginID });
+const reader = createReader({ logger, lifecycle, pluginID });
 
-// 注册工具菜单
-menu.registerToolsMenuItem({
-  label: "My Tool",
-  icon: "chrome://myplugin/content/icon.svg",
+// main/library/item
+menu.registerItemMenuItem({
+  label: "Process Selected Items",
   onCommand: (event, context) => {
-    console.log("Tool clicked");
-  }
-});
-
-// 注册右键菜单
-menu.registerContextMenuItem({
-  label: "Process Selected",
-  onCommand: (event, context) => {
-    const items = context.items;
-    console.log("Selected items:", items);
+    console.log("Selected items:", context.items);
   },
   onShowing: (event, context) => {
     context.setVisible(context.items?.length > 0);
   }
 });
 
-// 使用官方 API
-menu.register({
-  target: MENU_TARGETS.LIBRARY_ITEM,
-  menus: [{
-    menuType: "menuitem",
-    label: "My Action",
-    onCommand: (event, context) => {}
-  }]
+// main/library/collection
+menu.registerCollectionMenuItem({
+  label: "Rebuild Collection Index",
+  onCommand: (event, context) => {
+    console.log("Collection row:", context.collectionTreeRow);
+  }
+});
+
+// itemPane/info/row
+menu.registerItemPaneInfoRowMenuItem({
+  id: "metadata-row-actions",
+  label: "Normalize Field Value",
+  onCommand: (event, context) => {
+    console.log("Field name:", context.fieldName);
+  }
+});
+
+// reader/menubar/view
+menu.registerReaderMenubarViewMenuItem({
+  label: "Toggle Context Pane",
+  onCommand: () => {}
+});
+
+// Reader createViewContextMenu
+reader.registerViewContextMenuItem((event) => ({
+  label: `Inspect ${(event.params?.targetID || "reader-view")}`,
+  onCommand: () => {}
+}));
+
+// Reader createAnnotationContextMenu
+reader.registerAnnotationContextMenuItem({
+  label: "Process Annotation",
+  onCommand: () => {}
 });
 ```
 
-### Item Pane - 条目面板
+> 注意：当前推荐优先使用 scene helper，例如 `registerItemMenuItem()`、`registerItemPaneInfoRowMenuItem()`、`registerReaderMenubarViewMenuItem()`、`registerViewContextMenuItem()`、`registerAnnotationContextMenuItem()`。`registerContextMenuItem()`、`registerReaderMenuItem()` 与 `registerSubmenu()` 继续保留为兼容 helper。
+>
+> 迁移建议：
+> - `registerContextMenuItem(...)` 且 target 固定为 `main/library/item` 时，直接迁到 `registerItemMenuItem(...)`
+> - `registerReaderMenuItem({ target: MENU_TARGETS.READER_MENU_VIEW }, ...)` 时，直接迁到 `registerReaderMenubarViewMenuItem(...)`
+> - `registerSubmenu({ target: MENU_TARGETS.LIBRARY_ITEM | LIBRARY_COLLECTION | READER_MENU_VIEW, ... })` 时，优先迁到对应的 scene submenu helper
+> - 只有确实需要跨多个 `reader/menubar/*` target 复用时，再保留 `registerReaderMenuItem(...)`
+> - 只有确实需要跨 target 做通用子菜单装配时，再保留 `registerSubmenu(...)`
+> - `createViewContextMenu` / `createAnnotationContextMenu` 不要走 `menu-manager` 兼容 helper，应迁到 `reader.registerViewContextMenuItem()` / `reader.registerAnnotationContextMenuItem()`
+>
+> 动态菜单约束：
+> - 只有菜单显隐 / 禁用 / submenu children 明确依赖 live host state 时，才升级到 `createMenuStateResolver()` + `registerStateDrivenMenu()`
+> - collection scene 优先读 `hasCollectionSelection`、`collectionTreeRowID`、`collectionTreeRowType`，不要把 item selection 逻辑复用到 `main/library/collection`
+> - `popup repair` 继续只作为 hardening fallback 索引，不是模板默认菜单主链
+
+动态 submenu 示例：
+
+```javascript
+const resolveCollectionMenuState = createMenuStateResolver({
+  prefs,
+  preferenceKeys: ["feature.enabled"],
+});
+
+menu.registerStateDrivenMenu({
+  id: "collection-actions",
+  target: menu.MENU_TARGETS.LIBRARY_COLLECTION,
+  baseMenu: {
+    menuType: menu.MENU_TYPES.SUBMENU,
+    label: "Collection Actions",
+    menus: [{
+      menuType: menu.MENU_TYPES.MENUITEM,
+      label: "Placeholder",
+    }],
+  },
+  resolveState: resolveCollectionMenuState,
+  buildMenu({ state }) {
+    return {
+      visible: state.hasCollectionSelection,
+      menus: [
+        {
+          menuType: menu.MENU_TYPES.MENUITEM,
+          label: "Rebuild Collection Index",
+          onCommand: () => {},
+        },
+        {
+          menuType: menu.MENU_TYPES.MENUITEM,
+          label: `Inspect ${state.collectionTreeRowType || "selection"}`,
+          onCommand: () => {},
+        },
+      ],
+    };
+  },
+});
+```
+
+### Item Pane - 条目窗格
 
 ```javascript
 import { createItemPane } from "./features/item-pane.js";
@@ -451,7 +540,10 @@ const renderer = itemTree.createDefaultCellRenderer({ color: "blue" });
 ### Reader - 阅读器
 
 ```javascript
-import { createReader, READER_TYPES } from "./features/reader.js";
+import {
+  createReader,
+  READER_TYPES,
+} from "./features/reader.js";
 
 const reader = createReader({ logger });
 
@@ -482,6 +574,16 @@ await reader.updateAnnotation(annotationID, {
   color: "#00aa88"
 });
 await reader.deleteAnnotation(annotationID);
+
+reader.registerViewContextMenuItem({
+  label: "Inspect Reader View",
+  onCommand: () => {}
+});
+
+reader.registerAnnotationContextMenuItem({
+  label: "Process Annotation",
+  onCommand: () => {}
+});
 ```
 
 `activeSummary` 会给出当前活动 reader 的 `itemID`、`tabID`、`type` 和 `annotationCount`，适合用在命令面板、菜单项显隐和 Toast 摘要这类轻量 demo。
@@ -491,6 +593,8 @@ await reader.deleteAnnotation(annotationID);
 `interaction` 会进一步给出批注明细、可编辑批注数量、匹配窗口状态、`uiState` 和当前 reader 是否处于活动态，适合给 agent 做“Reader 交互是否真到位”的宿主侧判断。
 
 `createAnnotation()` 现在支持更友好的输入：即使只给 `type / comment / pageIndex`，模板也会自动补齐 `key / pageLabel / sortIndex / position`，便于 agent 和人工在控制台里快速做批注回环验证。
+
+Reader 官方事件面也归这里管理。若目标是 `renderToolbar`、`createViewContextMenu` 或 `createAnnotationContextMenu`，优先用 `registerViewContextMenuItem()` / `registerAnnotationContextMenuItem()` 或底层 `registerEventListener(...)`，不要把 Reader 上下文菜单并进 `menu-manager`。
 
 ### Dialog - 对话框
 
@@ -702,7 +806,7 @@ npm run release:upload -- --provider github-release --release-tag v1.0.0 --targe
 npm run release:preflight -- --verify-remote
 ```
 
-这一步会检查远端 `update.json` 是否可访问、是否包含当前 `addonId` 的首条更新记录，以及其中的 `update_link` 是否与本地发布产物一致。
+这一步会检查远端 `update.json` 是否可访问、是否包含当前 `addonId` 的首条更新记录，以及其中的 `update_link` 是否与本地发布产物一致。当前 `release:preflight` 还会把 China Commercial Delivery Gate 作为 release-only 严格门禁，校验 `CODE_PROVENANCE.md`、`THIRD_PARTY_NOTICES.md` 与 `COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md` 是否就绪。
 
 ### 5. 发布到 GitHub / 自定义发布端
 

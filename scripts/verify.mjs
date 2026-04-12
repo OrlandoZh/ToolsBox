@@ -40,6 +40,9 @@ export async function verifyWorkspace(projectRoot = root) {
     "src/core/i18n.js",
     "scripts/build.mjs",
     "LEGAL_RISK_CHECKLIST.md",
+    "CODE_PROVENANCE.md",
+    "THIRD_PARTY_NOTICES.md",
+    "COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md",
   ];
 
   const missing = [];

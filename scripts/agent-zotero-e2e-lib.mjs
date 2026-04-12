@@ -645,7 +645,7 @@ export function deriveFixHints({ issues = [], logSummary = null }) {
     hints.push("优先核对 `src/app/feature-composer.js` 中 `*-primary-action` 的 command palette 注册块是否仍保留在 baseline 注册链中。");
   }
   if (issueText.includes("主窗口上下文菜单项未注册")) {
-    hints.push("优先核对 `src/app/feature-composer.js` 中 `menuManager.registerContextMenuItem(...)` 是否仍位于官方菜单 API 分支内。");
+    hints.push("优先核对 `src/app/feature-composer.js` 中 `menuManager.registerItemMenuItem(...)` 是否仍位于官方菜单 API 分支内。");
   }
   if (issueText.includes("偏好设置面板未注册")) {
     hints.push("优先核对 `src/app/feature-composer.js` 中 `preferencePanes.registerPane(...)` 是否仍在 baseline 注册阶段执行，并确认 `content/preferences.xhtml` 仍可访问。");
@@ -696,7 +696,7 @@ export function deriveFixHints({ issues = [], logSummary = null }) {
     hints.push("优先核对 `src/app/feature-composer.js` 中 `*-reader-summary` 的 command palette 注册是否仍保留在 baseline 注册链中。");
   }
   if (issueText.includes("reader view 菜单项未注册")) {
-    hints.push("优先核对 `src/app/feature-composer.js` 中 `menuManager.registerReaderMenuItem(...)` 是否仍位于官方菜单 API 分支内。");
+    hints.push("优先核对 `src/app/feature-composer.js` 中 `menuManager.registerReaderMenubarViewMenuItem(...)` 是否仍位于官方菜单 API 分支内。");
   }
   if (issueText.includes("reader 官方事件监听注册异常")) {
     hints.push("优先核对 `src/features/reader.js` 中 `registerEventListener()` / `unregisterEventListener()` 是否仍把官方 listener 正确桥接到 Zotero.Reader。");
@@ -1098,6 +1098,52 @@ export function buildE2EMarkdown(report) {
     lines.push("- 无");
   } else {
     report.hints.forEach((item) => lines.push(`- ${item}`));
+  }
+
+  if (summary.domContractReport?.present) {
+    lines.push("", "## DOM Contract", "");
+    lines.push(`- 状态: \`${summary.domContractReport.statusLabel || summary.domContractReport.status || "-"}\``);
+    lines.push(`- Advisory: \`${summary.domContractReport.advisory ? "yes" : "no"}\``);
+    lines.push(`- Route: \`${summary.domContractReport.passedRouteCount ?? 0}/${summary.domContractReport.routeCount ?? 0}\``);
+    lines.push(`- 缺失 Route: \`${summary.domContractReport.missingRouteCount ?? 0}\``);
+    lines.push(`- 摘要: ${summary.domContractReport.summary || "-"}`);
+    const routes = Array.isArray(summary.domContractReport.routes) ? summary.domContractReport.routes : [];
+    routes.forEach((route) => {
+      lines.push(`- Route ${route.routeId || route.adapter || "-" }: \`${route.statusLabel || route.status || "-"}\` / 场景 ${(route.scenarioNames || []).join("、") || "-"}`);
+      lines.push(`- Route 摘要: ${route.summary || "-"}`);
+      lines.push(`- 失败检查: ${(route.failedChecks || []).join("；") || "-"}`);
+    });
+  }
+
+  if (
+    summary.toolbarDispatchMode
+    || summary.toolbarAppendedItemCount !== null
+    || summary.selectionPopupAppendedItemCount !== null
+    || summary.sidebarHeaderAppendedItemCount !== null
+    || summary.contextMenuProbeCount !== null
+    || (summary.contextMenuObservedTypes || []).length > 0
+    || (summary.contextMenuSyntheticFallbackTypes || []).length > 0
+  ) {
+    lines.push("", "## Reader 深层事件点", "");
+    lines.push(`- 分发摘要: ${summary.readerDispatchSummary || "-"}`);
+    lines.push(`- 工具栏分发: \`${summary.toolbarDispatchMode ?? "-"}\``);
+    lines.push(`- 工具栏追加项: \`${summary.toolbarAppendedItemCount ?? "-"}\``);
+    lines.push(`- 文本浮层追加项: \`${summary.selectionPopupAppendedItemCount ?? "-"}\``);
+    lines.push(`- 侧栏批注头追加项: \`${summary.sidebarHeaderAppendedItemCount ?? "-"}\``);
+    lines.push(`- 上下文菜单探针数: \`${summary.contextMenuProbeCount ?? "-"}\``);
+    lines.push(`- 上下文菜单摘要: ${summary.contextMenuSummary || "-"}`);
+    lines.push(`- 已观测类型: ${(summary.contextMenuObservedTypes || []).join("、") || "-"}`);
+    lines.push(`- fallback 类型: ${(summary.contextMenuSyntheticFallbackTypes || []).join("、") || "-"}`);
+  }
+
+  if (summary.performanceBudget?.present) {
+    lines.push("", "## Dev 性能预算", "");
+    lines.push(`- 状态: \`${summary.performanceBudget.statusLabel || summary.performanceBudget.status || "-"}\``);
+    lines.push(`- 模式: \`${summary.performanceBudget.budgetMode || "-"}\``);
+    lines.push(`- 摘要: ${summary.performanceBudget.summary || "-"}`);
+    lines.push(`- 宿主动作: \`${summary.performanceBudget.measuredActivityCount ?? 0}/${summary.performanceBudget.expectedActivityCount ?? 0}\``);
+    lines.push(`- 超预算项: \`${summary.performanceBudget.violationCount ?? 0}\``);
+    lines.push(`- 预算告警: ${summary.performanceBudget.violationSummary || "-"}`);
   }
 
   const launchFailure = report?.details?.launchFailure || null;

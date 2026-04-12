@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { summarizeAgentContextSnapshot } from "./agent-context-lib.mjs";
 import { parseBooleanEnvFlag } from "./script-runtime-lib.mjs";
 
 const OBSIDIAN_ALLOW_EXTERNAL_ENV = "AGENT_OBSIDIAN_ALLOW_EXTERNAL";
@@ -294,6 +295,9 @@ export async function evaluateObsidianWorkspaceGuard(projectRoot, options = {}) 
     sourceGateGeneratedAt: handoff.payload?.sourceGateGeneratedAt || null,
     sourceMonitorGeneratedAt: handoff.payload?.sourceMonitorGeneratedAt || null,
     sourceLoopGeneratedAt: handoff.payload?.sourceLoopGeneratedAt || null,
+    sourceAgentContextGeneratedAt: handoff.payload?.sourceAgentContextGeneratedAt || null,
+    sourceAgentContextDigest: handoff.payload?.sourceAgentContextDigest || null,
+    sourceAgentContextAlignmentStatus: handoff.payload?.sourceAgentContextAlignmentStatus || null,
     projectContext: handoff.payload?.projectContext || null,
   };
 
@@ -363,6 +367,8 @@ export async function evaluateObsidianWorkspaceGuard(projectRoot, options = {}) 
   const gate = await readJSONArtifact(resolveArtifactPath(projectRoot, "agent-gate.json", env));
   const monitor = await readJSONArtifact(resolveArtifactPath(projectRoot, "agent-monitor.json", env));
   const loop = await readJSONArtifact(resolveArtifactPath(projectRoot, "agent-zotero-loop.json", env));
+  const agentContext = await readJSONArtifact(resolveArtifactPath(projectRoot, "agent-context.json", env));
+  const agentContextSnapshot = summarizeAgentContextSnapshot(agentContext.payload);
   const latestSourceMs = Math.max(
     parseGeneratedAtMs(gate.payload?.generatedAt) || 0,
     parseGeneratedAtMs(monitor.payload?.generatedAt) || 0,
@@ -391,8 +397,8 @@ export async function evaluateObsidianWorkspaceGuard(projectRoot, options = {}) 
     result.freshnessStatus = "current";
   }
 
-  const statusNotePath = String(handoff.payload?.statusNote || path.join(workspaceDirCanonical, "01-Zotero-Agent-当前状态总览.md"));
-  const canvasPath = String(handoff.payload?.architectureCanvas || path.join(workspaceDirCanonical, "00-Zotero-Agent-项目架构与闭环.canvas"));
+  const statusNotePath = String(handoff.payload?.statusNote || path.join(workspaceDirCanonical, "01-当前Zotero插件-状态总览.md"));
+  const canvasPath = String(handoff.payload?.architectureCanvas || path.join(workspaceDirCanonical, "00-当前Zotero插件-功能与技术脉络.canvas"));
   const [statusNote, canvas] = await Promise.all([
     readTextArtifact(statusNotePath),
     readTextArtifact(canvasPath),
@@ -430,6 +436,22 @@ export async function evaluateObsidianWorkspaceGuard(projectRoot, options = {}) 
   const canvasSummarySource = String(canvasMeta.metadata.summary_source || "").trim();
   const statusBootstrapShell = String(statusFrontmatter.bootstrap_shell || "").trim();
   const canvasBootstrapShell = String(canvasMeta.metadata.bootstrap_shell || "").trim();
+  const statusAgentContextDigest = String(statusFrontmatter.agent_context_digest || "").trim();
+  const canvasAgentContextDigest = String(canvasMeta.metadata.agent_context_digest || "").trim();
+  const statusAgentContextGeneratedAt = String(statusFrontmatter.agent_context_generated_at || "").trim();
+  const canvasAgentContextGeneratedAt = String(canvasMeta.metadata.agent_context_generated_at || "").trim();
+  const actualAgentContextDigest = agentContext.present && agentContext.invalid !== true
+    ? String(agentContextSnapshot?.budgetMeta?.digest || "").trim()
+    : "";
+  const actualAgentContextGeneratedAt = agentContext.present && agentContext.invalid !== true
+    ? String(agentContextSnapshot?.generatedAt || "").trim()
+    : "";
+  const expectedAgentContextDigest = String(
+    result.sourceAgentContextDigest || actualAgentContextDigest || "",
+  ).trim();
+  const expectedAgentContextGeneratedAt = String(
+    result.sourceAgentContextGeneratedAt || actualAgentContextGeneratedAt || "",
+  ).trim();
 
   if (!statusGenerationId || !canvasGenerationId || !result.generationId || statusGenerationId !== result.generationId || canvasGenerationId !== result.generationId) {
     result.coherenceStatus = "generation-drift";
@@ -461,6 +483,71 @@ export async function evaluateObsidianWorkspaceGuard(projectRoot, options = {}) 
         handoffBootstrapShell: String(result.bootstrapShell),
         statusBootstrapShell,
         canvasBootstrapShell,
+      },
+    ));
+  } else if (
+    expectedAgentContextDigest
+    && !agentContext.present
+  ) {
+    result.coherenceStatus = "missing-agent-context-artifact";
+    pushFinding(result, strict ? "violations" : "warnings", buildFinding(
+      "coherence",
+      "missing-agent-context-artifact",
+      "Obsidian handoff 已声明 agent-context digest，但当前 `dist/agent-context.json` 缺失。",
+      {
+        expectedAgentContextDigest,
+      },
+    ));
+  } else if (
+    expectedAgentContextDigest
+    && agentContext.invalid === true
+  ) {
+    result.coherenceStatus = "invalid-agent-context-artifact";
+    pushFinding(result, strict ? "violations" : "warnings", buildFinding(
+      "coherence",
+      "invalid-agent-context-artifact",
+      "Obsidian handoff 已声明 agent-context digest，但当前 `dist/agent-context.json` 不是合法 JSON。",
+      {
+        expectedAgentContextDigest,
+      },
+    ));
+  } else if (
+    expectedAgentContextDigest
+    && (
+      statusAgentContextDigest !== expectedAgentContextDigest
+      || canvasAgentContextDigest !== expectedAgentContextDigest
+      || (expectedAgentContextGeneratedAt && statusAgentContextGeneratedAt !== expectedAgentContextGeneratedAt)
+      || (expectedAgentContextGeneratedAt && canvasAgentContextGeneratedAt !== expectedAgentContextGeneratedAt)
+    )
+  ) {
+    result.coherenceStatus = "agent-context-digest-drift";
+    pushFinding(result, strict ? "violations" : "warnings", buildFinding(
+      "coherence",
+      "agent-context-digest-drift",
+      "Obsidian handoff、状态页与白板引用的 agent-context digest / generated_at 不一致。",
+      {
+        expectedAgentContextDigest,
+        statusAgentContextDigest,
+        canvasAgentContextDigest,
+        expectedAgentContextGeneratedAt,
+        statusAgentContextGeneratedAt,
+        canvasAgentContextGeneratedAt,
+      },
+    ));
+  } else if (
+    expectedAgentContextDigest
+    && agentContext.present
+    && agentContext.invalid !== true
+    && String(agentContextSnapshot?.budgetMeta?.digest || "").trim() !== expectedAgentContextDigest
+  ) {
+    result.coherenceStatus = "agent-context-artifact-drift";
+    pushFinding(result, strict ? "violations" : "warnings", buildFinding(
+      "coherence",
+      "agent-context-artifact-drift",
+      "Obsidian handoff 引用的 agent-context digest 与当前 dist/agent-context.json 不一致。",
+      {
+        expectedAgentContextDigest,
+        actualAgentContextDigest: actualAgentContextDigest || null,
       },
     ));
   } else {

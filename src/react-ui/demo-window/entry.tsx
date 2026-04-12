@@ -22,7 +22,7 @@ function App({ context }: { context: ShellContext }) {
         <p className="react-ui-demo-copy">
           This standalone window is intentionally product-neutral. It shows how a downstream
           project can keep the template core in plain JS while isolating a React/TS lane behind
-          an opt-in bundle contract.
+          an opt-in bundle contract, then reuse the same lane for host-mounted surface bridges.
         </p>
       </header>
       <section className="react-ui-demo-grid">
@@ -31,7 +31,7 @@ function App({ context }: { context: ShellContext }) {
           <ul>
             <li>Default disabled</li>
             <li>Built only through build:react-ui</li>
-            <li>Hosted by a checked-in XHTML shell</li>
+            <li>Ships both a window shell and a host-mounted renderer bridge</li>
           </ul>
         </article>
         <article>

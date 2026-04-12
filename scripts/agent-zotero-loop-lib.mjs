@@ -193,7 +193,7 @@ export function deriveZoteroLoopActions(state) {
 
 export function buildZoteroLoopMarkdown(report) {
   const lines = [
-    "# Zotero Agent 编排回合报告",
+    "# 当前 Zotero 插件编排回合报告",
     "",
     `- 生成时间: \`${report.generatedAt}\``,
     `- 执行模式: \`${report.dryRun ? "dry-run" : "live"}\``,

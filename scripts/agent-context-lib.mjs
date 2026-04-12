@@ -3,16 +3,16 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import {
   CURRENT_TRUTH_SOURCE_FILE,
-  extractCurrentTruthActiveBatchId,
-  readCurrentTruthSummary,
+  readCurrentTruthState,
 } from "./docs-current-truth-lib.mjs";
 import {
   resolveAgentArtifactPath,
   resolveAgentContextArtifacts,
 } from "./agent-artifacts.mjs";
+import { loadReferenceDistillationState } from "./agent-reference-intake-lib.mjs";
 import { writeJSONArtifact } from "./script-runtime-lib.mjs";
 
-export const AGENT_CONTEXT_SCHEMA_VERSION = 1;
+export const AGENT_CONTEXT_SCHEMA_VERSION = 2;
 export const AGENT_CONTEXT_RUNTIME_COMPACT_PROFILE = "runtime-compact-v1";
 
 const RUNTIME_COMPACT_MAX_TEXT_LENGTH = 120;
@@ -102,25 +102,6 @@ function buildCurrentTruthExcerpt(summaryText, max = 4) {
     .slice(0, max);
 }
 
-function extractCurrentWaveNameFromTruth(summaryText) {
-  const patterns = [
-    /当前 active expansion wave[：:]\s*`([^`]+)`/u,
-    /当前已显式进入 `([^`]+)`/u,
-  ];
-  for (const pattern of patterns) {
-    const match = String(summaryText || "").match(pattern);
-    if (match?.[1]) {
-      return String(match[1]).trim() || null;
-    }
-  }
-  return null;
-}
-
-function extractAcceptanceTrackFromTruth(summaryText) {
-  const match = String(summaryText || "").match(/(?:验收主线|acceptance track)[：:]\s*`([^`]+)`/u);
-  return match?.[1] ? String(match[1]).trim() || null : null;
-}
-
 function buildContextSignal(id, kind, message, recommendation) {
   return {
     id,
@@ -146,17 +127,18 @@ async function loadJSONIfExists(filePath) {
 async function readCurrentTruthContext(projectRoot) {
   const sourcePath = path.join(projectRoot, CURRENT_TRUTH_SOURCE_FILE);
   try {
-    const [summary, stats] = await Promise.all([
-      Promise.resolve().then(() => readCurrentTruthSummary(projectRoot)),
+    const [{ summary, meta, activeBatchId, currentWaveName, acceptanceTrack }, stats] = await Promise.all([
+      Promise.resolve().then(() => readCurrentTruthState(projectRoot)),
       fs.stat(sourcePath),
     ]);
     return {
       present: true,
       sourceFile: CURRENT_TRUTH_SOURCE_FILE,
       updatedAt: stats.mtime.toISOString(),
-      activeBatchId: extractCurrentTruthActiveBatchId(summary),
-      currentWaveNameFromTruth: extractCurrentWaveNameFromTruth(summary),
-      acceptanceTrackFromTruth: extractAcceptanceTrackFromTruth(summary),
+      meta,
+      activeBatchId,
+      currentWaveNameFromTruth: currentWaveName,
+      acceptanceTrackFromTruth: acceptanceTrack,
       summary,
       excerpt: buildCurrentTruthExcerpt(summary, 4),
     };
@@ -165,6 +147,7 @@ async function readCurrentTruthContext(projectRoot) {
       present: false,
       sourceFile: CURRENT_TRUTH_SOURCE_FILE,
       updatedAt: null,
+      meta: null,
       activeBatchId: null,
       currentWaveNameFromTruth: null,
       acceptanceTrackFromTruth: null,
@@ -391,18 +374,170 @@ function summarizeDelegationContext(monitor) {
   };
 }
 
-function pickDecisionHints({ monitor, memory, gate, validationDecision }) {
+function collectUniqueSignalKinds(signals, max = 6) {
+  return Array.from(new Set(
+    (Array.isArray(signals) ? signals : [])
+      .map((item) => String(item?.kind || "").trim())
+      .filter(Boolean),
+  )).slice(0, max);
+}
+
+function hasSignal(signals, id) {
+  return (Array.isArray(signals) ? signals : []).some((item) => item?.id === id);
+}
+
+function resolveSourceAlignmentRepair({
+  currentTruth = null,
+  monitor = null,
+  memory = null,
+  gate = null,
+  driftSignals = null,
+} = {}) {
+  const signals = Array.isArray(driftSignals?.signals) ? driftSignals.signals : [];
+
+  if (!currentTruth?.present || hasSignal(signals, "missing-current-truth")) {
+    return {
+      command: "npm run agent:context",
+      message: "先更新 `docs/CURRENT_BACKLOG.md` 的 current truth，再重新执行 `npm run agent:context`。",
+      blocker: "缺少 current truth 摘要，当前无法确认稳定治理语义。",
+      evidenceRefs: [CURRENT_TRUTH_SOURCE_FILE, "dist/agent-context.json"],
+    };
+  }
+
+  if (!monitor?.present || hasSignal(signals, "missing-monitor")) {
+    return {
+      command: "npm run agent:monitor",
+      message: "先执行 `npm run agent:monitor`，再重新汇总当前上下文。",
+      blocker: "缺少 agent-monitor 工件，当前无法生成动态上下文主视图。",
+      evidenceRefs: ["dist/agent-monitor.json", "dist/agent-context.json"],
+    };
+  }
+
+  if (
+    hasSignal(signals, "truth-wave-mismatch")
+    || hasSignal(signals, "truth-acceptance-track-mismatch")
+  ) {
+    return {
+      command: "npm run agent:context",
+      message: "先对齐 `docs/CURRENT_BACKLOG.md` 与当前 project mirrors，再重新执行 `npm run agent:context`。",
+      blocker: signals[0]?.message || "current truth 与 project mirror 之间存在 scope drift。",
+      evidenceRefs: [
+        CURRENT_TRUTH_SOURCE_FILE,
+        "config/project-expansion-wave.json",
+        "dist/agent-context.json",
+      ],
+    };
+  }
+
+  if (!gate?.present || hasSignal(signals, "gate-older-than-monitor")) {
+    return {
+      command: "npm run agent:gate",
+      message: "执行 `npm run agent:gate`，让 gate 与最新 monitor/current truth 重新对齐。",
+      blocker: !gate?.present
+        ? "缺少 agent-gate 工件，当前上下文还未进入 post-gate 对齐态。"
+        : "最新 gate 工件早于 monitor，当前上下文可能混入过期 gate 结论。",
+      evidenceRefs: ["dist/agent-gate.json", "dist/agent-context.json"],
+    };
+  }
+
+  if (!memory?.present || hasSignal(signals, "memory-older-than-monitor")) {
+    return {
+      command: "npm run agent:memory",
+      message: "执行 `npm run agent:memory`，让记忆层与最新 monitor/current truth 对齐。",
+      blocker: !memory?.present
+        ? "缺少 agent-memory 工件，当前仍在引用不完整的记忆层上下文。"
+        : "最新 agent-memory 工件早于 monitor，当前上下文仍在引用旧记忆快照。",
+      evidenceRefs: ["dist/agent-memory.json", "dist/agent-context.json"],
+    };
+  }
+
+  return {
+    command: null,
+    message: null,
+    blocker: null,
+    evidenceRefs: [],
+  };
+}
+
+function buildSourceAlignment({
+  currentTruth = null,
+  monitor = null,
+  memory = null,
+  gate = null,
+  driftSignals = null,
+  generationStage = "standalone",
+} = {}) {
+  const warningKinds = collectUniqueSignalKinds(driftSignals?.signals, 6);
+  const repair = resolveSourceAlignmentRepair({
+    currentTruth,
+    monitor,
+    memory,
+    gate,
+    driftSignals,
+  });
+  if (
+    repair.command
+    && warningKinds.length === 0
+    && (!currentTruth?.present || !monitor?.present || !memory?.present || !gate?.present)
+  ) {
+    warningKinds.push("missing-required-section");
+  }
+  const status = repair.command
+    ? "repair-required"
+    : warningKinds.length > 0
+    ? "repair-required"
+    : generationStage === "post-gate"
+      ? "aligned"
+      : "standalone";
+  const preferredRepairCommand = repair.command || (generationStage === "post-gate" ? null : "npm run agent:gate");
+  return {
+    status,
+    generationStage,
+    preferredRepairCommand,
+    warningKinds,
+    summary: status === "aligned"
+      ? "当前 agent-context 已和最新 gate/current truth 对齐。"
+      : repair.message || "当前 agent-context 尚未进入 post-gate 对齐态。",
+  };
+}
+
+function pickDecisionHints({
+  currentTruth,
+  monitor,
+  memory,
+  gate,
+  validationDecision,
+  driftSignals,
+  generationStage = "standalone",
+}) {
+  const repair = resolveSourceAlignmentRepair({
+    currentTruth,
+    monitor,
+    memory,
+    gate,
+    driftSignals,
+  });
+  if (repair.command) {
+    return {
+      nextAction: repair.message,
+      nextActionCommand: repair.command,
+      mainBlocker: repair.blocker,
+      recommendedEvidence: truncateList(repair.evidenceRefs, 6),
+      summary: `${repair.blocker}；下一步 ${repair.command}`,
+    };
+  }
+
   const nextAction = String(
-    gate?.frontpageSummary?.nextAction
-    || monitor?.frontpageSummary?.nextAction
+    gate?.nextAction
+    || monitor?.nextAction
     || memory?.recommendation?.nextAction
     || "npm run agent:monitor",
   ).trim();
   const mainBlocker = String(
-    gate?.issues?.[0]
-    || gate?.frontpageSummary?.primaryBlockers?.[0]
-    || monitor?.frontpageSummary?.primarySignals?.[0]
-    || memory?.currentIncident?.recentReasons?.[0]?.label
+    gate?.headline
+    || monitor?.primarySignals?.[0]
+    || monitor?.headline
+    || memory?.currentIncident?.recentBlocker
     || "当前没有明确主阻断，优先刷新最新工件。",
   ).trim();
   const recommendedEvidence = truncateList(
@@ -425,7 +560,6 @@ function pickDecisionHints({ monitor, memory, gate, validationDecision }) {
 export function evaluateAgentContextDrift({
   currentTruth = null,
   projectExpansionWave = null,
-  projectValidationOverrides = null,
   monitor = null,
   memory = null,
   gate = null,
@@ -471,17 +605,6 @@ export function evaluateAgentContextDrift({
       "先同步 current truth 与 expansion wave mirror 的 acceptance track，再刷新 agent-context。",
     ));
   }
-  if (mirrorWave && projectValidationOverrides?.present) {
-    const overrideSummary = String(projectValidationOverrides.summary || "");
-    if (overrideSummary && !overrideSummary.includes(mirrorWave)) {
-      signals.push(buildContextSignal(
-        "validation-mirror-mismatch",
-        "scope-mismatch",
-        `project-validation-overrides 摘要未体现当前 wave ${mirrorWave}，存在 truth / mirror 漂移风险。`,
-        "同步 `config/project-validation-overrides.json` 的 wave 说明，再刷新 agent-context。",
-      ));
-    }
-  }
   if (monitorMs !== null && gateMs !== null && gateMs < monitorMs) {
     signals.push(buildContextSignal(
       "gate-older-than-monitor",
@@ -515,6 +638,8 @@ function buildRuntimeCompactArtifactRefs() {
     monitor: "dist/agent-monitor.json",
     gate: "dist/agent-gate.json",
     memory: "dist/agent-memory.json",
+    referenceIntake: "dist/agent-reference-intake/index.json",
+    referenceDistill: "dist/agent-reference-distill/latest.json",
     contextJSON: "dist/agent-context.json",
     contextMarkdown: "dist/agent-context.md",
   };
@@ -531,9 +656,22 @@ export function evaluateRuntimeCompactBudget(runtimeCompact) {
     "monitor",
     "gate",
     "memory",
+    "referenceIntake",
+    "referenceDistill",
     "contextJSON",
     "contextMarkdown",
   ].filter((key) => !String(payload?.artifactRefs?.[key] || "").trim());
+  const missingAlignmentFields = [
+    "status",
+    "generationStage",
+  ].filter((key) => !String(payload?.alignmentRef?.[key] || "").trim());
+  const missingReferenceDistillationFields = [
+    "status",
+    "pendingCount",
+    "lastTopic",
+    "lastDistilledAt",
+    "nextSuggestedAction",
+  ].filter((key) => !Object.prototype.hasOwnProperty.call(payload?.referenceDistillationRef || {}, key));
   const violations = [];
   if (tooLongFields.length > 0) {
     violations.push(`存在 ${tooLongFields.length} 个超出 ${RUNTIME_COMPACT_MAX_TEXT_LENGTH} 字符预算的字段`);
@@ -547,6 +685,12 @@ export function evaluateRuntimeCompactBudget(runtimeCompact) {
   if (missingArtifactKeys.length > 0) {
     violations.push(`缺少 artifact refs：${missingArtifactKeys.join("、")}`);
   }
+  if (missingAlignmentFields.length > 0) {
+    violations.push(`缺少 alignment refs：${missingAlignmentFields.join("、")}`);
+  }
+  if (missingReferenceDistillationFields.length > 0) {
+    violations.push(`缺少 reference distillation refs：${missingReferenceDistillationFields.join("、")}`);
+  }
   return {
     profile: AGENT_CONTEXT_RUNTIME_COMPACT_PROFILE,
     maxTextLength: RUNTIME_COMPACT_MAX_TEXT_LENGTH,
@@ -555,6 +699,8 @@ export function evaluateRuntimeCompactBudget(runtimeCompact) {
     maxEvidenceRefs: RUNTIME_COMPACT_MAX_EVIDENCE_REFS,
     tooLongFieldCount: tooLongFields.length,
     missingArtifactKeys,
+    missingAlignmentFields,
+    missingReferenceDistillationFields,
     withinBudget: violations.length === 0,
     violationCount: violations.length,
     violations,
@@ -575,8 +721,14 @@ export function buildRuntimeCompactView(context) {
   const driftSignals = payload?.driftSignals && typeof payload.driftSignals === "object"
     ? payload.driftSignals
     : {};
+  const sourceAlignment = payload?.sourceAlignment && typeof payload.sourceAlignment === "object"
+    ? payload.sourceAlignment
+    : {};
   const sourceFreshness = payload?.sourceFreshness && typeof payload.sourceFreshness === "object"
     ? payload.sourceFreshness
+    : {};
+  const referenceDistillation = payload?.dynamicContext?.referenceDistillation && typeof payload.dynamicContext.referenceDistillation === "object"
+    ? payload.dynamicContext.referenceDistillation
     : {};
   const driftWarnings = (Array.isArray(driftSignals.signals) ? driftSignals.signals : [])
     .filter((item) => item?.status === "warning" || item?.severity === "warning")
@@ -610,12 +762,30 @@ export function buildRuntimeCompactView(context) {
   };
   const runtimeCompact = {
     truthRef,
+    alignmentRef: {
+      status: normalizeCompactText(sourceAlignment.status || "missing"),
+      generationStage: normalizeCompactText(sourceAlignment.generationStage || "missing"),
+      preferredRepairCommand: normalizeCompactText(sourceAlignment.preferredRepairCommand),
+      warningKinds: truncateList(
+        (Array.isArray(sourceAlignment.warningKinds) ? sourceAlignment.warningKinds : [])
+          .map((item) => normalizeCompactText(item))
+          .filter(Boolean),
+        RUNTIME_COMPACT_MAX_LIST_ITEMS,
+      ),
+    },
     actionRef,
     statusRef,
     driftRef: {
       status: normalizeCompactText(driftSignals.status || "missing"),
       warningCount: Number(driftSignals.warningCount || 0),
       warnings: driftWarnings,
+    },
+    referenceDistillationRef: {
+      status: normalizeCompactText(referenceDistillation.status || "idle") || "idle",
+      pendingCount: Math.max(0, Number(referenceDistillation.pendingCount || 0)),
+      lastTopic: normalizeCompactText(referenceDistillation.lastTopic),
+      lastDistilledAt: normalizeCompactText(referenceDistillation.lastDistilledAt),
+      nextSuggestedAction: normalizeCompactText(referenceDistillation.nextSuggestedAction),
     },
     evidenceRefs: truncateList(
       (Array.isArray(decisionHints.recommendedEvidence) ? decisionHints.recommendedEvidence : [])
@@ -639,9 +809,11 @@ export function buildRuntimeCompactView(context) {
     ...budget,
     digest: hashObject({
       truthRef: runtimeCompact.truthRef,
+      alignmentRef: runtimeCompact.alignmentRef,
       actionRef: runtimeCompact.actionRef,
       statusRef: runtimeCompact.statusRef,
       driftRef: runtimeCompact.driftRef,
+      referenceDistillationRef: runtimeCompact.referenceDistillationRef,
       evidenceRefs: runtimeCompact.evidenceRefs,
       artifactRefs: runtimeCompact.artifactRefs,
       freshness: runtimeCompact.freshness,
@@ -659,9 +831,12 @@ export function summarizeAgentContextSnapshot(agentContext) {
     present: Boolean(payload),
     generatedAt: payload?.generatedAt || null,
     truthRef: runtimeCompact.truthRef || {},
+    alignmentRef: runtimeCompact.alignmentRef || {},
+    sourceAlignment: runtimeCompact.alignmentRef || {},
     actionRef: runtimeCompact.actionRef || {},
     statusRef: runtimeCompact.statusRef || {},
     driftRef: runtimeCompact.driftRef || {},
+    referenceDistillationRef: runtimeCompact.referenceDistillationRef || {},
     evidenceRefs: truncateList(runtimeCompact.evidenceRefs, RUNTIME_COMPACT_MAX_EVIDENCE_REFS),
     artifactRefs: runtimeCompact.artifactRefs || buildRuntimeCompactArtifactRefs(),
     freshness: runtimeCompact.freshness || {},
@@ -673,7 +848,7 @@ export function summarizeAgentContextSnapshot(agentContext) {
       violations: ["缺少 runtime compact budget metadata"],
     },
     summary: payload
-      ? `${runtimeCompact.truthRef?.activeBatchId || "-"} / ${runtimeCompact.actionRef?.nextAction || "-"} / drift ${runtimeCompact.driftRef?.status || "missing"}`
+      ? `${runtimeCompact.truthRef?.activeBatchId || "-"} / ${runtimeCompact.alignmentRef?.status || "missing"} / ${runtimeCompact.actionRef?.nextAction || "-"}`
       : "缺少 agent-context 工件。",
   };
 }
@@ -685,7 +860,11 @@ export function buildAgentContext({
   monitor = null,
   memory = null,
   gate = null,
-} = {}) {
+  referenceDistillation = null,
+} = {}, options = {}) {
+  const generationStage = options.generationStage === "post-gate"
+    ? "post-gate"
+    : "standalone";
   const validationDecision = summarizeValidationDecision(
     gate?.validationDecision || monitor?.validationDecision || null,
   );
@@ -696,11 +875,49 @@ export function buildAgentContext({
   const gateSummary = summarizeGateContext(gate);
   const releaseSummary = summarizeReleaseContext(monitor, gate);
   const delegationSummary = summarizeDelegationContext(monitor);
-  const decisionHints = pickDecisionHints({
+  const referenceDistillationSummary = referenceDistillation && typeof referenceDistillation === "object"
+    ? {
+      status: String(referenceDistillation.status || "").trim() || "idle",
+      statusLabel: String(referenceDistillation.statusLabel || "").trim() || "空闲",
+      summary: String(referenceDistillation.summary || "").trim() || "reference distillation idle",
+      pendingCount: Number(referenceDistillation.pendingCount || 0),
+      lastTopic: String(referenceDistillation.lastTopic || "").trim() || null,
+      lastDistilledAt: String(referenceDistillation.lastDistilledAt || "").trim() || null,
+      nextSuggestedAction: String(referenceDistillation.nextSuggestedAction || "").trim() || null,
+    }
+    : {
+      status: "idle",
+      statusLabel: "空闲",
+      summary: "reference distillation idle",
+      pendingCount: 0,
+      lastTopic: null,
+      lastDistilledAt: null,
+      nextSuggestedAction: "继续优先走 REFERENCE_INDEX 路由。",
+    };
+  const driftSignals = evaluateAgentContextDrift({
+    currentTruth,
+    projectExpansionWave,
+    projectValidationOverrides,
     monitor,
     memory,
     gate,
+  });
+  const sourceAlignment = buildSourceAlignment({
+    currentTruth,
+    monitor: monitorSummary,
+    memory: memorySummary,
+    gate: gateSummary,
+    driftSignals,
+    generationStage,
+  });
+  const decisionHints = pickDecisionHints({
+    currentTruth,
+    monitor: monitorSummary,
+    memory: memorySummary,
+    gate: gateSummary,
     validationDecision,
+    driftSignals,
+    generationStage,
   });
   const stableContext = {
     currentTruth: {
@@ -727,6 +944,7 @@ export function buildAgentContext({
       validationOverrideSummary: validationOverrides.summary,
       truthWaveName: currentTruth?.currentWaveNameFromTruth || null,
       truthAcceptanceTrack: currentTruth?.acceptanceTrackFromTruth || null,
+      truthMetaSchemaVersion: Number(currentTruth?.meta?.schemaVersion || 0) || null,
     },
   };
   stableContext.stableContextKey = hashObject({
@@ -748,6 +966,7 @@ export function buildAgentContext({
     gate: gateSummary,
     release: releaseSummary,
     delegation: delegationSummary,
+    referenceDistillation: referenceDistillationSummary,
   };
   dynamicContext.dynamicFingerprint = hashObject({
     monitor: {
@@ -776,6 +995,12 @@ export function buildAgentContext({
       reviewWindowCount: delegationSummary.reviewWindowCount,
       changedPathCount: delegationSummary.changedPathCount,
     },
+    referenceDistillation: {
+      status: referenceDistillationSummary.status,
+      pendingCount: referenceDistillationSummary.pendingCount,
+      lastTopic: referenceDistillationSummary.lastTopic,
+      lastDistilledAt: referenceDistillationSummary.lastDistilledAt,
+    },
   });
 
   const context = {
@@ -789,15 +1014,9 @@ export function buildAgentContext({
     },
     stableContext,
     dynamicContext,
+    sourceAlignment,
     decisionHints,
-    driftSignals: evaluateAgentContextDrift({
-      currentTruth,
-      projectExpansionWave,
-      projectValidationOverrides,
-      monitor,
-      memory,
-      gate,
-    }),
+    driftSignals,
   };
   context.runtimeCompact = buildRuntimeCompactView(context);
   return context;
@@ -809,6 +1028,9 @@ export function renderAgentContextMarkdown(context) {
     : {};
   const dynamic = context?.dynamicContext && typeof context.dynamicContext === "object"
     ? context.dynamicContext
+    : {};
+  const sourceAlignment = context?.sourceAlignment && typeof context.sourceAlignment === "object"
+    ? context.sourceAlignment
     : {};
   const decision = context?.decisionHints && typeof context.decisionHints === "object"
     ? context.decisionHints
@@ -832,11 +1054,13 @@ export function renderAgentContextMarkdown(context) {
     `- Profile: \`${runtimeCompact?.budgetMeta?.profile || AGENT_CONTEXT_RUNTIME_COMPACT_PROFILE}\``,
     `- Digest: \`${runtimeCompact?.budgetMeta?.digest || "-"}\``,
     `- Truth Ref: batch=\`${runtimeCompact?.truthRef?.activeBatchId || "-"}\` / wave=\`${runtimeCompact?.truthRef?.currentWaveName || "-"}\` / validation=\`${runtimeCompact?.truthRef?.validationLevel || "-"}\``,
+    `- Alignment Ref: status=\`${runtimeCompact?.alignmentRef?.status || "missing"}\` / stage=\`${runtimeCompact?.alignmentRef?.generationStage || "missing"}\` / repair=\`${runtimeCompact?.alignmentRef?.preferredRepairCommand || "-"}\` / kinds=${(Array.isArray(runtimeCompact?.alignmentRef?.warningKinds) ? runtimeCompact.alignmentRef.warningKinds : []).join("、") || "-"}`,
     `- Action Ref: next=\`${runtimeCompact?.actionRef?.nextAction || "-"}\` / blocker=${runtimeCompact?.actionRef?.mainBlocker || "-"}`,
     `- Status Ref: monitor=\`${runtimeCompact?.statusRef?.monitorStatus || "-"}\` / gate=\`${runtimeCompact?.statusRef?.gateStatus || "-"}\` / memory=\`${runtimeCompact?.statusRef?.memoryFingerprint || runtimeCompact?.statusRef?.memoryStrategyLabel || "-"}\` / release=\`${runtimeCompact?.statusRef?.releaseStatus || "-"}\``,
     `- Drift Ref: \`${runtimeCompact?.driftRef?.status || "missing"}\` / warning \`${runtimeCompact?.driftRef?.warningCount ?? 0}\` / ${(Array.isArray(runtimeCompact?.driftRef?.warnings) ? runtimeCompact.driftRef.warnings : []).join("；") || "当前未检测到 drift warning"}`,
+    `- Reference Distillation Ref: status=\`${runtimeCompact?.referenceDistillationRef?.status || "idle"}\` / pending=\`${runtimeCompact?.referenceDistillationRef?.pendingCount ?? 0}\` / topic=\`${runtimeCompact?.referenceDistillationRef?.lastTopic || "-"}\` / last=\`${runtimeCompact?.referenceDistillationRef?.lastDistilledAt || "-"}\` / next=\`${runtimeCompact?.referenceDistillationRef?.nextSuggestedAction || "-"}\``,
     `- Evidence Refs: ${(Array.isArray(runtimeCompact?.evidenceRefs) ? runtimeCompact.evidenceRefs : []).join("；") || "当前没有额外建议证据。"}`,
-    `- Artifact Refs: truth=\`${runtimeCompact?.artifactRefs?.currentTruth || CURRENT_TRUTH_SOURCE_FILE}\` / monitor=\`${runtimeCompact?.artifactRefs?.monitor || "dist/agent-monitor.json"}\` / gate=\`${runtimeCompact?.artifactRefs?.gate || "dist/agent-gate.json"}\` / memory=\`${runtimeCompact?.artifactRefs?.memory || "dist/agent-memory.json"}\` / context=\`${runtimeCompact?.artifactRefs?.contextJSON || "dist/agent-context.json"}\``,
+    `- Artifact Refs: truth=\`${runtimeCompact?.artifactRefs?.currentTruth || CURRENT_TRUTH_SOURCE_FILE}\` / monitor=\`${runtimeCompact?.artifactRefs?.monitor || "dist/agent-monitor.json"}\` / gate=\`${runtimeCompact?.artifactRefs?.gate || "dist/agent-gate.json"}\` / memory=\`${runtimeCompact?.artifactRefs?.memory || "dist/agent-memory.json"}\` / reference-intake=\`${runtimeCompact?.artifactRefs?.referenceIntake || "dist/agent-reference-intake/index.json"}\` / reference-distill=\`${runtimeCompact?.artifactRefs?.referenceDistill || "dist/agent-reference-distill/latest.json"}\` / context=\`${runtimeCompact?.artifactRefs?.contextJSON || "dist/agent-context.json"}\``,
     `- Freshness: truth=\`${runtimeCompact?.freshness?.currentTruthUpdatedAt || "-"}\` / monitor=\`${runtimeCompact?.freshness?.monitorGeneratedAt || "-"}\` / gate=\`${runtimeCompact?.freshness?.gateGeneratedAt || "-"}\` / memory=\`${runtimeCompact?.freshness?.memoryGeneratedAt || "-"}\``,
     `- Budget: \`${runtimeCompact?.budgetMeta?.withinBudget ? "within-budget" : "warning"}\` / violation \`${runtimeCompact?.budgetMeta?.violationCount ?? 0}\``,
     "",
@@ -846,6 +1070,8 @@ export function renderAgentContextMarkdown(context) {
     `- Monitor artifact: \`${runtimeCompact?.artifactRefs?.monitor || "dist/agent-monitor.json"}\``,
     `- Gate artifact: \`${runtimeCompact?.artifactRefs?.gate || "dist/agent-gate.json"}\``,
     `- Memory artifact: \`${runtimeCompact?.artifactRefs?.memory || "dist/agent-memory.json"}\``,
+    `- Reference intake artifact: \`${runtimeCompact?.artifactRefs?.referenceIntake || "dist/agent-reference-intake/index.json"}\``,
+    `- Reference distill artifact: \`${runtimeCompact?.artifactRefs?.referenceDistill || "dist/agent-reference-distill/latest.json"}\``,
     `- Agent context JSON: \`${runtimeCompact?.artifactRefs?.contextJSON || "dist/agent-context.json"}\``,
     `- Agent context Markdown: \`${runtimeCompact?.artifactRefs?.contextMarkdown || "dist/agent-context.md"}\``,
     "",
@@ -860,6 +1086,7 @@ export function renderAgentContextMarkdown(context) {
     `- Validation Level: \`${stable.validation?.levelLabel || stable.validation?.level || "-"}\``,
     `- Host-visible Scope: ${stable.hostVisibleScope?.summary || "缺少 host-visible scope 摘要。"}`,
     `- Clean-room / Governance: ${stable.governance?.cleanroomSummary || "-"}`,
+    `- Source Alignment: \`${sourceAlignment.status || "missing"}\` / stage \`${sourceAlignment.generationStage || "missing"}\` / repair \`${sourceAlignment.preferredRepairCommand || "-"}\` / ${(Array.isArray(sourceAlignment.warningKinds) ? sourceAlignment.warningKinds : []).join("、") || "当前没有 source-level warning kind"}`,
     "",
     "## 审计附录：动态上下文",
     "",
@@ -868,6 +1095,7 @@ export function renderAgentContextMarkdown(context) {
     `- Gate: ${dynamic.gate?.summary || "缺少 agent-gate 工件。"}`,
     `- Release: ${dynamic.release?.summary || "缺少 release-matrix 摘要。"}`,
     `- Delegation: ${dynamic.delegation?.summary || "缺少 delegation / validation context 摘要。"}`,
+    `- Reference Distillation: ${dynamic.referenceDistillation?.summary || "reference distillation idle"}`,
     "",
     "## 决策提示",
     "",
@@ -922,13 +1150,14 @@ export async function writeAgentContextArtifacts(projectRoot, context) {
 }
 
 export async function loadAgentContextSources(projectRoot) {
-  const [currentTruth, projectExpansionWave, projectValidationOverrides, monitor, memory, gate] = await Promise.all([
+  const [currentTruth, projectExpansionWave, projectValidationOverrides, monitor, memory, gate, referenceDistillation] = await Promise.all([
     readCurrentTruthContext(projectRoot),
     loadJSONIfExists(path.join(projectRoot, "config", "project-expansion-wave.json")),
     loadJSONIfExists(path.join(projectRoot, "config", "project-validation-overrides.json")),
     loadJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-monitor.json")),
     loadJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-memory.json")),
     loadJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-gate.json")),
+    loadReferenceDistillationState(projectRoot),
   ]);
   return {
     currentTruth,
@@ -937,5 +1166,6 @@ export async function loadAgentContextSources(projectRoot) {
     monitor,
     memory,
     gate,
+    referenceDistillation,
   };
 }

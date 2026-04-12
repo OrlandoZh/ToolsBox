@@ -22,11 +22,15 @@ export interface HostActionPayloadMap {
   "preferences.openPane": {
     paneID?: string;
     scrollTo?: string;
+    windowWidth?: number;
+    windowHeight?: number;
     timeoutMs?: number;
   };
   "preferences.selectTab": {
     paneID?: string;
     tabID: string;
+    windowWidth?: number;
+    windowHeight?: number;
     timeoutMs?: number;
   };
   "preferences.setCheckbox": {
@@ -35,6 +39,8 @@ export interface HostActionPayloadMap {
     preferenceID?: string;
     selector?: string;
     checked: boolean;
+    windowWidth?: number;
+    windowHeight?: number;
     timeoutMs?: number;
   };
   "preferences.setTextbox": {
@@ -43,6 +49,8 @@ export interface HostActionPayloadMap {
     preferenceID?: string;
     selector?: string;
     value: string;
+    windowWidth?: number;
+    windowHeight?: number;
     timeoutMs?: number;
   };
   "preferences.selectMenulist": {
@@ -51,6 +59,8 @@ export interface HostActionPayloadMap {
     preferenceID?: string;
     selector?: string;
     value: string;
+    windowWidth?: number;
+    windowHeight?: number;
     timeoutMs?: number;
   };
   "contextPane.setOpen": {

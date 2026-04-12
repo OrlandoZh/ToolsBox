@@ -46,10 +46,44 @@ const PROJECT_SOURCE_SCAN_TARGETS = [
   ".env.example",
 ];
 const SOURCE_SCAN_EXCLUDE_FILES = new Set([
+  "config/reference-projects.json",
   "scripts/cleanroom-audit-lib.mjs",
   "scripts/cleanroom-audit.mjs",
   "scripts/cleanroom-similarity.mjs",
 ]);
+const CHINA_COMMERCIAL_DELIVERY_SECTION = "China Commercial Delivery Gate";
+const CHINA_LEGAL_DOC_REQUIREMENTS = [
+  {
+    id: "code-provenance",
+    file: "CODE_PROVENANCE.md",
+    label: "代码来源留档",
+    requiredSnippets: [
+      "## 模块来源摘要",
+      "## reference 使用边界",
+      "## 发布包排除项",
+    ],
+  },
+  {
+    id: "third-party-notices",
+    file: "THIRD_PARTY_NOTICES.md",
+    label: "第三方 notices",
+    requiredSnippets: [
+      "## 当前发布包内第三方项",
+      "## 当前未进入发布包的研究材料",
+      "## 维护要求",
+    ],
+  },
+  {
+    id: "commercial-delivery-rights-notice",
+    file: "COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md",
+    label: "商业交付权利说明",
+    requiredSnippets: [
+      "## 权利边界",
+      "## 商业交付提示",
+      "UNLICENSED",
+    ],
+  },
+];
 const DEFAULT_SPEC_REQUIREMENTS = [
   "Zotero Cleanroom Template",
   "Zotero 7/8",
@@ -280,6 +314,7 @@ function buildAuditMarkdown(report) {
     `- Generated At: \`${report.generatedAt}\``,
     `- Project Root: \`${report.projectRoot}\``,
     `- Similarity Status: \`${report.similarity.status}\``,
+    `- China Legal Status: \`${report.chinaLegal?.status || "unknown"}\``,
     "",
     "## Checks",
     "",
@@ -535,6 +570,104 @@ function evaluateLegalChecklist(content) {
   };
 }
 
+async function evaluateChinaLegalDocs(projectRoot) {
+  const docs = [];
+  const missingDocs = [];
+  const contentIssues = [];
+
+  for (const requirement of CHINA_LEGAL_DOC_REQUIREMENTS) {
+    const absolutePath = path.join(projectRoot, requirement.file);
+    if (!(await exists(absolutePath))) {
+      missingDocs.push(requirement.file);
+      docs.push({
+        id: requirement.id,
+        file: requirement.file,
+        label: requirement.label,
+        present: false,
+        contentReady: false,
+        missingSnippets: requirement.requiredSnippets,
+      });
+      continue;
+    }
+
+    const content = await readText(absolutePath);
+    const missingSnippets = requirement.requiredSnippets.filter((snippet) => !content.includes(snippet));
+    if (missingSnippets.length > 0) {
+      contentIssues.push(`${requirement.file} 缺少必需片段: ${missingSnippets.join("、")}`);
+    }
+    docs.push({
+      id: requirement.id,
+      file: requirement.file,
+      label: requirement.label,
+      present: true,
+      contentReady: missingSnippets.length === 0,
+      missingSnippets,
+    });
+  }
+
+  return {
+    docs,
+    missingDocs,
+    contentIssues,
+    docPackReady: missingDocs.length === 0 && contentIssues.length === 0,
+  };
+}
+
+function evaluateChinaCommercialDeliveryGate(legalItems) {
+  const chinaItems = legalItems.filter((item) => item.section.includes(CHINA_COMMERCIAL_DELIVERY_SECTION));
+  const structureIssues = [];
+  const completionIssues = [];
+
+  if (chinaItems.length === 0) {
+    structureIssues.push("缺少 China Commercial Delivery Gate 区段。");
+  }
+
+  for (const item of chinaItems) {
+    if (!item.evidence) {
+      structureIssues.push(`China Commercial Delivery Gate 缺少 Evidence: ${item.label}`);
+    }
+    if (!item.checked) {
+      completionIssues.push(`China Commercial Delivery Gate 未勾选: ${item.label}`);
+    }
+  }
+
+  return {
+    items: chinaItems,
+    structureIssues,
+    completionIssues,
+    structured: structureIssues.length === 0,
+    deliveryGateOK: structureIssues.length === 0 && completionIssues.length === 0,
+  };
+}
+
+async function evaluateChinaLegalPack(projectRoot, legalEvaluation, mode) {
+  const docEvaluation = await evaluateChinaLegalDocs(projectRoot);
+  const gateEvaluation = evaluateChinaCommercialDeliveryGate(legalEvaluation.items);
+  const issues = [
+    ...docEvaluation.missingDocs.map((file) => `缺少中国法交付文档: ${file}`),
+    ...docEvaluation.contentIssues,
+    ...gateEvaluation.structureIssues,
+    ...gateEvaluation.completionIssues,
+  ];
+  const summary = issues.join("；") || "中国法商业交付文档骨架与 release-only gate 已就绪。";
+  const blocking = mode === "release" && issues.length > 0;
+
+  return {
+    status: blocking ? "blocking" : (issues.length > 0 ? "advisory" : "ready"),
+    summary,
+    docPackReady: docEvaluation.docPackReady,
+    deliveryGateOK: docEvaluation.docPackReady && gateEvaluation.deliveryGateOK,
+    missingDocs: docEvaluation.missingDocs,
+    docIssues: docEvaluation.contentIssues,
+    gateIssues: [
+      ...gateEvaluation.structureIssues,
+      ...gateEvaluation.completionIssues,
+    ],
+    docs: docEvaluation.docs,
+    items: gateEvaluation.items,
+  };
+}
+
 async function scanSourceFilesForForbiddenPatterns(projectRoot) {
   const collection = await collectTextFiles(projectRoot, PROJECT_SOURCE_SCAN_TARGETS);
   const findings = [];
@@ -604,6 +737,7 @@ export async function runCleanroomAudit(options = {}) {
   });
   const specEvaluation = evaluateSpecDocument(specContent);
   const legalEvaluation = evaluateLegalChecklist(legalContent);
+  const chinaLegal = await evaluateChinaLegalPack(projectRoot, legalEvaluation, mode);
   const forbiddenPatternFindings = await scanSourceFilesForForbiddenPatterns(projectRoot);
   const gitBaseline = checkGitBaseline(projectRoot);
 
@@ -660,6 +794,30 @@ export async function runCleanroomAudit(options = {}) {
         ? similarity.summary
         : "本地未挂载 reference 快照，release 模式下不可放行。",
     },
+    {
+      id: "china-commercial-delivery-doc-pack",
+      label: "中国法商业交付文档骨架已就绪",
+      ok: chinaLegal.docPackReady,
+      required: mode === "release",
+      evidence: "CODE_PROVENANCE.md / THIRD_PARTY_NOTICES.md / COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md",
+      details: chinaLegal.missingDocs.length > 0 || chinaLegal.docIssues.length > 0
+        ? [
+          chinaLegal.missingDocs.length > 0 ? `缺少文档: ${chinaLegal.missingDocs.join("、")}` : "",
+          chinaLegal.docIssues.join("；"),
+        ].filter(Boolean).join("；")
+        : `文档骨架已就绪: ${CHINA_LEGAL_DOC_REQUIREMENTS.map((item) => item.file).join("、")}`,
+    },
+    {
+      id: "china-commercial-delivery-gate",
+      label: "LEGAL_RISK_CHECKLIST 的 China Commercial Delivery Gate 已完成并带 Evidence",
+      ok: chinaLegal.deliveryGateOK,
+      required: mode === "release",
+      evidence: "LEGAL_RISK_CHECKLIST.md",
+      details: chinaLegal.gateIssues.join("；")
+        || (chinaLegal.deliveryGateOK
+          ? `China Commercial Delivery Gate items: ${chinaLegal.items.length}`
+          : chinaLegal.summary),
+    },
   ];
 
   const blockers = checks.filter((item) => item.required && !item.ok)
@@ -675,6 +833,15 @@ export async function runCleanroomAudit(options = {}) {
       summary: similarity.summary,
       flaggedFileCount: similarity.flaggedFileCount,
       highRiskFindingCount: similarity.highRiskFindingCount,
+    },
+    chinaLegal: {
+      status: chinaLegal.status,
+      summary: chinaLegal.summary,
+      docPackReady: chinaLegal.docPackReady,
+      deliveryGateOK: chinaLegal.deliveryGateOK,
+      missingDocs: chinaLegal.missingDocs,
+      docIssues: chinaLegal.docIssues,
+      gateIssues: chinaLegal.gateIssues,
     },
     checks,
     blockers,

@@ -282,6 +282,51 @@ describe("Agent Obsidian Handoff Lib", () => {
       visualGeometrySummary: "library 几何不一致 2000x1200 / 3388x2172",
       visualCanonicalCoverageSummary: "canonical 基线覆盖部分：仍不匹配 hot-reload-library.png、hot-reload-reader.png",
       visualCanonicalMismatchedTargets: ["hot-reload-library.png", "hot-reload-reader.png"],
+      agentContext: {
+        present: true,
+        generatedAt: "2026-03-20T12:00:00.500Z",
+        truthRef: {
+          activeBatchId: "ENG-HIGH-104",
+          currentWaveName: "Phase E Extension Wave 1",
+          validationLevel: "需要视觉验证",
+        },
+        alignmentRef: {
+          status: "aligned",
+          generationStage: "post-gate",
+          preferredRepairCommand: null,
+        },
+        actionRef: {
+          nextAction: "npm run zotero:watch",
+          mainBlocker: "watch 状态需要刷新：已过期。",
+        },
+        statusRef: {
+          monitorStatus: "需关注",
+          gateStatus: "需先处理",
+        },
+        driftRef: {
+          status: "warning",
+          warningCount: 1,
+          warnings: ["watch 过期"],
+        },
+        referenceDistillationRef: {
+          status: "queued",
+          pendingCount: 1,
+          lastTopic: "Plugin Menu Patterns",
+          lastDistilledAt: "2026-03-20T11:58:00.000Z",
+          nextSuggestedAction: "等待后台 reference distillation 完成。",
+        },
+        evidenceRefs: ["dist/agent-gate.md"],
+        artifactRefs: {
+          currentTruth: "docs/CURRENT_BACKLOG.md",
+          monitor: "dist/agent-monitor.json",
+          gate: "dist/agent-gate.json",
+          memory: "dist/agent-memory.json",
+        },
+        budgetMeta: {
+          profile: "runtime-compact-v1",
+          digest: "digest-test",
+        },
+      },
       projectContext: {
         currentTruth: {
           activeBatchId: "ENG-HIGH-104",
@@ -352,22 +397,25 @@ describe("Agent Obsidian Handoff Lib", () => {
       },
     });
 
-    assert.ok(markdown.includes("# Zotero Agent 当前状态总览"));
+    assert.ok(markdown.includes("# 当前 Zotero 插件状态总览"));
     assert.ok(markdown.includes("summary_source: gate"));
     assert.ok(markdown.includes("handoff_generation_id: obsidian-generation-1"));
-    assert.ok(markdown.includes("## 当前项目语义"));
+    assert.ok(markdown.includes("agent_context_digest: digest-test"));
+    assert.ok(markdown.includes("## 当前插件主线"));
     assert.ok(markdown.includes("当前 wave：Phase E Extension Wave 1"));
     assert.ok(markdown.includes("Validation mirror：项目覆盖 2 条"));
-    assert.ok(markdown.includes("## 当前自动链状态"));
-    assert.ok(markdown.includes("自动阻塞项"));
+    assert.ok(markdown.includes("Alignment Ref：status=`aligned` / stage=`post-gate` / repair=`-`"));
+    assert.ok(markdown.includes("Reference Distillation：status=`queued` / pending=`1` / topic=`Plugin Menu Patterns`"));
+    assert.ok(markdown.includes("## 当前自动结论与验证"));
+    assert.ok(markdown.includes("当前风险与阻塞"));
     assert.ok(markdown.includes("npm run zotero:watch"));
-    assert.ok(markdown.includes("## Reader 深层宿主状态"));
+    assert.ok(markdown.includes("## Reader 专项证据"));
     assert.ok(markdown.includes("流模式 paginated"));
     assert.ok(markdown.includes("视觉主阻断：采集未稳定"));
     assert.ok(markdown.includes("视觉几何摘要：library 几何不一致 2000x1200 / 3388x2172"));
     assert.ok(markdown.includes("Canonical 覆盖摘要：canonical 基线覆盖部分"));
     assert.ok(markdown.includes("Canonical 未对齐目标：hot-reload-library.png、hot-reload-reader.png"));
-    assert.ok(markdown.includes("## 受限补丁摘要"));
+    assert.ok(markdown.includes("## 补丁与修复收口"));
     assert.ok(markdown.includes("创建文件 x1"));
     assert.ok(markdown.includes("未进入白名单：行为回归"));
     assert.ok(markdown.includes("目标文件缺失 x1 / addon-static/locale/zh-CN/main.ftl"));
@@ -456,11 +504,11 @@ describe("Agent Obsidian Handoff Lib", () => {
     assert.ok(Array.isArray(canvas.edges));
     assert.equal(canvas.nodes[0].type, "text");
     assert.ok(canvas.nodes.some((item) => String(item.text).includes("generation_id=obsidian-generation-2")));
-    assert.ok(canvas.nodes.some((item) => String(item.text).includes("当前项目态白板")));
+    assert.ok(canvas.nodes.some((item) => String(item.text).includes("当前 Zotero 插件白板")));
     assert.ok(canvas.nodes.some((item) => String(item.text).includes("Phase E Extension Wave 1")));
-    assert.ok(canvas.nodes.some((item) => String(item.text).includes("项目覆盖 1 条")));
-    assert.ok(canvas.nodes.some((item) => String(item.text).includes("当前自动链状态")));
-    assert.ok(canvas.nodes.some((item) => String(item.text).includes("人工入口与辅助说明")));
+    assert.ok(canvas.nodes.some((item) => String(item.text).includes("当前主线 / truth")));
+    assert.ok(canvas.nodes.some((item) => String(item.text).includes("共享技术骨架")));
+    assert.ok(canvas.nodes.some((item) => String(item.text).includes("协作入口")));
   });
 
   it("should avoid fallback wording when no blockers remain", () => {
@@ -509,7 +557,7 @@ describe("Agent Obsidian Handoff Lib", () => {
       patchSummary: {},
     });
 
-    assert.ok(markdown.includes("当前已满足 agent 质量闸门，可继续执行推荐命令或进入后续开发 / 发布流程。"));
+    assert.ok(markdown.includes("当前已满足主要质量闸门，可继续执行推荐命令或进入后续开发 / 发布流程。"));
     assert.equal(markdown.includes("当前没有明确阻塞项，优先复核 gate 与 loop 是否一致。"), false);
   });
 
@@ -556,12 +604,12 @@ describe("Agent Obsidian Handoff Lib", () => {
       visualCanonicalMismatchedTargets: [],
     });
 
-    assert.ok(markdown.includes("# Zotero Agent 闭环流程图（Visual Companion）"));
+    assert.ok(markdown.includes("# 当前 Zotero 插件交互流转图（Visual Companion）"));
     assert.ok(markdown.includes("```mermaid"));
-    assert.ok(markdown.includes("watch"));
-    assert.ok(markdown.includes("agent:zotero:e2e"));
-    assert.ok(markdown.includes("agent:obsidian"));
-    assert.ok(markdown.includes("human verdict"));
+    assert.ok(markdown.includes("Zotero host"));
+    assert.ok(markdown.includes("pane surfaces"));
+    assert.ok(markdown.includes("surface-local evidence"));
+    assert.ok(markdown.includes("next command"));
   });
 
   it("should render optional excalidraw visual companion markdown", () => {
@@ -594,23 +642,27 @@ describe("Agent Obsidian Handoff Lib", () => {
     assert.ok(markdown.includes("excalidraw-plugin: parsed"));
     assert.ok(markdown.includes("# Excalidraw Data"));
     assert.ok(markdown.includes("```json"));
-    assert.ok(markdown.includes("预期 UI 变化"));
-    assert.ok(markdown.includes("真实回归"));
-    assert.ok(markdown.includes("证据不足"));
+    assert.ok(markdown.includes("Pane Surfaces"));
+    assert.ok(markdown.includes("Reader Surfaces"));
+    assert.ok(markdown.includes("Menu Surfaces"));
   });
 
   it("should render split human guides for manual usage only", () => {
     const quickstart = buildHumanQuickstartMarkdown();
     const advanced = buildHumanAdvancedGuideMarkdown();
 
-    assert.ok(quickstart.includes("# Zotero Agent 人工快速上手"));
+    assert.ok(quickstart.includes("# 模板协作人工快速上手"));
     assert.ok(quickstart.includes("## 快速入口"));
     assert.ok(quickstart.includes("## Reader Verdict 三模板"));
     assert.ok(quickstart.includes("npm run agent:zotero:e2e:update-baseline"));
-    assert.ok(quickstart.includes("[[04-Zotero-Agent-高级介入规范]]"));
-    assert.ok(advanced.includes("# Zotero Agent 高级介入规范"));
+    assert.ok(quickstart.includes("[[04-模板协作-高级介入规范]]"));
+    assert.ok(quickstart.includes("npm run agent:ui:design -- run product-ui-design-update"));
+    assert.ok(quickstart.includes("20-当前Zotero插件-产品整体 UI 设计与更新流程.excalidraw.md"));
+    assert.ok(advanced.includes("# 模板协作高级介入规范"));
     assert.ok(advanced.includes("## 字段语义说明"));
     assert.ok(advanced.includes("## 哪些内容不要改"));
+    assert.ok(advanced.includes("## 产品整体 UI 设计链"));
+    assert.ok(advanced.includes("dist/agent-delegation/OBSIDIAN-UI-DESIGN-001/"));
     assert.ok(advanced.includes("## Reader Verdict 专用模板"));
     assert.ok(advanced.includes("真实回归"));
     assert.ok(advanced.includes("证据不足"));
@@ -744,8 +796,8 @@ describe("Agent Obsidian Handoff Lib", () => {
       assert.ok(markdown.includes(testCase.label));
 
       const canvas = buildObsidianInterventionCanvas(summary);
-      assert.ok(canvas.nodes.some((item) => String(item.text).includes("当前项目态白板")));
-      assert.ok(canvas.nodes.some((item) => String(item.text).includes("当前自动链状态")));
+      assert.ok(canvas.nodes.some((item) => String(item.text).includes("当前 Zotero 插件白板")));
+      assert.ok(canvas.nodes.some((item) => String(item.text).includes("共享技术骨架")));
     }
   });
 
@@ -759,7 +811,19 @@ describe("Agent Obsidian Handoff Lib", () => {
             readerSidebarView: "annotations",
             readerHostStateSummary: "侧边栏视图 annotations；上下文面板 打开",
             readerHostStateNote: "已从 Reader interaction diagnostics 场景读回 2 项深层宿主状态。",
-            readerDispatchSummary: "文本浮层 synthetic-fallback；侧栏批注头 customEvent",
+            toolbarDispatchMode: "customEvent",
+            toolbarAppendedItemCount: 1,
+            selectionPopupAppendedItemCount: 1,
+            sidebarHeaderAppendedItemCount: 2,
+            contextMenuProbeCount: 5,
+            contextMenuObservedTypes: [
+              "createViewContextMenu",
+              "createAnnotationContextMenu",
+            ],
+            contextMenuSyntheticFallbackTypes: [
+              "createViewContextMenu",
+            ],
+            readerDispatchSummary: "工具栏 customEvent；文本浮层 synthetic-fallback；侧栏批注头 customEvent",
             contextMenuSummary: "已观测 5 类；synthetic-fallback 5 类",
             toolbarEvidenceSummary: "renderToolbar 宿主点已观测；Hook 通过；细粒度 通过；分发 customEvent",
             visualEvidenceSummary: "library 已对齐；reader 已对齐",
@@ -774,6 +838,19 @@ describe("Agent Obsidian Handoff Lib", () => {
 
     assert.equal(summary.readerHostStateSummary, "侧边栏视图 annotations；上下文面板 打开");
     assert.equal(summary.readerHostStateNote, "已从 Reader interaction diagnostics 场景读回 2 项深层宿主状态。");
+    assert.equal(summary.toolbarDispatchMode, "customEvent");
+    assert.equal(summary.toolbarAppendedItemCount, 1);
+    assert.equal(summary.selectionPopupAppendedItemCount, 1);
+    assert.equal(summary.sidebarHeaderAppendedItemCount, 2);
+    assert.equal(summary.contextMenuProbeCount, 5);
+    assert.deepEqual(summary.contextMenuObservedTypes, [
+      "createViewContextMenu",
+      "createAnnotationContextMenu",
+    ]);
+    assert.deepEqual(summary.contextMenuSyntheticFallbackTypes, [
+      "createViewContextMenu",
+    ]);
+    assert.ok(summary.readerDispatchSummary?.includes("工具栏"));
     assert.ok(summary.readerDispatchSummary?.includes("文本浮层"));
     assert.ok(summary.readerDispatchSummary?.includes("synthetic-fallback"));
     assert.ok(summary.readerDispatchSummary?.includes("侧栏批注头"));
@@ -794,6 +871,13 @@ describe("Agent Obsidian Handoff Lib", () => {
             readerHostStateObserved: false,
             readerHostStateSummary: null,
             readerHostStateNote: null,
+            toolbarDispatchMode: null,
+            toolbarAppendedItemCount: null,
+            selectionPopupAppendedItemCount: null,
+            sidebarHeaderAppendedItemCount: null,
+            contextMenuProbeCount: null,
+            contextMenuObservedTypes: [],
+            contextMenuSyntheticFallbackTypes: [],
             readerDispatchSummary: null,
             contextMenuSummary: null,
             toolbarEvidenceSummary: null,
@@ -807,6 +891,13 @@ describe("Agent Obsidian Handoff Lib", () => {
 
     assert.equal(summary.readerHostStateSummary, null);
     assert.equal(summary.readerHostStateNote, null);
+    assert.equal(summary.toolbarDispatchMode, null);
+    assert.equal(summary.toolbarAppendedItemCount, null);
+    assert.equal(summary.selectionPopupAppendedItemCount, null);
+    assert.equal(summary.sidebarHeaderAppendedItemCount, null);
+    assert.equal(summary.contextMenuProbeCount, null);
+    assert.deepEqual(summary.contextMenuObservedTypes, []);
+    assert.deepEqual(summary.contextMenuSyntheticFallbackTypes, []);
     assert.equal(summary.readerDispatchSummary, null);
     assert.equal(summary.contextMenuSummary, null);
     assert.equal(summary.toolbarEvidenceSummary, null);
@@ -897,7 +988,7 @@ describe("Agent Obsidian Handoff Lib", () => {
     assert.ok(markdown.includes("## 视觉证据导航"));
     assert.ok(markdown.includes("## Capture Attempt 诊断"));
     assert.ok(markdown.includes("Attempt 诊断"));
-    assert.ok(markdown.includes("详见：[[02-Zotero-Agent-证据索引]]"));
+    assert.ok(markdown.includes("详见：[[02-当前Zotero插件-证据索引]]"));
     assert.ok(markdown.includes("当前阶段：等待人工 Reader verdict"));
 
     const humanWindow = buildHumanInterventionWindowMarkdown(summary, "");
@@ -1063,20 +1154,40 @@ describe("Agent Obsidian Handoff Lib", () => {
       diagnosis: null,
       readerHostStateSummary: "侧边栏视图 annotations；上下文面板 打开",
       readerHostStateNote: "已从 Reader interaction diagnostics 场景读回 2 项深层宿主状态。",
+      toolbarDispatchMode: "customEvent",
+      toolbarAppendedItemCount: 1,
+      selectionPopupAppendedItemCount: 1,
+      sidebarHeaderAppendedItemCount: 2,
+      contextMenuProbeCount: 5,
+      contextMenuObservedTypes: [
+        "createViewContextMenu",
+        "createAnnotationContextMenu",
+      ],
+      contextMenuSyntheticFallbackTypes: [
+        "createViewContextMenu",
+      ],
       toolbarEvidenceSummary: "renderToolbar 宿主点已观测；Hook 通过；细粒度 通过",
       visualEvidenceSummary: "library 已对齐；reader 已对齐",
       visualCaptureStabilitySummary: "视觉采集稳定性：library 稳定（2 次，哈希收敛）；reader 待稳（3 次，重试上限）",
       visualCaptureStabilityStages: [
         { kind: "reader", stable: false, attemptCount: 3, selectionReason: "max-attempt-reached" },
       ],
-      readerDispatchSummary: "文本浮层 synthetic-fallback；侧栏批注头 customEvent",
+      readerDispatchSummary: "工具栏 customEvent；文本浮层 synthetic-fallback；侧栏批注头 customEvent",
       contextMenuSummary: "已观测 5 类；synthetic-fallback 5 类",
       patchSummary: null,
     });
 
-    assert.ok(markdown.includes("# Zotero Agent 当前状态总览"));
-    assert.ok(markdown.includes("## Reader 深层宿主状态"));
+    assert.ok(markdown.includes("# 当前 Zotero 插件状态总览"));
+    assert.ok(markdown.includes("## Reader 专项证据"));
     assert.ok(markdown.includes("侧边栏视图 annotations"));
+    assert.ok(markdown.includes("工具栏分发"));
+    assert.ok(markdown.includes("工具栏追加项"));
+    assert.ok(markdown.includes("工具栏 customEvent"));
+    assert.ok(markdown.includes("文本浮层追加项"));
+    assert.ok(markdown.includes("侧栏批注头追加项"));
+    assert.ok(markdown.includes("上下文菜单探针数"));
+    assert.ok(markdown.includes("已观测类型"));
+    assert.ok(markdown.includes("fallback 类型"));
     assert.ok(markdown.includes("renderToolbar 证据"));
     assert.ok(markdown.includes("视觉证据"));
     assert.ok(markdown.includes("视觉采集稳定性"));
@@ -1084,5 +1195,6 @@ describe("Agent Obsidian Handoff Lib", () => {
     assert.ok(markdown.includes("文本浮层 synthetic-fallback"));
     assert.ok(markdown.includes("侧栏批注头 customEvent"));
     assert.ok(markdown.includes("已观测 5 类"));
+    assert.ok(markdown.includes("createViewContextMenu"));
   });
 });

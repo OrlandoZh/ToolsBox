@@ -11,7 +11,7 @@
 ### `menu-manager`
 
 - Version: `1`
-- Summary: 冻结 MenuManager 包装层与 Zotero 官方菜单目标、菜单类型和注册入口的对齐关系。
+- Summary: 冻结 MenuManager 包装层与 Zotero 官方菜单目标、菜单类型、state-driven submenu 路径和注册入口的对齐关系，仅覆盖 official MenuManager surfaces，不覆盖 Reader createViewContextMenu/createAnnotationContextMenu。
 - Owner Files:
   - `src/features/menu-manager.js`
 - Reference Sources:
@@ -21,8 +21,11 @@
   - menu types: `src/features/menu-manager.js` includes `export const MENU_TYPES = {`, `MENUITEM: "menuitem"`, `SUBMENU: "submenu"`
   - tab types: `src/features/menu-manager.js` includes `export const TAB_TYPES = {`, `READER_PDF: "reader/pdf"`, `READER_SNAPSHOT: "reader/snapshot"`
   - official registration bridge: `src/features/menu-manager.js` includes `function hasOfficialAPI() {`, `return Zotero && Zotero.MenuManager && typeof Zotero.MenuManager.registerMenu === "function";`, `function register(config) {`, `const menuData = menus.map((menuItem, index) => wrapMenuData(menuId, menuItem, `${index}`, menuPaths));`, `function getMenuRegistrationSnapshot(menuId = null) {`, `function getLiveMenuState(menuId, menuPath = null) {`
+  - scene helper registration: `src/features/menu-manager.js` includes `function registerItemMenuItem(menuItem) {`, `function registerItemPaneInfoRowMenuItem(menuItem) {`, `function registerReaderMenubarViewMenuItem(menuItem) {`, `function registerItemSubmenu(config) {`, `function registerCollectionSubmenu(config) {`, `function registerReaderMenubarViewSubmenu(config) {`
+  - compat helper registration: `src/features/menu-manager.js` includes `function registerContextMenuItem(menuItem) {`, `function registerReaderMenuItem(config, menuItem) {`, `function registerSubmenu(config) {`
+  - state-driven menu helpers: `src/features/menu-manager.js` includes `export function createMenuStateResolver(options = {}) {`, `collectionTreeRowID: collectionTreeRow && typeof collectionTreeRow === "object"`, `function rebuildDynamicSubmenu(context, menuItem) {`, `function registerStateDrivenMenu(config) {`
 - Required Types:
-  - `types/features.d.ts` includes `readonly MENU_TARGETS: typeof MENU_TARGETS;`, `readonly MENU_TYPES: typeof MENU_TYPES;`, `registerReaderMenuItem(`, `getMenuRegistrationSnapshot(menuId?: string | null): MenuRegistrationSnapshot[] | MenuRegistrationSnapshot | null;`, `getLiveMenuState(menuId: string, menuPath?: string | null): LiveMenuState | null;`, `isOfficialAPIAvailable(): boolean;`
+  - `types/features.d.ts` includes `collectionTreeRowID: unknown;`, `readonly MENU_TARGETS: typeof MENU_TARGETS;`, `readonly MENU_TYPES: typeof MENU_TYPES;`, `createMenuStateResolver(options?: MenuStateResolverOptions): (context?: MenuContext) => MenuResolvedState;`, `registerItemMenuItem(`, `registerItemPaneInfoRowMenuItem(`, `registerReaderMenubarViewMenuItem(`, `registerItemSubmenu(`, `registerCollectionSubmenu(`, `registerReaderMenubarViewSubmenu(`, `registerContextMenuItem(`, `registerReaderMenuItem(`, `registerSubmenu(`, `registerStateDrivenMenu(options: StateDrivenMenuOptions): string | null;`, `getMenuRegistrationSnapshot(menuId?: string | null): MenuRegistrationSnapshot[] | MenuRegistrationSnapshot | null;`, `getLiveMenuState(menuId: string, menuPath?: string | null): LiveMenuState | null;`, `isOfficialAPIAvailable(): boolean;`
 - Required Tests:
   - `menu-manager.test.js`
   - `toolchain.test.js`
@@ -97,16 +100,17 @@
 ### `reader-events`
 
 - Version: `1`
-- Summary: 冻结 Reader 事件包装层与 Zotero 官方事件类型、注册入口和 synthetic fallback 边界的对齐关系。
+- Summary: 冻结 Reader 事件包装层与 Zotero 官方事件类型、注册入口和 synthetic fallback 边界的对齐关系，覆盖 Reader context menu 与 renderToolbar surface。
 - Owner Files:
   - `src/features/reader.js`
 - Reference Sources:
   - `chrome/content/zotero/xpcom/reader.js` includes `@typedef {"renderTextSelectionPopup" | "renderSidebarAnnotationHeader" | "renderToolbar" |`, `registerEventListener(type, handler, pluginID = undefined) {`, `unregisterEventListener(type, handler) {`
 - Exported Surface:
-  - reader event constants: `src/features/reader.js` includes `export const READER_EVENT_TYPES = {`, `RENDER_TOOLBAR: "renderToolbar"`, `CREATE_SELECTOR_CONTEXT_MENU: "createSelectorContextMenu"`, `export const READER_EVENT_KNOWN_TYPES = Object.freeze([`, `export const READER_EVENT_SYNTHETIC_FALLBACK_TYPES = Object.freeze([`
+  - reader event constants: `src/features/reader.js` includes `export const READER_EVENT_TYPES = {`, `RENDER_TOOLBAR: "renderToolbar"`, `CREATE_VIEW_CONTEXT_MENU: "createViewContextMenu"`, `CREATE_ANNOTATION_CONTEXT_MENU: "createAnnotationContextMenu"`, `CREATE_SELECTOR_CONTEXT_MENU: "createSelectorContextMenu"`, `export const READER_EVENT_KNOWN_TYPES = Object.freeze([`, `export const READER_EVENT_SYNTHETIC_FALLBACK_TYPES = Object.freeze([`
   - reader event bridge: `src/features/reader.js` includes `function isEventAPIAvailable() {`, `async function waitForReaderReady(target, options = {}) {`, `function findToolbarElement(target, options = {}) {`, `function findSidebarViewElements(target, view, options = {}) {`, `async function setContextPaneOpen(target, open, options = {}) {`, `async function selectSidebarView(target, view, options = {}) {`, `function getKnownEventTypes() {`, `function getProbeCompatibleEventTypes() {`, `function dispatchSyntheticEvent(target, options = {}) {`, `function getEventAPIReport() {`, `function registerEventListener(type, handler, options = {}) {`, `function unregisterEventListener(type, handler) {`
+  - reader context menu helpers: `src/features/reader.js` includes `function registerViewContextMenuItem(menuItemOrFactory, options = {}) {`, `READER_EVENT_TYPES.CREATE_VIEW_CONTEXT_MENU,`, `function registerAnnotationContextMenuItem(menuItemOrFactory, options = {}) {`, `READER_EVENT_TYPES.CREATE_ANNOTATION_CONTEXT_MENU,`
 - Required Types:
-  - `types/features.d.ts` includes `export const READER_EVENT_TYPES: {`, `readonly READER_EVENT_TYPES: typeof READER_EVENT_TYPES;`, `isEventAPIAvailable(): boolean;`, `waitForReaderReady(target: unknown, options?: { timeoutMs?: number; intervalMs?: number }): Promise<unknown | null>;`, `setContextPaneOpen(target: unknown, open: boolean, options?: { timeoutMs?: number; intervalMs?: number }): Promise<Record<string, unknown> | null>;`, `selectSidebarView(target: unknown, view: string, options?: {`, `findToolbarElement(target: unknown, options?: { selector?: string; view?: "primary" | "secondary" }): Element | null;`, `findSidebarViewElements(target: unknown, view: string, options?: { view?: "primary" | "secondary" }): {`, `registerEventListener(type: string, handler: (event: ReaderEvent) => void, options?: { pluginID?: string }): (() => void) | null;`, `getKnownEventTypes(): string[];`, `getProbeCompatibleEventTypes(): string[];`, `getEventAPIReport(): ReaderEventAPIReport;`, `dispatchSyntheticEvent(target: unknown, options?: {`, `getReaderFrameWindow(target: unknown, options?: { view?: "primary" | "secondary" }): Window | null;`
+  - `types/features.d.ts` includes `export const READER_EVENT_TYPES: {`, `readonly READER_EVENT_TYPES: typeof READER_EVENT_TYPES;`, `isEventAPIAvailable(): boolean;`, `waitForReaderReady(target: unknown, options?: { timeoutMs?: number; intervalMs?: number }): Promise<unknown | null>;`, `setContextPaneOpen(target: unknown, open: boolean, options?: { timeoutMs?: number; intervalMs?: number }): Promise<Record<string, unknown> | null>;`, `selectSidebarView(target: unknown, view: string, options?: {`, `findToolbarElement(target: unknown, options?: { selector?: string; view?: "primary" | "secondary" }): Element | null;`, `findSidebarViewElements(target: unknown, view: string, options?: { view?: "primary" | "secondary" }): {`, `registerViewContextMenuItem(menuItemOrFactory: ReaderContextMenuItemSource, options?: { pluginID?: string }): (() => void) | null;`, `registerAnnotationContextMenuItem(menuItemOrFactory: ReaderContextMenuItemSource, options?: { pluginID?: string }): (() => void) | null;`, `registerEventListener(type: string, handler: (event: ReaderEvent) => void, options?: { pluginID?: string }): (() => void) | null;`, `getKnownEventTypes(): string[];`, `getProbeCompatibleEventTypes(): string[];`, `getEventAPIReport(): ReaderEventAPIReport;`, `dispatchSyntheticEvent(target: unknown, options?: {`, `getReaderFrameWindow(target: unknown, options?: { view?: "primary" | "secondary" }): Window | null;`
 - Required Tests:
   - `reader.test.js`
   - `agent-zotero-e2e-lib.test.js`

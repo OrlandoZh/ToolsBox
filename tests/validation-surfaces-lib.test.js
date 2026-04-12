@@ -18,6 +18,8 @@ describe("Validation Surfaces Lib", () => {
     assert.ok(registry.surfaces.some((entry) => entry.id === "annotation-context-menu"));
     assert.ok(registry.surfaces.some((entry) => entry.id === "render-toolbar"));
     assert.ok(registry.surfaces.some((entry) => entry.id === "menu-item"));
+    assert.ok(registry.surfaces.some((entry) => entry.id === "collection-menu"));
+    assert.ok(registry.surfaces.some((entry) => entry.id === "menu-submenu"));
     assert.ok(registry.surfaces.some((entry) => entry.id === "item-pane-sidenav"));
     assert.ok(registry.surfaces.some((entry) => entry.id === "reader-sidebar-view"));
     assert.deepEqual(registry.surfaces.find((entry) => entry.id === "preference-pane")?.hostSemanticDomains, ["preference-panes"]);
@@ -38,9 +40,11 @@ describe("Validation Surfaces Lib", () => {
     assert.equal(missing, false);
     assert.equal(mirror.status, "active");
     assert.equal(Array.isArray(mirror.surfaces), true);
-    assert.ok(mirror.surfaces.length >= 6);
+    assert.ok(mirror.surfaces.length >= 8);
     assert.ok(mirror.surfaces.some((entry) => entry.contractSurfaceId === "preference-pane"));
     assert.ok(mirror.surfaces.some((entry) => entry.contractSurfaceId === "reader-sidebar-view"));
+    assert.ok(mirror.surfaces.some((entry) => entry.contractSurfaceId === "collection-menu"));
+    assert.ok(mirror.surfaces.some((entry) => entry.contractSurfaceId === "menu-submenu"));
   });
 
   it("should inspect the current project surface verification scaffold as passed", () => {

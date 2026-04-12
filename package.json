@@ -37,6 +37,7 @@
     "agent:monitor": "node scripts/agent-monitor.mjs",
     "agent:context": "node scripts/agent-context.mjs",
     "agent:context:guard": "node scripts/agent-context-guard.mjs",
+    "agent:context:guard:strict": "node scripts/agent-context-guard.mjs --strict",
     "agent:dashboard": "npm run agent:monitor && npm run agent:context && node scripts/agent-dashboard.mjs",
     "agent:obsidian": "node scripts/agent-obsidian-handoff.mjs",
     "agent:workspace:guard": "node scripts/agent-workspace-guard.mjs",
@@ -47,8 +48,8 @@
     "agent:host:guard:strict": "node scripts/zotero-host-interface-guard.mjs --strict",
     "agent:host:semantic:guard": "node scripts/zotero-host-semantic-index-guard.mjs",
     "agent:host:semantic:guard:strict": "node scripts/zotero-host-semantic-index-guard.mjs --strict",
-    "agent:gate": "npm run agent:workspace:guard:strict && npm run agent:host:guard:strict && npm run agent:host:semantic:guard:strict && npm run agent:monitor && npm run agent:context && node scripts/agent-gate.mjs --profile dev",
-    "agent:gate:release": "npm run agent:workspace:guard:strict && npm run agent:host:guard:strict && npm run agent:host:semantic:guard:strict && npm run agent:monitor && npm run agent:context && node scripts/agent-gate.mjs --profile release",
+    "agent:gate": "npm run agent:workspace:guard:strict && npm run agent:host:guard:strict && npm run agent:host:semantic:guard:strict && npm run agent:monitor && node scripts/agent-gate.mjs --profile dev",
+    "agent:gate:release": "npm run agent:workspace:guard:strict && npm run agent:host:guard:strict && npm run agent:host:semantic:guard:strict && npm run agent:monitor && node scripts/agent-gate.mjs --profile release",
     "agent:sync": "node scripts/agent-sync.mjs",
     "agent:report": "npm run agent:check && npm run agent:dashboard",
     "agent:pipeline": "npm run agent:check && npm run agent:release && npm run agent:dashboard && npm run agent:gate:release",
@@ -61,6 +62,11 @@
     "agent:zotero:autofix": "node scripts/agent-zotero-autofix.mjs --cycles 2 --strategy hot --max-attempts 4",
     "agent:check": "node scripts/agent-runner.mjs check -- npm run check",
     "agent:memory": "node scripts/agent-memory.mjs",
+    "agent:reference:intake": "node scripts/agent-reference-intake.mjs",
+    "agent:reference:distill": "node scripts/agent-reference-distill.mjs",
+    "agent:reference:drain": "node scripts/agent-reference-drain.mjs",
+    "agent:reference:update": "node scripts/agent-reference-update.mjs",
+    "agent:ui:design": "node scripts/agent-ui-design.mjs",
     "agent:delegate:list": "node scripts/agent-delegation.mjs list",
     "agent:delegate:run": "node scripts/agent-delegation.mjs run",
     "agent:delegate:review": "node scripts/agent-delegation.mjs review",
@@ -76,5 +82,10 @@
     "zotero:smoke": "node scripts/zotero.mjs smoke",
     "zotero:test": "node scripts/zotero.mjs test",
     "zotero:scenario": "node scripts/zotero.mjs scenario"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   }
 }

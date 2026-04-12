@@ -5,6 +5,7 @@ export const DEFAULT_OPTIONAL_BUNDLE_REGISTRY_RELATIVE_PATH = path.join("config"
 
 const OPTIONAL_BUNDLE_LANES = new Set(["js-core", "ts-isolated"]);
 const OPTIONAL_BUNDLE_IMPLEMENTATION_STATUSES = new Set(["implemented", "planned"]);
+const OPTIONAL_BUNDLE_ARTIFACT_KINDS = new Set(["window-shell", "surface-bridge"]);
 
 function fail(message) {
   throw new Error(message);
@@ -36,18 +37,102 @@ function ensureNonEmptyString(value, label) {
   return normalized;
 }
 
+function normalizeOptionalString(value, label) {
+  if (value == null || value === "") {
+    return null;
+  }
+  return ensureNonEmptyString(value, label);
+}
+
+function normalizeBuildArtifactContract(artifact, prefix, index) {
+  const artifactPrefix = `${prefix}.build.artifacts[${index}]`;
+  if (!artifact || typeof artifact !== "object" || Array.isArray(artifact)) {
+    fail(`${artifactPrefix} must be an object.`);
+  }
+
+  const kind = normalizeOptionalString(artifact.kind, `${artifactPrefix}.kind`) || "window-shell";
+  if (!OPTIONAL_BUNDLE_ARTIFACT_KINDS.has(kind)) {
+    fail(
+      `${artifactPrefix}.kind must be one of: `
+      + `${Array.from(OPTIONAL_BUNDLE_ARTIFACT_KINDS).join(", ")}`,
+    );
+  }
+
+  const shell = normalizeOptionalString(artifact.shell, `${artifactPrefix}.shell`);
+  if (kind === "window-shell" && !shell) {
+    fail(`${artifactPrefix}.shell must be a non-empty string.`);
+  }
+
+  return {
+    id: ensureNonEmptyString(artifact.id, `${artifactPrefix}.id`),
+    kind,
+    summary: ensureNonEmptyString(artifact.summary, `${artifactPrefix}.summary`),
+    entry: ensureNonEmptyString(artifact.entry, `${artifactPrefix}.entry`),
+    stylesheet: ensureNonEmptyString(artifact.stylesheet, `${artifactPrefix}.stylesheet`),
+    shell,
+    outputScript: ensureNonEmptyString(artifact.outputScript, `${artifactPrefix}.outputScript`),
+    outputStyle: ensureNonEmptyString(artifact.outputStyle, `${artifactPrefix}.outputStyle`),
+    globalKey: normalizeOptionalString(artifact.globalKey, `${artifactPrefix}.globalKey`),
+  };
+}
+
 function normalizeBuildContract(build, prefix) {
   if (!build || typeof build !== "object" || Array.isArray(build)) {
     fail(`${prefix}.build must be an object.`);
   }
 
+  let artifacts = [];
+  if (Array.isArray(build.artifacts)) {
+    artifacts = build.artifacts.map((artifact, index) => (
+      normalizeBuildArtifactContract(artifact, prefix, index)
+    ));
+  } else if (
+    typeof build.entry === "string"
+    || typeof build.stylesheet === "string"
+    || typeof build.shell === "string"
+    || typeof build.outputScript === "string"
+    || typeof build.outputStyle === "string"
+  ) {
+    artifacts = [
+      normalizeBuildArtifactContract(
+        {
+          id: "default",
+          kind: "window-shell",
+          summary: "Legacy single-artifact build contract.",
+          entry: build.entry,
+          stylesheet: build.stylesheet,
+          shell: build.shell,
+          outputScript: build.outputScript,
+          outputStyle: build.outputStyle,
+          globalKey: build.globalKey,
+        },
+        prefix,
+        0,
+      ),
+    ];
+  } else {
+    fail(`${prefix}.build.artifacts must be a non-empty array.`);
+  }
+
+  if (artifacts.length === 0) {
+    fail(`${prefix}.build.artifacts must be a non-empty array.`);
+  }
+
+  const seenArtifactIDs = new Set();
+  artifacts.forEach((artifact) => {
+    if (seenArtifactIDs.has(artifact.id)) {
+      fail(`${prefix}.build.artifacts has duplicate id: ${artifact.id}`);
+    }
+    seenArtifactIDs.add(artifact.id);
+  });
+
   return {
     scriptName: ensureNonEmptyString(build.scriptName, `${prefix}.build.scriptName`),
-    entry: ensureNonEmptyString(build.entry, `${prefix}.build.entry`),
-    stylesheet: ensureNonEmptyString(build.stylesheet, `${prefix}.build.stylesheet`),
-    shell: ensureNonEmptyString(build.shell, `${prefix}.build.shell`),
-    outputScript: ensureNonEmptyString(build.outputScript, `${prefix}.build.outputScript`),
-    outputStyle: ensureNonEmptyString(build.outputStyle, `${prefix}.build.outputStyle`),
+    requiredPackages: ensureArrayOfStrings(
+      build.requiredPackages || [],
+      `${prefix}.build.requiredPackages`,
+    ),
+    artifacts,
   };
 }
 
@@ -155,6 +240,33 @@ export function isOptionalBundleEnabled(registry, bundleId) {
   return Boolean(getOptionalBundle(registry, bundleId)?.enabled);
 }
 
+export function listOptionalBundleRequiredPackages(registry) {
+  const normalizedRegistry = normalizeOptionalBundleRegistry(registry);
+  const packageNames = new Set();
+
+  normalizedRegistry.bundles.forEach((bundle) => {
+    if (!bundle.build) {
+      return;
+    }
+    bundle.build.requiredPackages.forEach((packageName) => {
+      packageNames.add(packageName);
+    });
+  });
+
+  return Array.from(packageNames).sort();
+}
+
+function hasPackageDependency(packageJSON, packageName) {
+  if (!packageJSON || typeof packageJSON !== "object") {
+    return false;
+  }
+
+  return Boolean(
+    packageJSON.dependencies?.[packageName]
+    || packageJSON.devDependencies?.[packageName],
+  );
+}
+
 export function inspectOptionalBundleContracts(projectRoot, options = {}) {
   const { registryPath, registry } = options.registry
     ? {
@@ -182,21 +294,24 @@ export function inspectOptionalBundleContracts(projectRoot, options = {}) {
       return;
     }
 
-    const requiredFiles = [
-      bundle.build.entry,
-      bundle.build.stylesheet,
-      bundle.build.shell,
-    ];
+    bundle.build.artifacts.forEach((artifact) => {
+      const requiredFiles = [
+        artifact.entry,
+        artifact.stylesheet,
+        ...(artifact.shell ? [artifact.shell] : []),
+      ];
 
-    requiredFiles.forEach((relativePath) => {
-      if (!fs.existsSync(path.join(projectRoot, relativePath))) {
-        issues.push({
-          bundleId: bundle.id,
-          reason: "missing-build-input",
-          file: relativePath,
-          message: `Optional bundle \`${bundle.id}\` is missing required build input: ${relativePath}`,
-        });
-      }
+      requiredFiles.forEach((relativePath) => {
+        if (!fs.existsSync(path.join(projectRoot, relativePath))) {
+          issues.push({
+            bundleId: bundle.id,
+            artifactId: artifact.id,
+            reason: "missing-build-input",
+            file: relativePath,
+            message: `Optional bundle \`${bundle.id}\` artifact \`${artifact.id}\` is missing required build input: ${relativePath}`,
+          });
+        }
+      });
     });
 
     const buildScript = String(bundle.build.scriptName || "").trim();
@@ -208,6 +323,19 @@ export function inspectOptionalBundleContracts(projectRoot, options = {}) {
         message: `Optional bundle \`${bundle.id}\` requires package.json script \`${buildScript}\`.`,
       });
     }
+
+    bundle.build.requiredPackages.forEach((packageName) => {
+      if (hasPackageDependency(packageJSON, packageName)) {
+        return;
+      }
+
+      issues.push({
+        bundleId: bundle.id,
+        reason: "missing-required-package",
+        packageName,
+        message: `Optional bundle \`${bundle.id}\` requires package.json dependency \`${packageName}\`.`,
+      });
+    });
   });
 
   return {

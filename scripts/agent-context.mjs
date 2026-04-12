@@ -49,6 +49,13 @@ main().catch(async (error) => {
       dynamicContext: {
         dynamicFingerprint: null,
       },
+      sourceAlignment: {
+        status: "repair-required",
+        generationStage: "standalone",
+        preferredRepairCommand: "npm run agent:context",
+        warningKinds: ["missing-required-section"],
+        summary: failureInfo.errorMessage,
+      },
       decisionHints: {
         nextAction: "npm run agent:monitor",
         nextActionCommand: "npm run agent:monitor",

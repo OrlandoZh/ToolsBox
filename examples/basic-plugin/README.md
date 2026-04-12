@@ -11,7 +11,7 @@
 - **Notifier** - 事件监听
 
 ### Features 模块
-- **MenuManager** - 工具菜单、右键菜单、收藏集菜单
+- **MenuManager** - 工具菜单、条目菜单项、收藏集菜单
 - **ItemPane** - 自定义 Section、InfoRow
 - **Reader** - 阅读器工具
 
@@ -96,14 +96,16 @@ menu.registerToolsMenuItem({
   }
 });
 
-// 右键菜单
-menu.registerContextMenuItem({
+// 条目菜单项
+menu.registerItemMenuItem({
   label: "Process Selected",
   onShowing: (event, context) => {
     context.setVisible(context.items?.length > 0);
   }
 });
 ```
+
+> 当前模板默认推荐优先使用 scene helper，例如 `registerItemMenuItem()`、`registerCollectionMenuItem()`、`registerItemPaneInfoRowMenuItem()`、`registerReaderMenubarViewMenuItem()`。
 
 ### 注册面板
 

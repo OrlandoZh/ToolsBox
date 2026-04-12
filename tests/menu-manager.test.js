@@ -87,7 +87,79 @@ function createFakeDocument() {
 }
 
 describe("Menu Manager", () => {
-  it("should pass l10n ids through official menu registration helpers", () => {
+  it("should register scene-oriented item and item-pane helpers to the expected official targets", () => {
+    const { manager, calls } = createManagerHarness();
+
+    manager.registerItemMenuItem({
+      id: "item-action",
+      label: "Item Action",
+      onCommand() {},
+    });
+    manager.registerItemPaneInfoRowMenuItem({
+      id: "field-action",
+      label: "Field Action",
+      onCommand() {},
+    });
+
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0].target, manager.MENU_TARGETS.LIBRARY_ITEM);
+    assert.equal(calls[0].menus[0].label, "Item Action");
+    assert.equal(calls[1].target, manager.MENU_TARGETS.ITEM_PANE_INFO_ROW);
+    assert.equal(calls[1].menus[0].label, "Field Action");
+  });
+
+  it("should register scene-oriented reader menubar helper to reader/menubar/view", () => {
+    const { manager, calls } = createManagerHarness();
+
+    manager.registerReaderMenubarViewMenuItem({
+      id: "reader-view-action",
+      label: "Reader View Action",
+      onCommand() {},
+    });
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].target, manager.MENU_TARGETS.READER_MENU_VIEW);
+    assert.equal(calls[0].menus[0].label, "Reader View Action");
+  });
+
+  it("should register scene-oriented submenu helpers to the expected official targets", () => {
+    const { manager, calls } = createManagerHarness();
+
+    manager.registerItemSubmenu({
+      id: "item-submenu",
+      label: "Item Group",
+      menus: [{
+        menuType: manager.MENU_TYPES.MENUITEM,
+        label: "Child Action",
+      }],
+    });
+    manager.registerCollectionSubmenu({
+      id: "collection-submenu",
+      label: "Collection Group",
+      menus: [{
+        menuType: manager.MENU_TYPES.MENUITEM,
+        label: "Collection Action",
+      }],
+    });
+    manager.registerReaderMenubarViewSubmenu({
+      id: "reader-submenu",
+      label: "Reader Group",
+      menus: [{
+        menuType: manager.MENU_TYPES.MENUITEM,
+        label: "Reader Action",
+      }],
+    });
+
+    assert.equal(calls.length, 3);
+    assert.equal(calls[0].target, manager.MENU_TARGETS.LIBRARY_ITEM);
+    assert.equal(calls[1].target, manager.MENU_TARGETS.LIBRARY_COLLECTION);
+    assert.equal(calls[2].target, manager.MENU_TARGETS.READER_MENU_VIEW);
+    assert.equal(calls[0].menus[0].menuType, manager.MENU_TYPES.SUBMENU);
+    assert.equal(calls[1].menus[0].menuType, manager.MENU_TYPES.SUBMENU);
+    assert.equal(calls[2].menus[0].menuType, manager.MENU_TYPES.SUBMENU);
+  });
+
+  it("should keep the legacy context menu alias wired to the item scene helper", () => {
     const { manager, calls } = createManagerHarness();
 
     manager.registerContextMenuItem({
@@ -97,11 +169,12 @@ describe("Menu Manager", () => {
     });
 
     assert.equal(calls.length, 1);
+    assert.equal(calls[0].target, manager.MENU_TARGETS.LIBRARY_ITEM);
     assert.equal(calls[0].menus[0].l10nID, "cleanroom-menu-label");
     assert.equal("label" in calls[0].menus[0], false);
   });
 
-  it("should fallback to plain label without sending null l10nID", () => {
+  it("should keep the legacy reader menu alias wired to the requested reader target", () => {
     const { manager, calls } = createManagerHarness();
 
     manager.registerReaderMenuItem(
@@ -116,11 +189,31 @@ describe("Menu Manager", () => {
     );
 
     assert.equal(calls.length, 1);
+    assert.equal(calls[0].target, manager.MENU_TARGETS.READER_MENU_VIEW);
     assert.equal(calls[0].menus[0].label, "Reader Action");
     assert.equal("l10nID" in calls[0].menus[0], false);
   });
 
-  it("should retain the host returned menu id for snapshotting and cleanup", () => {
+  it("should keep the generic submenu alias available for cross-target compatibility", () => {
+    const { manager, calls } = createManagerHarness();
+
+    manager.registerSubmenu({
+      id: "legacy-submenu",
+      target: manager.MENU_TARGETS.LIBRARY_COLLECTION,
+      label: "Legacy Group",
+      menus: [{
+        menuType: manager.MENU_TYPES.MENUITEM,
+        label: "Legacy Action",
+      }],
+    });
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].target, manager.MENU_TARGETS.LIBRARY_COLLECTION);
+    assert.equal(calls[0].menus[0].menuType, manager.MENU_TYPES.SUBMENU);
+    assert.equal(calls[0].menus[0].label, "Legacy Group");
+  });
+
+  it("should retain the host returned menu id for legacy alias snapshotting and cleanup", () => {
     const { manager, unregisterCalls } = createManagerHarness();
 
     const menuID = manager.registerReaderMenuItem(
@@ -208,6 +301,7 @@ describe("Menu Manager", () => {
       libraryType: "group",
       hasCollectionSelection: true,
       hasSavedSearchSelection: false,
+      collectionTreeRowID: "C-1",
       collectionTreeRowType: "collection",
       preferenceFlags: {
         "feature.enabled": true,
@@ -268,6 +362,7 @@ describe("Menu Manager", () => {
             {
               menuType: manager.MENU_TYPES.MENUITEM,
               label: `Summarize ${state.itemCount} items`,
+              onCommand() {},
             },
             {
               menuType: manager.MENU_TYPES.MENUITEM,
@@ -326,6 +421,7 @@ describe("Menu Manager", () => {
       libraryType: null,
       hasCollectionSelection: false,
       hasSavedSearchSelection: false,
+      collectionTreeRowID: null,
       collectionTreeRowType: null,
       preferenceFlags: {
         "reader.summary.enabled": true,
@@ -356,5 +452,20 @@ describe("Menu Manager", () => {
       visible: true,
       disabled: false,
     });
+
+    const childLiveState = manager.getLiveMenuState("dynamic-reader-menu", "0.0");
+    assert.equal(childLiveState.menuId, "dynamic-reader-menu");
+    assert.equal(childLiveState.menuPath, "0.0");
+    assert.equal(childLiveState.menuElem?.label, "Summarize 2 items");
+    assert.equal(childLiveState.popupElem, submenuPopup);
+    assert.equal(childLiveState.phase, "dynamic-rebuild");
+    assert.deepEqual(childLiveState.resolvedState, liveState.resolvedState);
+    assert.deepEqual(childLiveState.resolvedMenu, {
+      menuType: "menuitem",
+      label: "Summarize 2 items",
+    });
+
+    submenuPopup.childNodes[0].listeners.command?.({ type: "command" });
+    assert.equal(manager.getLiveMenuState("dynamic-reader-menu", "0.0").phase, "onCommand");
   });
 });

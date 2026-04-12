@@ -16,6 +16,13 @@
   padding: 10px;
   background: var(--cleanroom-pref-bg);
   color: var(--cleanroom-pref-text);
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
+
+.cleanroom-pref-root[data-pref-width-bucket="compact"] {
+  padding-inline: 8px;
 }
 
 .cleanroom-pref-root groupbox {
@@ -25,6 +32,8 @@
   border-radius: 6px;
   background: var(--cleanroom-pref-surface);
   box-shadow: var(--cleanroom-pref-shadow);
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .cleanroom-pref-root caption {
@@ -37,12 +46,45 @@
   color: var(--cleanroom-pref-muted);
 }
 
+.cleanroom-pref-section,
+.cleanroom-pref-section-body,
+.cleanroom-pref-field-row,
+.cleanroom-pref-control-wrap {
+  min-width: 0;
+}
+
+.cleanroom-pref-section-body > * + * {
+  margin-top: 6px;
+}
+
+.cleanroom-pref-label {
+  margin-inline-end: 8px;
+  max-width: 16em;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.cleanroom-pref-root[data-pref-layout="stacked"] .cleanroom-pref-label {
+  margin-inline-end: 0;
+  margin-bottom: 4px;
+  max-width: none;
+}
+
+.cleanroom-pref-checkbox,
+.cleanroom-pref-hint {
+  max-width: 100%;
+}
+
 .cleanroom-pref-root textbox,
 .cleanroom-pref-root menulist {
   color: var(--cleanroom-pref-text);
   background: var(--cleanroom-pref-control-bg);
   border: 1px solid var(--cleanroom-pref-control-border);
   border-radius: 4px;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .cleanroom-pref-root textbox::placeholder {
@@ -53,4 +95,27 @@
 .cleanroom-pref-root menulist,
 .cleanroom-pref-root menuitem {
   color: var(--cleanroom-pref-control-text);
+}
+
+.cleanroom-pref-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cleanroom-pref-action-btn,
+.cleanroom-pref-action-row > button {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 30px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.cleanroom-pref-action-row[data-layout="pair"] > button,
+.cleanroom-pref-action-row[data-layout="pair"] > .cleanroom-pref-action-btn {
+  flex: 1 1 12em;
 }

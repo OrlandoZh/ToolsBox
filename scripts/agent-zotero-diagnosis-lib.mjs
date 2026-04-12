@@ -296,7 +296,7 @@ const DIAGNOSIS_RULES = [
     ],
     recommendedActions: [
       "确认 `registerBaselineFeatures()` 中的 Reader 摘要命令仍注册到 command palette。",
-      "若官方菜单 API 可用，确认 Reader View 菜单项仍通过 `menuManager.registerReaderMenuItem(...)` 注册。",
+      "若官方菜单 API 可用，确认 Reader View 菜单项仍通过 `menuManager.registerReaderMenubarViewMenuItem(...)` 注册。",
     ],
     signatures: [
       {

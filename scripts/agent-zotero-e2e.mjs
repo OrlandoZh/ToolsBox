@@ -45,8 +45,12 @@ import {
   summarizeVisualBaselineEntries,
 } from "./agent-zotero-visual-lib.mjs";
 import {
+  inspectCaptureBoundsAlignment,
   normalizeCaptureWindowBounds,
+  rebaseCaptureWindowBounds,
+  resolveStageRelativeSurfaceBounds,
   resolveCaptureWindowBounds,
+  shouldCaptureSurfaceFromReferenceStage,
 } from "./agent-zotero-capture-window-lib.mjs";
 import {
   waitForVisualStageSettled,
@@ -56,6 +60,7 @@ import {
   createScriptError,
   parseEnumOption,
   parseIntegerOption,
+  readJSONFile,
   resolvePathOption,
   wrapScriptError,
   writeJSONArtifact,
@@ -79,6 +84,7 @@ const VISUAL_CAPTURE_POLICY = Object.freeze({
   stageOrder: Object.freeze(["library", "reader"]),
   maxAttemptsPerStage: 3,
   activationDelayMs: 320,
+  captureActivationDelayMs: 1000,
   betweenAttemptsMs: 220,
   stageWarmupMs: Object.freeze({
     library: 550,
@@ -190,6 +196,8 @@ const ADDITIVE_E2E_SUMMARY_FIELDS = Object.freeze([
   "lifecycleSlowThresholdMs",
   "lifecycleLastSlowStage",
   "lifecycleBoundaryEvents",
+  "performanceBudget",
+  "domContractReport",
   "readerEventReport",
 ]);
 
@@ -240,8 +248,8 @@ async function evaluateCaptureInChrome(rdp, expression, options = {}) {
   });
 }
 
-function pickAdditiveE2ESummaryFields(report) {
-  const summary = summarizeE2EReport(report);
+function pickAdditiveE2ESummaryFields(report, options = {}) {
+  const summary = summarizeE2EReport(report, options);
   const picked = {};
   for (const field of ADDITIVE_E2E_SUMMARY_FIELDS) {
     if (Object.prototype.hasOwnProperty.call(summary, field)) {
@@ -249,6 +257,17 @@ function pickAdditiveE2ESummaryFields(report) {
     }
   }
   return picked;
+}
+
+async function readPerformanceBudgetConfig() {
+  const configPath = path.join(projectRoot, "config", "performance-budget.json");
+  if (!await pathExists(configPath)) {
+    return null;
+  }
+  return await readJSONFile(configPath, {
+    failedStage: "read-performance-budget-config",
+    label: "config/performance-budget.json",
+  });
 }
 
 async function readZoteroRuntimeContext(rdp) {
@@ -515,6 +534,11 @@ function summarizeVisualCapturePolicy() {
     stageOrder: Array.from(VISUAL_CAPTURE_POLICY.stageOrder || []),
     maxAttemptsPerStage: Number(VISUAL_CAPTURE_POLICY.maxAttemptsPerStage || 1),
     activationDelayMs: Number(VISUAL_CAPTURE_POLICY.activationDelayMs || 0),
+    captureActivationDelayMs: Number(
+      VISUAL_CAPTURE_POLICY.captureActivationDelayMs
+      || VISUAL_CAPTURE_POLICY.activationDelayMs
+      || 0,
+    ),
     betweenAttemptsMs: Number(VISUAL_CAPTURE_POLICY.betweenAttemptsMs || 0),
     stageWarmupMs: {
       library: getVisualStageWarmupMs("library"),
@@ -529,6 +553,14 @@ function summarizeVisualCapturePolicy() {
       height: Number(VISUAL_CAPTURE_WINDOW_GEOMETRY.height || 0),
     },
   };
+}
+
+function resolveVisualStageTargetTitle(stage, state) {
+  return normalizeMaybeString(
+    state?.windowTitle
+    || state?.preparation?.windowTitle
+    || state?.readerSnapshot?.windowTitle,
+  );
 }
 
 function parseArgs(argv) {
@@ -1425,6 +1457,7 @@ async function prepareVisualState({ rdp, config, stage }) {
         stage: "library",
         itemID: state.itemID,
         libraryID,
+        windowTitle: readMainWindowTitle(),
         summaryJSON: JSON.stringify(prepared.summary),
         selectionJSON: JSON.stringify(prepared.selection),
         preparationJSON: JSON.stringify(prepared.preparation),
@@ -1629,6 +1662,7 @@ async function prepareVisualState({ rdp, config, stage }) {
       stage: "reader",
       itemID: state.itemID,
       attachmentID: state.attachmentID,
+      windowTitle: readMainWindowTitle(),
       preparationJSON: JSON.stringify(readerPreparation),
       readerJSON: JSON.stringify(readerSummary),
       readerSnapshotJSON: JSON.stringify(readerSnapshot),
@@ -1978,32 +2012,96 @@ async function cleanupVisualShell({ rdp, config }) {
 }
 
 async function getZoteroWindowBounds() {
+  return await getZoteroWindowBoundsForTitle();
+}
+
+function escapeAppleScriptString(value) {
+  return String(value || "")
+    .replaceAll("\\", "\\\\")
+    .replaceAll("\"", "\\\"");
+}
+
+function buildZoteroWindowAppleScriptLines({ targetTitle = "", width = null, height = null } = {}) {
+  const serializedTargetTitle = escapeAppleScriptString(normalizeMaybeString(targetTitle) || "");
+  const normalizedWidth = Number.parseInt(String(width ?? ""), 10);
+  const normalizedHeight = Number.parseInt(String(height ?? ""), 10);
+  const canResize = Number.isFinite(normalizedWidth) && normalizedWidth > 0
+    && Number.isFinite(normalizedHeight) && normalizedHeight > 0;
   const lines = [
-    'tell application "Zotero" to activate',
-    'tell application "System Events" to tell process "Zotero"',
-    'set frontmost to true',
-    'set targetWindow to first window',
-    'try',
-    'perform action "AXRaise" of targetWindow',
-    'end try',
-    'set {xPos, yPos} to position of targetWindow',
-    'set {winWidth, winHeight} to size of targetWindow',
-    'return (xPos as string) & "," & (yPos as string) & "," & (winWidth as string) & "," & (winHeight as string)',
-    'end tell',
+    'tell application "Zotero"',
+    "activate",
+    `set requestedWindowTitle to "${serializedTargetTitle}"`,
+    "if (count of windows) is 0 then error \"No Zotero windows available\"",
+    "try",
+    "set fallbackWindow to front window",
+    "on error",
+    "set fallbackWindow to window 1",
+    "end try",
+    "if requestedWindowTitle is not \"\" then",
+    "try",
+    "set targetWindow to first window whose name is requestedWindowTitle",
+    "on error",
+    "set targetWindow to fallbackWindow",
+    "end try",
+    "else",
+    "set targetWindow to fallbackWindow",
+    "end if",
+    "try",
+    "set index of targetWindow to 1",
+    "end try",
   ];
-
-  const { stdout } = await execFileText("osascript", lines.flatMap((line) => ["-e", line]));
-  const parts = stdout.trim().split(",").map((value) => Number.parseInt(value, 10));
-  if (parts.length !== 4 || parts.some((value) => !Number.isFinite(value))) {
-    throw new Error(`Invalid Zotero window bounds: ${stdout.trim()}`);
+  if (canResize) {
+    lines.push(
+      "set currentBounds to bounds of targetWindow",
+      "set leftPos to item 1 of currentBounds",
+      "set topPos to item 2 of currentBounds",
+      `set bounds of targetWindow to {leftPos, topPos, leftPos + ${normalizedWidth}, topPos + ${normalizedHeight}}`,
+    );
   }
+  lines.push(
+    "set windowName to \"\"",
+    "try",
+    "set windowName to name of targetWindow",
+    "end try",
+    "set {leftPos, topPos, rightPos, bottomPos} to bounds of targetWindow",
+    "set winWidth to rightPos - leftPos",
+    "set winHeight to bottomPos - topPos",
+    "return windowName & linefeed & (leftPos as string) & \",\" & (topPos as string) & \",\" & (winWidth as string) & \",\" & (winHeight as string)",
+    "end tell",
+  );
+  return lines;
+}
 
-  return {
+function parseZoteroWindowAppleScriptResult(stdout, contextLabel = "Zotero window bounds") {
+  const normalizedOutput = String(stdout || "").replace(/\s+$/, "");
+  const lines = normalizedOutput.split(/\r?\n/);
+  if (lines.length === 1) {
+    lines.unshift("");
+  }
+  if (lines.length < 2) {
+    throw new Error(`Invalid ${contextLabel}: ${normalizedOutput.trim()}`);
+  }
+  const parts = String(lines[1] || "")
+    .trim()
+    .split(",")
+    .map((value) => Number.parseInt(value, 10));
+  if (parts.length !== 4 || parts.some((value) => !Number.isFinite(value))) {
+    throw new Error(`Invalid ${contextLabel}: ${normalizedOutput.trim()}`);
+  }
+  return normalizeCaptureWindowBounds({
     x: parts[0],
     y: parts[1],
     width: parts[2],
     height: parts[3],
-  };
+    title: normalizeMaybeString(lines[0]) || null,
+    source: "app-window",
+  });
+}
+
+async function getZoteroWindowBoundsForTitle(targetTitle = null) {
+  const lines = buildZoteroWindowAppleScriptLines({ targetTitle });
+  const { stdout } = await execFileText("osascript", lines.flatMap((line) => ["-e", line]));
+  return parseZoteroWindowAppleScriptResult(stdout, "Zotero window bounds");
 }
 
 async function activateZoteroWindowForCapture(activationDelayMs = VISUAL_CAPTURE_POLICY.activationDelayMs) {
@@ -2016,13 +2114,19 @@ async function getZoteroQuartzWindowBounds(title = null) {
   const script = `
 ObjC.import('CoreGraphics');
 const targetTitle = ${JSON.stringify(rawTitle)};
+const normalizeText = (value) => String(value || "").trim().toLowerCase();
+const normalizedTargetTitle = normalizeText(targetTitle);
 const windows = ObjC.deepUnwrap($.CGWindowListCopyWindowInfo($.kCGWindowListOptionOnScreenOnly, $.kCGNullWindowID)) || [];
 const matches = windows
   .filter((entry) => {
-    const ownerName = String(entry.kCGWindowOwnerName || "");
+    const ownerName = normalizeText(entry.kCGWindowOwnerName);
     const layer = Number(entry.kCGWindowLayer || 0);
-    const windowTitle = String(entry.kCGWindowName || "");
-    return ownerName === "Zotero" && layer === 0 && (!targetTitle || windowTitle === targetTitle);
+    const windowTitle = normalizeText(entry.kCGWindowName);
+    const titleMatches = !normalizedTargetTitle
+      || windowTitle === normalizedTargetTitle
+      || (windowTitle && windowTitle.includes(normalizedTargetTitle))
+      || (normalizedTargetTitle && normalizedTargetTitle.includes(windowTitle));
+    return ownerName.includes("zotero") && layer === 0 && titleMatches;
   })
   .sort((left, right) => {
     const leftArea = Number(left.kCGWindowBounds?.Width || 0) * Number(left.kCGWindowBounds?.Height || 0);
@@ -2088,37 +2192,130 @@ async function focusChromeCaptureWindow({ rdp, geometry = VISUAL_CAPTURE_WINDOW_
   return normalizeCaptureWindowBounds(parseChromeEvalResult(rawResult));
 }
 
-async function setZoteroWindowGeometry(geometry = VISUAL_CAPTURE_WINDOW_GEOMETRY) {
+async function captureZoteroWindowViaRdp(filePath, options = {}) {
+  if (!options.rdp) {
+    return null;
+  }
+
+  const requestedWidth = Number.parseInt(String(
+    options.bounds?.width
+    || options.geometry?.width
+    || VISUAL_CAPTURE_WINDOW_GEOMETRY.width,
+  ), 10);
+  const requestedHeight = Number.parseInt(String(
+    options.bounds?.height
+    || options.geometry?.height
+    || VISUAL_CAPTURE_WINDOW_GEOMETRY.height,
+  ), 10);
+  const rawResult = await evaluateCaptureInChrome(options.rdp, `(async () => {
+    try {
+      const win = typeof Zotero?.getMainWindow === "function"
+        ? Zotero.getMainWindow()
+        : null;
+      if (!win?.document?.createElement) {
+        return JSON.stringify({ ok: false, error: "main-window-missing" });
+      }
+
+      try {
+        win.focus();
+      } catch {}
+
+      const width = ${Number.isFinite(requestedWidth) && requestedWidth > 0 ? requestedWidth : 0} > 0
+        ? ${Number.isFinite(requestedWidth) && requestedWidth > 0 ? requestedWidth : 0}
+        : Number(win.innerWidth || win.outerWidth || 0);
+      const height = ${Number.isFinite(requestedHeight) && requestedHeight > 0 ? requestedHeight : 0} > 0
+        ? ${Number.isFinite(requestedHeight) && requestedHeight > 0 ? requestedHeight : 0}
+        : Number(win.innerHeight || win.outerHeight || 0);
+      const scale = Number(win.devicePixelRatio || 1) > 0
+        ? Number(win.devicePixelRatio || 1)
+        : 1;
+      const canvas = win.document.createElement("canvas");
+      canvas.width = Math.max(1, Math.ceil(width * scale));
+      canvas.height = Math.max(1, Math.ceil(height * scale));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        return JSON.stringify({ ok: false, error: "canvas-context-missing" });
+      }
+      if (typeof ctx.drawWindow !== "function") {
+        return JSON.stringify({ ok: false, error: "drawWindow-unavailable" });
+      }
+
+      ctx.scale(scale, scale);
+      ctx.drawWindow(win, 0, 0, width, height, "rgb(255,255,255)");
+
+      const dataUrl = canvas.toDataURL("image/png");
+      const base64 = String(dataUrl || "").split(",")[1] || "";
+      if (!base64) {
+        return JSON.stringify({ ok: false, error: "png-encode-failed" });
+      }
+
+      const decodeBase64 = typeof atob === "function"
+        ? atob
+        : globalThis.atob;
+      const binary = decodeBase64(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) {
+        bytes[index] = binary.charCodeAt(index);
+      }
+
+      const IOUtilsAPI = typeof IOUtils !== "undefined"
+        ? IOUtils
+        : ChromeUtils.importESModule("resource://gre/modules/IOUtils.sys.mjs").IOUtils;
+      await IOUtilsAPI.write(${JSON.stringify(filePath)}, bytes);
+
+      return JSON.stringify({
+        ok: true,
+        x: Number(win.screenX || 0),
+        y: Number(win.screenY || 0),
+        width: Number(width || 0),
+        height: Number(height || 0),
+        title: String(win.document?.title || ""),
+        source: "rdp-draw-window",
+      });
+    } catch (error) {
+      return JSON.stringify({
+        ok: false,
+        error: error?.message || String(error),
+      });
+    }
+  })()`, {
+    label: "visual:capture-window-rdp",
+    timeoutMs: VISUAL_CAPTURE_EVAL_TIMEOUT_MS.hostAction,
+  });
+
+  const payload = parseChromeEvalResult(rawResult);
+  if (!payload || payload.ok !== true) {
+    throw attachVisualCaptureFailure(
+      new Error(normalizeMaybeString(payload?.error) || "Unable to capture Zotero window via RDP"),
+      {
+        failureKind: "capture-command-failed",
+        failureCategory: "capture-command-failed",
+        failureStage: "capture-window-rdp",
+        failureMessage: normalizeMaybeString(payload?.error) || "Unable to capture Zotero window via RDP",
+        bounds: options.bounds || null,
+        boundsSource: normalizeMaybeString(options.bounds?.source) || "rdp-draw-window",
+        windowTitle: normalizeMaybeString(payload?.title) || normalizeMaybeString(options.bounds?.title),
+        command: "rdp-draw-window",
+      },
+    );
+  }
+
+  return normalizeCaptureWindowBounds(payload);
+}
+
+async function setZoteroWindowGeometry(geometry = VISUAL_CAPTURE_WINDOW_GEOMETRY, options = {}) {
   const width = Number.parseInt(String(geometry?.width || VISUAL_CAPTURE_WINDOW_GEOMETRY.width), 10);
   const height = Number.parseInt(String(geometry?.height || VISUAL_CAPTURE_WINDOW_GEOMETRY.height), 10);
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-    return await getZoteroWindowBounds();
+    return await getZoteroWindowBoundsForTitle(options.targetTitle);
   }
-
-  const lines = [
-    "tell application \"System Events\" to tell process \"Zotero\"",
-    "set frontmost to true",
-    "set targetWindow to first window",
-    `set size of targetWindow to {${width}, ${height}}`,
-    "try",
-    "perform action \"AXRaise\" of targetWindow",
-    "end try",
-    "set {xPos, yPos} to position of targetWindow",
-    "set {winWidth, winHeight} to size of targetWindow",
-    "return (xPos as string) & \",\" & (yPos as string) & \",\" & (winWidth as string) & \",\" & (winHeight as string)",
-    "end tell",
-  ];
+  const lines = buildZoteroWindowAppleScriptLines({
+    targetTitle: options.targetTitle,
+    width,
+    height,
+  });
   const { stdout } = await execFileText("osascript", lines.flatMap((line) => ["-e", line]));
-  const parts = stdout.trim().split(",").map((value) => Number.parseInt(value, 10));
-  if (parts.length !== 4 || parts.some((value) => !Number.isFinite(value))) {
-    throw new Error(`Invalid Zotero window bounds after geometry set: ${stdout.trim()}`);
-  }
-  return {
-    x: parts[0],
-    y: parts[1],
-    width: parts[2],
-    height: parts[3],
-  };
+  return parseZoteroWindowAppleScriptResult(stdout, "Zotero window bounds after geometry set");
 }
 
 async function ensureZoteroWindowReadyForCapture(options = {}) {
@@ -2129,6 +2326,8 @@ async function ensureZoteroWindowReadyForCapture(options = {}) {
     ? options.settleDelayMs
     : 0;
   const geometry = options.geometry || VISUAL_CAPTURE_WINDOW_GEOMETRY;
+  const explicitTargetTitle = normalizeMaybeString(options.targetTitle);
+  const shouldUseChromeFocus = !explicitTargetTitle;
 
   try {
     await activateZoteroWindowForCapture(activationDelayMs);
@@ -2140,27 +2339,34 @@ async function ensureZoteroWindowReadyForCapture(options = {}) {
       failureStage: "activate-window",
     });
   }
-  const initialChromeBounds = await focusChromeCaptureWindow({
-    rdp: options.rdp,
-    geometry,
+  const initialChromeBounds = shouldUseChromeFocus
+    ? await focusChromeCaptureWindow({
+      rdp: options.rdp,
+      geometry,
+    }).catch(() => null)
+    : null;
+  const fallbackBounds = await setZoteroWindowGeometry(geometry, {
+    targetTitle: explicitTargetTitle,
   }).catch(() => null);
-  const fallbackBounds = await setZoteroWindowGeometry(geometry).catch(() => null);
-  const refreshedChromeBounds = await focusChromeCaptureWindow({
-    rdp: options.rdp,
-    geometry,
-  }).catch(() => null);
-  const preferredTitle = normalizeMaybeString(refreshedChromeBounds?.title)
+  const refreshedChromeBounds = shouldUseChromeFocus
+    ? await focusChromeCaptureWindow({
+      rdp: options.rdp,
+      geometry,
+    }).catch(() => null)
+    : null;
+  const preferredTitle = explicitTargetTitle
+    || normalizeMaybeString(refreshedChromeBounds?.title)
     || normalizeMaybeString(initialChromeBounds?.title)
     || null;
   const quartzBounds = await getZoteroQuartzWindowBounds(preferredTitle).catch(() => null);
-  const genericQuartzBounds = quartzBounds
+  const genericQuartzBounds = (quartzBounds || explicitTargetTitle)
     ? null
     : await getZoteroQuartzWindowBounds().catch(() => null);
   let bounds = null;
   try {
     bounds = await resolveCaptureWindowBounds({
-      preferred: async () => quartzBounds || refreshedChromeBounds || initialChromeBounds,
-      fallback: async () => genericQuartzBounds || fallbackBounds,
+      preferred: async () => quartzBounds || genericQuartzBounds || refreshedChromeBounds || initialChromeBounds,
+      fallback: async () => fallbackBounds,
     });
   }
   catch (error) {
@@ -2176,7 +2382,7 @@ async function ensureZoteroWindowReadyForCapture(options = {}) {
 }
 
 async function captureZoteroWindow(filePath, options = {}) {
-  if (process.platform !== "darwin") {
+  if (!options.rdp && process.platform !== "darwin") {
     throw new Error("UI capture is currently implemented for macOS only");
   }
 
@@ -2184,20 +2390,42 @@ async function captureZoteroWindow(filePath, options = {}) {
   const maxAttempts = Number.isInteger(options.maxAttempts) && options.maxAttempts > 0
     ? options.maxAttempts
     : 3;
+  const captureActivationDelayMs = Number.isFinite(options.activationDelayMs) && options.activationDelayMs >= 0
+    ? options.activationDelayMs
+    : Number(
+      VISUAL_CAPTURE_POLICY.captureActivationDelayMs
+      || VISUAL_CAPTURE_POLICY.activationDelayMs
+      || 0,
+    );
   const bounds = options.bounds && typeof options.bounds === "object"
     ? options.bounds
     : null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
+      if (options.rdp) {
+        if (captureActivationDelayMs > 0) {
+          await activateZoteroWindowForCapture(captureActivationDelayMs);
+        }
+        const rdpBounds = await captureZoteroWindowViaRdp(filePath, {
+          rdp: options.rdp,
+          bounds,
+          geometry: options.geometry,
+        });
+        return rdpBounds || bounds;
+      }
+
       let captureBounds = bounds;
       const captureGeometry = {
         width: captureBounds?.width || options.geometry?.width || VISUAL_CAPTURE_WINDOW_GEOMETRY.width,
         height: captureBounds?.height || options.geometry?.height || VISUAL_CAPTURE_WINDOW_GEOMETRY.height,
       };
+      const targetTitle = normalizeMaybeString(options.targetTitle)
+        || normalizeMaybeString(captureBounds?.title)
+        || null;
       if (!captureBounds) {
         try {
-          captureBounds = await setZoteroWindowGeometry(captureGeometry);
+          captureBounds = await setZoteroWindowGeometry(captureGeometry, { targetTitle });
         }
         catch (error) {
           throw attachVisualCaptureFailure(error, {
@@ -2208,7 +2436,7 @@ async function captureZoteroWindow(filePath, options = {}) {
         }
       }
       else {
-        const refreshedBounds = await setZoteroWindowGeometry(captureGeometry).catch(() => null);
+        const refreshedBounds = await setZoteroWindowGeometry(captureGeometry, { targetTitle }).catch(() => null);
         if (refreshedBounds) {
           captureBounds = {
             ...captureBounds,
@@ -2218,14 +2446,18 @@ async function captureZoteroWindow(filePath, options = {}) {
           };
         }
       }
-      await activateZoteroWindowForCapture(40);
-      const quartzBounds = await getZoteroQuartzWindowBounds(captureBounds?.title || null).catch(() => null);
-      if (quartzBounds) {
+      await activateZoteroWindowForCapture(captureActivationDelayMs);
+      const quartzBounds = await getZoteroQuartzWindowBounds(targetTitle).catch(() => null);
+      const genericQuartzBounds = (quartzBounds || targetTitle)
+        ? null
+        : await getZoteroQuartzWindowBounds().catch(() => null);
+      const resolvedQuartzBounds = quartzBounds || genericQuartzBounds || null;
+      if (resolvedQuartzBounds) {
         captureBounds = {
           ...captureBounds,
-          ...quartzBounds,
-          title: quartzBounds.title || captureBounds?.title || null,
-          source: quartzBounds.source || captureBounds?.source || null,
+          ...resolvedQuartzBounds,
+          title: resolvedQuartzBounds.title || captureBounds?.title || null,
+          source: resolvedQuartzBounds.source || captureBounds?.source || null,
         };
       }
       const rect = `${captureBounds.x},${captureBounds.y},${captureBounds.width},${captureBounds.height}`;
@@ -2258,12 +2490,195 @@ async function captureZoteroWindow(filePath, options = {}) {
   throw lastError || new Error("Unable to capture Zotero window");
 }
 
-function resolveSurfaceCaptureBounds(surfaceTarget) {
-  const rect = normalizeCaptureWindowBounds(surfaceTarget?.rect || null);
-  if (rect) {
-    return rect;
+function resolveSurfaceCaptureGeometry(surfaceTarget) {
+  const windowBounds = normalizeCaptureWindowBounds(surfaceTarget?.windowBounds || null);
+  if (!windowBounds) {
+    return VISUAL_CAPTURE_WINDOW_GEOMETRY;
   }
-  return normalizeCaptureWindowBounds(surfaceTarget?.windowBounds || null);
+  return {
+    width: windowBounds.width,
+    height: windowBounds.height,
+  };
+}
+
+function resolveSurfaceCaptureBounds(surfaceTarget, currentWindowBounds = null) {
+  const rect = normalizeCaptureWindowBounds(surfaceTarget?.rect || null);
+  const previousWindowBounds = normalizeCaptureWindowBounds(surfaceTarget?.windowBounds || null);
+  const normalizedCurrentWindowBounds = normalizeCaptureWindowBounds(currentWindowBounds);
+  const rectTitle = normalizeMaybeString(rect?.title);
+  const previousWindowTitle = normalizeMaybeString(previousWindowBounds?.title);
+  const currentWindowTitle = normalizeMaybeString(normalizedCurrentWindowBounds?.title);
+  const allowWindowRebase = !(
+    rectTitle
+    && previousWindowTitle
+    && currentWindowTitle
+    && previousWindowTitle === rectTitle
+    && currentWindowTitle !== rectTitle
+  );
+
+  if (rect) {
+    const candidates = [];
+    if (allowWindowRebase && previousWindowBounds && normalizedCurrentWindowBounds) {
+      candidates.push(rebaseCaptureWindowBounds(rect, previousWindowBounds, normalizedCurrentWindowBounds));
+    }
+    candidates.push(rect);
+
+    if (normalizedCurrentWindowBounds) {
+      for (const candidate of candidates) {
+        const alignment = inspectCaptureBoundsAlignment(candidate, normalizedCurrentWindowBounds);
+        if (alignment.ok) {
+          return candidate;
+        }
+      }
+      return null;
+    }
+
+    return candidates[0] || null;
+  }
+
+  return normalizedCurrentWindowBounds || previousWindowBounds;
+}
+
+function clipCaptureBoundsToWindow(bounds, windowBounds) {
+  const normalizedBounds = normalizeCaptureWindowBounds(bounds);
+  const normalizedWindowBounds = normalizeCaptureWindowBounds(windowBounds);
+  if (!normalizedBounds || !normalizedWindowBounds) {
+    return normalizedBounds;
+  }
+
+  const left = Math.max(normalizedBounds.x, normalizedWindowBounds.x);
+  const top = Math.max(normalizedBounds.y, normalizedWindowBounds.y);
+  const right = Math.min(
+    normalizedBounds.x + normalizedBounds.width,
+    normalizedWindowBounds.x + normalizedWindowBounds.width,
+  );
+  const bottom = Math.min(
+    normalizedBounds.y + normalizedBounds.height,
+    normalizedWindowBounds.y + normalizedWindowBounds.height,
+  );
+  const width = right - left;
+  const height = bottom - top;
+  if (width <= 0 || height <= 0) {
+    return null;
+  }
+
+  return {
+    x: left,
+    y: top,
+    width,
+    height,
+    title: normalizedBounds.title || normalizedWindowBounds.title || null,
+    source: normalizedBounds.source || normalizedWindowBounds.source || null,
+  };
+}
+
+function resolveSurfaceReferenceStage(surfaceTarget, actionId = null) {
+  const kind = String(surfaceTarget?.captureKind || actionId || "").trim();
+  if (!kind) {
+    return null;
+  }
+
+  if (kind.startsWith("surface-preference-")) {
+    return null;
+  }
+
+  if (kind.startsWith("surface-item-pane-") || kind.startsWith("surface-context-pane-")) {
+    return "library";
+  }
+
+  if (kind.startsWith("surface-reader-")) {
+    return "reader";
+  }
+
+  if (kind.startsWith("surface-menu-")) {
+    const targetScene = String(surfaceTarget?.details?.targetScene || "").trim();
+    if (targetScene.startsWith("reader")) {
+      return "reader";
+    }
+    if (targetScene) {
+      return "library";
+    }
+  }
+
+  return null;
+}
+
+function resolveStageCropPixelBounds(stageCapture, cropBounds) {
+  const stageBounds = normalizeCaptureWindowBounds(stageCapture?.bounds || null);
+  const normalizedCropBounds = clipCaptureBoundsToWindow(cropBounds, stageBounds);
+  const pixelWidth = Number(stageCapture?.analysis?.width || 0);
+  const pixelHeight = Number(stageCapture?.analysis?.height || 0);
+  if (!stageBounds || !normalizedCropBounds || pixelWidth <= 0 || pixelHeight <= 0) {
+    return null;
+  }
+
+  const scaleX = pixelWidth / stageBounds.width;
+  const scaleY = pixelHeight / stageBounds.height;
+  const offsetX = Math.max(0, normalizedCropBounds.x - stageBounds.x);
+  const offsetY = Math.max(0, normalizedCropBounds.y - stageBounds.y);
+  const cropX = Math.max(0, Math.round(offsetX * scaleX));
+  const cropY = Math.max(0, Math.round(offsetY * scaleY));
+  const cropWidth = Math.max(1, Math.round(normalizedCropBounds.width * scaleX));
+  const cropHeight = Math.max(1, Math.round(normalizedCropBounds.height * scaleY));
+
+  return {
+    cropX: Math.min(cropX, Math.max(0, pixelWidth - 1)),
+    cropY: Math.min(cropY, Math.max(0, pixelHeight - 1)),
+    cropWidth: Math.min(cropWidth, pixelWidth - cropX),
+    cropHeight: Math.min(cropHeight, pixelHeight - cropY),
+    bounds: normalizedCropBounds,
+  };
+}
+
+async function captureSurfaceFromStageImage({
+  filePath,
+  stageCapture,
+  cropBounds,
+}) {
+  const stageBounds = normalizeCaptureWindowBounds(stageCapture?.bounds || null);
+  const resolvedPixelBounds = resolveStageCropPixelBounds(stageCapture, cropBounds);
+  if (!stageBounds || !resolvedPixelBounds) {
+    return null;
+  }
+
+  const {
+    cropX,
+    cropY,
+    cropWidth,
+    cropHeight,
+    bounds,
+  } = resolvedPixelBounds;
+  const stagePixelWidth = Number(stageCapture?.analysis?.width || 0);
+  const stagePixelHeight = Number(stageCapture?.analysis?.height || 0);
+
+  if (
+    cropX === 0
+    && cropY === 0
+    && cropWidth === stagePixelWidth
+    && cropHeight === stagePixelHeight
+  ) {
+    await fs.copyFile(stageCapture.path, filePath);
+  }
+  else {
+    await execFileText("sips", [
+      "-c",
+      String(cropHeight),
+      String(cropWidth),
+      "--cropOffset",
+      String(cropY),
+      String(cropX),
+      stageCapture.path,
+      "--out",
+      filePath,
+    ]);
+  }
+
+  return {
+    ...bounds,
+    source: normalizeMaybeString(bounds.source)
+      || normalizeMaybeString(stageBounds.source)
+      || "stage-crop",
+  };
 }
 
 async function captureScreenRect(filePath, bounds) {
@@ -2403,24 +2818,58 @@ async function resolveReaderToolbarSurfaceTarget({ rdp, config }) {
 }
 
 async function captureSurfaceEvidenceTarget({
+  rdp,
   cycle,
   captureDir,
   surfaceTarget,
   actionId = null,
+  stageCapture = null,
 }) {
-  const bounds = resolveSurfaceCaptureBounds(surfaceTarget);
+  const useReferenceStage = Boolean(
+    stageCapture?.path
+    && shouldCaptureSurfaceFromReferenceStage(surfaceTarget),
+  );
+  const normalizedStageBounds = useReferenceStage
+    ? normalizeCaptureWindowBounds(stageCapture?.bounds || null)
+    : null;
+  const stageRelativeBounds = normalizedStageBounds
+    ? resolveStageRelativeSurfaceBounds(surfaceTarget, normalizedStageBounds)
+    : null;
+  const currentWindowBounds = stageRelativeBounds
+    ? null
+    : await ensureZoteroWindowReadyForCapture({
+      geometry: resolveSurfaceCaptureGeometry(surfaceTarget),
+      activationDelayMs: 120,
+      settleDelayMs: VISUAL_SURFACE_CAPTURE_DELAY_MS,
+      targetTitle: surfaceTarget?.windowBounds?.title || null,
+    }).catch(() => null);
+  const liveRelativeBounds = currentWindowBounds
+    ? resolveStageRelativeSurfaceBounds(surfaceTarget, currentWindowBounds)
+    : null;
+  const bounds = stageRelativeBounds
+    ? clipCaptureBoundsToWindow(stageRelativeBounds, normalizedStageBounds) || stageRelativeBounds
+    : liveRelativeBounds
+      ? clipCaptureBoundsToWindow(liveRelativeBounds, currentWindowBounds) || liveRelativeBounds
+      : resolveSurfaceCaptureBounds(surfaceTarget, currentWindowBounds);
   if (!bounds) {
     return {
       capture: null,
-      warning: `${surfaceTarget?.captureKind || actionId || "surface"} 缺少可截图的 rect/windowBounds`,
+      warning: `${surfaceTarget?.captureKind || actionId || "surface"} 缺少可信 rect/windowBounds`,
     };
   }
 
-  await activateZoteroWindowForCapture(120);
-  await sleep(VISUAL_SURFACE_CAPTURE_DELAY_MS);
   const kind = String(surfaceTarget?.captureKind || actionId || "surface").trim() || "surface";
   const filePath = path.join(captureDir, `cycle-${cycle}-${kind}.png`);
-  await captureScreenRect(filePath, bounds);
+  if (useReferenceStage && normalizedStageBounds && stageCapture?.path && stageRelativeBounds) {
+    await captureSurfaceFromStageImage({
+      filePath,
+      stageCapture,
+      cropBounds: bounds,
+    });
+  }
+  else {
+    await captureScreenRect(filePath, bounds);
+  }
   const analysis = await readPNGAnalysis(filePath);
   return {
     capture: {
@@ -2435,6 +2884,14 @@ async function captureSurfaceEvidenceTarget({
       metadata: {
         actionId,
         surfaceTarget,
+        currentWindowBounds,
+        referenceStage: useReferenceStage && normalizedStageBounds
+          ? {
+            kind: stageCapture?.kind || null,
+            path: stageCapture?.path || null,
+            bounds: normalizedStageBounds,
+          }
+          : null,
       },
     },
     warning: null,
@@ -2446,6 +2903,7 @@ async function captureSurfaceLocalVisuals({
   config,
   cycle,
   captureDir,
+  stageCaptures = null,
 }) {
   const result = {
     captures: [],
@@ -2457,12 +2915,15 @@ async function captureSurfaceLocalVisuals({
       result.warnings.push(`${actionId} 未返回 surface target`);
       return;
     }
+    const referenceStage = resolveSurfaceReferenceStage(actionResult.surfaceTarget, actionId);
     try {
       const captured = await captureSurfaceEvidenceTarget({
+        rdp,
         cycle,
         captureDir,
         surfaceTarget: actionResult.surfaceTarget,
         actionId,
+        stageCapture: referenceStage ? stageCaptures?.[referenceStage] || null : null,
       });
       if (captured.capture) {
         result.captures.push(captured.capture);
@@ -2811,14 +3272,20 @@ async function captureStableVisualStage({
         geometry: policy.targetWindowGeometry,
         activationDelayMs: policy.activationDelayMs,
         settleDelayMs: attempt === 1 ? warmupMs : Number(policy.betweenAttemptsMs || 0),
+        targetTitle: resolveVisualStageTargetTitle(stage, state),
       });
       const attemptPath = path.join(captureDir, `cycle-${cycle}-${stage}-attempt-${attempt}.png`);
-      await captureZoteroWindow(attemptPath, { bounds });
+      const capturedBounds = await captureZoteroWindow(attemptPath, {
+        rdp,
+        bounds,
+        targetTitle: resolveVisualStageTargetTitle(stage, state),
+        activationDelayMs: policy.captureActivationDelayMs || policy.activationDelayMs,
+      });
       const analysis = await readPNGAnalysis(attemptPath);
       attempts.push({
         index: attempt,
         path: attemptPath,
-        bounds,
+        bounds: capturedBounds || bounds,
         analysis,
       });
       lastFailure = null;
@@ -2958,6 +3425,36 @@ async function captureStableVisualStage({
   };
 }
 
+function resolveVisualCaptureWindowTitle(capture) {
+  return normalizeMaybeString(
+    capture?.bounds?.title
+    || capture?.metadata?.windowTitle
+    || capture?.metadata?.preparation?.windowTitle,
+  );
+}
+
+function findCrossStageCaptureHashCollision(captures, currentCapture) {
+  const currentHash = normalizeMaybeString(currentCapture?.analysis?.sha256);
+  const currentKind = normalizeMaybeString(currentCapture?.kind);
+  const currentTitle = resolveVisualCaptureWindowTitle(currentCapture);
+  if (!currentHash || !currentKind || !currentTitle) {
+    return null;
+  }
+  return (Array.isArray(captures) ? captures : []).find((capture) => {
+    const candidateHash = normalizeMaybeString(capture?.analysis?.sha256);
+    const candidateKind = normalizeMaybeString(capture?.kind);
+    const candidateTitle = resolveVisualCaptureWindowTitle(capture);
+    return Boolean(
+      candidateHash
+      && candidateHash === currentHash
+      && candidateKind
+      && candidateKind !== currentKind
+      && candidateTitle
+      && candidateTitle !== currentTitle,
+    );
+  }) || null;
+}
+
 async function captureCycleVisuals({
   rdp,
   config,
@@ -3001,6 +3498,30 @@ async function captureCycleVisuals({
         captureDir,
         visualBaselineDir,
       });
+      const conflictingCapture = stageCapture.capture
+        ? findCrossStageCaptureHashCollision(visuals.captures, stageCapture.capture)
+        : null;
+      if (conflictingCapture && stageCapture.stability) {
+        const currentTitle = resolveVisualCaptureWindowTitle(stageCapture.capture);
+        const conflictingTitle = resolveVisualCaptureWindowTitle(conflictingCapture);
+        stageCapture.stability = {
+          ...stageCapture.stability,
+          stable: false,
+          failureKind: "capture-target-collision",
+          failureCategory: "capture-command-failed",
+          failureStage: "capture-stage",
+          failureMessage: `${stageCapture.capture.kind} capture duplicated ${conflictingCapture.kind} hash while window titles differed (${currentTitle} vs ${conflictingTitle})`,
+          boundsSource: stageCapture.stability.boundsSource
+            || stageCapture.capture?.bounds?.source
+            || null,
+          windowTitle: stageCapture.stability.windowTitle
+            || currentTitle
+            || null,
+        };
+        visuals.warnings.push(
+          `${stageCapture.capture.kind} capture matched ${conflictingCapture.kind} hash with a different window title; treating this stage as wrong-target capture`,
+        );
+      }
       if (stageCapture.capture) {
         visuals.captures.push(stageCapture.capture);
       }
@@ -3010,7 +3531,7 @@ async function captureCycleVisuals({
       if (stageCapture.warning) {
         visuals.warnings.push(stageCapture.warning);
       }
-      if (stage === "reader" && !stageCapture.capture) {
+      if (stage === "reader" && (!stageCapture.capture || stageCapture.stability?.stable === false)) {
         skipSurfaceLocal = true;
       }
     }
@@ -3024,6 +3545,10 @@ async function captureCycleVisuals({
         config,
         cycle,
         captureDir,
+        stageCaptures: {
+          library: visuals.captures.find((entry) => entry.kind === "library") || null,
+          reader: visuals.captures.find((entry) => entry.kind === "reader") || null,
+        },
       });
       if (Array.isArray(surfaceLocal?.captures) && surfaceLocal.captures.length > 0) {
         visuals.captures.push(...surfaceLocal.captures);
@@ -3157,6 +3682,7 @@ async function main() {
     const { config, buildPath } = await readAddonRuntimeInfo(projectRoot, {
       requireBuild: false,
     });
+    const performanceBudgetConfig = await readPerformanceBudgetConfig();
     if (!options.skipBuild && !await pathExists(buildPath)) {
       buildAddon(projectRoot, {
         env: {
@@ -3168,7 +3694,11 @@ async function main() {
       throw new Error(`Build output not found: ${buildPath}`);
     }
 
-    const rdpPort = runnerConfig.rdpPort || await findFreePort();
+    const rdpPort = runnerConfig.rdpPort || await findFreePort().catch((error) => {
+      throw wrapScriptError(error, {
+        failedStage: "resolve-rdp-port",
+      });
+    });
     const runtimeSanitization = await prepareRuntime({
       projectRoot,
       profilePath: runnerConfig.profilePath,
@@ -3404,7 +3934,9 @@ async function main() {
       report.errorMessage = null;
       report.failedStage = null;
     }
-    Object.assign(report, pickAdditiveE2ESummaryFields(report));
+    Object.assign(report, pickAdditiveE2ESummaryFields(report, {
+      performanceBudgetConfig,
+    }));
 
     await fs.mkdir(zoteroArtifacts.artifactsDir, { recursive: true });
     await writeJSONArtifact(zoteroArtifacts.reportJSON, report);

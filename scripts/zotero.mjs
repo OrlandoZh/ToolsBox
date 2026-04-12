@@ -701,7 +701,11 @@ export async function main() {
         failedStage: "read-runner-config",
       });
     });
-  const rdpPort = runnerConfig.rdpPort || await findFreePort();
+  const rdpPort = runnerConfig.rdpPort || await findFreePort().catch((error) => {
+    throw wrapScriptError(error, {
+      failedStage: "resolve-rdp-port",
+    });
+  });
   const watchRecoveryTestOptions = readWatchRecoveryTestOptions();
 
   const runtimeSanitization = await prepareRuntime({

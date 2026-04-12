@@ -123,7 +123,8 @@ npm run export:project
 - `npm run agent:obsidian`
   - 读取当前 `agent-zotero-loop / agent-gate / agent-monitor / agent-zotero-e2e` 工件
   - 输出到独立目录 `obsidian/agent-workbench/`
-  - 包含项目架构白板、当前状态总览、证据索引、人工指令窗口
+  - 默认以“当前 Zotero 插件”为中心生成工作台，而不是生成模板框架总览
+  - 包含当前插件功能与技术脉络白板、状态总览、证据索引、功能与可见面地图、技术脉络与宿主接入、分 surface 的 UI 概念图，以及模板协作指南和人工指令窗口
   - 可通过 `AGENT_OBSIDIAN_DIR=/path/to/vault-folder` 重定向到单独的 Obsidian 管理目录
 - `npm run export:project`
   - 导出剔除 agent / runner / tests / docs / reference 的纯项目工程
@@ -173,16 +174,33 @@ npm run export:project
 
 另有一组 Obsidian 人工介入工件默认写到独立目录 `obsidian/agent-workbench/`，不放进 `dist/`：
 
-- `00-Zotero-Agent-项目架构与闭环.canvas`
-- `01-Zotero-Agent-当前状态总览.md`
-- `02-Zotero-Agent-证据索引.md`
-- `10-Zotero-Agent-人工指令窗口.md`
+- `00-当前Zotero插件-功能与技术脉络.canvas`
+- `01-当前Zotero插件-状态总览.md`
+- `02-当前Zotero插件-证据索引.md`
+- `03-模板协作-人工快速上手.md`
+- `04-模板协作-高级介入规范.md`
+- `05-当前Zotero插件-功能与可见面地图.md`
+- `06-当前Zotero插件-技术脉络与宿主接入.md`
+- `07-当前Zotero插件-偏好设置面板 UI 概念.excalidraw.md`
+- `08-当前Zotero插件-条目与上下文窗格 UI 概念.excalidraw.md`
+- `09-当前Zotero插件-Reader UI 概念.excalidraw.md`
+- `10-模板协作-人工指令窗口.md`
+- `11-当前Zotero插件-菜单与子菜单 UI 概念.excalidraw.md`
+
+启用 `AGENT_OBSIDIAN_VISUALS=1` 时，还会额外生成：
+
+- `12-当前Zotero插件-交互流转图.md`
+- `13-当前Zotero插件-功能版图.excalidraw.md`
 
 其中：
 
 - `agent-monitor.json` 适合作为“运行态总览”，现在可优先读取 `frontpageSummary` / `readinessSummary`
 - `agent-dashboard.html` 会把 Reader 事件桥单独渲染成摘要卡片，便于人工快速确认事件 API 是否可用、细粒度 Hook 是否已被真机观测
 - `agent-gate.json` 适合作为“是否可继续推进/发布”的准入判定
+- `obsidian/agent-workbench/01-当前Zotero插件-状态总览.md` 适合作为“当前插件主线入口”
+- `obsidian/agent-workbench/05-当前Zotero插件-功能与可见面地图.md` 适合作为“当前插件各可见面分组入口”
+- `obsidian/agent-workbench/06-当前Zotero插件-技术脉络与宿主接入.md` 适合作为“当前 surface 为什么走这条技术链”的定位入口
+- `obsidian/agent-workbench/10-模板协作-人工指令窗口.md` 仍是唯一人工输入面
 
 如果你只是想做脚本联调、单元测试，或希望把一次实验性的 agent 判断与当前真机结论分开，可以临时指定：
 

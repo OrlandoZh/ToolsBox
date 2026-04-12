@@ -12,7 +12,7 @@
 
 - Version: `1`
 - Host Namespace: `Zotero.MenuManager`
-- Summary: 冻结 MenuManager 的 target、menuType、MenuData 字段面与 host-visible menu item 语义。
+- Summary: 冻结 MenuManager 的 target、menuType、MenuData 字段面、collection selection contract 与 official MenuManager host-visible menu item 语义 / submenu 语义，不覆盖 Reader createViewContextMenu/createAnnotationContextMenu。
 - Owner Files:
   - `src/features/menu-manager.js`
 - Reference Sources:
@@ -24,6 +24,9 @@
   - `target` / 菜单目标
     - Use For: 描述 MenuManager 注册落点，如 main/library/item、reader/menubar/view。
     - Avoid: -
+  - `submenu` / 子菜单
+    - Use For: 描述 MenuData.menuType=submenu、submenu root 与 submenu popup 的 host-visible surface。
+    - Avoid: `menu group`
 - Enums:
   - `VALID_TARGETS`: `main/menubar/file`, `main/library/item`, `main/library/collection`, `reader/menubar/view`, `itemPane/info/row`, `notesPane/addItemNote`, `sidenav/locate`
     - Extensible: `false`
@@ -47,9 +50,17 @@
   - `menu-item` / `menu-item`
     - Host Events: -
     - Surface Terms: `menu item`, `target`, `menuType`
-    - Notes: 判断菜单 surface 时，先证明 live host menu 中可见，再谈整窗视觉。
+    - Notes: 判断菜单 surface 时，先证明 live host menu 中可见，再谈整窗视觉。；这里只治理 Zotero.MenuManager target；Reader createViewContextMenu/createAnnotationContextMenu 属于 reader-events 域。
+  - `collection-menu` / `collection-menu`
+    - Host Events: -
+    - Surface Terms: `collection menu`, `collectionTreeRow`, `target`
+    - Notes: collection menu 只在 main/library/collection 语义下成立，不能拿 item selection 语义代替。；验证 collection menu 时，应同时证明 live collection context 与 menu surface 都已建立。
+  - `menu-submenu` / `menu-submenu`
+    - Host Events: -
+    - Surface Terms: `submenu`, `menuPath`, `menuType`
+    - Notes: 当 surface 指向 submenu root 或 submenu child path 时，应优先证明 live submenu popup / child content，而不是只看父 popup 壳。；动态 submenu child 应通过 menuPath 与 live rebuilt state 对齐，不靠模糊 DOM 猜测。
 - Required Types:
-  - `types/features.d.ts` includes `readonly MENU_TARGETS: typeof MENU_TARGETS;`, `readonly MENU_TYPES: typeof MENU_TYPES;`, `registerReaderMenuItem(`, `isOfficialAPIAvailable(): boolean;`
+  - `types/features.d.ts` includes `collectionTreeRowID: unknown;`, `readonly MENU_TARGETS: typeof MENU_TARGETS;`, `readonly MENU_TYPES: typeof MENU_TYPES;`, `createMenuStateResolver(options?: MenuStateResolverOptions): (context?: MenuContext) => MenuResolvedState;`, `registerItemMenuItem(`, `registerItemPaneInfoRowMenuItem(`, `registerReaderMenubarViewMenuItem(`, `registerItemSubmenu(`, `registerCollectionSubmenu(`, `registerReaderMenubarViewSubmenu(`, `registerContextMenuItem(`, `registerReaderMenuItem(`, `registerSubmenu(`, `registerStateDrivenMenu(options: StateDrivenMenuOptions): string | null;`, `isOfficialAPIAvailable(): boolean;`
 - Required Tests:
   - `zotero-host-semantic-index-lib.test.js`
   - `zotero-host-semantic-index.test.js`
@@ -201,7 +212,7 @@
 
 - Version: `1`
 - Host Namespace: `Zotero.Reader`
-- Summary: 冻结 Reader.registerEventListener 的 event type、event payload 与 host-visible reader surface 语义。
+- Summary: 冻结 Reader.registerEventListener 的 event type、event payload 与 host-visible reader surface 语义，覆盖 renderToolbar 与 Reader context menu surfaces。
 - Owner Files:
   - `src/features/reader.js`
 - Reference Sources:
@@ -210,9 +221,12 @@
   - `renderToolbar` / renderToolbar 工具栏注入
     - Use For: 描述 Reader 官方工具栏注入事件类型。
     - Avoid: `toolbar entry`
+  - `view context menu` / 视图区上下文菜单
+    - Use For: 描述 createViewContextMenu 对应的 live host menu surface。
+    - Avoid: `Reader 右键菜单`, `空白区右键`
   - `annotation context menu` / 批注上下文菜单
     - Use For: 描述 createAnnotationContextMenu 对应的 live host menu surface。
-    - Avoid: -
+    - Avoid: `Reader 右键菜单`
   - `selector context menu` / 选择器上下文菜单
     - Use For: 描述 createSelectorContextMenu 对应的宿主菜单 surface。
     - Avoid: -
@@ -236,10 +250,14 @@
     - Host Events: `renderToolbar`
     - Surface Terms: `renderToolbar`, `ReaderEvent`, `append`
     - Notes: renderToolbar 属于 host-visible 注入点，先证明注入 UI 可见，再谈视觉证据。
+  - `view-context-menu` / `context-menu`
+    - Host Events: `createViewContextMenu`
+    - Surface Terms: `view context menu`, `menu item`, `append`
+    - Notes: createViewContextMenu 属于 Reader.registerEventListener surface，不属于 menu-manager 的 reader/menubar/view target。
   - `annotation-context-menu` / `context-menu`
     - Host Events: `createAnnotationContextMenu`
     - Surface Terms: `annotation context menu`, `menu item`, `append`
-    - Notes: 监听器注册不等于菜单真的可见；必须验证 live reader 场景。
+    - Notes: 监听器注册不等于菜单真的可见；必须验证 live reader 场景。；createAnnotationContextMenu 属于 Reader.registerEventListener surface，不属于 menu-manager 的 reader/menubar/view target。
   - `selector-context-menu` / `context-menu`
     - Host Events: `createSelectorContextMenu`
     - Surface Terms: `selector context menu`, `append`
@@ -253,7 +271,7 @@
     - Surface Terms: `sidebarView`, `Reader sidebar`, `annotations`
     - Notes: Reader sidebar view 必须沿用宿主 view id 语义，不要把按钮文案或视觉位置当成稳定接口名。；sidebarWidth 可作为贴边式 geometry 信号，但它是状态字段，不是新的 surface 名或布局模式名。
 - Required Types:
-  - `types/features.d.ts` includes `export const READER_EVENT_TYPES: {`, `readonly READER_EVENT_TYPES: typeof READER_EVENT_TYPES;`, `waitForReaderReady(target: unknown, options?: { timeoutMs?: number; intervalMs?: number }): Promise<unknown | null>;`, `setContextPaneOpen(target: unknown, open: boolean, options?: { timeoutMs?: number; intervalMs?: number }): Promise<Record<string, unknown> | null>;`, `selectSidebarView(target: unknown, view: string, options?: {`, `registerEventListener(type: string, handler: (event: ReaderEvent) => void, options?: { pluginID?: string }): (() => void) | null;`, `dispatchSyntheticEvent(target: unknown, options?: {`, `getReaderFrameWindow(target: unknown, options?: { view?: "primary" | "secondary" }): Window | null;`
+  - `types/features.d.ts` includes `export const READER_EVENT_TYPES: {`, `readonly READER_EVENT_TYPES: typeof READER_EVENT_TYPES;`, `registerViewContextMenuItem(menuItemOrFactory: ReaderContextMenuItemSource, options?: { pluginID?: string }): (() => void) | null;`, `registerAnnotationContextMenuItem(menuItemOrFactory: ReaderContextMenuItemSource, options?: { pluginID?: string }): (() => void) | null;`, `waitForReaderReady(target: unknown, options?: { timeoutMs?: number; intervalMs?: number }): Promise<unknown | null>;`, `setContextPaneOpen(target: unknown, open: boolean, options?: { timeoutMs?: number; intervalMs?: number }): Promise<Record<string, unknown> | null>;`, `selectSidebarView(target: unknown, view: string, options?: {`, `registerEventListener(type: string, handler: (event: ReaderEvent) => void, options?: { pluginID?: string }): (() => void) | null;`, `dispatchSyntheticEvent(target: unknown, options?: {`, `getReaderFrameWindow(target: unknown, options?: { view?: "primary" | "secondary" }): Window | null;`
 - Required Tests:
   - `zotero-host-semantic-index-lib.test.js`
   - `zotero-host-semantic-index.test.js`

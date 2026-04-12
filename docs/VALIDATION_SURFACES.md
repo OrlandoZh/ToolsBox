@@ -138,6 +138,49 @@
   - Assuming menu registration alone means the menu item is visible to users.
   - Using generic screenshots before confirming the live host menu contains the item.
 
+### `collection-menu`
+
+- Version: `1`
+- Kind: `collection-menu`
+- Summary: A host-visible collection menu action aligned with Zotero collection selection semantics and main/library/collection target behavior.
+- Supports Visual Evidence: `true`
+- Entry Matchers:
+  - `^src/app/host-action-(?:catalog|actions)(?:/|\.|$)`
+  - `^src/features/menu-manager(?:/|\.|$)`
+  - `^src/platform/zotero-host(?:/|\.|$)`
+- Host Semantic Domains:
+  - `menu-manager`
+- Required Host Assertions:
+  - The collection menu registration is attached to main/library/collection rather than item selection semantics.
+  - The collection context is established in the live host before the menu is shown.
+  - The collection menu item or submenu becomes visible in the live host popup.
+  - The collection menu action can be replayed and the post-action result is observable.
+  - A surface-local evidence target can be returned for the live collection menu or submenu surface.
+- Non-Goals:
+  - Assuming item selection state proves the collection menu target is active.
+  - Treating registration against main/library/collection as sufficient without live popup evidence.
+
+### `menu-submenu`
+
+- Version: `1`
+- Kind: `menu-submenu`
+- Summary: A host-visible submenu surface whose visibility, structure, or child actions may depend on live menu state and `menuPath` resolution.
+- Supports Visual Evidence: `true`
+- Entry Matchers:
+  - `^src/app/host-action-(?:catalog|actions)(?:/|\.|$)`
+  - `^src/features/menu-manager(?:/|\.|$)`
+- Host Semantic Domains:
+  - `menu-manager`
+- Required Host Assertions:
+  - The submenu root is registered against an expected host menu target.
+  - The submenu root or submenu popup becomes visible in the live host.
+  - Dynamic submenu children are rebuilt or observed from live state before child actions are asserted.
+  - A submenu child can be addressed through `menuPath` and replayed without relying on generic DOM guesses.
+  - A surface-local evidence target can be returned for the submenu root or submenu popup.
+- Non-Goals:
+  - Assuming a submenu label alone proves its children were rebuilt from live state.
+  - Treating popup repair or direct DOM fallback as the default submenu verification path.
+
 ### `reader-sidebar-view`
 
 - Version: `1`

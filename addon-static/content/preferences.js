@@ -1,10 +1,14 @@
 (function bootstrapCleanroomPreferencesController() {
+  const COMPACT_LAYOUT_MAX_WIDTH = 620;
   const THEME_HELPER_KEY = "__CLEANROOM_THEME_CONTRACT__";
   const WINDOW_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
   const STORAGE_KEY = "__cleanroomPreferenceThemeState__";
   const PREF_ELEMENT_ID = "pref-themeMode";
   const ROOT_SELECTOR = ".cleanroom-pref-root";
+  const FIELD_ROW_SELECTOR = ".cleanroom-pref-field-row";
   const DEFAULT_MODE = "follow-host";
+  const INLINE_LAYOUT_MODE = "inline";
+  const STACKED_LAYOUT_MODE = "stacked";
   const LOCALIZED_TEXT_SPECS = Object.freeze([
     Object.freeze({
       id: "cleanroom-pref-caption",
@@ -116,6 +120,162 @@
     }
     const name = prefElement.getAttribute("name") || prefElement.name;
     return typeof name === "string" && name.trim() ? name.trim() : null;
+  }
+
+  function setDatasetAttribute(element, datasetKey, attributeName, value) {
+    if (!element || typeof value !== "string") {
+      return;
+    }
+    if (element.dataset && typeof element.dataset === "object") {
+      element.dataset[datasetKey] = value;
+    }
+    if (typeof element.setAttribute === "function") {
+      element.setAttribute(attributeName, value);
+    }
+  }
+
+  function readBoxMetric(root, propertyName) {
+    const directValue = Number(root?.[propertyName]);
+    if (Number.isFinite(directValue) && directValue > 0) {
+      return Math.round(directValue);
+    }
+    if (typeof root?.getBoundingClientRect === "function") {
+      const rect = root.getBoundingClientRect();
+      const width = Number(rect?.width);
+      if (Number.isFinite(width) && width > 0) {
+        return Math.round(width);
+      }
+    }
+    return 0;
+  }
+
+  function computeLayoutMetrics(root) {
+    const rootClientWidth = readBoxMetric(root, "clientWidth");
+    const measuredScrollWidth = readBoxMetric(root, "scrollWidth");
+    const rootScrollWidth = Math.max(rootClientWidth, measuredScrollWidth);
+    const horizontalOverflowPx = Math.max(0, rootScrollWidth - rootClientWidth);
+    const hasHorizontalOverflow = horizontalOverflowPx > 1;
+    const layoutMode = rootClientWidth > 0 && rootClientWidth <= COMPACT_LAYOUT_MAX_WIDTH
+      ? STACKED_LAYOUT_MODE
+      : INLINE_LAYOUT_MODE;
+    const widthBucket = layoutMode === STACKED_LAYOUT_MODE ? "compact" : "regular";
+    return {
+      layoutMode,
+      widthBucket,
+      rootClientWidth,
+      rootScrollWidth,
+      horizontalOverflowPx,
+      hasHorizontalOverflow,
+    };
+  }
+
+  function applyFieldRowLayout(root, layoutMode) {
+    if (!root || typeof root.querySelectorAll !== "function") {
+      return 0;
+    }
+    const rows = Array.from(root.querySelectorAll(FIELD_ROW_SELECTOR) || []);
+    rows.forEach((row) => {
+      if (typeof row.setAttribute !== "function") {
+        return;
+      }
+      row.setAttribute("orient", layoutMode === STACKED_LAYOUT_MODE ? "vertical" : "horizontal");
+      row.setAttribute("align", layoutMode === STACKED_LAYOUT_MODE ? "stretch" : "center");
+      row.setAttribute("data-pref-row-layout", layoutMode);
+    });
+    return rows.length;
+  }
+
+  function applyCompactLayoutState(root) {
+    if (!root) {
+      return {
+        layoutMode: INLINE_LAYOUT_MODE,
+        widthBucket: "regular",
+        rootClientWidth: 0,
+        rootScrollWidth: 0,
+        horizontalOverflowPx: 0,
+        hasHorizontalOverflow: false,
+        rowCount: 0,
+      };
+    }
+
+    if (typeof root.setAttribute === "function") {
+      root.setAttribute("data-pref-root", "true");
+    }
+
+    const metrics = computeLayoutMetrics(root);
+    setDatasetAttribute(root, "prefLayout", "data-pref-layout", metrics.layoutMode);
+    setDatasetAttribute(root, "prefWidthBucket", "data-pref-width-bucket", metrics.widthBucket);
+    setDatasetAttribute(
+      root,
+      "prefHorizontalOverflow",
+      "data-pref-horizontal-overflow",
+      metrics.hasHorizontalOverflow ? "true" : "false",
+    );
+    if (typeof root.setAttribute === "function") {
+      root.setAttribute(
+        "data-pref-horizontal-overflow-px",
+        String(metrics.horizontalOverflowPx),
+      );
+    }
+
+    const rowCount = applyFieldRowLayout(root, metrics.layoutMode);
+    return {
+      ...metrics,
+      rowCount,
+    };
+  }
+
+  function observeCompactLayout(root) {
+    let currentState = applyCompactLayoutState(root);
+    const refresh = () => {
+      currentState = applyCompactLayoutState(root);
+      return currentState;
+    };
+
+    let resizeObserver = null;
+    const ResizeObserverCtor = window?.ResizeObserver;
+    if (typeof ResizeObserverCtor === "function" && root) {
+      try {
+        resizeObserver = new ResizeObserverCtor(() => {
+          refresh();
+        });
+        resizeObserver.observe(root);
+      }
+      catch {}
+    }
+
+    const onWindowResize = () => {
+      refresh();
+    };
+    try {
+      window.addEventListener("resize", onWindowResize);
+    }
+    catch {}
+
+    if (typeof window?.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(() => {
+        refresh();
+      });
+    }
+
+    return {
+      refresh,
+      getState() {
+        return currentState;
+      },
+      dispose() {
+        if (resizeObserver && typeof resizeObserver.disconnect === "function") {
+          try {
+            resizeObserver.disconnect();
+          }
+          catch {}
+        }
+        try {
+          window.removeEventListener("resize", onWindowResize);
+        }
+        catch {}
+      },
+    };
   }
 
   function setLocalizedElementValue(element, attribute, value) {
@@ -279,6 +439,7 @@
       bridge,
     });
     const fluentTranslationRequested = requestFluentTranslation(root);
+    const layoutController = observeCompactLayout(root);
 
     const prefName = getThemeModePrefName();
     let rawMode = readRawThemeMode(prefName);
@@ -323,6 +484,7 @@
 
     function cleanup() {
       themeControl.dispose();
+      layoutController.dispose();
 
       if (
         prefName
@@ -354,6 +516,7 @@
     };
 
     const state = themeControl.refresh();
+    const layoutState = layoutController.refresh();
     return {
       ok: true,
       bridge,
@@ -364,6 +527,13 @@
       rootFound: true,
       mode: state.mode,
       effectiveTheme: state.effectiveTheme,
+      layoutMode: layoutState.layoutMode,
+      widthBucket: layoutState.widthBucket,
+      rootClientWidth: layoutState.rootClientWidth,
+      rootScrollWidth: layoutState.rootScrollWidth,
+      horizontalOverflowPx: layoutState.horizontalOverflowPx,
+      hasHorizontalOverflow: layoutState.hasHorizontalOverflow,
+      prefRowCount: layoutState.rowCount,
     };
   }
 

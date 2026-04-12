@@ -1,7 +1,11 @@
 import { describe, it, assert } from "./test-framework.js";
 import {
+  inspectCaptureBoundsAlignment,
   normalizeCaptureWindowBounds,
+  rebaseCaptureWindowBounds,
+  resolveStageRelativeSurfaceBounds,
   resolveCaptureWindowBounds,
+  shouldCaptureSurfaceFromReferenceStage,
 } from "../scripts/agent-zotero-capture-window-lib.mjs";
 import {
   isVisualStageSettleSnapshotReady,
@@ -98,6 +102,241 @@ describe("Agent Zotero Capture Window Lib", () => {
     });
 
     assert.equal(bounds.source, "apple-window");
+  });
+
+  it("should rebase a surface capture rect to the current window origin", () => {
+    const rebased = rebaseCaptureWindowBounds(
+      {
+        x: 320,
+        y: 180,
+        width: 280,
+        height: 160,
+        source: "element",
+      },
+      {
+        x: 100,
+        y: 100,
+        width: 1000,
+        height: 600,
+        title: "Original Window",
+        source: "window",
+      },
+      {
+        x: 460,
+        y: 240,
+        width: 1000,
+        height: 600,
+        title: "Current Window",
+        source: "cg-window",
+      },
+    );
+
+    assert.deepEqual(rebased, {
+      x: 680,
+      y: 320,
+      width: 280,
+      height: 160,
+      title: "Current Window",
+      source: "element",
+    });
+  });
+
+  it("should reject capture rects that mostly fall outside the current window", () => {
+    const aligned = inspectCaptureBoundsAlignment(
+      {
+        x: 540,
+        y: 280,
+        width: 320,
+        height: 180,
+      },
+      {
+        x: 500,
+        y: 240,
+        width: 1000,
+        height: 600,
+      },
+    );
+    const misaligned = inspectCaptureBoundsAlignment(
+      {
+        x: 1180,
+        y: 760,
+        width: 400,
+        height: 240,
+      },
+      {
+        x: 500,
+        y: 240,
+        width: 1000,
+        height: 600,
+      },
+    );
+
+    assert.equal(aligned.ok, true);
+    assert.ok(aligned.captureOverlapRatio > 0.9);
+    assert.equal(misaligned.ok, false);
+    assert.ok(misaligned.captureOverlapRatio < 0.3);
+  });
+
+  it("should resolve a stage-relative element rect against the stable stage window", () => {
+    const resolved = resolveStageRelativeSurfaceBounds(
+      {
+        rect: {
+          x: 1349,
+          y: 651,
+          width: 696,
+          height: 103,
+          title: "My Library - Zotero",
+          source: "element",
+        },
+        windowBounds: {
+          x: 1141,
+          y: 339,
+          width: 927,
+          height: 628,
+          title: "My Library - Zotero",
+          source: "window",
+        },
+      },
+      {
+        x: 1141,
+        y: 339,
+        width: 1000,
+        height: 600,
+        title: "My Library - Zotero",
+        source: "rdp-draw-window",
+      },
+    );
+
+    assert.deepEqual(resolved, {
+      x: 1349,
+      y: 651,
+      width: 696,
+      height: 103,
+      title: "My Library - Zotero",
+      source: "element",
+    });
+  });
+
+  it("should rebuild edge-attached sidebar bounds against the stable stage window", () => {
+    const resolved = resolveStageRelativeSurfaceBounds(
+      {
+        rect: {
+          x: 1141,
+          y: 339,
+          width: 240,
+          height: 628,
+          title: "PDF.js viewer",
+          source: "reader-ui-state-sidebarWidth+window-bounds",
+        },
+        windowBounds: {
+          x: 1141,
+          y: 339,
+          width: 927,
+          height: 628,
+          title: "PDF.js viewer",
+          source: "window",
+        },
+        details: {
+          edgeMode: "sidebar-attached",
+          minimumViableWidth: 240,
+        },
+      },
+      {
+        x: 1141,
+        y: 339,
+        width: 1000,
+        height: 600,
+        title: "Agent Visual Validation - Zotero",
+        source: "rdp-draw-window",
+      },
+    );
+
+    assert.deepEqual(resolved, {
+      x: 1141,
+      y: 339,
+      width: 240,
+      height: 600,
+      title: "Agent Visual Validation - Zotero",
+      source: "sidebar-edge+window-bounds",
+    });
+  });
+
+  it("should keep stable library surfaces on the reference stage", () => {
+    assert.equal(shouldCaptureSurfaceFromReferenceStage({
+      captureKind: "surface-item-pane-cleanroomtemplate-details",
+      details: {
+        surfaceEvidenceElement: "pane-root",
+      },
+    }), true);
+  });
+
+  it("should prefer live capture for reader sidebar and menu popup surfaces", () => {
+    assert.equal(shouldCaptureSurfaceFromReferenceStage({
+      captureKind: "surface-reader-sidebar-thumbnails",
+      details: {
+        surfaceEvidenceElement: "sidebar-panel",
+      },
+    }), false);
+
+    assert.equal(shouldCaptureSurfaceFromReferenceStage({
+      captureKind: "surface-menu-reader-menubar-view-cleanroomtemplate-reader-summary",
+      details: {
+        surfaceEvidenceElement: "menu-popup",
+      },
+    }), false);
+  });
+
+  it("should synthesize pane-attached bounds from the stable stage window when only edge metadata is available", () => {
+    const resolved = resolveStageRelativeSurfaceBounds(
+      {
+        details: {
+          edgeMode: "pane-attached",
+          minimumViableWidth: 240,
+        },
+      },
+      {
+        x: 1141,
+        y: 339,
+        width: 1000,
+        height: 600,
+        title: "My Library - Zotero",
+        source: "rdp-draw-window",
+      },
+    );
+
+    assert.deepEqual(resolved, {
+      x: 1901,
+      y: 339,
+      width: 240,
+      height: 600,
+      title: "My Library - Zotero",
+      source: "pane-edge+window-bounds",
+    });
+  });
+
+  it("should fall back to the stable stage window when no rect metadata is available", () => {
+    const resolved = resolveStageRelativeSurfaceBounds(
+      {
+        details: {},
+      },
+      {
+        x: 1141,
+        y: 339,
+        width: 1000,
+        height: 600,
+        title: "PDF.js viewer",
+        source: "rdp-draw-window",
+      },
+    );
+
+    assert.deepEqual(resolved, {
+      x: 1141,
+      y: 339,
+      width: 1000,
+      height: 600,
+      title: "PDF.js viewer",
+      source: "rdp-draw-window",
+    });
   });
 
   it("should wait for stable library settle snapshots and reset on change", async () => {

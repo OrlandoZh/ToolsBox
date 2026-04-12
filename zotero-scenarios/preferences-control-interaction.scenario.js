@@ -1,4 +1,22 @@
 registerZoteroScenario("preference pane control interaction", async ({ assert, addonConfig, helpers }) => {
+  const PREFERENCE_HOST_WINDOW = Object.freeze({
+    windowWidth: 800,
+    windowHeight: 600,
+  });
+  const rootID = "cleanroomtemplate-preferences-root";
+  const controlIDs = [
+    "cleanroom-menu-label",
+    "cleanroom-log-level",
+    "cleanroom-theme-mode",
+  ];
+
+  function getPreferenceWindow() {
+    if (typeof Services?.wm?.getMostRecentWindow === "function") {
+      return Services.wm.getMostRecentWindow("zotero:pref") || null;
+    }
+    return null;
+  }
+
   function assertSingleSurfaceEvidenceTarget(result, expectedSurfaceId, captureKindPrefix) {
     assert.equal(result.surfaceEvidenceTargets.length, 1);
     const target = result.surfaceEvidenceTargets[0];
@@ -6,6 +24,25 @@ registerZoteroScenario("preference pane control interaction", async ({ assert, a
     assert.equal(target.scope, "surface-local");
     assert.ok(String(target.captureKind || "").startsWith(captureKindPrefix));
     return target;
+  }
+
+  function assertPreferencePaneGeometryHealthy(result, surfaceTarget) {
+    const rootClientWidth = Number(result.observedState.rootClientWidth || surfaceTarget.details?.rootClientWidth || 0);
+    const layoutMode = String(
+      result.observedState.layoutMode
+      || surfaceTarget.details?.layoutMode
+      || "",
+    );
+    const hasHorizontalOverflow = result.observedState.hasHorizontalOverflow === true
+      || surfaceTarget.details?.hasHorizontalOverflow === true;
+
+    assert.ok(rootClientWidth > 0, `expected rootClientWidth > 0, got ${rootClientWidth}`);
+    assert.equal(hasHorizontalOverflow, false, `expected no horizontal overflow, got ${JSON.stringify(result.observedState)}`);
+    assert.ok(layoutMode === "inline" || layoutMode === "stacked", `unexpected layoutMode '${layoutMode}'`);
+
+    if (rootClientWidth <= 620) {
+      assert.equal(layoutMode, "stacked", `expected stacked layout at width ${rootClientWidth}`);
+    }
   }
 
   const paneID = `${addonConfig.addonRef}-preferences`;
@@ -53,6 +90,7 @@ registerZoteroScenario("preference pane control interaction", async ({ assert, a
   const openResult = helpers.toSurfaceSmokeResult(
     await helpers.runHostAction("preferences.openPane", {
       paneID,
+      ...PREFERENCE_HOST_WINDOW,
     }),
   );
   const sentinelMenuLabel = `Scenario Menu ${Date.now()}`;
@@ -64,6 +102,7 @@ registerZoteroScenario("preference pane control interaction", async ({ assert, a
       paneID,
       controlID: "cleanroom-menu-label",
       value: sentinelMenuLabel,
+      ...PREFERENCE_HOST_WINDOW,
     }),
   );
   const logLevelResult = helpers.toSurfaceSmokeResult(
@@ -71,6 +110,7 @@ registerZoteroScenario("preference pane control interaction", async ({ assert, a
       paneID,
       controlID: "cleanroom-log-level",
       value: targetLogLevel,
+      ...PREFERENCE_HOST_WINDOW,
     }),
   );
   const themeModeResult = helpers.toSurfaceSmokeResult(
@@ -78,6 +118,7 @@ registerZoteroScenario("preference pane control interaction", async ({ assert, a
       paneID,
       controlID: "cleanroom-theme-mode",
       value: targetThemeMode,
+      ...PREFERENCE_HOST_WINDOW,
     }),
   );
 
@@ -129,6 +170,9 @@ registerZoteroScenario("preference pane control interaction", async ({ assert, a
   assert.equal(paneTarget.details?.geometrySettled, true);
   assert.ok(Number(paneTarget.details?.surfaceGeometry?.width || 0) > 0);
   assert.ok(Number(paneTarget.details?.surfaceGeometry?.height || 0) > 0);
+  assert.equal(paneTarget.details?.windowResize?.requestedWidth, 800);
+  assert.equal(paneTarget.details?.windowResize?.requestedHeight, 600);
+  assertPreferencePaneGeometryHealthy(openResult, paneTarget);
   const menuLabelTarget = assertSingleSurfaceEvidenceTarget(menuLabelResult, "preference-control", "preference-control-");
   const logLevelTarget = assertSingleSurfaceEvidenceTarget(logLevelResult, "preference-control", "preference-control-");
   const themeModeTarget = assertSingleSurfaceEvidenceTarget(themeModeResult, "preference-control", "preference-control-");
@@ -138,12 +182,16 @@ registerZoteroScenario("preference pane control interaction", async ({ assert, a
   assert.equal(logLevelTarget.details?.controlID, "cleanroom-log-level");
   assert.equal(themeModeTarget.details?.paneID, paneID);
   assert.equal(themeModeTarget.details?.controlID, "cleanroom-theme-mode");
+  assertPreferencePaneGeometryHealthy(menuLabelResult, menuLabelTarget);
+  assertPreferencePaneGeometryHealthy(logLevelResult, logLevelTarget);
+  assertPreferencePaneGeometryHealthy(themeModeResult, themeModeTarget);
 
   const resetMenuLabelResult = helpers.toSurfaceSmokeResult(
     await helpers.runHostAction("preferences.setTextbox", {
       paneID,
       controlID: "cleanroom-menu-label",
       value: originalMenuLabel.value,
+      ...PREFERENCE_HOST_WINDOW,
     }),
   );
   const resetLogLevelResult = helpers.toSurfaceSmokeResult(
@@ -151,6 +199,7 @@ registerZoteroScenario("preference pane control interaction", async ({ assert, a
       paneID,
       controlID: "cleanroom-log-level",
       value: originalLogLevel.value,
+      ...PREFERENCE_HOST_WINDOW,
     }),
   );
   const resetThemeModeResult = helpers.toSurfaceSmokeResult(
@@ -158,6 +207,7 @@ registerZoteroScenario("preference pane control interaction", async ({ assert, a
       paneID,
       controlID: "cleanroom-theme-mode",
       value: originalThemeMode.value,
+      ...PREFERENCE_HOST_WINDOW,
     }),
   );
 
@@ -167,6 +217,51 @@ registerZoteroScenario("preference pane control interaction", async ({ assert, a
   assert.equal(services.prefs.getStringPref(menuLabelPref, ""), originalMenuLabel.value);
   assert.equal(services.prefs.getStringPref(logLevelPref, "info"), originalLogLevel.value);
   assert.equal(services.prefs.getStringPref(themeModePref, "follow-host"), originalThemeMode.value);
+
+  const preferenceWindow = getPreferenceWindow();
+  const preferenceDocument = preferenceWindow?.document || null;
+  const root = preferenceDocument?.getElementById?.(rootID) || null;
+  const resolvedControls = controlIDs.map((controlID) => preferenceDocument?.getElementById?.(controlID) || null);
+  const controlsWithinRoot = root && typeof root.contains === "function"
+    ? resolvedControls.every((control) => Boolean(control) && root.contains(control))
+    : false;
+  const domContract = helpers.toDomContractResult({
+    routeId: "preference-pane",
+    adapter: "preference-pane",
+    checks: [
+      helpers.createDomContractCheck("root-marker-present", Boolean(root), {
+        label: "preference pane root marker is present",
+        actual: root ? root.id : null,
+        expected: rootID,
+      }),
+      helpers.createDomContractCheck("root-owner-document", root?.ownerDocument === preferenceDocument && Boolean(preferenceDocument), {
+        label: "preference pane root uses the preference window document",
+      }),
+      helpers.createDomContractCheck("root-connected", root?.isConnected === true, {
+        label: "preference pane root stays connected after interaction replay",
+      }),
+      helpers.createDomContractCheck("controls-under-root", controlsWithinRoot, {
+        label: "preference controls stay attached under the plugin-owned root",
+        actual: resolvedControls.map((control, index) => ({
+          controlID: controlIDs[index],
+          present: Boolean(control),
+        })),
+      }),
+      helpers.createDomContractCheck("pref-writeback", (
+        menuLabelResult.observedState.prefValueAfter === sentinelMenuLabel
+        && logLevelResult.observedState.prefValueAfter === targetLogLevel
+        && themeModeResult.observedState.prefValueAfter === targetThemeMode
+      ), {
+        label: "preference control replay writes back to prefs",
+      }),
+      helpers.createDomContractCheck("no-horizontal-overflow", openResult.observedState.hasHorizontalOverflow !== true, {
+        label: "preference pane stays free of horizontal overflow",
+        actual: openResult.observedState.hasHorizontalOverflow === true,
+        expected: false,
+      }),
+    ],
+    summary: "Preference pane DOM contract tracks root marker, ownerDocument, connection state, control ownership, pref writeback, and overflow health after live control replay.",
+  });
 
   return {
     paneID,
@@ -181,5 +276,6 @@ registerZoteroScenario("preference pane control interaction", async ({ assert, a
       ...logLevelResult.surfaceEvidenceTargets,
       ...themeModeResult.surfaceEvidenceTargets,
     ],
+    domContract,
   };
 });

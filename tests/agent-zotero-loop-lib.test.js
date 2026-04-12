@@ -311,7 +311,8 @@ describe("Agent Zotero Loop Lib", () => {
       nextAction: "npm run agent:zotero:autofix",
     });
 
-    assert.ok(markdown.includes("# Zotero Agent 编排回合报告"));
+    assert.ok(markdown.includes("# 当前 Zotero 插件编排回合报告"));
+    assert.equal(markdown.includes("# Zotero Agent 编排回合报告"), false);
     assert.ok(markdown.includes("执行模式"));
     assert.ok(markdown.includes("npm run agent:zotero:autofix"));
     assert.ok(markdown.includes("当前 gate 未通过"));
@@ -355,7 +356,8 @@ describe("Agent Zotero Loop Lib", () => {
       nextAction: "npm run agent:zotero:e2e",
     });
 
-    assert.ok(markdown.includes("# Zotero Agent 编排回合报告"));
+    assert.ok(markdown.includes("# 当前 Zotero 插件编排回合报告"));
+    assert.equal(markdown.includes("# Zotero Agent 编排回合报告"), false);
     assert.ok(markdown.includes("分类: `执行错误`"));
     assert.ok(markdown.includes("阶段: `run-e2e`"));
     assert.ok(markdown.includes("E2E execution failed"));

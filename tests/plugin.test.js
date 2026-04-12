@@ -394,6 +394,9 @@ describe("Plugin", () => {
     assert.equal(plugin.api.preferencePanes.getPaneCount(), 1);
     assert.equal(plugin.api.commandPalette.getCommandCount(), 3);
     assert.equal(plugin.api.menuManager.getMenuCount(), 2);
+    assert.typeOf(plugin.api.menuManager.registerItemMenuItem, "function");
+    assert.typeOf(plugin.api.menuManager.registerItemPaneInfoRowMenuItem, "function");
+    assert.typeOf(plugin.api.menuManager.registerReaderMenubarViewMenuItem, "function");
     assert.equal(plugin.api.itemPane.getSectionCount(), 1);
     assert.equal(plugin.api.itemPane.getInfoRowCount(), 1);
     assert.equal(plugin.api.itemTree.getColumnCount(), 1);
@@ -403,6 +406,8 @@ describe("Plugin", () => {
     assert.typeOf(plugin.api.agent.describeReader, "function");
     assert.typeOf(plugin.api.agent.inspectReader, "function");
     assert.typeOf(plugin.api.reader.getReaderUIStateSnapshot, "function");
+    assert.typeOf(plugin.api.reader.registerViewContextMenuItem, "function");
+    assert.typeOf(plugin.api.reader.registerAnnotationContextMenuItem, "function");
     assert.typeOf(plugin.api.reader.registerEventListener, "function");
     assert.typeOf(plugin.api.reader.unregisterAllEventListeners, "function");
     assert.typeOf(plugin.api.reader.getEventAPIReport, "function");

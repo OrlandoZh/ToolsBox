@@ -117,6 +117,15 @@ export interface PreferencePaneSurfaceSnapshot {
   registeredStylesheetCount: number;
   hasInlineLoadHook: boolean;
   hasLoadBridgeSignature: boolean;
+  surfaceRootStrategy: string | null;
+  surfaceRootTagName: string | null;
+  surfaceRootID: string | null;
+  layoutMode: string | null;
+  widthBucket: string | null;
+  rootClientWidth: number;
+  rootScrollWidth: number;
+  horizontalOverflowPx: number;
+  hasHorizontalOverflow: boolean;
   hasInteractiveRoot: boolean;
   interactiveRootStrategy: string | null;
   interactiveRootTagName: string | null;
@@ -141,6 +150,27 @@ export interface PreferencePaneSurfaceGeometrySettleSnapshot {
     width: number;
     height: number;
   } | null;
+}
+
+export interface PreferencePaneWindowResizeSnapshot {
+  requestedWidth: number | null;
+  requestedHeight: number | null;
+  targetWidth: number | null;
+  targetHeight: number | null;
+  applied: boolean;
+  strategy: string | null;
+  beforeBounds: HostWindowBounds | null;
+  afterBounds: HostWindowBounds | null;
+  widthMatched: boolean;
+  heightMatched: boolean;
+  widthSatisfied: boolean;
+  heightSatisfied: boolean;
+  boundarySatisfied: boolean;
+  settled: boolean;
+  timedOut: boolean;
+  observedMs: number;
+  sampleCount: number;
+  settleReason: string | null;
 }
 
 export interface ZoteroHost {
@@ -192,6 +222,8 @@ export interface ZoteroHost {
   preparePreferencePane(options?: {
     paneID?: string | null;
     scrollTo?: string;
+    windowWidth?: number;
+    windowHeight?: number;
     timeoutMs?: number;
   }): Promise<{
     window: Window | null;
@@ -204,6 +236,7 @@ export interface ZoteroHost {
     surfaceElement?: Element | null;
     surfaceElementStrategy?: string | null;
     surfaceGeometrySettle?: PreferencePaneSurfaceGeometrySettleSnapshot | null;
+    windowResize?: PreferencePaneWindowResizeSnapshot | null;
   }>;
   getContextPaneState(window?: Window | null): Record<string, unknown>;
   setContextPaneOpen(open: boolean, options?: { window?: Window | null; timeoutMs?: number }): Promise<Record<string, unknown>>;

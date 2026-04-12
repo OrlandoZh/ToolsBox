@@ -14,6 +14,57 @@ import {
 } from "../scripts/agent-zotero-validation-lib.mjs";
 import { normalizeDiagnosisFingerprint } from "../scripts/agent-zotero-diagnosis-lib.mjs";
 
+function buildDomContractScenarioResult({
+  name,
+  routeId,
+  adapter = routeId,
+  checkCount = 1,
+  failedChecks = [],
+  summary = "dom contract summary",
+}) {
+  return {
+    name,
+    status: "passed",
+    details: {
+      domContract: {
+        routeId,
+        adapter,
+        status: failedChecks.length > 0 ? "failed" : "passed",
+        statusLabel: failedChecks.length > 0 ? "异常" : "通过",
+        checkCount,
+        failedCheckCount: failedChecks.length,
+        failedChecks,
+        summary,
+      },
+    },
+  };
+}
+
+function buildDomContractE2EReport(results) {
+  return {
+    generatedAt: "2026-04-11T00:00:00.000Z",
+    passed: true,
+    issues: [],
+    hints: [],
+    cycles: [{
+      index: 1,
+      passed: true,
+      checks: {},
+      tests: { failed: 0 },
+      scenarios: {
+        failed: 0,
+        results,
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        errorBoundaryHitCount: 0,
+        errorBoundaryEvents: [],
+      },
+    }],
+  };
+}
+
 describe("Agent Zotero Validation Lib", () => {
   it("should label baseline-best-match capture selection distinctly", () => {
     assert.equal(
@@ -599,6 +650,151 @@ describe("Agent Zotero Validation Lib", () => {
     assert.equal(summary.visualCaptureAttemptDiagnosisItems[0]?.stderr, "could not create image from rect");
     assert.ok(buildVisualPrimaryBlockerSummary(summary)?.includes("先复核窗口 bounds / 激活 / screencapture 调用"));
     assert.equal(pickPureVisualReaderNextAction(summary), "npm run agent:zotero:e2e");
+  });
+
+  it("should classify wrong-target hash collisions as capture-command-failed", () => {
+    const summary = summarizeE2EReport({
+      generatedAt: "2026-04-08T11:00:00.000Z",
+      passed: false,
+      issues: ["reader capture duplicated library hash"],
+      primaryDiagnosis: {
+        fingerprint: "reader-ui:reader-visual-drift",
+        feature: "reader-ui",
+        featureLabel: "Reader 与视觉回归",
+        severity: "medium",
+        confidence: 0.88,
+        summary: "Reader 相关视觉基线发生漂移或缺失。",
+      },
+      cycles: [{
+        index: 1,
+        bootMode: "restart",
+        passed: false,
+        checks: {},
+        tests: { failed: 0 },
+        scenarios: { failed: 0, results: [] },
+        logs: { errorCount: 0, warnCount: 1 },
+        visuals: {
+          captures: [
+            {
+              kind: "library",
+              path: "/tmp/cycle-1-library.png",
+              bounds: {
+                x: 120,
+                y: 80,
+                width: 1000,
+                height: 600,
+                source: "app-window",
+                title: "My Library - Zotero",
+              },
+              analysis: {
+                width: 2000,
+                height: 1200,
+                sha256: "same-sha",
+              },
+            },
+            {
+              kind: "reader",
+              path: "/tmp/cycle-1-reader.png",
+              bounds: {
+                x: 120,
+                y: 80,
+                width: 1000,
+                height: 600,
+                source: "app-window",
+                title: "Agent Visual Validation - Zotero",
+              },
+              analysis: {
+                width: 2000,
+                height: 1200,
+                sha256: "same-sha",
+              },
+            },
+          ],
+          captureStability: {
+            stages: [
+              {
+                kind: "library",
+                stable: true,
+                attemptCount: 2,
+                selectedAttempt: 2,
+                selectionReason: "stable-hash-pair",
+              },
+              {
+                kind: "reader",
+                stable: false,
+                attemptCount: 2,
+                selectedAttempt: 2,
+                selectionReason: "stable-hash-pair",
+                failureKind: "capture-target-collision",
+                failureCategory: "capture-command-failed",
+                failureStage: "capture-stage",
+                failureMessage: "reader capture duplicated library hash while window titles differed",
+                boundsSource: "app-window",
+                windowTitle: "Agent Visual Validation - Zotero",
+                attempts: [
+                  {
+                    index: 1,
+                    sha256: "same-sha",
+                    width: 2000,
+                    height: 1200,
+                    bounds: { x: 120, y: 80, width: 1000, height: 600 },
+                  },
+                  {
+                    index: 2,
+                    sha256: "same-sha",
+                    width: 2000,
+                    height: 1200,
+                    bounds: { x: 120, y: 80, width: 1000, height: 600 },
+                  },
+                ],
+              },
+            ],
+          },
+          analysis: {
+            baselines: [
+              {
+                kind: "library",
+                status: "compared",
+                ok: true,
+                metrics: {
+                  sameDimensions: true,
+                  actualWidth: 2000,
+                  actualHeight: 1200,
+                  baselineWidth: 2000,
+                  baselineHeight: 1200,
+                },
+              },
+              {
+                kind: "reader",
+                status: "compared",
+                ok: false,
+                metrics: {
+                  sameDimensions: true,
+                  actualWidth: 2000,
+                  actualHeight: 1200,
+                  baselineWidth: 2000,
+                  baselineHeight: 1200,
+                },
+                issues: ["reader 截图与库视图截图完全相同"],
+              },
+            ],
+            summary: {
+              baseline: {
+                driftCount: 1,
+                missingCount: 0,
+              },
+            },
+          },
+        },
+      }],
+    });
+
+    assert.equal(summary.visualPrimaryBlockerKind, "capture-command-failed");
+    assert.equal(summary.visualPrimaryBlockerKindLabel, "截图调用失败");
+    const collisionItem = summary.visualCaptureAttemptDiagnosisItems.find((entry) => entry.failureKind === "capture-target-collision");
+    assert.ok(collisionItem);
+    assert.equal(collisionItem?.boundsSource, "app-window");
+    assert.equal(buildVisualCaptureFailureStageSummary(summary), "reader（截图命中错误窗口：reader capture duplicated library hash while window titles differed）");
   });
 
   it("should classify stable geometry mismatch as baseline-geometry-mismatch", () => {
@@ -1981,6 +2177,11 @@ describe("Agent Zotero Validation Lib", () => {
                   dispatchMode: "synthetic-fallback",
                   appendedItemCount: 1,
                 },
+                toolbarProbe: {
+                  type: "renderToolbar",
+                  dispatchMode: "customEvent",
+                  appendedItemCount: 2,
+                },
                 sidebarHeaderProbe: {
                   type: "renderSidebarAnnotationHeader",
                   dispatchMode: "synthetic-fallback",
@@ -2046,6 +2247,8 @@ describe("Agent Zotero Validation Lib", () => {
     assert.equal(summary.readerSidebarView, "annotations");
     assert.equal(summary.selectionPopupDispatchMode, "synthetic-fallback");
     assert.equal(summary.selectionPopupAppendedItemCount, 1);
+    assert.equal(summary.toolbarDispatchMode, "customEvent");
+    assert.equal(summary.toolbarAppendedItemCount, 2);
     assert.equal(summary.sidebarHeaderDispatchMode, "synthetic-fallback");
     assert.equal(summary.sidebarHeaderAppendedItemCount, 1);
     assert.equal(summary.contextMenuProbeCount, 5);
@@ -2053,6 +2256,7 @@ describe("Agent Zotero Validation Lib", () => {
     assert.ok(summary.contextMenuObservedTypes.includes("createViewContextMenu"));
     assert.equal(summary.contextMenuSyntheticFallbackTypes.length, 5);
     assert.ok(summary.contextMenuSyntheticFallbackTypes.includes("createViewContextMenu"));
+    assert.ok(summary.readerDispatchSummary.includes("工具栏 customEvent"));
     assert.ok(summary.readerDispatchSummary.includes("文本浮层"));
     assert.ok(summary.readerDispatchSummary.includes("侧栏批注头"));
     assert.ok(summary.contextMenuSummary.includes("已观测 5 类"));
@@ -2107,6 +2311,8 @@ describe("Agent Zotero Validation Lib", () => {
     assert.equal(summary.status, "passed");
     assert.equal(summary.selectionPopupDispatchMode, null);
     assert.equal(summary.selectionPopupAppendedItemCount, null);
+    assert.equal(summary.toolbarDispatchMode, null);
+    assert.equal(summary.toolbarAppendedItemCount, null);
     assert.equal(summary.sidebarHeaderDispatchMode, null);
     assert.equal(summary.sidebarHeaderAppendedItemCount, null);
     assert.equal(summary.contextMenuProbeCount, 5);
@@ -2127,6 +2333,17 @@ describe("Agent Zotero Validation Lib", () => {
         checks: {},
         scenarios: {
           results: [
+            {
+              name: "reader fine-grained hook diagnostics",
+              status: "passed",
+              details: {
+                toolbarProbe: {
+                  type: "renderToolbar",
+                  dispatchMode: "customEvent",
+                  appendedItemCount: 3,
+                },
+              },
+            },
             {
               name: "reader interaction diagnostics",
               status: "passed",
@@ -2164,13 +2381,15 @@ describe("Agent Zotero Validation Lib", () => {
     assert.equal(summary.status, "passed");
     assert.equal(summary.selectionPopupDispatchMode, "customEvent");
     assert.equal(summary.selectionPopupAppendedItemCount, null);
+    assert.equal(summary.toolbarDispatchMode, "customEvent");
+    assert.equal(summary.toolbarAppendedItemCount, 3);
     assert.equal(summary.sidebarHeaderDispatchMode, null);
     assert.equal(summary.sidebarHeaderAppendedItemCount, 2);
     assert.equal(summary.contextMenuProbeCount, null);
     assert.deepEqual(summary.contextMenuObservedTypes, ["createViewContextMenu"]);
     assert.deepEqual(summary.contextMenuSyntheticFallbackTypes, []);
+    assert.ok(summary.readerDispatchSummary.includes("工具栏 customEvent"));
     assert.ok(summary.readerDispatchSummary.includes("文本浮层 customEvent"));
-    assert.ok(summary.readerDispatchSummary.includes("侧栏批注头 -"));
     assert.ok(summary.contextMenuSummary.includes("已观测 1 类"));
     assert.ok(summary.contextMenuSummary.includes("synthetic-fallback 0 类"));
   });
@@ -2208,6 +2427,8 @@ describe("Agent Zotero Validation Lib", () => {
     assert.equal(summary.readerHostStateObserved, false);
     assert.equal(summary.selectionPopupDispatchMode, null);
     assert.equal(summary.selectionPopupAppendedItemCount, null);
+    assert.equal(summary.toolbarDispatchMode, null);
+    assert.equal(summary.toolbarAppendedItemCount, null);
     assert.equal(summary.sidebarHeaderDispatchMode, null);
     assert.equal(summary.sidebarHeaderAppendedItemCount, null);
     assert.equal(summary.contextMenuProbeCount, null);
@@ -2850,5 +3071,191 @@ describe("Agent Zotero Validation Lib", () => {
 
     assert.equal(summary.patchArchivePresent, true);
     assert.equal(summary.patchPlanStatus, "review-ready");
+  });
+
+  it("should summarize advisory performance budget from telemetry and host actions", () => {
+    const summary = summarizeE2EReport({
+      generatedAt: "2026-04-06T00:00:00.000Z",
+      passed: true,
+      issues: [],
+      hints: [],
+      cycles: [{
+        index: 1,
+        passed: true,
+        checks: {
+          hostReadyDurationMs: 2100,
+          startupDurationMs: 3200,
+          shutdownDurationMs: 950,
+          lifecycleSlowOperationCount: 1,
+          httpSlowOperationCount: 0,
+        },
+        tests: { failed: 0 },
+        scenarios: {
+          failed: 0,
+          results: [{
+            name: "performance budget diagnostics",
+            status: "passed",
+            details: {
+              activities: [
+                { actionId: "itemPane.selectPane", durationMs: 420, ready: true, surfaceId: "item-pane-sidenav" },
+                { actionId: "contextPane.selectPane", durationMs: 680, ready: true, surfaceId: "context-pane" },
+                { actionId: "reader.sidebar.selectView", durationMs: 860, ready: true, surfaceId: "reader-sidebar-view" },
+                { actionId: "preferences.openPane", durationMs: 1220, ready: true, surfaceId: "preference-pane" },
+              ],
+            },
+          }],
+        },
+        logs: {
+          errorCount: 0,
+          warnCount: 0,
+          errorBoundaryHitCount: 0,
+          errorBoundaryEvents: [],
+        },
+      }],
+    }, {
+      now: "2026-04-06T00:30:00.000Z",
+    });
+
+    assert.equal(summary.performanceBudget.present, true);
+    assert.equal(summary.performanceBudget.status, "passed");
+    assert.equal(summary.performanceBudget.statusLabel, "通过");
+    assert.equal(summary.performanceBudget.violationCount, 0);
+    assert.equal(summary.performanceBudget.measuredActivityCount, 4);
+    assert.ok(String(summary.performanceBudget.summary || "").includes("dev-only advisory"));
+  });
+
+  it("should flag advisory performance budget violations without changing e2e status semantics", () => {
+    const summary = summarizeE2EReport({
+      generatedAt: "2026-04-06T00:00:00.000Z",
+      passed: true,
+      issues: [],
+      hints: [],
+      cycles: [{
+        index: 1,
+        passed: true,
+        checks: {
+          hostReadyDurationMs: 2200,
+          startupDurationMs: 4210,
+          shutdownDurationMs: 910,
+          lifecycleSlowOperationCount: 1,
+          httpSlowOperationCount: 0,
+        },
+        tests: { failed: 0 },
+        scenarios: {
+          failed: 0,
+          results: [{
+            name: "performance budget diagnostics",
+            status: "passed",
+            details: {
+              activities: [
+                { actionId: "itemPane.selectPane", durationMs: 430, ready: true, surfaceId: "item-pane-sidenav" },
+                { actionId: "contextPane.selectPane", durationMs: 700, ready: true, surfaceId: "context-pane" },
+                { actionId: "reader.sidebar.selectView", durationMs: 1710, ready: true, surfaceId: "reader-sidebar-view" },
+                { actionId: "preferences.openPane", durationMs: 1260, ready: true, surfaceId: "preference-pane" },
+              ],
+            },
+          }],
+        },
+        logs: {
+          errorCount: 0,
+          warnCount: 0,
+          errorBoundaryHitCount: 0,
+          errorBoundaryEvents: [],
+        },
+      }],
+    }, {
+      now: "2026-04-06T00:30:00.000Z",
+    });
+
+    assert.equal(summary.status, "passed");
+    assert.equal(summary.performanceBudget.status, "attention");
+    assert.equal(summary.performanceBudget.statusLabel, "需关注");
+    assert.equal(summary.performanceBudget.violationCount, 2);
+    assert.ok(String(summary.performanceBudget.violationSummary || "").includes("Startup"));
+    assert.ok(String(summary.performanceBudget.violationSummary || "").includes("Reader 侧边栏切换"));
+  });
+
+  it("should summarize a passed dom contract report when all three routes are present", () => {
+    const summary = summarizeE2EReport(buildDomContractE2EReport([
+      buildDomContractScenarioResult({
+        name: "preference pane control interaction",
+        routeId: "preference-pane",
+        summary: "preference pane ok",
+      }),
+      buildDomContractScenarioResult({
+        name: "item pane DOM contract advisory",
+        routeId: "item-pane",
+        summary: "item pane ok",
+      }),
+      buildDomContractScenarioResult({
+        name: "reader surface smoke",
+        routeId: "reader",
+        summary: "reader ok",
+      }),
+    ]));
+
+    assert.equal(summary.domContractReport.present, true);
+    assert.equal(summary.domContractReport.status, "passed");
+    assert.equal(summary.domContractReport.routeCount, 3);
+    assert.equal(summary.domContractReport.passedRouteCount, 3);
+    assert.equal(summary.domContractReport.failedRouteCount, 0);
+    assert.equal(summary.domContractReport.missingRouteCount, 0);
+  });
+
+  it("should summarize a partial dom contract report when a route is missing", () => {
+    const summary = summarizeE2EReport(buildDomContractE2EReport([
+      buildDomContractScenarioResult({
+        name: "preference pane control interaction",
+        routeId: "preference-pane",
+      }),
+      buildDomContractScenarioResult({
+        name: "reader surface smoke",
+        routeId: "reader",
+      }),
+    ]));
+
+    assert.equal(summary.domContractReport.status, "partial");
+    assert.equal(summary.domContractReport.passedRouteCount, 2);
+    assert.equal(summary.domContractReport.missingRouteCount, 1);
+    assert.equal(summary.domContractReport.routes.find((route) => route.routeId === "item-pane")?.status, "missing");
+  });
+
+  it("should summarize a failed dom contract report without changing advisory semantics", () => {
+    const summary = summarizeE2EReport(buildDomContractE2EReport([
+      buildDomContractScenarioResult({
+        name: "preference pane control interaction",
+        routeId: "preference-pane",
+      }),
+      buildDomContractScenarioResult({
+        name: "item pane DOM contract advisory",
+        routeId: "item-pane",
+        checkCount: 3,
+        failedChecks: [
+          {
+            id: "plugin-root-unique",
+            label: "item pane rerender keeps a single plugin-owned root",
+            note: "observed duplicate root",
+          },
+        ],
+      }),
+      buildDomContractScenarioResult({
+        name: "reader surface smoke",
+        routeId: "reader",
+      }),
+    ]));
+
+    assert.equal(summary.domContractReport.status, "failed");
+    assert.equal(summary.domContractReport.failedRouteCount, 1);
+    assert.ok(summary.domContractReport.summary.includes("advisory + non-blocking"));
+    assert.ok(summary.domContractReport.routes.find((route) => route.routeId === "item-pane")?.failedChecks[0].includes("item pane DOM contract advisory"));
+  });
+
+  it("should expose a missing dom contract report when no route data is present", () => {
+    const summary = summarizeE2EReport(null);
+
+    assert.equal(summary.domContractReport.present, false);
+    assert.equal(summary.domContractReport.status, "missing");
+    assert.equal(summary.domContractReport.routeCount, 3);
+    assert.equal(summary.domContractReport.missingRouteCount, 3);
   });
 });

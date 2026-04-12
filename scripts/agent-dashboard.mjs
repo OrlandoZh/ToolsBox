@@ -524,8 +524,60 @@ function renderReaderEventBridge(e2e) {
         <div class="subtle">Canonical 未对齐目标: ${escapeHTML((e2e.visualCanonicalMismatchedTargets || []).join("、") || "-")}</div>
         <div class="subtle">深层宿主状态: ${escapeHTML(e2e.readerHostStateObserved ? (e2e.readerHostStateSummary || "-") : "未观测")}</div>
         <div class="subtle">宿主状态备注: ${escapeHTML(e2e.readerHostStateNote || "-")}</div>
+        <div class="subtle">工具栏分发: ${escapeHTML(e2e.toolbarDispatchMode || "-")}</div>
+        <div class="subtle">工具栏追加项: ${escapeHTML(e2e.toolbarAppendedItemCount ?? "-")}</div>
+        <div class="subtle">文本浮层追加项: ${escapeHTML(e2e.selectionPopupAppendedItemCount ?? "-")}</div>
+        <div class="subtle">侧栏批注头追加项: ${escapeHTML(e2e.sidebarHeaderAppendedItemCount ?? "-")}</div>
+        <div class="subtle">上下文菜单探针数: ${escapeHTML(e2e.contextMenuProbeCount ?? "-")}</div>
         <div class="subtle">分发摘要: ${escapeHTML(e2e.readerDispatchSummary || "-")}</div>
         <div class="subtle">上下文菜单探针: ${escapeHTML(e2e.contextMenuSummary || "-")}</div>
+        <div class="subtle">上下文菜单已观测类型: ${escapeHTML((e2e.contextMenuObservedTypes || []).join("、") || "-")}</div>
+        <div class="subtle">上下文菜单 fallback 类型: ${escapeHTML((e2e.contextMenuSyntheticFallbackTypes || []).join("、") || "-")}</div>
+      </div>`;
+}
+
+function renderDomContract(e2e) {
+  const report = e2e.domContractReport || null;
+  if (!report) {
+    return '<div class="diagnosis-panel"><div class="subtle">当前没有 DOM contract 摘要。</div></div>';
+  }
+
+  const status = String(report.status || "missing").trim();
+  const severityClass = status === "passed"
+    ? "status-ok"
+    : (status === "missing" || status === "partial" ? "status-warn" : "status-bad");
+  const routeRows = (Array.isArray(report.routes) ? report.routes : []).map((route) => (
+    `<tr>
+      <td>${escapeHTML(route.routeId || route.adapter || "-")}</td>
+      <td>${escapeHTML(route.statusLabel || route.status || "-")}</td>
+      <td>${escapeHTML((route.scenarioNames || []).join("、") || "-")}</td>
+      <td>${escapeHTML(`${route.failedCheckCount ?? 0}/${route.checkCount ?? 0}`)}</td>
+    </tr>`
+  )).join("\n") || '<tr><td>-</td><td>-</td><td>-</td><td>-</td></tr>';
+  const failedChecksText = (Array.isArray(report.routes) ? report.routes : [])
+    .flatMap((route) => Array.isArray(route.failedChecks) ? route.failedChecks : [])
+    .slice(0, 8)
+    .join("；") || "-";
+
+  return `<div class="diagnosis-panel">
+        <div class="validation-head">
+          <div class="label">DOM Contract</div>
+          <span class="status-pill ${severityClass}">${escapeHTML(report.statusLabel || "缺失")}</span>
+        </div>
+        <div class="validation-metrics">
+          <div><span class="label">Advisory</span><span class="metric-value">${escapeHTML(report.advisory ? "是" : "否")}</span></div>
+          <div><span class="label">Route 覆盖</span><span class="metric-value">${escapeHTML(`${report.passedRouteCount ?? 0}/${report.routeCount ?? 0}`)}</span></div>
+          <div><span class="label">异常 Route</span><span class="metric-value">${escapeHTML(report.failedRouteCount ?? 0)}</span></div>
+          <div><span class="label">缺失 Route</span><span class="metric-value">${escapeHTML(report.missingRouteCount ?? 0)}</span></div>
+        </div>
+        <div class="subtle">${escapeHTML(report.summary || "当前没有 DOM contract 摘要")}</div>
+        <div class="subtle">失败检查: ${escapeHTML(failedChecksText)}</div>
+        <table class="attempt-table diagnosis-table">
+          <thead>
+            <tr><th>Route</th><th>状态</th><th>场景</th><th>失败/总数</th></tr>
+          </thead>
+          <tbody>${routeRows}</tbody>
+        </table>
       </div>`;
 }
 
@@ -776,6 +828,7 @@ function renderZoteroValidation(summary) {
             <div class="subtle">服务摘要: ${escapeHTML(serviceSummaryText)}</div>
             <div class="subtle">服务问题: ${escapeHTML(serviceIssuesText)}</div>
             ${renderDiagnosisDetails(e2e)}
+            ${renderDomContract(e2e)}
             ${renderReaderEventBridge(e2e)}
             ${renderCapabilityCoverage(e2e)}
           </div>
@@ -835,7 +888,10 @@ function renderEngineeringHardening(summary) {
   const validationText = Array.isArray(hardening.validationFailureCategories) && hardening.validationFailureCategories.length > 0
     ? hardening.validationFailureCategories.map((item) => `${item.label} x${item.count}`).join("；")
     : "未记录新的校验失败";
+  const performanceBudget = hardening.performanceBudget || null;
+  const performanceStatus = String(performanceBudget?.status || "missing").trim();
   const statusClass = hardening.errorBoundaryHitCount > 0 || Number(hardening.httpTimeoutCount || 0) > 0
+    || performanceStatus === "attention"
     ? "status-warn"
     : "status-ok";
 
@@ -858,6 +914,9 @@ function renderEngineeringHardening(summary) {
               <div><span class="label">Host Ready</span><span class="metric-value">${escapeHTML(`${hardening.hostReadyDurationMs ?? 0}ms`)}</span></div>
               <div><span class="label">Startup</span><span class="metric-value">${escapeHTML(`${hardening.startupDurationMs ?? 0}ms`)}</span></div>
               <div><span class="label">Shutdown</span><span class="metric-value">${escapeHTML(`${hardening.shutdownDurationMs ?? 0}ms`)}</span></div>
+              <div><span class="label">性能预算</span><span class="metric-value">${escapeHTML(performanceBudget?.statusLabel || performanceBudget?.status || "-")}</span></div>
+              <div><span class="label">预算活动</span><span class="metric-value">${escapeHTML(`${performanceBudget?.measuredActivityCount ?? 0}/${performanceBudget?.expectedActivityCount ?? 0}`)}</span></div>
+              <div><span class="label">超预算项</span><span class="metric-value">${escapeHTML(performanceBudget?.violationCount ?? 0)}</span></div>
             </div>
             <div class="subtle">${escapeHTML(hardening.summary || "暂无工程化硬化摘要")}</div>
             <div class="subtle">边界事件: ${escapeHTML(boundaryText)}</div>
@@ -866,6 +925,8 @@ function renderEngineeringHardening(summary) {
             <div class="subtle">生命周期慢阈值: ${escapeHTML(`${hardening.lifecycleSlowThresholdMs ?? 0}ms`)}</div>
             <div class="subtle">最近生命周期慢阶段: ${escapeHTML(hardening.lifecycleLastSlowStage || "-")}</div>
             <div class="subtle">最近 HTTP 错误: ${escapeHTML(`${hardening.httpLastErrorKind || "-"} / ${hardening.httpLastErrorMessage || "-"}`)}</div>
+            <div class="subtle">性能预算: ${escapeHTML(performanceBudget?.summary || "当前未采集 dev-only performance budget")}</div>
+            <div class="subtle">预算告警: ${escapeHTML(performanceBudget?.violationSummary || "-")}</div>
           </div>
         </div>
       </section>`;

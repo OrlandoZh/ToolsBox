@@ -68,6 +68,8 @@ export const TAB_TYPES = {
 
 const RESOLVED_MENU_STATE = Symbol("cleanroom.resolvedMenuState");
 const RESOLVED_MENU_MODEL = Symbol("cleanroom.resolvedMenuModel");
+const LIVE_MENU_ID = Symbol("cleanroom.liveMenuId");
+const LIVE_MENU_PATH = Symbol("cleanroom.liveMenuPath");
 
 function readObjectValue(target, key) {
   if (!target || typeof target !== "object") {
@@ -79,6 +81,13 @@ function readObjectValue(target, key) {
   catch {
     return null;
   }
+}
+
+function cloneValue(value) {
+  if (value === undefined) {
+    return undefined;
+  }
+  return JSON.parse(JSON.stringify(value));
 }
 
 function callIfFunction(target, methodName) {
@@ -262,6 +271,9 @@ export function createMenuStateResolver(options = {}) {
       libraryType: detectMenuLibraryType(context, items),
       hasCollectionSelection: hasCollectionRowKind(collectionTreeRow, "collection"),
       hasSavedSearchSelection: hasCollectionRowKind(collectionTreeRow, "search"),
+      collectionTreeRowID: collectionTreeRow && typeof collectionTreeRow === "object"
+        ? cloneValue(collectionTreeRow.id ?? collectionTreeRow.ref ?? null)
+        : null,
       collectionTreeRowType: typeof readObjectValue(collectionTreeRow, "type") === "string"
         ? readObjectValue(collectionTreeRow, "type")
         : null,
@@ -346,6 +358,14 @@ export function createMenuManager(options) {
     catch {
       return null;
     }
+  }
+
+  function setLiveMenuBinding(context, menuId, menuPath) {
+    if (!context || typeof context !== "object") {
+      return;
+    }
+    context[LIVE_MENU_ID] = menuId || null;
+    context[LIVE_MENU_PATH] = menuPath || null;
   }
 
   function cloneLiveMenuContext(context) {
@@ -452,6 +472,7 @@ export function createMenuManager(options) {
 
     const wrapHook = (hookName, original) => (event, context) => {
       try {
+        setLiveMenuBinding(context, menuId, path);
         if (typeof original === "function") {
           return original(event, context);
         }
@@ -684,29 +705,71 @@ export function createMenuManager(options) {
     return popup;
   }
 
-  function attachMenuCommand(element, menuItem) {
-    if (!element || !menuItem || typeof menuItem.onCommand !== "function") {
+  function buildDynamicMenuCommandContext(baseContext, menuId, menuPath, menuItem, menuElem) {
+    const commandContext = baseContext && typeof baseContext === "object"
+      ? {
+        ...baseContext,
+      }
+      : {};
+    commandContext.menuElem = menuElem || null;
+    setLiveMenuBinding(commandContext, menuId, menuPath);
+    if (RESOLVED_MENU_STATE in commandContext) {
+      commandContext[RESOLVED_MENU_STATE] = baseContext[RESOLVED_MENU_STATE];
+    }
+    if (menuItem && typeof menuItem === "object") {
+      commandContext[RESOLVED_MENU_MODEL] = menuItem;
+    }
+    return commandContext;
+  }
+
+  function attachMenuCommand(element, menuItem, options = {}) {
+    if (!element || !menuItem) {
       return;
     }
+    const menuId = typeof options.menuId === "string" && options.menuId.trim()
+      ? options.menuId.trim()
+      : null;
+    const menuPath = typeof options.menuPath === "string" && options.menuPath.trim()
+      ? options.menuPath.trim()
+      : null;
+    if (!menuId || !menuPath) {
+      if (typeof menuItem.onCommand !== "function") {
+        return;
+      }
+    }
+    const baseContext = options.context && typeof options.context === "object"
+      ? options.context
+      : null;
+    const invokeCommand = (event) => {
+      const commandContext = buildDynamicMenuCommandContext(baseContext, menuId, menuPath, menuItem, element);
+      try {
+        if (typeof menuItem.onCommand === "function") {
+          menuItem.onCommand(event, commandContext);
+        }
+      }
+      finally {
+        if (menuId && menuPath) {
+          recordLiveMenuState(menuId, menuPath, commandContext, "onCommand");
+        }
+      }
+    };
     if (typeof element.addEventListener === "function") {
-      element.addEventListener("command", (event) => {
-        menuItem.onCommand(event, {
-          menuElem: element,
-        });
-      });
+      element.addEventListener("command", invokeCommand);
     } else {
-      element.oncommand = (event) => {
-        menuItem.onCommand(event, {
-          menuElem: element,
-        });
-      };
+      element.oncommand = invokeCommand;
     }
   }
 
-  function buildDynamicMenuElement(menuItem, ownerDocument) {
+  function buildDynamicMenuElement(menuItem, ownerDocument, options = {}) {
     if (!menuItem || typeof menuItem !== "object") {
       return null;
     }
+    const menuId = typeof options.menuId === "string" && options.menuId.trim()
+      ? options.menuId.trim()
+      : null;
+    const menuPath = typeof options.menuPath === "string" && options.menuPath.trim()
+      ? options.menuPath.trim()
+      : null;
     const tagName = menuItem.menuType === MENU_TYPES.SUBMENU
       ? "menu"
       : menuItem.menuType === MENU_TYPES.SEPARATOR
@@ -727,13 +790,20 @@ export function createMenuManager(options) {
       } else if (typeof menuItem.enabled === "boolean") {
         element.disabled = !menuItem.enabled;
       }
-      attachMenuCommand(element, menuItem);
+      attachMenuCommand(element, menuItem, {
+        context: options.context || null,
+        menuId,
+        menuPath,
+      });
     }
 
     if (menuItem.menuType === MENU_TYPES.SUBMENU) {
       const popup = ensureSubmenuPopup(element);
       const childElements = (Array.isArray(menuItem.menus) ? menuItem.menus : [])
-        .map((child) => buildDynamicMenuElement(child, ownerDocument))
+        .map((child, index) => buildDynamicMenuElement(child, ownerDocument, {
+          ...options,
+          menuPath: menuPath ? `${menuPath}.${index}` : `${index}`,
+        }))
         .filter(Boolean);
       if (typeof popup.replaceChildren === "function") {
         popup.replaceChildren(...childElements);
@@ -750,22 +820,78 @@ export function createMenuManager(options) {
     return element;
   }
 
+  function recordDynamicMenuTreeState(context, menuItem, menuId, menuPath, element) {
+    if (!context || typeof context !== "object" || !menuItem || !menuId || !menuPath || !element) {
+      return;
+    }
+    const liveContext = {
+      ...context,
+      menuElem: element,
+    };
+    setLiveMenuBinding(liveContext, menuId, menuPath);
+    liveContext[RESOLVED_MENU_STATE] = context[RESOLVED_MENU_STATE] || null;
+    liveContext[RESOLVED_MENU_MODEL] = menuItem;
+    recordLiveMenuState(menuId, menuPath, liveContext, "dynamic-rebuild");
+
+    if (menuItem.menuType !== MENU_TYPES.SUBMENU || !Array.isArray(menuItem.menus)) {
+      return;
+    }
+
+    const popup = ensureSubmenuPopup(element);
+    const childElements = Array.isArray(popup?.childNodes)
+      ? popup.childNodes
+      : Array.from(popup?.children || []);
+    menuItem.menus.forEach((child, index) => {
+      recordDynamicMenuTreeState(
+        liveContext,
+        child,
+        menuId,
+        `${menuPath}.${index}`,
+        childElements[index] || null,
+      );
+    });
+  }
+
   function rebuildDynamicSubmenu(context, menuItem) {
     if (menuItem?.menuType !== MENU_TYPES.SUBMENU || !context?.menuElem) {
       return;
     }
+    const menuId = typeof context?.[LIVE_MENU_ID] === "string" && context[LIVE_MENU_ID].trim()
+      ? context[LIVE_MENU_ID].trim()
+      : null;
+    const basePath = typeof context?.[LIVE_MENU_PATH] === "string" && context[LIVE_MENU_PATH].trim()
+      ? context[LIVE_MENU_PATH].trim()
+      : null;
     const popup = ensureSubmenuPopup(context.menuElem);
-    const childElements = (Array.isArray(menuItem.menus) ? menuItem.menus : [])
-      .map((child) => buildDynamicMenuElement(child, context.menuElem.ownerDocument || popup?.ownerDocument || null))
-      .filter(Boolean);
+    const builtChildren = (Array.isArray(menuItem.menus) ? menuItem.menus : [])
+      .map((child, index) => ({
+        child,
+        menuPath: basePath ? `${basePath}.${index}` : `${index}`,
+        element: buildDynamicMenuElement(
+          child,
+          context.menuElem.ownerDocument || popup?.ownerDocument || null,
+          {
+            context,
+            menuId,
+            menuPath: basePath ? `${basePath}.${index}` : `${index}`,
+          },
+        ),
+      }))
+      .filter((entry) => entry.element);
+    const childElements = builtChildren.map((entry) => entry.element);
     if (typeof popup.replaceChildren === "function") {
       popup.replaceChildren(...childElements);
-      return;
+    } else {
+      popup.childNodes = [];
+      childElements.forEach((child) => {
+        if (typeof popup.appendChild === "function") {
+          popup.appendChild(child);
+        }
+      });
     }
-    popup.childNodes = [];
-    childElements.forEach((child) => {
-      if (typeof popup.appendChild === "function") {
-        popup.appendChild(child);
+    builtChildren.forEach(({ child, menuPath, element }) => {
+      if (menuId && menuPath) {
+        recordDynamicMenuTreeState(context, child, menuId, menuPath, element);
       }
     });
   }
@@ -919,89 +1045,27 @@ export function createMenuManager(options) {
     });
   }
 
-  /**
-   * 注册条目右键菜单项（便捷方法）
-   * @param {Object} menuItem - 菜单项配置
-   * @param {string} [menuItem.id] - 菜单项 ID
-   * @param {string} menuItem.label - 菜单标签
-   * @param {Function} menuItem.onCommand - 点击回调 (event, context) => void
-   * @param {Function} [menuItem.onShowing] - 显示前回调，可控制可见性
-   * @param {string} [menuItem.icon] - 图标路径
-   * @returns {string|null} 菜单 ID
-   */
-  function registerContextMenuItem(menuItem) {
+  function registerSingleMenuItem(target, menuItem) {
     return register({
       id: menuItem.id,
-      target: MENU_TARGETS.LIBRARY_ITEM,
+      target,
       menus: [{
         menuType: MENU_TYPES.MENUITEM,
         label: menuItem.label,
         l10nID: menuItem.l10nID,
         l10nArgs: menuItem.l10nArgs,
         icon: menuItem.icon,
+        enableForTabTypes: menuItem.enableForTabTypes,
         onCommand: menuItem.onCommand,
         onShowing: menuItem.onShowing,
       }],
     });
   }
 
-  /**
-   * 注册收藏集右键菜单项（便捷方法）
-   * @param {Object} menuItem - 菜单项配置
-   * @returns {string|null} 菜单 ID
-   */
-  function registerCollectionMenuItem(menuItem) {
-    return register({
-      id: menuItem.id,
-      target: MENU_TARGETS.LIBRARY_COLLECTION,
-      menus: [{
-        menuType: MENU_TYPES.MENUITEM,
-        label: menuItem.label,
-        l10nID: menuItem.l10nID,
-        l10nArgs: menuItem.l10nArgs,
-        icon: menuItem.icon,
-        onCommand: menuItem.onCommand,
-        onShowing: menuItem.onShowing,
-      }],
-    });
-  }
-
-  /**
-   * 注册阅读器菜单项（便捷方法）
-   * @param {Object} config - 配置
-   * @param {string} config.target - 阅读器菜单目标（READER_MENU_*）
-   * @param {Object} menuItem - 菜单项配置
-   * @returns {string|null} 菜单 ID
-   */
-  function registerReaderMenuItem(config, menuItem) {
-    return register({
-      id: menuItem.id,
-      target: config.target,
-      menus: [{
-        menuType: MENU_TYPES.MENUITEM,
-        label: menuItem.label,
-        l10nID: menuItem.l10nID,
-        l10nArgs: menuItem.l10nArgs,
-        icon: menuItem.icon,
-        onCommand: menuItem.onCommand,
-        onShowing: menuItem.onShowing,
-      }],
-    });
-  }
-
-  /**
-   * 注册子菜单
-   * @param {Object} config - 配置
-   * @param {string} config.target - 菜单目标
-   * @param {string} config.label - 子菜单标签
-   * @param {Array} config.menus - 子菜单项数组
-   * @param {string} [config.icon] - 图标路径
-   * @returns {string|null} 菜单 ID
-   */
-  function registerSubmenu(config) {
+  function registerSingleSubmenu(target, config) {
     return register({
       id: config.id,
-      target: config.target,
+      target,
       menus: [{
         menuType: MENU_TYPES.SUBMENU,
         label: config.label,
@@ -1011,6 +1075,107 @@ export function createMenuManager(options) {
         menus: config.menus,
       }],
     });
+  }
+
+  /**
+   * 注册条目菜单项（main/library/item）
+   * @param {Object} menuItem - 菜单项配置
+   * @returns {string|null} 菜单 ID
+   */
+  function registerItemMenuItem(menuItem) {
+    return registerSingleMenuItem(MENU_TARGETS.LIBRARY_ITEM, menuItem);
+  }
+
+  /**
+   * 注册条目右键菜单项（兼容别名；推荐新代码改用 registerItemMenuItem）
+   * @param {Object} menuItem - 菜单项配置
+   * @param {string} [menuItem.id] - 菜单项 ID
+   * @param {string} menuItem.label - 菜单标签
+   * @param {Function} menuItem.onCommand - 点击回调 (event, context) => void
+   * @param {Function} [menuItem.onShowing] - 显示前回调，可控制可见性
+   * @param {string} [menuItem.icon] - 图标路径
+   * @returns {string|null} 菜单 ID
+   */
+  function registerContextMenuItem(menuItem) {
+    return registerItemMenuItem(menuItem);
+  }
+
+  /**
+   * 注册收藏集右键菜单项（便捷方法）
+   * @param {Object} menuItem - 菜单项配置
+   * @returns {string|null} 菜单 ID
+   */
+  function registerCollectionMenuItem(menuItem) {
+    return registerSingleMenuItem(MENU_TARGETS.LIBRARY_COLLECTION, menuItem);
+  }
+
+  /**
+   * 注册条目窗格信息行菜单项（itemPane/info/row）
+   * @param {Object} menuItem - 菜单项配置
+   * @returns {string|null} 菜单 ID
+   */
+  function registerItemPaneInfoRowMenuItem(menuItem) {
+    return registerSingleMenuItem(MENU_TARGETS.ITEM_PANE_INFO_ROW, menuItem);
+  }
+
+  /**
+   * 注册 Reader View 菜单栏菜单项（reader/menubar/view）
+   * @param {Object} menuItem - 菜单项配置
+   * @returns {string|null} 菜单 ID
+   */
+  function registerReaderMenubarViewMenuItem(menuItem) {
+    return registerSingleMenuItem(MENU_TARGETS.READER_MENU_VIEW, menuItem);
+  }
+
+  /**
+   * 注册阅读器菜单项（兼容 helper；推荐 reader/menubar/view 使用 registerReaderMenubarViewMenuItem）
+   * @param {Object} config - 配置
+   * @param {string} config.target - 阅读器菜单目标（READER_MENU_*）
+   * @param {Object} menuItem - 菜单项配置
+   * @returns {string|null} 菜单 ID
+   */
+  function registerReaderMenuItem(config, menuItem) {
+    return registerSingleMenuItem(config.target, menuItem);
+  }
+
+  /**
+   * 注册条目子菜单（main/library/item）
+   * @param {Object} config - 配置
+   * @returns {string|null} 菜单 ID
+   */
+  function registerItemSubmenu(config) {
+    return registerSingleSubmenu(MENU_TARGETS.LIBRARY_ITEM, config);
+  }
+
+  /**
+   * 注册收藏集子菜单（main/library/collection）
+   * @param {Object} config - 配置
+   * @returns {string|null} 菜单 ID
+   */
+  function registerCollectionSubmenu(config) {
+    return registerSingleSubmenu(MENU_TARGETS.LIBRARY_COLLECTION, config);
+  }
+
+  /**
+   * 注册 Reader View 菜单栏子菜单（reader/menubar/view）
+   * @param {Object} config - 配置
+   * @returns {string|null} 菜单 ID
+   */
+  function registerReaderMenubarViewSubmenu(config) {
+    return registerSingleSubmenu(MENU_TARGETS.READER_MENU_VIEW, config);
+  }
+
+  /**
+   * 注册子菜单（兼容 helper；推荐优先使用 scene-specific submenu helpers）
+   * @param {Object} config - 配置
+   * @param {string} config.target - 菜单目标
+   * @param {string} config.label - 子菜单标签
+   * @param {Array} config.menus - 子菜单项数组
+   * @param {string} [config.icon] - 图标路径
+   * @returns {string|null} 菜单 ID
+   */
+  function registerSubmenu(config) {
+    return registerSingleSubmenu(config.target, config);
   }
 
   function registerStateDrivenMenu(config) {
@@ -1202,9 +1367,15 @@ export function createMenuManager(options) {
 
     // 便捷注册方法
     registerToolsMenuItem,
+    registerItemMenuItem,
     registerContextMenuItem,
     registerCollectionMenuItem,
+    registerItemPaneInfoRowMenuItem,
     registerReaderMenuItem,
+    registerReaderMenubarViewMenuItem,
+    registerItemSubmenu,
+    registerCollectionSubmenu,
+    registerReaderMenubarViewSubmenu,
     registerSubmenu,
     registerStateDrivenMenu,
     registerSeparator,

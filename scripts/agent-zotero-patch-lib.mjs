@@ -484,7 +484,7 @@ function buildReaderEntryCommandRegistrationDraft() {
     existsText: '      id: `${config.addonRef}-reader-summary`,',
     anchorText: "    if (menuManager.isOfficialAPIAvailable()) {",
     beforeContextText: '      id: `${config.addonRef}-primary-action`,',
-    afterContextText: "      menuManager.registerContextMenuItem({",
+    afterContextText: "    itemTree.registerColumn({",
     contextWindowChars: 2400,
     insertMode: "before",
       snippet: `    commandPalette.registerCommand({
@@ -534,47 +534,37 @@ function buildReaderEntryMenuRegistrationDraft() {
     anchorText: `    }
 
     itemTree.registerColumn({`,
-    beforeContextText: "      menuManager.registerContextMenuItem({",
+    beforeContextText: "    if (menuManager.isOfficialAPIAvailable()) {",
     afterContextText: "      dataKey: demoColumnKey,",
     contextWindowChars: 3200,
     insertMode: "before",
-    snippet: `      menuManager.registerReaderMenuItem(
-        {
-          target: menuManager.MENU_TARGETS.READER_MENU_VIEW,
+    snippet: `      menuManager.registerReaderMenubarViewMenuItem({
+        id: \`\${config.addonRef}-reader-summary\`,
+        l10nID: "cleanroom-reader-menu-label",
+        onShowing: (event, context) => {
+          if (context && typeof context.setVisible === "function") {
+            context.setVisible(Boolean(reader.getActiveSummary()));
+          }
         },
-        {
-          id: \`\${config.addonRef}-reader-summary\`,
-          l10nID: "cleanroom-reader-menu-label",
-          onShowing: (event, context) => {
-            if (context && typeof context.setVisible === "function") {
-              context.setVisible(Boolean(reader.getActiveSummary()));
-            }
-          },
-          onCommand: () => {
-            runReaderDemo();
-          },
+        onCommand: () => {
+          runReaderDemo();
         },
-      );
+      });
 
 `,
     patch: `@@ registerBaselineFeatures()
-+      menuManager.registerReaderMenuItem(
-+        {
-+          target: menuManager.MENU_TARGETS.READER_MENU_VIEW,
++      menuManager.registerReaderMenubarViewMenuItem({
++        id: \`\${config.addonRef}-reader-summary\`,
++        l10nID: "cleanroom-reader-menu-label",
++        onShowing: (event, context) => {
++          if (context && typeof context.setVisible === "function") {
++            context.setVisible(Boolean(reader.getActiveSummary()));
++          }
 +        },
-+        {
-+          id: \`\${config.addonRef}-reader-summary\`,
-+          l10nID: "cleanroom-reader-menu-label",
-+          onShowing: (event, context) => {
-+            if (context && typeof context.setVisible === "function") {
-+              context.setVisible(Boolean(reader.getActiveSummary()));
-+            }
-+          },
-+          onCommand: () => {
-+            runReaderDemo();
-+          },
++        onCommand: () => {
++          runReaderDemo();
 +        },
-+      );`,
++      });`,
   };
 }
 
@@ -1372,7 +1362,7 @@ const PATCH_WHITELIST_RULES = [
         existsText: '      id: `${config.addonRef}-reader-summary`,',
         anchorText: "    if (menuManager.isOfficialAPIAvailable()) {",
         beforeContextText: '      id: `${config.addonRef}-primary-action`,',
-        afterContextText: "      menuManager.registerContextMenuItem({",
+        afterContextText: "    itemTree.registerColumn({",
         contextWindowChars: 2400,
         insertMode: "before",
         snippet: `    commandPalette.registerCommand({
@@ -1677,7 +1667,7 @@ const PATCH_WHITELIST_RULES = [
       "不得在此补丁中改写 Reader 菜单、主命令实现或宿主菜单目标。",
     ],
     proposedEdits: [
-      "核对 `menuManager.registerContextMenuItem(...)` 是否仍位于 `menuManager.isOfficialAPIAvailable()` 分支内。",
+      "核对 `menuManager.registerItemMenuItem(...)` 是否仍位于 `menuManager.isOfficialAPIAvailable()` 分支内。",
       "若只是上下文菜单入口遗漏，优先补回单个注册块。",
     ],
     verificationContract: {
@@ -1717,7 +1707,7 @@ const PATCH_WHITELIST_RULES = [
         contextWindowChars: 2400,
         insertMode: "after",
         snippet: `
-      menuManager.registerContextMenuItem({
+      menuManager.registerItemMenuItem({
         id: \`\${config.addonRef}-context-action\`,
         l10nID: "cleanroom-menu-label",
         onCommand: (event, context) => {
@@ -1730,7 +1720,7 @@ const PATCH_WHITELIST_RULES = [
       });
 `,
         patch: `@@ registerBaselineFeatures()
-+      menuManager.registerContextMenuItem({
++      menuManager.registerItemMenuItem({
 +        id: \`\${config.addonRef}-context-action\`,
 +        l10nID: "cleanroom-menu-label",
 +        onCommand: (event, context) => {

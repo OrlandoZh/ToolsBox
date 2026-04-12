@@ -343,6 +343,39 @@ registerZoteroScenario("reader fine-grained hook diagnostics", async ({ assert, 
     const removed = plugin.api.reader.unregisterAllEventListeners();
     assert.equal(removed, 3 + menuDefinitions.length);
     assert.equal(plugin.api.reader.getEventListenerCount(), 0);
+    const domContract = helpers.toDomContractResult({
+      routeId: "reader",
+      adapter: "reader",
+      checks: [
+        helpers.createDomContractCheck("selection-popup-event-doc", firstSelectionInvocation.hasDoc === true, {
+          label: "text selection popup uses event.doc",
+        }),
+        helpers.createDomContractCheck("toolbar-event-doc", toolbarInvocationForAttachment.hasDoc === true, {
+          label: "reader toolbar hook uses event.doc",
+        }),
+        helpers.createDomContractCheck("sidebar-header-event-doc", sidebarHeaderInvocationForAttachment.hasDoc === true, {
+          label: "sidebar annotation header uses event.doc",
+        }),
+        helpers.createDomContractCheck("menu-append-observed", menuDefinitions.every((definition) => {
+          const probeEntry = menuProbes.find((entry) => entry.type === definition.type);
+          return probeEntry?.probe?.appendedItemCount === 1;
+        }), {
+          label: "reader menu append results are observable for fine-grained hooks",
+        }),
+        helpers.createDomContractCheck("listener-cleanup", removed === (3 + menuDefinitions.length) && plugin.api.reader.getEventListenerCount() === 0, {
+          label: "reader listener cleanup returns to the baseline after the scenario",
+          actual: {
+            removed,
+            remaining: plugin.api.reader.getEventListenerCount(),
+          },
+          expected: {
+            removed: 3 + menuDefinitions.length,
+            remaining: 0,
+          },
+        }),
+      ],
+      summary: "Reader fine-grained DOM contract tracks event.doc on element routes, append visibility on menu routes, and listener cleanup back to baseline.",
+    });
 
     return {
       attachmentID: attachment.id,
@@ -373,6 +406,7 @@ registerZoteroScenario("reader fine-grained hook diagnostics", async ({ assert, 
       },
       toolbarInvocationCount: toolbarInvocations.length,
       removed,
+      domContract,
     };
   }
   finally {

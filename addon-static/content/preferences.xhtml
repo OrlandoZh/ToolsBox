@@ -1,4 +1,12 @@
-<vbox xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" flex="1" class="cleanroom-pref-root">
+<vbox
+  xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+  id="cleanroomtemplate-preferences-root"
+  flex="1"
+  class="cleanroom-pref-root"
+  data-pref-root="true"
+  data-pref-layout="inline"
+  data-pref-width-bucket="regular"
+>
   <preferences id="cleanroom-preferences">
     <preference id="pref-enabled" name="__PREFS_PREFIX__.enabled" type="bool" />
     <preference id="pref-menuLabel" name="__PREFS_PREFIX__.menuLabel" type="string" />
@@ -6,75 +14,116 @@
     <preference id="pref-themeMode" name="__PREFS_PREFIX__.themeMode" type="string" />
   </preferences>
 
-  <groupbox>
+  <groupbox class="cleanroom-pref-section">
     <caption id="cleanroom-pref-caption" data-l10n-id="cleanroom-pref-caption" />
-    <checkbox
-      id="cleanroom-enabled"
-      data-l10n-id="cleanroom-pref-enabled"
-      preference="pref-enabled"
-    />
+    <vbox class="cleanroom-pref-section-body">
+      <checkbox
+        id="cleanroom-enabled"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-enabled"
+        preference="pref-enabled"
+      />
+    </vbox>
   </groupbox>
 
-  <groupbox>
+  <groupbox class="cleanroom-pref-section">
     <caption id="cleanroom-pref-menu-section" data-l10n-id="cleanroom-pref-menu-section" />
-    <hbox align="center">
-      <label
-        id="cleanroom-pref-menu-label-text"
-        data-l10n-id="cleanroom-pref-menu-label"
-        control="cleanroom-menu-label"
+    <vbox class="cleanroom-pref-section-body">
+      <hbox class="cleanroom-pref-field-row" align="center" orient="horizontal">
+        <label
+          id="cleanroom-pref-menu-label-text"
+          class="cleanroom-pref-label"
+          data-l10n-id="cleanroom-pref-menu-label"
+          control="cleanroom-menu-label"
+        />
+        <vbox class="cleanroom-pref-control-wrap" flex="1">
+          <textbox
+            id="cleanroom-menu-label"
+            class="cleanroom-pref-control cleanroom-pref-textbox"
+            preference="pref-menuLabel"
+            flex="1"
+          />
+        </vbox>
+      </hbox>
+      <description
+        id="cleanroom-pref-menu-hint"
+        class="cleanroom-pref-hint"
+        data-l10n-id="cleanroom-pref-menu-hint"
       />
-      <textbox id="cleanroom-menu-label" preference="pref-menuLabel" flex="1" />
-    </hbox>
-    <description id="cleanroom-pref-menu-hint" data-l10n-id="cleanroom-pref-menu-hint" />
+    </vbox>
   </groupbox>
 
-  <groupbox>
+  <groupbox class="cleanroom-pref-section">
     <caption id="cleanroom-pref-logging-section" data-l10n-id="cleanroom-pref-logging-section" />
-    <hbox align="center">
-      <label
-        id="cleanroom-pref-log-level-text"
-        data-l10n-id="cleanroom-pref-log-level"
-        control="cleanroom-log-level"
-      />
-      <menulist id="cleanroom-log-level" preference="pref-logLevel">
-        <menupopup>
-          <menuitem label="debug" value="debug" />
-          <menuitem label="info" value="info" />
-          <menuitem label="warn" value="warn" />
-          <menuitem label="error" value="error" />
-        </menupopup>
-      </menulist>
-    </hbox>
+    <vbox class="cleanroom-pref-section-body">
+      <hbox class="cleanroom-pref-field-row" align="center" orient="horizontal">
+        <label
+          id="cleanroom-pref-log-level-text"
+          class="cleanroom-pref-label"
+          data-l10n-id="cleanroom-pref-log-level"
+          control="cleanroom-log-level"
+        />
+        <vbox class="cleanroom-pref-control-wrap" flex="1">
+          <menulist
+            id="cleanroom-log-level"
+            class="cleanroom-pref-control cleanroom-pref-menulist"
+            preference="pref-logLevel"
+            flex="1"
+          >
+            <menupopup>
+              <menuitem label="debug" value="debug" />
+              <menuitem label="info" value="info" />
+              <menuitem label="warn" value="warn" />
+              <menuitem label="error" value="error" />
+            </menupopup>
+          </menulist>
+        </vbox>
+      </hbox>
+    </vbox>
   </groupbox>
 
-  <groupbox>
+  <groupbox class="cleanroom-pref-section">
     <caption id="cleanroom-pref-theme-section" data-l10n-id="cleanroom-pref-theme-section" />
-    <hbox align="center">
-      <label
-        id="cleanroom-pref-theme-mode-text"
-        data-l10n-id="cleanroom-pref-theme-mode"
-        control="cleanroom-theme-mode"
+    <vbox class="cleanroom-pref-section-body">
+      <hbox class="cleanroom-pref-field-row" align="center" orient="horizontal">
+        <label
+          id="cleanroom-pref-theme-mode-text"
+          class="cleanroom-pref-label"
+          data-l10n-id="cleanroom-pref-theme-mode"
+          control="cleanroom-theme-mode"
+        />
+        <vbox class="cleanroom-pref-control-wrap" flex="1">
+          <menulist
+            id="cleanroom-theme-mode"
+            class="cleanroom-pref-control cleanroom-pref-menulist"
+            preference="pref-themeMode"
+            flex="1"
+          >
+            <menupopup>
+              <menuitem
+                id="cleanroom-pref-theme-follow-host"
+                data-l10n-id="cleanroom-pref-theme-follow-host"
+                value="follow-host"
+              />
+              <menuitem
+                id="cleanroom-pref-theme-light"
+                data-l10n-id="cleanroom-pref-theme-light"
+                value="light"
+              />
+              <menuitem
+                id="cleanroom-pref-theme-dark"
+                data-l10n-id="cleanroom-pref-theme-dark"
+                value="dark"
+              />
+            </menupopup>
+          </menulist>
+        </vbox>
+      </hbox>
+      <description
+        id="cleanroom-pref-theme-hint"
+        class="cleanroom-pref-hint"
+        data-l10n-id="cleanroom-pref-theme-hint"
       />
-      <menulist id="cleanroom-theme-mode" preference="pref-themeMode">
-        <menupopup>
-          <menuitem
-            id="cleanroom-pref-theme-follow-host"
-            data-l10n-id="cleanroom-pref-theme-follow-host"
-            value="follow-host"
-          />
-          <menuitem
-            id="cleanroom-pref-theme-light"
-            data-l10n-id="cleanroom-pref-theme-light"
-            value="light"
-          />
-          <menuitem
-            id="cleanroom-pref-theme-dark"
-            data-l10n-id="cleanroom-pref-theme-dark"
-            value="dark"
-          />
-        </menupopup>
-      </menulist>
-    </hbox>
-    <description id="cleanroom-pref-theme-hint" data-l10n-id="cleanroom-pref-theme-hint" />
+    </vbox>
   </groupbox>
 </vbox>

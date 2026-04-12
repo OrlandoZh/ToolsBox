@@ -17,7 +17,7 @@ const HOST_ACTION_CATALOG = Object.freeze([
     label: "Open Preference Pane",
     status: HOST_ACTION_STATUSES.READY,
     category: "preferences",
-    summary: "Open Zotero preferences and navigate to the requested preference pane.",
+    summary: "Open Zotero preferences, navigate to the requested preference pane, and verify its live surface geometry is settled without horizontal overflow.",
     authoritativeSource: [
       {
         file: "reference/zotero-main/chrome/content/zotero/xpcom/utilities_internal.js",
@@ -38,6 +38,7 @@ const HOST_ACTION_CATALOG = Object.freeze([
       "The requested pane is selected in the preferences sidebar.",
       "The pane fragment is mounted and structurally observable.",
       "The pane exposes interactive controls, preference bindings, or load/localization bridge signals.",
+      "The selected pane root exposes a live width signal and remains free of horizontal overflow after layout settle.",
       "A surface-local evidence target is returned for the selected pane root, and its geometry is settled on the live pane fragment.",
     ],
     evidenceTargets: [
@@ -86,7 +87,7 @@ const HOST_ACTION_CATALOG = Object.freeze([
     label: "Set Preference Checkbox",
     status: HOST_ACTION_STATUSES.READY,
     category: "preferences",
-    summary: "Open a live Zotero preference pane, toggle a checkbox control, and verify the pref writeback.",
+    summary: "Open a live Zotero preference pane, toggle a checkbox control, and verify the pref writeback while the pane stays geometry-stable and overflow-safe.",
     authoritativeSource: [
       {
         file: "reference/zotero-main/chrome/content/zotero/preferences/preferences.js",
@@ -104,6 +105,7 @@ const HOST_ACTION_CATALOG = Object.freeze([
       "A live checkbox action is dispatched against the control element.",
       "The checkbox state matches the requested value after the action.",
       "The associated preference writeback matches the requested value.",
+      "The pane root remains geometry-settled and free of horizontal overflow after the interaction.",
       "A surface-local evidence target is returned for the control or pane fallback.",
     ],
     evidenceTargets: [
@@ -120,7 +122,7 @@ const HOST_ACTION_CATALOG = Object.freeze([
     label: "Set Preference Textbox",
     status: HOST_ACTION_STATUSES.READY,
     category: "preferences",
-    summary: "Open a live Zotero preference pane, update a textbox control, and verify the pref writeback.",
+    summary: "Open a live Zotero preference pane, update a textbox control, and verify the pref writeback while the pane stays geometry-stable and overflow-safe.",
     authoritativeSource: [
       {
         file: "reference/zotero-main/chrome/content/zotero/preferences/preferences.js",
@@ -138,6 +140,7 @@ const HOST_ACTION_CATALOG = Object.freeze([
       "Input/change events are dispatched on the live textbox control.",
       "The textbox value matches the requested value after the action.",
       "The associated preference writeback matches the requested value.",
+      "The pane root remains geometry-settled and free of horizontal overflow after the interaction.",
       "A surface-local evidence target is returned for the control or pane fallback.",
     ],
     evidenceTargets: [
@@ -154,7 +157,7 @@ const HOST_ACTION_CATALOG = Object.freeze([
     label: "Select Preference Menulist",
     status: HOST_ACTION_STATUSES.READY,
     category: "preferences",
-    summary: "Open a live Zotero preference pane, select a menulist value, and verify the pref writeback.",
+    summary: "Open a live Zotero preference pane, select a menulist value, and verify the pref writeback while the pane stays geometry-stable and overflow-safe.",
     authoritativeSource: [
       {
         file: "reference/zotero-main/chrome/content/zotero/preferences/preferences.js",
@@ -172,6 +175,7 @@ const HOST_ACTION_CATALOG = Object.freeze([
       "Command/change events are dispatched on the live menulist control.",
       "The menulist state matches the requested value after the action.",
       "The associated preference writeback matches the requested value.",
+      "The pane root remains geometry-settled and free of horizontal overflow after the interaction.",
       "A surface-local evidence target is returned for the control or pane fallback.",
     ],
     evidenceTargets: [
@@ -427,7 +431,7 @@ const HOST_ACTION_CATALOG = Object.freeze([
     label: "Show Live Menu",
     status: HOST_ACTION_STATUSES.READY,
     category: "menu",
-    summary: "Open a live Zotero menu target and observe the registered menu item in the real popup.",
+    summary: "Open a live Zotero menu target, including collection menus and submenu paths, and observe the registered surface in the real popup.",
     authoritativeSource: [
       {
         file: "reference/zotero-main/test/tests/pluginAPITest.js",
@@ -441,13 +445,15 @@ const HOST_ACTION_CATALOG = Object.freeze([
     executionEntry: "host.resolveMenuPopup() + menuManager.getLiveMenuState()",
     readinessAssertions: [
       "The live menu popup is open.",
-      "The registered menu item is visible in the live menu popup.",
-      "The live menu item is actionable rather than hidden or disabled.",
+      "The registered menu item or submenu path is visible in the live menu popup.",
+      "The live menu item or submenu path is actionable rather than hidden or disabled.",
       "The popup exposes real menu structure or item content, not just an empty shell.",
-      "A surface-local evidence target is returned for the live menu popup or menu item surface.",
+      "A surface-local evidence target is returned for the live menu popup, collection menu, or submenu surface.",
     ],
     evidenceTargets: [
       "menu-item",
+      "collection-menu",
+      "menu-submenu",
     ],
     ownerModules: [
       "src/platform/zotero-host.js",
@@ -461,7 +467,7 @@ const HOST_ACTION_CATALOG = Object.freeze([
     label: "Trigger Live Menu",
     status: HOST_ACTION_STATUSES.READY,
     category: "menu",
-    summary: "Trigger a live Zotero menu item by dispatching the menu command on the real host menu element.",
+    summary: "Trigger a live Zotero menu item or submenu child by dispatching the menu command on the real host menu element.",
     authoritativeSource: [
       {
         file: "reference/zotero-main/test/tests/pluginAPITest.js",
@@ -474,12 +480,14 @@ const HOST_ACTION_CATALOG = Object.freeze([
     ],
     executionEntry: "menu.show + live menu command dispatch",
     readinessAssertions: [
-      "The live menu item command is dispatched without error.",
-      "The live menu item remains actionable while being triggered.",
-      "A surface-local evidence target remains available for the triggered menu item surface.",
+      "The live menu item or submenu child command is dispatched without error.",
+      "The live menu item or submenu child remains actionable while being triggered.",
+      "A surface-local evidence target remains available for the triggered menu item, collection menu, or submenu surface.",
     ],
     evidenceTargets: [
       "menu-item",
+      "collection-menu",
+      "menu-submenu",
     ],
     ownerModules: [
       "src/platform/zotero-host.js",

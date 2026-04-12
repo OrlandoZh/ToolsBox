@@ -803,6 +803,110 @@ describe("Agent Telemetry", () => {
     assert.ok(gateMD.includes("生命周期时序"));
   });
 
+  it("should surface advisory performance budget in monitor, dashboard, and gate outputs", () => {
+    writeWatchStatus({
+      generatedAt: new Date().toISOString(),
+      latestStatus: "healthy",
+      latest: {
+        trigger: "watch-change",
+        passed: true,
+        issues: [],
+      },
+    });
+    writeE2EReport({
+      generatedAt: new Date().toISOString(),
+      strategy: "restart",
+      passed: true,
+      issues: [],
+      hints: [],
+      cycles: [{
+        index: 1,
+        passed: true,
+        summaryNote: "performance budget advisory captured",
+        checks: {
+          serviceTotal: 2,
+          serviceHealthyCount: 2,
+          serviceUnhealthyCount: 0,
+          serviceHealthOK: true,
+          serviceStatus: "healthy",
+          httpObserved: true,
+          httpRequestCount: 1,
+          httpSuccessCount: 1,
+          httpFailureCount: 0,
+          httpTimeoutCount: 0,
+          httpRetryCount: 0,
+          httpSlowOperationCount: 0,
+          httpSlowThresholdMs: 1200,
+          hostReadyDurationMs: 2200,
+          startupDurationMs: 4280,
+          shutdownDurationMs: 930,
+          lifecycleSlowOperationCount: 1,
+          lifecycleSlowThresholdMs: 2000,
+          lifecycleLastSlowStage: "startup",
+          lifecycleBoundaryEvents: [],
+        },
+        logs: {
+          errorCount: 0,
+          warnCount: 0,
+          errorBoundaryHitCount: 0,
+          errorBoundaryEvents: [],
+        },
+        tests: { failed: 0 },
+        scenarios: {
+          failed: 0,
+          results: [{
+            name: "performance budget diagnostics",
+            status: "passed",
+            details: {
+              activities: [
+                { actionId: "itemPane.selectPane", durationMs: 480, ready: true, surfaceId: "item-pane-sidenav" },
+                { actionId: "contextPane.selectPane", durationMs: 760, ready: true, surfaceId: "context-pane" },
+                { actionId: "reader.sidebar.selectView", durationMs: 1680, ready: true, surfaceId: "reader-sidebar-view" },
+                { actionId: "preferences.openPane", durationMs: 1240, ready: true, surfaceId: "preference-pane" },
+              ],
+            },
+          }],
+        },
+        visuals: {
+          analysis: {
+            summary: {
+              baseline: {
+                driftCount: 0,
+                missingCount: 0,
+              },
+            },
+          },
+        },
+      }],
+    });
+
+    execNode(["scripts/agent-runner.mjs", "performance-budget-telemetry", "--", "node", "-e", "process.exit(0)"]);
+    execNode(["scripts/agent-monitor.mjs"]);
+    execNode(["scripts/agent-dashboard.mjs"]);
+    try {
+      execNode(["scripts/agent-gate.mjs", "--min-pass-rate", "0", "--max-recent-failed", "999"]);
+    } catch {
+      // keep the generated gate artifacts for assertions
+    }
+
+    const monitorJSON = readArtifactJSON("agent-monitor.json");
+    const monitorMD = readArtifactText("agent-monitor.md");
+    const dashboardHTML = readArtifactText("agent-dashboard.html");
+    const gateMD = readArtifactText("agent-gate.md");
+
+    assert.equal(monitorJSON.engineeringHardening?.performanceBudget?.status, "attention");
+    assert.equal(monitorJSON.engineeringHardening?.performanceBudget?.violationCount, 2);
+    assert.equal(monitorJSON.engineeringHardening?.performanceBudget?.measuredActivityCount, 4);
+    assert.ok(String(monitorJSON.engineeringHardening?.summary || "").includes("性能预算"));
+    assert.ok(monitorMD.includes("性能预算"));
+    assert.ok(monitorMD.includes("预算活动"));
+    assert.ok(monitorMD.includes("超预算项"));
+    assert.ok(dashboardHTML.includes("性能预算"));
+    assert.ok(dashboardHTML.includes("预算告警"));
+    assert.ok(gateMD.includes("性能预算"));
+    assert.ok(gateMD.includes("预算告警"));
+  });
+
   it("should keep validation-stage e2e artifacts readable in monitor summary", () => {
     writeWatchStatus({
       generatedAt: new Date().toISOString(),
@@ -894,7 +998,7 @@ describe("Agent Telemetry", () => {
     assert.equal(monitorJSON.zoteroValidation?.e2e?.failedStage, "validation-summary");
     assert.ok(String(monitorJSON.zoteroValidation?.e2e?.errorMessage || "").includes("Reader renderToolbar / 官方 listener 桥接存在漂移"));
     assert.ok(String(monitorJSON.frontpageSummary?.headline || "").length > 0);
-    assert.equal(monitorJSON.frontpageSummary?.nextAction, "npm run agent:zotero:e2e");
+    assert.ok(String(monitorJSON.frontpageSummary?.nextAction || "").includes("npm run agent:zotero:e2e"));
     assert.ok(monitorMD.includes("E2E 失败分类: `验证错误`"));
     assert.ok(monitorMD.includes("E2E 失败阶段: `validation-summary`"));
   });
@@ -2125,9 +2229,9 @@ describe("Agent Telemetry", () => {
 
     const monitorJSON = readArtifactJSON("agent-monitor.json");
     const gateJSON = readArtifactJSON("agent-gate.json");
-    const statusOverviewMD = fs.readFileSync(obsidianPath("01-Zotero-Agent-当前状态总览.md"), "utf-8");
-    const evidenceIndexMD = fs.readFileSync(obsidianPath("02-Zotero-Agent-证据索引.md"), "utf-8");
-    const humanWindowMD = fs.readFileSync(obsidianPath("10-Zotero-Agent-人工指令窗口.md"), "utf-8");
+    const statusOverviewMD = fs.readFileSync(obsidianPath("01-当前Zotero插件-状态总览.md"), "utf-8");
+    const evidenceIndexMD = fs.readFileSync(obsidianPath("02-当前Zotero插件-证据索引.md"), "utf-8");
+    const humanWindowMD = fs.readFileSync(obsidianPath("10-模板协作-人工指令窗口.md"), "utf-8");
 
     assert.equal(monitorJSON.zoteroValidation?.e2e?.visualPrimaryBlockerKind, "ui-regression-candidate");
     assert.equal(monitorJSON.zoteroValidation?.e2e?.visualCanonicalCoverageKind, "complete");
@@ -3279,7 +3383,7 @@ describe("Agent Telemetry", () => {
     assert.equal(loopJSON.plannedActions.some((item) => item.id === "run-autofix"), false);
     assert.ok(loopJSON.plannedActions.some((item) => item.id === "run-watch-recovery"));
     assert.ok(loopJSON.steps.every((item) => item.status === "planned"));
-    assert.ok(loopMD.includes("# Zotero Agent 编排回合报告"));
+    assert.ok(loopMD.includes("# 当前 Zotero 插件编排回合报告"));
     assert.ok(loopMD.includes("执行 Zotero 真机 E2E"));
     assert.ok(loopMD.includes("刷新 Zotero watch 健康状态"));
   });
@@ -3317,27 +3421,27 @@ describe("Agent Telemetry", () => {
       // expected gate failure for intervention pack sample
     }
     execNode(["scripts/agent-monitor.mjs"]);
-    fs.mkdirSync(path.dirname(obsidianPath("05-Zotero-Agent-闭环流程图.md")), { recursive: true });
-    fs.writeFileSync(obsidianPath("05-Zotero-Agent-闭环流程图.md"), "# stale", "utf-8");
-    fs.writeFileSync(obsidianPath("06-Zotero-Agent-人工复核决策.excalidraw.md"), "# stale", "utf-8");
+    fs.mkdirSync(path.dirname(obsidianPath("12-当前Zotero插件-交互流转图.md")), { recursive: true });
+    fs.writeFileSync(obsidianPath("12-当前Zotero插件-交互流转图.md"), "# stale", "utf-8");
+    fs.writeFileSync(obsidianPath("13-当前Zotero插件-功能版图.excalidraw.md"), "# stale", "utf-8");
     execNode(["scripts/agent-obsidian-handoff.mjs"]);
 
-    const handoffMD = fs.readFileSync(obsidianPath("01-Zotero-Agent-当前状态总览.md"), "utf-8");
-    const handoffCanvas = fs.readFileSync(obsidianPath("00-Zotero-Agent-项目架构与闭环.canvas"), "utf-8");
-    const humanQuickstartMD = fs.readFileSync(obsidianPath("03-Zotero-Agent-人工快速上手.md"), "utf-8");
-    const humanAdvancedGuideMD = fs.readFileSync(obsidianPath("04-Zotero-Agent-高级介入规范.md"), "utf-8");
-    const humanWindowMD = fs.readFileSync(obsidianPath("10-Zotero-Agent-人工指令窗口.md"), "utf-8");
-    const visualFlowPath = obsidianPath("05-Zotero-Agent-闭环流程图.md");
-    const visualExcalidrawPath = obsidianPath("06-Zotero-Agent-人工复核决策.excalidraw.md");
+    const handoffMD = fs.readFileSync(obsidianPath("01-当前Zotero插件-状态总览.md"), "utf-8");
+    const handoffCanvas = fs.readFileSync(obsidianPath("00-当前Zotero插件-功能与技术脉络.canvas"), "utf-8");
+    const humanQuickstartMD = fs.readFileSync(obsidianPath("03-模板协作-人工快速上手.md"), "utf-8");
+    const humanAdvancedGuideMD = fs.readFileSync(obsidianPath("04-模板协作-高级介入规范.md"), "utf-8");
+    const humanWindowMD = fs.readFileSync(obsidianPath("10-模板协作-人工指令窗口.md"), "utf-8");
+    const visualFlowPath = obsidianPath("12-当前Zotero插件-交互流转图.md");
+    const visualExcalidrawPath = obsidianPath("13-当前Zotero插件-功能版图.excalidraw.md");
 
-    assert.ok(handoffMD.includes("# Zotero Agent 当前状态总览"));
-    assert.ok(handoffMD.includes("自动阻塞项"));
+    assert.ok(handoffMD.includes("# 当前 Zotero 插件状态总览"));
+    assert.ok(handoffMD.includes("当前风险与阻塞"));
     assert.ok(handoffMD.includes("src/app/plugin.js"));
     assert.ok(handoffCanvas.includes("\"nodes\""));
-    assert.ok(handoffCanvas.includes("人工指令窗口"));
-    assert.ok(humanQuickstartMD.includes("# Zotero Agent 人工快速上手"));
-    assert.ok(humanQuickstartMD.includes("[[04-Zotero-Agent-高级介入规范]]"));
-    assert.ok(humanAdvancedGuideMD.includes("# Zotero Agent 高级介入规范"));
+    assert.ok(handoffCanvas.includes("03-模板协作-人工快速上手.md"));
+    assert.ok(humanQuickstartMD.includes("# 模板协作人工快速上手"));
+    assert.ok(humanQuickstartMD.includes("[[04-模板协作-高级介入规范]]"));
+    assert.ok(humanAdvancedGuideMD.includes("# 模板协作高级介入规范"));
     assert.ok(humanAdvancedGuideMD.includes("## 介入规范建议"));
     assert.ok(humanWindowMD.includes("## 人工编辑区（保留）"));
     assert.equal(fs.existsSync(visualFlowPath), false);
@@ -3384,14 +3488,14 @@ describe("Agent Telemetry", () => {
       }
     }
 
-    const visualFlowMD = fs.readFileSync(obsidianPath("05-Zotero-Agent-闭环流程图.md"), "utf-8");
-    const visualDecisionMD = fs.readFileSync(obsidianPath("06-Zotero-Agent-人工复核决策.excalidraw.md"), "utf-8");
-    assert.ok(visualFlowMD.includes("# Zotero Agent 闭环流程图（Visual Companion）"));
+    const visualFlowMD = fs.readFileSync(obsidianPath("12-当前Zotero插件-交互流转图.md"), "utf-8");
+    const visualDecisionMD = fs.readFileSync(obsidianPath("13-当前Zotero插件-功能版图.excalidraw.md"), "utf-8");
+    assert.ok(visualFlowMD.includes("# 当前 Zotero 插件交互流转图（Visual Companion）"));
     assert.ok(visualFlowMD.includes("```mermaid"));
-    assert.ok(visualFlowMD.includes("agent:obsidian"));
+    assert.ok(visualFlowMD.includes("surface-local evidence"));
     assert.ok(visualDecisionMD.includes("excalidraw-plugin: parsed"));
     assert.ok(visualDecisionMD.includes("# Excalidraw Data"));
-    assert.ok(visualDecisionMD.includes("预期 UI 变化"));
+    assert.ok(visualDecisionMD.includes("Pane Surfaces"));
   });
 
   it("should honor human override from obsidian window during zotero loop dry-run", () => {
@@ -3447,8 +3551,8 @@ describe("Agent Telemetry", () => {
       issues: ["未观测到 session-restart-recovery"],
     });
 
-    fs.mkdirSync(path.dirname(obsidianPath("10-Zotero-Agent-人工指令窗口.md")), { recursive: true });
-    fs.writeFileSync(obsidianPath("10-Zotero-Agent-人工指令窗口.md"), [
+    fs.mkdirSync(path.dirname(obsidianPath("10-模板协作-人工指令窗口.md")), { recursive: true });
+    fs.writeFileSync(obsidianPath("10-模板协作-人工指令窗口.md"), [
       "# 旧内容",
       "## 人工编辑区（保留）",
       "",
@@ -3519,7 +3623,49 @@ describe("Agent Telemetry", () => {
         summaryNote: "真机验证通过",
         logs: { errorCount: 0, warnCount: 0 },
         tests: { failed: 0 },
-        scenarios: { failed: 0 },
+        scenarios: {
+          failed: 0,
+          results: [
+            { name: "baseline registration diagnostics", status: "passed" },
+            { name: "real item selection diagnostics", status: "passed" },
+            { name: "real notifier follows item updates", status: "passed" },
+            { name: "real reader summary on generated pdf", status: "passed" },
+            { name: "reader annotation roundtrip", status: "passed" },
+            { name: "reader event hook diagnostics", status: "passed" },
+            { name: "reader fine-grained hook diagnostics", status: "passed" },
+            { name: "agent action runs without blocking UI", status: "passed" },
+            { name: "preference pane surface smoke", status: "passed" },
+            { name: "preference pane control interaction", status: "passed" },
+            { name: "library item pane surface smoke", status: "passed" },
+            { name: "context pane surface smoke", status: "passed" },
+            { name: "reader surface smoke", status: "passed" },
+            { name: "live menu surface smoke", status: "passed" },
+            { name: "settings schema and preference pane diagnostics", status: "passed" },
+            { name: "multi-window mount diagnostics", status: "passed" },
+            {
+              name: "reader interaction diagnostics",
+              status: "passed",
+              details: {
+                toolbarDispatchMode: "customEvent",
+                toolbarAppendedItemCount: 2,
+                selectionPopupDispatchMode: "synthetic-fallback",
+                selectionPopupAppendedItemCount: 1,
+                sidebarHeaderDispatchMode: "customEvent",
+                sidebarHeaderAppendedItemCount: 2,
+                contextMenuProbeCount: 3,
+                contextMenuObservedTypes: [
+                  "createViewContextMenu",
+                  "createAnnotationContextMenu",
+                  "createColorContextMenu",
+                ],
+                contextMenuSyntheticFallbackTypes: [
+                  "createViewContextMenu",
+                  "createAnnotationContextMenu",
+                ],
+              },
+            },
+          ],
+        },
         visuals: {
           captureStability: {
             stages: [
@@ -3610,6 +3756,11 @@ describe("Agent Telemetry", () => {
     assert.equal(gateJSON.frontpageSummary?.e2e?.status, "passed");
     assert.equal(gateJSON.frontpageSummary?.e2e?.readerEvent?.status, "passed");
     assert.equal(gateJSON.frontpageSummary?.watchRecovery?.status, "passed");
+    assert.equal(gateJSON.zoteroValidation?.e2e?.toolbarDispatchMode, "customEvent");
+    assert.equal(gateJSON.zoteroValidation?.e2e?.toolbarAppendedItemCount, 2);
+    assert.equal(gateJSON.zoteroValidation?.e2e?.selectionPopupAppendedItemCount, 1);
+    assert.equal(gateJSON.zoteroValidation?.e2e?.sidebarHeaderAppendedItemCount, 2);
+    assert.equal(gateJSON.zoteroValidation?.e2e?.contextMenuProbeCount, 3);
     assert.ok(typeof gateJSON.frontpageSummary?.headline === "string");
     assert.ok(typeof gateJSON.frontpageSummary?.nextAction === "string");
     assert.ok(gateJSON.requiredChecks.some((item) => item.runName === "gate-pass-case" && item.ok === true));
@@ -3619,6 +3770,10 @@ describe("Agent Telemetry", () => {
     assert.ok(gateMD.includes("## 恢复韧性摘要"));
     assert.ok(gateMD.includes("## Zotero 真机验证"));
     assert.ok(gateMD.includes("Reader 事件桥"));
+    assert.ok(gateMD.includes("Reader 深层事件点"));
+    assert.ok(gateMD.includes("工具栏追加项"));
+    assert.ok(gateMD.includes("上下文菜单探针数"));
+    assert.ok(gateMD.includes("createViewContextMenu"));
     assert.ok(gateMD.includes("自动修复总耗时"));
     assert.ok(gateMD.includes("恢复回归"));
     assert.ok(gateMD.includes("恢复回归最新触发"));
@@ -4995,6 +5150,7 @@ describe("Agent Telemetry", () => {
     assert.equal(gateJSON.releaseMatrix?.status, "passed");
     assert.ok(gateJSON.issues.some((item) => String(item).includes("不只认 `dist/release-plan.json`")));
     assert.ok(gateJSON.recommendations.some((item) => String(item).includes("npm run agent:release")));
+    assert.equal(gateJSON.frontpageSummary?.nextAction, "npm run agent:release");
   });
 
   it("should keep host-noise visible without blocking release gate", () => {
@@ -5170,6 +5326,7 @@ describe("Agent Telemetry", () => {
     assert.equal(gateJSON.releaseMatrix?.status, "attention");
     assert.ok(gateJSON.issues.some((item) => String(item).includes("本地发布矩阵未通过")));
     assert.ok(gateJSON.issues.some((item) => String(item).includes("发布矩阵待补验证")));
+    assert.equal(gateJSON.frontpageSummary?.nextAction, "npm run release:install-smoke:stable");
     assert.ok(gateMD.includes("## 本地发布矩阵"));
     assert.ok(gateMD.includes("待补验证"));
   });
@@ -5271,6 +5428,7 @@ describe("Agent Telemetry", () => {
     assert.equal(gateJSON.releaseMatrix?.remoteVerification?.status, "pending");
     assert.ok(gateJSON.issues.some((item) => String(item).includes("远端发布验证未通过")));
     assert.ok(gateJSON.recommendations.some((item) => String(item).includes("release:preflight -- --verify-remote")));
+    assert.equal(gateJSON.frontpageSummary?.nextAction, "npm run release:preflight -- --verify-remote");
     assert.ok(gateMD.includes("远端验证"));
   });
 
@@ -5949,12 +6107,15 @@ describe("Agent Telemetry", () => {
     assert.equal(monitorJSON.zoteroValidation?.e2e?.readerSidebarView, "annotations");
     assert.equal(monitorJSON.zoteroValidation?.e2e?.selectionPopupDispatchMode, "synthetic-fallback");
     assert.equal(monitorJSON.zoteroValidation?.e2e?.selectionPopupAppendedItemCount, 1);
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.toolbarDispatchMode, "customEvent");
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.toolbarAppendedItemCount, 1);
     assert.equal(monitorJSON.zoteroValidation?.e2e?.sidebarHeaderDispatchMode, "customEvent");
     assert.equal(monitorJSON.zoteroValidation?.e2e?.sidebarHeaderAppendedItemCount, 2);
     assert.equal(monitorJSON.zoteroValidation?.e2e?.contextMenuProbeCount, 3);
     assert.equal(monitorJSON.zoteroValidation?.e2e?.contextMenuObservedTypes?.length, 3);
     assert.ok(monitorJSON.zoteroValidation?.e2e?.contextMenuObservedTypes?.includes("createViewContextMenu"));
     assert.equal(monitorJSON.zoteroValidation?.e2e?.contextMenuSyntheticFallbackTypes?.length, 3);
+    assert.ok(monitorJSON.zoteroValidation?.e2e?.readerDispatchSummary?.includes("工具栏 customEvent"));
     assert.ok(monitorJSON.zoteroValidation?.e2e?.readerDispatchSummary?.includes("文本浮层"));
     assert.ok(monitorJSON.zoteroValidation?.e2e?.readerDispatchSummary?.includes("synthetic-fallback"));
     assert.ok(monitorJSON.zoteroValidation?.e2e?.readerDispatchSummary?.includes("侧栏批注头"));
@@ -5968,17 +6129,35 @@ describe("Agent Telemetry", () => {
     assert.ok(monitorMD.includes("renderToolbar 宿主点已观测"));
     assert.ok(monitorMD.includes("library 已对齐"));
     assert.ok(monitorMD.includes("library 稳定"));
+    assert.ok(monitorMD.includes("工具栏分发"));
+    assert.ok(monitorMD.includes("工具栏追加项"));
+    assert.ok(monitorMD.includes("工具栏 customEvent"));
+    assert.ok(monitorMD.includes("文本浮层追加项"));
+    assert.ok(monitorMD.includes("侧栏批注头追加项"));
+    assert.ok(monitorMD.includes("上下文菜单探针数"));
+    assert.ok(monitorMD.includes("上下文菜单已观测类型"));
+    assert.ok(monitorMD.includes("上下文菜单 fallback 类型"));
     assert.ok(monitorMD.includes("文本浮层"));
     assert.ok(monitorMD.includes("侧栏批注头"));
     assert.ok(monitorMD.includes("已观测 3 类"));
+    assert.ok(monitorMD.includes("createViewContextMenu"));
     assert.ok(dashboardHTML.includes("renderToolbar 证据"));
     assert.ok(dashboardHTML.includes("视觉证据"));
     assert.ok(dashboardHTML.includes("视觉采集稳定性"));
     assert.ok(dashboardHTML.includes("renderToolbar 宿主点已观测"));
     assert.ok(dashboardHTML.includes("library 已对齐"));
     assert.ok(dashboardHTML.includes("library 稳定"));
+    assert.ok(dashboardHTML.includes("工具栏分发"));
+    assert.ok(dashboardHTML.includes("工具栏追加项"));
+    assert.ok(dashboardHTML.includes("工具栏 customEvent"));
+    assert.ok(dashboardHTML.includes("文本浮层追加项"));
+    assert.ok(dashboardHTML.includes("侧栏批注头追加项"));
+    assert.ok(dashboardHTML.includes("上下文菜单探针数"));
+    assert.ok(dashboardHTML.includes("上下文菜单已观测类型"));
+    assert.ok(dashboardHTML.includes("上下文菜单 fallback 类型"));
     assert.ok(dashboardHTML.includes("文本浮层"));
     assert.ok(dashboardHTML.includes("侧栏批注头"));
+    assert.ok(dashboardHTML.includes("createViewContextMenu"));
   });
 
   it("should handle reader deeper event point fields with null fallbacks in telemetry", () => {
@@ -6073,6 +6252,8 @@ describe("Agent Telemetry", () => {
     assert.equal(monitorJSON.zoteroValidation?.e2e?.status, "passed");
     assert.equal(monitorJSON.zoteroValidation?.e2e?.selectionPopupDispatchMode, null);
     assert.equal(monitorJSON.zoteroValidation?.e2e?.selectionPopupAppendedItemCount, null);
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.toolbarDispatchMode, null);
+    assert.equal(monitorJSON.zoteroValidation?.e2e?.toolbarAppendedItemCount, null);
     assert.equal(monitorJSON.zoteroValidation?.e2e?.sidebarHeaderDispatchMode, null);
     assert.equal(monitorJSON.zoteroValidation?.e2e?.sidebarHeaderAppendedItemCount, null);
     assert.equal(monitorJSON.zoteroValidation?.e2e?.contextMenuProbeCount, null);

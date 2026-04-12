@@ -441,8 +441,15 @@ function hasMeaningfulReaderHostState(summary) {
 
 function hasMeaningfulReaderDeeperEvidence(summary) {
   return Boolean(
-    normalizeSummaryText(summary?.readerDispatchSummary)
+    normalizeSummaryText(summary?.toolbarDispatchMode)
+    || typeof summary?.toolbarAppendedItemCount === "number"
+    || typeof summary?.selectionPopupAppendedItemCount === "number"
+    || typeof summary?.sidebarHeaderAppendedItemCount === "number"
+    || typeof summary?.contextMenuProbeCount === "number"
+    || normalizeSummaryText(summary?.readerDispatchSummary)
     || normalizeSummaryText(summary?.contextMenuSummary)
+    || (Array.isArray(summary?.contextMenuObservedTypes) && summary.contextMenuObservedTypes.length > 0)
+    || (Array.isArray(summary?.contextMenuSyntheticFallbackTypes) && summary.contextMenuSyntheticFallbackTypes.length > 0)
     || normalizeSummaryText(summary?.toolbarEvidenceSummary)
   );
 }
@@ -800,6 +807,15 @@ export function summarizeObsidianInterventionContext(reports = {}) {
   const e2e = reports.e2e && typeof reports.e2e === "object" ? reports.e2e : {};
   const bootstrapShell = reports.bootstrapShell === true;
   const agentContext = summarizeAgentContext(reports.agentContext);
+  const referenceDistillation = agentContext.referenceDistillationRef && typeof agentContext.referenceDistillationRef === "object"
+    ? agentContext.referenceDistillationRef
+    : {
+      status: "idle",
+      pendingCount: 0,
+      lastTopic: null,
+      lastDistilledAt: null,
+      nextSuggestedAction: "继续优先走 REFERENCE_INDEX 路由。",
+    };
 
   const loopState = loop.finalState && typeof loop.finalState === "object"
     ? loop.finalState
@@ -948,6 +964,9 @@ export function summarizeObsidianInterventionContext(reports = {}) {
 
   const commands = dedupeList([
     runnableNextCommand,
+    referenceDistillation.status === "failed" && referenceDistillation.nextSuggestedAction
+      ? referenceDistillation.nextSuggestedAction
+      : "",
     bootstrapShell ? "npm run check" : "",
     "npm run agent:zotero:loop --dry-run",
     "npm run agent:zotero:loop:human",
@@ -998,6 +1017,7 @@ export function summarizeObsidianInterventionContext(reports = {}) {
     commands,
     projectContext,
     agentContext,
+    referenceDistillation,
     currentTruthActiveBatchId: projectContext.currentTruth.activeBatchId,
     manualVerdictResolved: String(projectContext.currentTruth.activeBatchId || "").trim() === "READER-HIGH-126",
     autoChain: {
@@ -1035,6 +1055,21 @@ export function summarizeObsidianInterventionContext(reports = {}) {
     readerHostStateNote: isDefaultReaderHostStateNote(readerHostStateSource.readerHostStateNote)
       ? null
       : normalizeSummaryText(readerHostStateSource.readerHostStateNote),
+    toolbarDispatchMode: normalizeSummaryText(readerDeeperSource.toolbarDispatchMode),
+    toolbarAppendedItemCount: typeof readerDeeperSource.toolbarAppendedItemCount === "number"
+      ? Number(readerDeeperSource.toolbarAppendedItemCount)
+      : null,
+    selectionPopupAppendedItemCount: typeof readerDeeperSource.selectionPopupAppendedItemCount === "number"
+      ? Number(readerDeeperSource.selectionPopupAppendedItemCount)
+      : null,
+    sidebarHeaderAppendedItemCount: typeof readerDeeperSource.sidebarHeaderAppendedItemCount === "number"
+      ? Number(readerDeeperSource.sidebarHeaderAppendedItemCount)
+      : null,
+    contextMenuProbeCount: typeof readerDeeperSource.contextMenuProbeCount === "number"
+      ? Number(readerDeeperSource.contextMenuProbeCount)
+      : null,
+    contextMenuObservedTypes: truncateList(readerDeeperSource.contextMenuObservedTypes, 8),
+    contextMenuSyntheticFallbackTypes: truncateList(readerDeeperSource.contextMenuSyntheticFallbackTypes, 8),
     toolbarEvidenceSummary: normalizeSummaryText(readerDeeperSource.toolbarEvidenceSummary),
     visualEvidenceObserved: Boolean(
       visualEvidenceSource.visualEvidenceObserved === true
@@ -1140,6 +1175,21 @@ export function buildObsidianVisualViewModel(summary = {}) {
     commands,
     diagnosisLabel: summary.diagnosisLabel || null,
     diagnosis: summary.diagnosis || null,
+    toolbarDispatchMode: summary.toolbarDispatchMode || null,
+    toolbarAppendedItemCount: typeof summary.toolbarAppendedItemCount === "number"
+      ? Number(summary.toolbarAppendedItemCount)
+      : null,
+    selectionPopupAppendedItemCount: typeof summary.selectionPopupAppendedItemCount === "number"
+      ? Number(summary.selectionPopupAppendedItemCount)
+      : null,
+    sidebarHeaderAppendedItemCount: typeof summary.sidebarHeaderAppendedItemCount === "number"
+      ? Number(summary.sidebarHeaderAppendedItemCount)
+      : null,
+    contextMenuProbeCount: typeof summary.contextMenuProbeCount === "number"
+      ? Number(summary.contextMenuProbeCount)
+      : null,
+    contextMenuObservedTypes: truncateList(summary.contextMenuObservedTypes, 8),
+    contextMenuSyntheticFallbackTypes: truncateList(summary.contextMenuSyntheticFallbackTypes, 8),
     readerDispatchSummary: summary.readerDispatchSummary || null,
     contextMenuSummary: summary.contextMenuSummary || null,
     visualEvidenceObserved: Boolean(summary.visualEvidenceObserved),
@@ -1185,10 +1235,10 @@ export function buildObsidianVisualFlowMermaidMarkdown(viewModel = {}) {
   const lines = [
     "---",
     `generated_at: ${viewModel.generatedAt || new Date().toISOString()}`,
-    "type: zotero-agent-visual-flow",
+    "type: current-zotero-plugin-visual-flow",
     "---",
     "",
-    "# Zotero Agent 闭环流程图（Visual Companion）",
+    "# 当前 Zotero 插件交互流转图（Visual Companion）",
     "",
     `- 当前状态：${viewModel.statusLabel || "待人工介入"}`,
     `- 当前结论：${viewModel.headline || "-"}`,
@@ -1200,14 +1250,15 @@ export function buildObsidianVisualFlowMermaidMarkdown(viewModel = {}) {
     "",
     "```mermaid",
     "flowchart LR",
-    "  W[\"watch\"] --> E[\"agent:zotero:e2e\"]",
-    "  E --> M[\"agent:monitor\"]",
-    "  M --> G[\"agent:gate\"]",
-    "  G --> O[\"agent:obsidian\"]",
-    "  O --> H[\"human verdict\"]",
-    "  H -->|\"预期 UI 变化\"| B[\"agent:zotero:e2e:update-baseline（一次受控）\"]",
-    "  H -->|\"真实回归\"| R[\"hold 并交给 Codex 新开最小修复批次\"]",
-    "  H -->|\"证据不足\"| P[\"hold 并补证据项（不直接刷 baseline）\"]",
+    "  H[\"Zotero host\"] --> P[\"pane surfaces\"]",
+    "  H --> R[\"reader surfaces\"]",
+    "  H --> M[\"menu surfaces\"]",
+    "  P --> A[\"host action replay\"]",
+    "  R --> A",
+    "  M --> A",
+    "  A --> E[\"surface-local evidence\"]",
+    "  E --> S[\"status / evidence notes\"]",
+    "  S --> N[\"next command\"]",
     "```",
     "",
     "## 当前阻塞摘要",
@@ -1280,24 +1331,34 @@ function createExcalidrawRect(id, x, y, width, height, seed, versionNonce, updat
   });
 }
 
-function createExcalidrawText(id, x, y, text, seed, versionNonce, updated) {
+function createExcalidrawTextBox(
+  id,
+  x,
+  y,
+  text,
+  seed,
+  versionNonce,
+  updated,
+  options = {},
+) {
   const normalizedText = sanitizeDiagramText(text);
   return createExcalidrawElementBase({
     id,
     type: "text",
     x,
     y,
-    width: 260,
-    height: 80,
+    width: Number.isFinite(Number(options.width)) ? Number(options.width) : 260,
+    height: Number.isFinite(Number(options.height)) ? Number(options.height) : 80,
     seed,
     versionNonce,
     updated,
     extra: {
       backgroundColor: "transparent",
-      fontSize: 16,
+      fontSize: Number.isFinite(Number(options.fontSize)) ? Number(options.fontSize) : 16,
       fontFamily: 5,
+      strokeColor: options.strokeColor || "#374151",
       text: normalizedText,
-      textAlign: "left",
+      textAlign: options.textAlign || "left",
       verticalAlign: "top",
       baseline: 72,
       containerId: null,
@@ -1305,6 +1366,10 @@ function createExcalidrawText(id, x, y, text, seed, versionNonce, updated) {
       lineHeight: 1.25,
     },
   });
+}
+
+function createExcalidrawText(id, x, y, text, seed, versionNonce, updated) {
+  return createExcalidrawTextBox(id, x, y, text, seed, versionNonce, updated);
 }
 
 function createExcalidrawArrow(id, x, y, width, height, seed, versionNonce, updated) {
@@ -1333,41 +1398,274 @@ function createExcalidrawArrow(id, x, y, width, height, seed, versionNonce, upda
 }
 
 export function buildObsidianVisualVerdictExcalidrawMarkdown(viewModel = {}) {
-  const updated = Date.parse(String(viewModel.generatedAt || "")) || Date.now();
-  const branches = Array.isArray(viewModel.verdictBranches) && viewModel.verdictBranches.length > 0
-    ? viewModel.verdictBranches
-    : [];
-  const first = branches[0] || {};
-  const second = branches[1] || {};
-  const third = branches[2] || {};
-  const elements = [
-    createExcalidrawRect("root-rect", 20, 20, 320, 100, 101, 1001, updated, "#a5d8ff"),
-    createExcalidrawText("root-text", 36, 34, `当前结论\n${viewModel.headline || "-"}`, 102, 1002, updated),
-    createExcalidrawRect("decision-rect", 400, 20, 320, 100, 103, 1003, updated, "#fff3bf"),
-    createExcalidrawText("decision-text", 416, 34, `人工判定\n默认下一步: ${viewModel.nextAction || "-"}`, 104, 1004, updated),
-    createExcalidrawRect("branch-expected", 780, -120, 320, 110, 105, 1005, updated, "#b2f2bb"),
-    createExcalidrawText("branch-expected-text", 796, -106, `${first.verdict || "预期 UI 变化"}\n状态=${first.status || "-"} 模式=${first.mode || "-"}\n${first.nextAction || "-"}`, 106, 1006, updated),
-    createExcalidrawRect("branch-regression", 780, 40, 320, 110, 107, 1007, updated, "#ffc9c9"),
-    createExcalidrawText("branch-regression-text", 796, 54, `${second.verdict || "真实回归"}\n状态=${second.status || "-"} 模式=${second.mode || "-"}\n${second.nextAction || "-"}`, 108, 1008, updated),
-    createExcalidrawRect("branch-evidence", 780, 200, 320, 110, 109, 1009, updated, "#ffd8a8"),
-    createExcalidrawText("branch-evidence-text", 796, 214, `${third.verdict || "证据不足"}\n状态=${third.status || "-"} 模式=${third.mode || "-"}\n${third.nextAction || "-"}`, 110, 1010, updated),
-    createExcalidrawArrow("arrow-root-decision", 340, 70, 60, 0, 111, 1011, updated),
-    createExcalidrawArrow("arrow-decision-expected", 720, 60, 60, -110, 112, 1012, updated),
-    createExcalidrawArrow("arrow-decision-regression", 720, 70, 60, 20, 113, 1013, updated),
-    createExcalidrawArrow("arrow-decision-evidence", 720, 80, 60, 170, 114, 1014, updated),
-  ];
-  const jsonData = {
-    type: "excalidraw",
-    version: 2,
-    source: "https://github.com/zsviczian/obsidian-excalidraw-plugin",
-    elements,
-    appState: {
-      gridSize: null,
-      viewBackgroundColor: "#ffffff",
-    },
-    files: {},
-  };
+  const blockers = truncateList(viewModel.blockers, 3);
+  const files = truncateList(viewModel.candidateFiles, 3);
+  return buildLinearConceptExcalidrawMarkdown({
+    generatedAt: viewModel.generatedAt,
+    title: "当前 Zotero 插件功能版图",
+    summary: `状态：${viewModel.statusLabel || "待人工介入"}。把当前插件的 pane、reader、menu 与证据链放在同一张空间图上。`,
+    cards: [
+      {
+        title: "Pane Surfaces",
+        body: "preference pane\nItem Pane section / info row / sidenav\ncontext pane / reader sidebar view",
+        color: "#dbe4ff",
+      },
+      {
+        title: "Reader Surfaces",
+        body: "renderToolbar\nReader ready\nlocal capture\nfuture fine-grained hook lane",
+        color: "#c3fae8",
+      },
+      {
+        title: "Menu Surfaces",
+        body: "menu item\ncollection menu\ndynamic submenu\nreader/menubar/view menu item",
+        color: "#b2f2bb",
+      },
+      {
+        title: "Evidence + Action",
+        body: `证据导航\n${viewModel.visualEvidenceFocusSummary || "暂无"}\n下一步：${viewModel.nextAction || "-"}`,
+        color: "#ffd8a8",
+      },
+    ],
+    footerTitle: "当前结论",
+    footerSummary: `${viewModel.headline || "-"}\n候选文件：${files.length > 0 ? files.join("、") : "暂无"}\n阻塞：${blockers.length > 0 ? blockers.join("；") : "暂无明确阻塞项"}`,
+  });
+}
 
+const PLUGIN_SURFACE_GROUPS = Object.freeze([
+  {
+    id: "pane-surfaces",
+    title: "偏好设置与宿主窗格",
+    surfaces: ["preference pane", "Item Pane section / info row / sidenav", "context pane", "reader sidebar view"],
+    productGoal: "把插件设置、条目详情入口和 Reader 相关上下文保持在 Zotero 原生 pane 心智内。",
+    userActions: [
+      "从 Preferences 打开插件偏好设置并完成控制项交互",
+      "在条目详情区查看 section / info row，并切换 item pane sidenav 按钮",
+      "在 Reader 右侧切换 context pane / reader sidebar view",
+    ],
+    modules: [
+      "src/app/feature-composer.js",
+      "src/features/preference-panes.js",
+      "src/features/item-pane.js",
+      "src/app/host-actions.js",
+      "src/platform/zotero-host.js",
+    ],
+    route: "宿主注册式 surface -> pane fragment / load bridge -> host action replay -> surface-local evidence",
+    whyThisRoute: "这些 surface 都有明确宿主 contract，优先贴附在原生 pane 内，而不是先起独立窗口或 HTML shell。",
+    diagramLink: "[[07-当前Zotero插件-偏好设置面板 UI 概念]]",
+    scenarioFocus: "偏好设置控制项、窄宽度 degrade、窗格切换与贴边 geometry。",
+  },
+  {
+    id: "reader-surfaces",
+    title: "Reader 工具栏与侧栏",
+    surfaces: ["reader renderToolbar", "reader sidebar view"],
+    productGoal: "把 Reader 入口直接挂进当前阅读上下文，让动作和结果都停留在阅读流内。",
+    userActions: [
+      "在 Reader toolbar 触发插件动作",
+      "切换 Reader sidebar view 并观察内容就绪",
+      "让 toolbar / sidebar 结果和当前文档上下文保持同步",
+    ],
+    modules: [
+      "src/app/feature-composer.js",
+      "src/features/reader.js",
+      "src/features/reader-selection-actions.js",
+      "src/app/host-actions.js",
+    ],
+    route: "Reader event bridge -> renderToolbar / sidebar host surface -> action replay -> surface-local evidence",
+    whyThisRoute: "Reader 是独立宿主 surface，优先走官方事件桥与 host action，不把它降级成普通 DOM patch。",
+    diagramLink: "[[09-当前Zotero插件-Reader UI 概念]]",
+    scenarioFocus: "renderToolbar 注入、sidebar view 切换、selectedTab ready 与 surface-local capture。",
+  },
+  {
+    id: "menu-surfaces",
+    title: "菜单与子菜单",
+    surfaces: ["menu item", "collection menu", "dynamic submenu", "reader/menubar/view menu item"],
+    productGoal: "把常用动作挂到 item / collection / submenu 等场景化入口，并保持 live state 驱动。",
+    userActions: [
+      "从 item menu 触发单动作入口",
+      "在 collection menu 触发批量范围动作",
+      "展开 dynamic submenu 并按 menuPath 触发子项",
+      "从 reader/menubar/view menu item 进入 Reader 相关命令",
+    ],
+    modules: [
+      "src/app/feature-composer.js",
+      "src/features/menu-manager.js",
+      "src/features/menu-command.js",
+      "src/app/host-actions.js",
+      "src/platform/zotero-host.js",
+    ],
+    route: "MenuManager target registration -> state resolver -> dynamic submenu builder -> menuPath evidence",
+    whyThisRoute: "菜单是典型宿主注册面，优先保持 target / submenu / onShowing 语义，不把产品树结构和 toolkit 绑定死。",
+    diagramLink: "[[11-当前Zotero插件-菜单与子菜单 UI 概念]]",
+    scenarioFocus: "item / collection 场景区分、lazy submenu rebuild、menu.show / menu.trigger 重放。",
+  },
+]);
+
+function buildPluginCurrentPhase(summary = {}) {
+  const projectContext = summary.projectContext && typeof summary.projectContext === "object"
+    ? summary.projectContext
+    : {};
+  const currentTruth = projectContext.currentTruth && typeof projectContext.currentTruth === "object"
+    ? projectContext.currentTruth
+    : {};
+  const activeBatchId = String(currentTruth.activeBatchId || summary.currentTruthActiveBatchId || "").trim();
+
+  if (summary.bootstrapShell === true) {
+    return {
+      kind: "bootstrap-shell",
+      activeBatchId: activeBatchId || null,
+      label: "初始化占位",
+      summary: "当前工作台仍是初始化占位，必须先刷新到当前项目态后再判断插件功能与 UI。 ",
+      surfaceStatus: "待刷新",
+      nextFocus: "先执行 `npm run agent:sync`，再读取当前插件状态。",
+    };
+  }
+
+  if (activeBatchId === "ENG-HIGH-104") {
+    return {
+      kind: "release-only",
+      activeBatchId,
+      label: "release-only follow-up",
+      summary: "当前宿主可见面已经收敛为稳定基线；未收口项转向远端发布编排与 `updateURL` / `update_link` 分发闭环。",
+      surfaceStatus: "稳定基线",
+      nextFocus: "保持可见面说明与技术链索引清晰，同时推进远端发布验证，不回写已收口的 UI polish 主线。",
+    };
+  }
+
+  if (/^HOST-/u.test(activeBatchId)) {
+    return {
+      kind: "host-visible-polish",
+      activeBatchId,
+      label: "host-visible polish",
+      summary: "当前主线仍在收紧宿主可见面的交互一致性、贴边 geometry 和 surface-local evidence。",
+      surfaceStatus: "当前主线",
+      nextFocus: "优先围绕 host-visible surface 的真实交互与本地证据补闭环。",
+    };
+  }
+
+  if (/^READER-/u.test(activeBatchId)) {
+    return {
+      kind: "reader-focused",
+      activeBatchId,
+      label: "reader-focused wave",
+      summary: "当前主线聚焦 Reader 相关入口、事件点与可见面行为；其他 surface 以协同验证为主。",
+      surfaceStatus: "Reader 主线",
+      nextFocus: "优先围绕 Reader toolbar / sidebar / deeper event points 推进。",
+    };
+  }
+
+  return {
+    kind: "general",
+    activeBatchId: activeBatchId || null,
+    label: activeBatchId || "current project phase",
+    summary: currentTruth.summary || "当前主线需要结合 CURRENT_BACKLOG 与 gate/monitor 继续判定。",
+    surfaceStatus: "已建链",
+    nextFocus: summary.summaryNextAction || summary.nextAction || "继续查看状态总览与证据索引。",
+  };
+}
+
+function resolveSurfaceGroupStatus(group, phase) {
+  if (phase.kind === "bootstrap-shell") {
+    return "待刷新";
+  }
+  if (phase.kind === "release-only") {
+    return "稳定基线";
+  }
+  if (phase.kind === "host-visible-polish") {
+    return "当前主线";
+  }
+  if (phase.kind === "reader-focused") {
+    return group?.id === "reader-surfaces" ? "当前主线" : "协同 surface";
+  }
+  return "已建链";
+}
+
+function buildPluginSurfaceGroups(summary = {}) {
+  const phase = buildPluginCurrentPhase(summary);
+  return PLUGIN_SURFACE_GROUPS.map((group) => ({
+    ...group,
+    statusLabel: resolveSurfaceGroupStatus(group, phase),
+  }));
+}
+
+function buildPluginSharedTechnicalChain(summary = {}) {
+  const phase = buildPluginCurrentPhase(summary);
+  return [
+    {
+      title: "宿主注册优先",
+      detail: "优先使用 `PreferencePanes`、`MenuManager`、`Reader.registerEventListener` 这类宿主注册式 surface，而不是先 patch Zotero DOM。",
+    },
+    {
+      title: "统一装配层",
+      detail: "`src/app/feature-composer.js` 负责把 pane、reader、menu 等 surface 收到同一插件装配点，避免每个 surface 各写一套入口。",
+    },
+    {
+      title: "可回放 Host Action",
+      detail: "`src/app/host-actions.js` 把真实 UI 触达统一成可回放动作，既服务 scenario/smoke，也服务 surface-local evidence。",
+    },
+    {
+      title: "surface-local evidence",
+      detail: "`config/project-validation-surfaces.json` 已把 preference pane、pane surfaces、reader、menus 的 smoke contract 固定下来，优先局部证据而不是整窗截图。",
+    },
+    {
+      title: "当前项目焦点",
+      detail: phase.summary,
+    },
+  ];
+}
+
+function buildPluginSurfaceSummaryMarkdownLines(summary = {}) {
+  const groups = buildPluginSurfaceGroups(summary);
+  const lines = [];
+  groups.forEach((group) => {
+    lines.push(`## ${group.title}`, "");
+    lines.push(`- 当前状态：${group.statusLabel}`);
+    lines.push(`- 当前 surfaces：${group.surfaces.join("、")}`);
+    lines.push(`- 产品目标：${group.productGoal}`);
+    lines.push(`- 典型动作：${group.userActions.join("；")}`);
+    lines.push(`- 当前模块：${group.modules.map((item) => `\`${item}\``).join("、")}`);
+    lines.push(`- 技术路径：${group.route}`);
+    lines.push(`- 路线理由：${group.whyThisRoute}`);
+    lines.push(`- 当前关注：${group.scenarioFocus}`);
+    lines.push(`- 对应概念图：${group.diagramLink}`);
+    lines.push("");
+  });
+  return lines;
+}
+
+function buildPluginTechnicalLineageMarkdownLines(summary = {}) {
+  const groups = buildPluginSurfaceGroups(summary);
+  const sharedChain = buildPluginSharedTechnicalChain(summary);
+  const lines = [
+    "## 共享技术骨架",
+    "",
+  ];
+  sharedChain.forEach((item, index) => {
+    lines.push(`${index + 1}. ${item.title}`);
+    lines.push(`   ${item.detail}`);
+  });
+  lines.push("");
+
+  groups.forEach((group) => {
+    lines.push(`## ${group.title}`, "");
+    lines.push(`- 当前状态：${group.statusLabel}`);
+    lines.push(`- 宿主接入：${group.route}`);
+    lines.push(`- 当前模块：${group.modules.map((item) => `\`${item}\``).join("、")}`);
+    lines.push(`- 应用场景：${group.userActions.join("；")}`);
+    lines.push(`- 选型理由：${group.whyThisRoute}`);
+    lines.push(`- 参考索引：${group.id === "menu-surfaces"
+      ? "[[docs/REFERENCE_PLUGIN_MENU_PATTERNS.md]]、[[docs/REFERENCE_PLUGIN_TECHNICAL_CHAINS.md]]"
+      : "[[docs/UI_CREATION_PATHS.md]]、[[docs/REFERENCE_PLUGIN_TECHNICAL_CHAINS.md]]"}`);
+    lines.push("");
+  });
+
+  lines.push("## 附加参考索引", "");
+  lines.push("- `AIAssistant` 的 React panel 创建与切换经验适合作为更重型 HTML micro-app 的补充索引，但不替代当前 pane / reader / menu 的宿主注册主链。");
+  lines.push("- 如果未来扩展更复杂的 React surface，优先把它放到附加索引或新 wave 说明，不把当前已收口的主链重新描述成“模板框架演示”。");
+  lines.push("");
+  return lines;
+}
+
+function buildObsidianExcalidrawMarkdown(jsonData) {
   return [
     "---",
     "excalidraw-plugin: parsed",
@@ -1387,12 +1685,281 @@ export function buildObsidianVisualVerdictExcalidrawMarkdown(viewModel = {}) {
   ].join("\n");
 }
 
+function buildLinearConceptExcalidrawMarkdown({
+  generatedAt,
+  title,
+  summary,
+  cards = [],
+  footerTitle,
+  footerSummary,
+}) {
+  const updated = Date.parse(String(generatedAt || "")) || Date.now();
+  const normalizedCards = (Array.isArray(cards) ? cards : []).slice(0, 4);
+  const positions = [
+    { x: 20, y: 190 },
+    { x: 360, y: 190 },
+    { x: 700, y: 190 },
+    { x: 1040, y: 190 },
+  ];
+  const elements = [
+    createExcalidrawRect("root-rect", 20, 20, 620, 110, 1201, 2201, updated, "#dbe4ff"),
+    createExcalidrawTextBox(
+      "root-text",
+      44,
+      42,
+      `${title}\n${summary}`,
+      1202,
+      2202,
+      updated,
+      { width: 580, height: 82, fontSize: 18, strokeColor: "#1e40af" },
+    ),
+  ];
+
+  normalizedCards.forEach((card, index) => {
+    const pos = positions[index];
+    const rectID = `card-${index + 1}-rect`;
+    const textID = `card-${index + 1}-text`;
+    elements.push(
+      createExcalidrawRect(
+        rectID,
+        pos.x,
+        pos.y,
+        280,
+        170,
+        1301 + index * 10,
+        2301 + index * 10,
+        updated,
+        card.color || "#fff3bf",
+      ),
+      createExcalidrawTextBox(
+        textID,
+        pos.x + 16,
+        pos.y + 16,
+        `${card.title}\n${card.body}`,
+        1302 + index * 10,
+        2302 + index * 10,
+        updated,
+        { width: 248, height: 136, fontSize: 16 },
+      ),
+    );
+  });
+
+  elements.push(
+    createExcalidrawRect("footer-rect", 360, 420, 620, 130, 1401, 2401, updated, "#e5dbff"),
+    createExcalidrawTextBox(
+      "footer-text",
+      384,
+      444,
+      `${footerTitle}\n${footerSummary}`,
+      1402,
+      2402,
+      updated,
+      { width: 580, height: 88, fontSize: 16 },
+    ),
+  );
+
+  elements.push(createExcalidrawArrow("arrow-root-first", 320, 130, -160, 60, 1501, 2501, updated));
+  if (normalizedCards.length > 1) {
+    elements.push(createExcalidrawArrow("arrow-card-1-2", 300, 275, 60, 0, 1502, 2502, updated));
+  }
+  if (normalizedCards.length > 2) {
+    elements.push(createExcalidrawArrow("arrow-card-2-3", 640, 275, 60, 0, 1503, 2503, updated));
+  }
+  if (normalizedCards.length > 3) {
+    elements.push(createExcalidrawArrow("arrow-card-3-4", 980, 275, 60, 0, 1504, 2504, updated));
+  }
+  elements.push(createExcalidrawArrow("arrow-last-footer", 1180, 360, -420, 60, 1505, 2505, updated));
+
+  return buildObsidianExcalidrawMarkdown({
+    type: "excalidraw",
+    version: 2,
+    source: "https://github.com/zsviczian/obsidian-excalidraw-plugin",
+    elements,
+    appState: {
+      gridSize: null,
+      viewBackgroundColor: "#ffffff",
+    },
+    files: {},
+  });
+}
+
+export function buildPluginFeatureMapMarkdown(summary = {}) {
+  const phase = buildPluginCurrentPhase(summary);
+  return [
+    "---",
+    `generated_at: ${summary.generatedAt || new Date().toISOString()}`,
+    "type: current-zotero-plugin-feature-map",
+    "---",
+    "",
+    "# 当前 Zotero 插件功能与可见面地图",
+    "",
+    "> [!summary] 当前阅读方式",
+    `> 当前主线：${phase.label}`,
+    `> 主线说明：${phase.summary}`,
+    `> 下一焦点：${phase.nextFocus}`,
+    "> 这份笔记优先描述当前 Zotero 插件在宿主里的真实功能面与 UI surface，而不是模板自身的治理链。",
+    "",
+    ...buildPluginSurfaceSummaryMarkdownLines(summary),
+    "## 推荐阅读顺序",
+    "",
+    "- 先看 [[01-当前Zotero插件-状态总览]]，确认当前主线和风险。",
+    "- 再看 [[00-当前Zotero插件-功能与技术脉络]]，建立功能组与技术链的整体空间关系。",
+    "- 然后按需要打开各 UI 概念图：[[07-当前Zotero插件-偏好设置面板 UI 概念]]、[[08-当前Zotero插件-条目与上下文窗格 UI 概念]]、[[09-当前Zotero插件-Reader UI 概念]]、[[11-当前Zotero插件-菜单与子菜单 UI 概念]]。",
+    "- 如果你想看为什么这些 surface 走这条技术路线，再读 [[06-当前Zotero插件-技术脉络与宿主接入]]。",
+    "",
+  ].join("\n");
+}
+
+export function buildObsidianTechnicalLineageMarkdown(summary = {}) {
+  const phase = buildPluginCurrentPhase(summary);
+  return [
+    "---",
+    `generated_at: ${summary.generatedAt || new Date().toISOString()}`,
+    "type: current-zotero-plugin-technical-lineage",
+    "---",
+    "",
+    "# 当前 Zotero 插件技术脉络与宿主接入",
+    "",
+    "> [!info] 当前技术视角",
+    `> 当前主线：${phase.label}`,
+    `> 当前说明：${phase.summary}`,
+    "> 这里记录的是“当前插件如何接到 Zotero 宿主、如何验证、如何扩面”的技术脉络，不复述模板治理本身。",
+    "",
+    ...buildPluginTechnicalLineageMarkdownLines(summary),
+  ].join("\n");
+}
+
+export function buildPluginUIConceptArtifacts(summary = {}) {
+  const phase = buildPluginCurrentPhase(summary);
+  return {
+    preferencePaneMarkdown: buildLinearConceptExcalidrawMarkdown({
+      generatedAt: summary.generatedAt,
+      title: "偏好设置面板 UI 概念",
+      summary: `当前状态：${phase.surfaceStatus}。核心关注 PreferencePanes host shell、pane root、控制项交互与窄宽度 degrade。`,
+      cards: [
+        {
+          title: "宿主 Preferences Shell",
+          body: "Zotero Preferences\n侧边栏选择插件 pane\n宿主窗口边界 800x600",
+          color: "#dbe4ff",
+        },
+        {
+          title: "Pane Root + Load Bridge",
+          body: "preference pane root\n载入 FTL / stylesheets / bridge\n保持插件设置语义在宿主 pane 内",
+          color: "#c3fae8",
+        },
+        {
+          title: "控制项与写回",
+          body: "开关 / theme / 偏好写回\n真实交互回放\n结构与内容都要可观察",
+          color: "#b2f2bb",
+        },
+        {
+          title: "窄宽度 Hardening",
+          body: "geometry ready\nroot width observed\nno horizontal overflow\n必要时 stacked-first degrade",
+          color: "#ffd8a8",
+        },
+      ],
+      footerTitle: "对应模块与证据",
+      footerSummary: "模块：src/features/preference-panes.js、src/app/host-actions.js、src/platform/zotero-host.js\n证据：preference pane surface smoke + local capture。",
+    }),
+    paneMarkdown: buildLinearConceptExcalidrawMarkdown({
+      generatedAt: summary.generatedAt,
+      title: "条目与上下文窗格 UI 概念",
+      summary: `当前状态：${phase.surfaceStatus}。核心关注 item pane sidenav、context pane section 与贴边 pane geometry。`,
+      cards: [
+        {
+          title: "Item Pane Sidenav",
+          body: "在库视图选择条目\n侧边按钮可见且可切换\nsurface fragment 被真实挂载",
+          color: "#dbe4ff",
+        },
+        {
+          title: "条目详情 Surface",
+          body: "item pane content root\n与当前选中条目同步\n避免脱离宿主详情流",
+          color: "#c3fae8",
+        },
+        {
+          title: "Context Pane Section",
+          body: "Reader 右侧 context pane\nsection 可切换\n与活动 tab / reader 上下文对齐",
+          color: "#b2f2bb",
+        },
+        {
+          title: "贴边布局与采样",
+          body: "edge-mode occupancy\n遵循 live pane bounds\nsurface-local capture 优先",
+          color: "#ffd8a8",
+        },
+      ],
+      footerTitle: "对应模块与证据",
+      footerSummary: "模块：src/features/item-pane.js、src/app/host-actions.js、src/platform/zotero-host.js\n证据：item/context pane surface smoke、geometry settle、surface-local evidence。",
+    }),
+    readerMarkdown: buildLinearConceptExcalidrawMarkdown({
+      generatedAt: summary.generatedAt,
+      title: "Reader UI 概念",
+      summary: `当前状态：${phase.surfaceStatus}。核心关注 renderToolbar、reader sidebar view 与 Reader ready 后的真实交互。`,
+      cards: [
+        {
+          title: "Reader Host Shell",
+          body: "活动 reader tab\nselectedTab ready\n文档上下文是一等输入",
+          color: "#dbe4ff",
+        },
+        {
+          title: "renderToolbar 注入",
+          body: "toolbar button / action\n在阅读流内直接可见\n动作后结果可观察",
+          color: "#c3fae8",
+        },
+        {
+          title: "Sidebar View",
+          body: "reader sidebar view\n切换视图后 surface ready\n贴边布局跟随 live bounds",
+          color: "#b2f2bb",
+        },
+        {
+          title: "Reader 证据链",
+          body: "surface-local capture\n必要时 synthetic fallback\n不把整窗截图当唯一真相",
+          color: "#ffd8a8",
+        },
+      ],
+      footerTitle: "对应模块与证据",
+      footerSummary: "模块：src/features/reader.js、src/features/reader-selection-actions.js、src/app/host-actions.js\n证据：reader surface smoke、toolbar trigger、sidebar select、local capture。",
+    }),
+    menuMarkdown: buildLinearConceptExcalidrawMarkdown({
+      generatedAt: summary.generatedAt,
+      title: "菜单与子菜单 UI 概念",
+      summary: `当前状态：${phase.surfaceStatus}。核心关注 item / collection 场景区分、dynamic submenu rebuild 与 menuPath evidence。`,
+      cards: [
+        {
+          title: "Menu Targets",
+          body: "item menu\ncollection menu\n不同 target 对应不同选择语义",
+          color: "#dbe4ff",
+        },
+        {
+          title: "State Resolver",
+          body: "live selection / prefs / collection context\nonShowing 时求值\n不在启动时一次性写死",
+          color: "#c3fae8",
+        },
+        {
+          title: "Dynamic Submenu",
+          body: "submenu 是一等结构\n展开时 lazy rebuild children\n保留 separator / path 语义",
+          color: "#b2f2bb",
+        },
+        {
+          title: "Trigger + Evidence",
+          body: "menu.show / menu.trigger\n通过 menuPath 回放子项\n记录 surface-local evidence",
+          color: "#ffd8a8",
+        },
+      ],
+      footerTitle: "对应模块与证据",
+      footerSummary: "模块：src/features/menu-manager.js、src/features/menu-command.js、src/app/host-actions.js\n证据：menu surface smoke、collection scene、submenu path 验证。",
+    }),
+  };
+}
+
 export function buildObsidianInterventionMarkdown(summary) {
   const blockers = truncateList(summary.blockers, 8);
   const candidateFiles = truncateList(summary.candidateFiles, 8);
   const commands = truncateList(summary.commands, 8);
   const visualEvidenceItems = normalizeVisualEvidenceItems(summary.visualEvidenceItems, 3);
   const visualAttemptDiagnosisItems = normalizeVisualCaptureAttemptDiagnosisItems(summary.visualCaptureAttemptDiagnosisItems, 3);
+  const phase = buildPluginCurrentPhase(summary);
+  const surfaceGroups = buildPluginSurfaceGroups(summary);
+  const sharedChain = buildPluginSharedTechnicalChain(summary);
   const projectContext = summary.projectContext && typeof summary.projectContext === "object"
     ? summary.projectContext
     : {};
@@ -1433,23 +2000,29 @@ export function buildObsidianInterventionMarkdown(summary) {
     `current_truth_active_batch: "${String(currentTruth.activeBatchId || "").replaceAll('"', "'")}"`,
     `validation_level: ${validationDecision.level || "unknown"}`,
     `next_action: "${String(summary.summaryNextAction || summary.nextAction || "-").replaceAll('"', "'")}"`,
-    "type: zotero-agent-status",
+    `agent_context_generated_at: ${agentContext.generatedAt || "-"}`,
+    `agent_context_digest: ${agentContext.budgetMeta?.digest || "-"}`,
+    `agent_context_alignment_status: ${agentContext.alignmentRef?.status || "-"}`,
+    "type: current-zotero-plugin-status",
     "---",
     "",
-    "# Zotero Agent 当前状态总览",
+    "# 当前 Zotero 插件状态总览",
     "",
     "> [!summary] 自动化当前判断",
     `> 状态：${summary.statusLabel || "待人工介入"}`,
     `> 结论：${summary.headline || "-"}`,
+    `> 当前主线：${phase.label}`,
+    `> 主线说明：${phase.summary}`,
     `> 摘要下一步：${summary.summaryNextAction || "-"}`,
     `> 可执行命令：\`${summary.runnableNextCommand || "-"}\``,
+    "> 相关工作台：[[00-当前Zotero插件-功能与技术脉络]] / [[05-当前Zotero插件-功能与可见面地图]] / [[06-当前Zotero插件-技术脉络与宿主接入]]",
     "",
   ];
 
   if (summary.bootstrapShell === true) {
     lines.push(
       "> [!warning] 初始化占位工作台",
-      "> 当前 Obsidian 工作台仅用于初始化占位，不代表 fresh gate / monitor 结论。",
+      "> 当前 Obsidian 工作台仅用于初始化占位，不代表当前插件的 fresh gate / monitor 结论。",
       "> 下一步必须先执行 `npm run agent:sync`，再把白板刷新成当前项目态。",
       "",
     );
@@ -1459,26 +2032,33 @@ export function buildObsidianInterventionMarkdown(summary) {
     lines.splice(lines.length - 1, 0, `> 当前阶段：${humanStageLabel}`);
   }
 
-  lines.push("## 当前项目语义", "");
+  lines.push("## 当前插件主线", "");
   lines.push(`- 当前 truth active batch：${currentTruth.activeBatchId || "-"}`);
-  lines.push(`- 当前 truth 摘要：${currentTruth.summary || "-"}`);
+  lines.push(`- 当前主线摘要：${currentTruth.summary || phase.summary || "-"}`);
+  lines.push(`- 当前 wave：${expansionWave.currentWaveName || expansionWave.summary || "-"}`);
+  lines.push(`- 验收主线：${expansionWave.acceptanceTrack || "-"}`);
+  lines.push(`- 可见面状态：${phase.surfaceStatus}`);
+  lines.push(`- 下一焦点：${phase.nextFocus}`);
+  lines.push(`- Validation mirror：${validationOverrides.summary || "-"}`);
+  lines.push(`- Validation level：${validationDecision.levelLabel || validationDecision.level || "-"}`);
   if (Array.isArray(currentTruth.excerpt) && currentTruth.excerpt.length > 0) {
     currentTruth.excerpt.forEach((item) => lines.push(`- truth 要点：${item}`));
   }
-  lines.push(`- 当前 wave：${expansionWave.currentWaveName || "-"}`);
-  lines.push(`- 验收主线：${expansionWave.acceptanceTrack || expansionWave.summary || "-"}`);
-  lines.push(`- Wave 状态：${expansionWave.status || "-"}`);
-  lines.push(`- In scope：${truncateList(expansionWave.inScopeModules, 6).join("、") || (expansionWave.present ? "未声明" : "缺少 project-expansion-wave mirror")}`);
-  lines.push(`- Out of scope：${truncateList(expansionWave.outOfScopeModules, 6).join("、") || (expansionWave.present ? "未声明" : "缺少 project-expansion-wave mirror")}`);
-  lines.push(`- Module archetypes：${truncateList(expansionWave.moduleArchetypes, 4).join("；") || "-"}`);
-  lines.push(`- 显式视觉升级模块：${truncateList(expansionWave.explicitVisualUpgradeModules, 6).join("、") || "-"}`);
-  lines.push(`- Validation mirror：${validationOverrides.summary || "-"}`);
-  lines.push(`- Validation level：${validationDecision.levelLabel || validationDecision.level || "-"}`);
-  lines.push(`- 命中验证域：${truncateList(validationDecision.matchedDomain, 4).join("、") || "-"}`);
-  lines.push(`- 命中项目覆盖：${truncateList(validationDecision.matchedProjectOverride, 4).join("、") || "-"}`);
   lines.push("");
 
-  lines.push("## 当前上下文", "");
+  lines.push("## 当前插件可见面", "");
+  surfaceGroups.forEach((group) => {
+    lines.push(`- ${group.title}：${group.statusLabel}；surface=${group.surfaces.join(" / ")}；图=${group.diagramLink}`);
+  });
+  lines.push("");
+
+  lines.push("## 当前技术脉络", "");
+  sharedChain.forEach((item) => {
+    lines.push(`- ${item.title}：${item.detail}`);
+  });
+  lines.push("");
+
+  lines.push("## 当前开发上下文", "");
   if (!agentContext.present) {
     lines.push("- 缺少 `dist/agent-context.json` / `dist/agent-context.md`，当前仍回退到 gate / monitor / truth 汇总。");
   } else {
@@ -1486,18 +2066,19 @@ export function buildObsidianInterventionMarkdown(summary) {
     lines.push(`- Compact Profile：\`${agentContext.budgetMeta?.profile || "-"}\``);
     lines.push(`- Compact Digest：\`${agentContext.budgetMeta?.digest || "-"}\``);
     lines.push(`- Truth Ref：batch=\`${agentContext.truthRef?.activeBatchId || "-"}\` / wave=\`${agentContext.truthRef?.currentWaveName || "-"}\` / validation=\`${agentContext.truthRef?.validationLevel || "-"}\``);
+    lines.push(`- Alignment Ref：status=\`${agentContext.alignmentRef?.status || "missing"}\` / stage=\`${agentContext.alignmentRef?.generationStage || "missing"}\` / repair=\`${agentContext.alignmentRef?.preferredRepairCommand || "-"}\``);
     lines.push(`- Action Ref：next=\`${agentContext.actionRef?.nextAction || "-"}\` / blocker=${agentContext.actionRef?.mainBlocker || "-"}`);
-    lines.push(`- Status Ref：monitor=\`${agentContext.statusRef?.monitorStatus || "-"}\` / gate=\`${agentContext.statusRef?.gateStatus || "-"}\` / memory=\`${agentContext.statusRef?.memoryFingerprint || agentContext.statusRef?.memoryStrategyLabel || "-"}\` / release=\`${agentContext.statusRef?.releaseStatus || "-"}\``);
+    lines.push(`- Status Ref：monitor=\`${agentContext.statusRef?.monitorStatus || "-"}\` / gate=\`${agentContext.statusRef?.gateStatus || "-"}\` / release=\`${agentContext.statusRef?.releaseStatus || "-"}\``);
+    lines.push(`- Reference Distillation：status=\`${agentContext.referenceDistillationRef?.status || "idle"}\` / pending=\`${agentContext.referenceDistillationRef?.pendingCount ?? 0}\` / topic=\`${agentContext.referenceDistillationRef?.lastTopic || "-"}\` / last=\`${agentContext.referenceDistillationRef?.lastDistilledAt || "-"}\` / next=\`${agentContext.referenceDistillationRef?.nextSuggestedAction || "-"}\``);
     lines.push(`- 建议证据：${truncateList(agentContext.evidenceRefs, 4).join("；") || "-"}`);
     lines.push(`- Drift 状态：\`${agentContext.driftRef?.status || "missing"}\` / warning \`${agentContext.driftRef?.warningCount ?? 0}\``);
-    lines.push(`- Artifact Refs：truth=\`${agentContext.artifactRefs?.currentTruth || "-"}\` / monitor=\`${agentContext.artifactRefs?.monitor || "-"}\` / gate=\`${agentContext.artifactRefs?.gate || "-"}\` / memory=\`${agentContext.artifactRefs?.memory || "-"}\``);
     if (Array.isArray(agentContext.driftRef?.warnings) && agentContext.driftRef.warnings.length > 0) {
       agentContext.driftRef.warnings.forEach((item) => lines.push(`- Drift：${item}`));
     }
   }
   lines.push("");
 
-  lines.push("## 当前自动链状态", "");
+  lines.push("## 当前自动结论与验证", "");
   lines.push(`- 摘要来源：${summary.summarySource || "-"}`);
   lines.push(`- Gate：${autoChain.gate?.statusLabel || "-"} / ${autoChain.gate?.generatedAt || "-"}`);
   lines.push(`- Monitor：${autoChain.monitor?.statusLabel || "-"} / ${autoChain.monitor?.generatedAt || "-"}`);
@@ -1515,7 +2096,7 @@ export function buildObsidianInterventionMarkdown(summary) {
   if (summary.diagnosisLabel || summary.diagnosis) {
     lines.push("> [!note] 主诊断");
     if (summary.diagnosisLabel) {
-      lines.push(`> 功能：${summary.diagnosisLabel}`);
+      lines.push(`> 功能位点：${summary.diagnosisLabel}`);
     }
     if (summary.diagnosis) {
       lines.push(`> 说明：${summary.diagnosis}`);
@@ -1523,10 +2104,31 @@ export function buildObsidianInterventionMarkdown(summary) {
     lines.push("");
   }
 
-  if (summary.readerHostStateSummary || summary.readerHostStateNote) {
-    lines.push("## Reader 深层宿主状态", "");
+  if (
+    summary.readerHostStateSummary
+    || summary.readerHostStateNote
+    || summary.toolbarDispatchMode
+    || summary.toolbarAppendedItemCount !== null
+    || summary.selectionPopupAppendedItemCount !== null
+    || summary.sidebarHeaderAppendedItemCount !== null
+    || summary.contextMenuProbeCount !== null
+    || summary.readerDispatchSummary
+    || summary.contextMenuSummary
+    || summary.contextMenuObservedTypes.length > 0
+    || summary.contextMenuSyntheticFallbackTypes.length > 0
+  ) {
+    lines.push("## Reader 专项证据", "");
     lines.push(`- 状态摘要：${summary.readerHostStateSummary || "-"}`);
     lines.push(`- 备注：${summary.readerHostStateNote || "-"}`);
+    lines.push(`- 工具栏分发：${summary.toolbarDispatchMode || "-"}`);
+    lines.push(`- 工具栏追加项：${summary.toolbarAppendedItemCount ?? "-"}`);
+    lines.push(`- 文本浮层追加项：${summary.selectionPopupAppendedItemCount ?? "-"}`);
+    lines.push(`- 侧栏批注头追加项：${summary.sidebarHeaderAppendedItemCount ?? "-"}`);
+    lines.push(`- 上下文菜单探针数：${summary.contextMenuProbeCount ?? "-"}`);
+    lines.push(`- 分发摘要：${summary.readerDispatchSummary || "-"}`);
+    lines.push(`- 上下文菜单：${summary.contextMenuSummary || "-"}`);
+    lines.push(`- 已观测类型：${Array.isArray(summary.contextMenuObservedTypes) ? (summary.contextMenuObservedTypes.join("、") || "-") : "-"}`);
+    lines.push(`- fallback 类型：${Array.isArray(summary.contextMenuSyntheticFallbackTypes) ? (summary.contextMenuSyntheticFallbackTypes.join("、") || "-") : "-"}`);
     lines.push("");
   }
 
@@ -1536,10 +2138,8 @@ export function buildObsidianInterventionMarkdown(summary) {
     || summary.visualCaptureAttemptDiagnosisSummary
     || summary.visualCaptureStabilitySummary
     || summary.visualPrimaryBlockerSummary
-    || summary.readerDispatchSummary
-    || summary.contextMenuSummary
   ) {
-    lines.push("## Reader 事件点分发", "");
+    lines.push("## 当前关键证据", "");
     lines.push(`- renderToolbar 证据：${summary.toolbarEvidenceSummary || "-"}`);
     lines.push(`- 视觉证据：${summary.visualEvidenceSummary || "-"}`);
     lines.push(`- 证据导航：${summary.visualEvidenceFocusSummary || "-"}`);
@@ -1550,8 +2150,6 @@ export function buildObsidianInterventionMarkdown(summary) {
     lines.push(`- 视觉几何摘要：${summary.visualGeometrySummary || "-"}`);
     lines.push(`- Canonical 覆盖摘要：${summary.visualCanonicalCoverageSummary || "-"}`);
     lines.push(`- Canonical 未对齐目标：${truncateList(summary.visualCanonicalMismatchedTargets, 8).join("、") || "-"}`);
-    lines.push(`- 分发摘要：${summary.readerDispatchSummary || "-"}`);
-    lines.push(`- 上下文菜单：${summary.contextMenuSummary || "-"}`);
     lines.push("");
   }
 
@@ -1562,7 +2160,7 @@ export function buildObsidianInterventionMarkdown(summary) {
     visualEvidenceItems.forEach((item) => {
       lines.push(`- ${formatVisualEvidenceItemLabel(item)} | Capture: ${toMarkdownLink(item.capturePath)} | Baseline: ${toMarkdownLink(item.baselinePath)}`);
     });
-    lines.push("- 详见：[[02-Zotero-Agent-证据索引]]", "");
+    lines.push("- 详见：[[02-当前Zotero插件-证据索引]]", "");
   }
 
   if (summary.visualCaptureAttemptDiagnosisSummary || visualAttemptDiagnosisItems.length > 0) {
@@ -1574,12 +2172,12 @@ export function buildObsidianInterventionMarkdown(summary) {
         : "-";
       lines.push(`- ${formatAttemptDiagnosisItemLabel(item)} | 原因: ${selectionReasonLabel} | 已选: ${item.selectedAttempt ?? "-"} / ${item.attemptCount ?? 0} | Hash 全变: ${formatAttemptDiagnosisBoolean(item.allHashesUnique)} | Bounds 固定: ${formatAttemptDiagnosisBoolean(item.boundsStable)} | 光栅固定: ${formatAttemptDiagnosisBoolean(item.rasterSizeStable)}`);
     });
-    lines.push("- 详见：[[02-Zotero-Agent-证据索引]]", "");
+    lines.push("- 详见：[[02-当前Zotero插件-证据索引]]", "");
   }
 
-  lines.push("## 自动阻塞项", "");
+  lines.push("## 当前风险与阻塞", "");
   if (blockers.length === 0) {
-    lines.push("- 当前已满足 agent 质量闸门，可继续执行推荐命令或进入后续开发 / 发布流程。");
+    lines.push("- 当前已满足主要质量闸门，可继续执行推荐命令或进入后续开发 / 发布流程。");
   } else {
     blockers.forEach((item) => lines.push(`- ${item}`));
   }
@@ -1594,7 +2192,7 @@ export function buildObsidianInterventionMarkdown(summary) {
     candidateFiles.forEach((item) => lines.push(`- \`${item}\``));
   }
 
-  lines.push("", "## 受限补丁摘要", "");
+  lines.push("", "## 补丁与修复收口", "");
   if (!patchSummary.planStatusLabel && !patchSummary.applicationStatusLabel && !patchSummary.unsupportedCategoryLabel) {
     lines.push(shouldPrioritizeVisualEvidence(summary)
       ? "- 当前先人工复核视觉证据，不默认执行历史补丁动作。"
@@ -1629,10 +2227,10 @@ export function buildObsidianEvidenceMarkdown(summary) {
   const lines = [
     "---",
     `generated_at: ${summary.generatedAt}`,
-    "type: zotero-agent-evidence-index",
+    "type: current-zotero-plugin-evidence-index",
     "---",
     "",
-    "# Zotero Agent 证据索引",
+    "# 当前 Zotero 插件证据索引",
     "",
     "## 当前证据",
     "",
@@ -1672,12 +2270,14 @@ export function buildObsidianEvidenceMarkdown(summary) {
 
   lines.push(
     "",
-    "## 人工介入入口",
+    "## 工作台入口",
     "",
-    "- [[03-Zotero-Agent-人工快速上手]]",
-    "- [[04-Zotero-Agent-高级介入规范]]",
-    "- [[10-Zotero-Agent-人工指令窗口]]",
-    "- [[01-Zotero-Agent-当前状态总览]]",
+    "- [[01-当前Zotero插件-状态总览]]",
+    "- [[05-当前Zotero插件-功能与可见面地图]]",
+    "- [[06-当前Zotero插件-技术脉络与宿主接入]]",
+    "- [[03-模板协作-人工快速上手]]",
+    "- [[04-模板协作-高级介入规范]]",
+    "- [[10-模板协作-人工指令窗口]]",
     "",
   );
   return lines.join("\n");
@@ -1686,17 +2286,17 @@ export function buildObsidianEvidenceMarkdown(summary) {
 export function buildHumanQuickstartMarkdown() {
   return [
     "---",
-    "type: zotero-agent-human-quickstart",
+    "type: template-collaboration-human-quickstart",
     "audience: human-only",
     "agent_reading: disabled",
     "---",
     "",
-    "# Zotero Agent 人工快速上手",
+    "# 模板协作人工快速上手",
     "",
     "> [!abstract] 这份笔记适合谁",
     "> 这是一份给新进入项目的人看的快速上手说明，帮助你先理解工作台、掌握最短操作路径，再决定是否需要人工介入。",
     ">",
-    "> agent 不会把这份说明当作执行输入；真正会被读取的是 `10-Zotero-Agent-人工指令窗口.md` 中的保留编辑区。",
+    "> agent 不会把这份说明当作执行输入；真正会被读取的是 `10-模板协作-人工指令窗口.md` 中的保留编辑区。",
     "",
     "> [!tip] 一句话理解整套链路",
     "> agent 先自动构建与验证，人工只在需要时介入判断和定向，随后 agent 再根据人工修改继续推进。",
@@ -1704,31 +2304,35 @@ export function buildHumanQuickstartMarkdown() {
     "## 快速入口",
     "",
     "> [!info] 先从这里开始",
-    "> - 当前状态：[[01-Zotero-Agent-当前状态总览]]",
-    "> - 项目白板：[[00-Zotero-Agent-项目架构与闭环]]",
-    "> - 证据索引：[[02-Zotero-Agent-证据索引]]",
-    "> - 高级规范：[[04-Zotero-Agent-高级介入规范]]",
-    "> - 人工输入窗口：[[10-Zotero-Agent-人工指令窗口]]",
+    "> - 当前插件状态：[[01-当前Zotero插件-状态总览]]",
+    "> - 插件功能白板：[[00-当前Zotero插件-功能与技术脉络]]",
+    "> - 证据索引：[[02-当前Zotero插件-证据索引]]",
+    "> - 功能地图：[[05-当前Zotero插件-功能与可见面地图]]",
+    "> - 高级规范：[[04-模板协作-高级介入规范]]",
+    "> - 人工输入窗口：[[10-模板协作-人工指令窗口]]",
     "",
     "## 工作台文件怎么用",
     "",
     "| 文件 | 作用 | 建议用法 |",
     "| --- | --- | --- |",
-    "| `00-Zotero-Agent-项目架构与闭环.canvas` | 看整体结构、自动链路、人工入口、证据关系 | 先建立全局理解，再决定要不要介入 |",
-    "| `01-Zotero-Agent-当前状态总览.md` | 看当前状态、阻塞项、建议动作 | 先读这个，快速判断是不是需要人工接管 |",
-    "| `02-Zotero-Agent-证据索引.md` | 跳转到报告和证据工件 | 当你需要核对日志、报告、旧结论时再下钻 |",
-    "| `04-Zotero-Agent-高级介入规范.md` | 看字段语义、介入边界、规范建议 | 当你要正式接管一轮路径时再读 |",
-    "| `10-Zotero-Agent-人工指令窗口.md` | 唯一的人机协作输入窗口 | 只在这里写状态、下一步指令、关注文件、备注 |",
+    "| `00-当前Zotero插件-功能与技术脉络.canvas` | 看当前插件的功能组、UI surface 和技术链空间关系 | 先建立产品与技术全局理解，再决定要不要介入 |",
+    "| `01-当前Zotero插件-状态总览.md` | 看当前主线、阻塞项、建议动作 | 先读这个，快速判断是不是需要人工接管 |",
+    "| `02-当前Zotero插件-证据索引.md` | 跳转到报告和证据工件 | 当你需要核对日志、报告、旧结论时再下钻 |",
+    "| `05-当前Zotero插件-功能与可见面地图.md` | 看当前插件有哪些稳定可见面与入口 | 当你要理解 UI 面的业务分组时优先看这里 |",
+    "| `06-当前Zotero插件-技术脉络与宿主接入.md` | 看这些 surface 为什么走这条宿主接入路径 | 当你要做技术判断或扩面选型时再读 |",
+    "| `04-模板协作-高级介入规范.md` | 看字段语义、介入边界、规范建议 | 当你要正式接管一轮路径时再读 |",
+    "| `10-模板协作-人工指令窗口.md` | 唯一的人机协作输入窗口 | 只在这里写状态、下一步指令、关注文件、备注 |",
     "",
     "## 推荐操作顺序",
     "",
     "> [!check] 建议按这个顺序使用",
-    "> 1. 先看 `01-Zotero-Agent-当前状态总览.md`，判断现在卡在哪。",
-    "> 2. 再看 `00-Zotero-Agent-项目架构与闭环.canvas`，确认问题处于哪一层。",
-    "> 3. 需要深挖时，去 `02-Zotero-Agent-证据索引.md` 找对应报告。",
-    "> 4. 如果你准备正式介入，再读一遍 `04-Zotero-Agent-高级介入规范.md`。",
-    "> 5. 只有当你确定要改变本轮路径时，才去修改 `10-Zotero-Agent-人工指令窗口.md`。",
-    "> 6. 修改完成后，再让 agent 进入下一轮执行。",
+    "> 1. 先看 `01-当前Zotero插件-状态总览.md`，判断现在卡在哪。",
+    "> 2. 再看 `00-当前Zotero插件-功能与技术脉络.canvas`，确认问题属于哪个插件功能组。",
+    "> 3. 需要深挖时，去 `05-当前Zotero插件-功能与可见面地图.md` 和 `06-当前Zotero插件-技术脉络与宿主接入.md` 找对应说明。",
+    "> 4. 需要证据时，再去 `02-当前Zotero插件-证据索引.md` 找对应报告。",
+    "> 5. 如果你准备正式介入，再读一遍 `04-模板协作-高级介入规范.md`。",
+    "> 6. 只有当你确定要改变本轮路径时，才去修改 `10-模板协作-人工指令窗口.md`。",
+    "> 7. 修改完成后，再让 agent 进入下一轮执行。",
     "",
     "## 介入前检查清单",
     "",
@@ -1738,10 +2342,32 @@ export function buildHumanQuickstartMarkdown() {
     "> - 你知道要改的是“执行路径”，而不是随手记一点想法。",
     "> - 你的下一步指令最好能落到现有脚本命令或明确文件路径。",
     "",
+    "## 本地 reference 快照怎么更新",
+    "",
+    "> [!info] 只在你确实需要刷新本地参考项目版本时才用",
+    "> 不要直接手改 `reference/` 目录；先走受管命令链。",
+    "",
+    "- 先执行 `npm run agent:reference:update -- list`，查看当前有哪些受管的 git-backed reference 项目。",
+    "- 更新单个项目时，使用 `npm run agent:reference:update -- update --project <id>`。",
+    "- 需要批量刷新全部受管项目时，使用 `npm run agent:reference:update -- update --all`。",
+    "- 如果目标目录是脏 worktree、非 git 目录，或者现有 origin 与 manifest 不一致，脚本会默认阻断；只有在你明确接受覆盖时，才使用 `--allow-dirty` 或 `--replace-existing`。",
+    "- `config/reference-projects.json` 管的是 rolling git 快照；像 `reference/<project>/<release-version>` 这种版本号写进目录名的 release/archive 快照，继续人工新建版本目录，不走这条命令链。",
+    "",
+    "## 产品整体 UI 设计草图怎么更新",
+    "",
+    "> [!info] 只在你需要一轮产品整体 UI 设计 / 改版草图时才用",
+    "> 这条链只产出 Obsidian Excalidraw，不改业务源码，也不覆盖默认 `07~11` 自动概念图。",
+    "",
+    "- 先执行 `npm run agent:ui:design -- list`，查看当前可用的人工 UI 设计工作链。",
+    "- 运行时使用 `npm run agent:ui:design -- run product-ui-design-update --goal \"<你的设计目标>\"`。",
+    "- 产物固定写到 `obsidian/agent-workbench/20-当前Zotero插件-产品整体 UI 设计与更新流程.excalidraw.md`。",
+    "- 这份 Excalidraw 是设计呈现工件，不是新的 verdict / 输入面；真正改变执行路径，仍然只改 `10-模板协作-人工指令窗口.md`。",
+    "- `agent:obsidian` 刷新默认工作台时不会覆盖这份手动 UI 设计草图。",
+    "",
     "## Reader Verdict 三模板",
     "",
     "> [!important] 当前阶段如果显示“等待人工 Reader verdict”",
-    "> 仍然只改 `10-Zotero-Agent-人工指令窗口.md` 里的 5 个字段：`状态 / 模式 / 下一步指令 / 关注文件 / 备注`。",
+    "> 仍然只改 `10-模板协作-人工指令窗口.md` 里的 5 个字段：`状态 / 模式 / 下一步指令 / 关注文件 / 备注`。",
     "> 不要新增第二套输入方式，也不要把 Mermaid / Excalidraw 当成新的 verdict 来源。",
     "",
     "### 模板 1：预期 UI 变化",
@@ -1819,7 +2445,7 @@ export function buildHumanQuickstartMarkdown() {
     "",
     "> [!note] 最后提醒",
     "> 如果你不想介入，就不要改输入窗口。让 agent 自动继续，本身就是这套框架的默认正确用法。",
-    "> 如果你准备正式接管一轮执行路径，请继续阅读 [[04-Zotero-Agent-高级介入规范]]。",
+    "> 如果你准备正式接管一轮执行路径，请继续阅读 [[04-模板协作-高级介入规范]]。",
     "",
   ].join("\n");
 }
@@ -1827,27 +2453,27 @@ export function buildHumanQuickstartMarkdown() {
 export function buildHumanAdvancedGuideMarkdown() {
   return [
     "---",
-    "type: zotero-agent-human-advanced-guide",
+    "type: template-collaboration-human-advanced-guide",
     "audience: human-only",
     "agent_reading: disabled",
     "---",
     "",
-    "# Zotero Agent 高级介入规范",
+    "# 模板协作高级介入规范",
     "",
     "> [!important] 这份笔记适合什么时候看",
     "> 当你准备正式改写本轮执行路径、暂停自动链路，或需要给 agent 更高质量的人工判断时，再看这份规范。",
     "",
     "> [!info] 快速跳转",
-    "> - 回到快速上手：[[03-Zotero-Agent-人工快速上手]]",
-    "> - 当前状态：[[01-Zotero-Agent-当前状态总览]]",
-    "> - 人工输入窗口：[[10-Zotero-Agent-人工指令窗口]]",
+    "> - 回到快速上手：[[03-模板协作-人工快速上手]]",
+    "> - 当前插件状态：[[01-当前Zotero插件-状态总览]]",
+    "> - 人工输入窗口：[[10-模板协作-人工指令窗口]]",
     "",
     "## 哪些内容不要改",
     "",
     "> [!danger] 这些区域不要手动改",
-    "> - `01-Zotero-Agent-当前状态总览.md` 里的自动摘要",
-    "> - `02-Zotero-Agent-证据索引.md` 的自动生成列表",
-    "> - `10-Zotero-Agent-人工指令窗口.md` 中 `## 人工编辑区（保留）` 之前的自动摘要说明",
+    "> - `01-当前Zotero插件-状态总览.md` 里的自动摘要",
+    "> - `02-当前Zotero插件-证据索引.md` 的自动生成列表",
+    "> - `10-模板协作-人工指令窗口.md` 中 `## 人工编辑区（保留）` 之前的自动摘要说明",
     "> - `.canvas` 白板里的自动节点文本，除非你明确只是在做人类笔记副本",
     "",
     "- 如果你想记录人工分析，请优先写在自己的 Obsidian 笔记里，或在白板另建人工节点。",
@@ -1875,6 +2501,7 @@ export function buildHumanAdvancedGuideMarkdown() {
     "",
     "- 好的写法：`npm run agent:zotero:autofix`",
     "- 好的写法：`npm run agent:gate`",
+    "- 好的写法：`npm run agent:reference:update -- update --project zotero-main`",
     "- 不好的写法：`先看看问题`",
     "- 不好的写法：`修一下 item pane`",
     "- 当前如果处于 Reader verdict 收尾阶段，`force-next` 只建议配合 `npm run agent:zotero:e2e:update-baseline` 做一次受控 baseline refresh。",
@@ -1901,6 +2528,16 @@ export function buildHumanAdvancedGuideMarkdown() {
     "- 建议优先使用仓库已有脚本，避免临时命令让后续复现变差。",
     "- 建议在 `补充记录` 里留下这次介入原因，方便下一轮回看。",
     "- 建议只在确定要改变本轮路径时，把 `状态` 从 `pending` 改掉。",
+    "",
+    "## 产品整体 UI 设计链",
+    "",
+    "> [!info] 这条链适合什么场景",
+    "> 当你需要一轮面向产品整体的 UI 设计 / 改版草图，但又不想让 agent 直接改实现或覆盖默认 `07~11` 概念图时，优先走这条人工触发链。",
+    "",
+    "- 推荐命令：`npm run agent:ui:design -- run product-ui-design-update --goal \"统一 preference pane / item pane / reader 的产品层导航\"`",
+    "- 设计呈现只允许落在 `obsidian/agent-workbench/20-当前Zotero插件-产品整体 UI 设计与更新流程.excalidraw.md`。",
+    "- 这条链默认复用现有 delegation 审查工件，因此仍会在 `dist/agent-delegation/OBSIDIAN-UI-DESIGN-001/` 下留下 run / review 记录。",
+    "- 这份 Excalidraw 只负责设计呈现，不是新的执行输入面；要改本轮执行路径，仍然回到 `10-模板协作-人工指令窗口.md`。",
     "",
     "## 推荐模板",
     "",
@@ -1961,7 +2598,6 @@ export function buildHumanAdvancedGuideMarkdown() {
 }
 
 export function buildObsidianInterventionCanvas(summary) {
-  const visualModel = buildObsidianVisualViewModel(summary);
   const projectContext = summary.projectContext && typeof summary.projectContext === "object"
     ? summary.projectContext
     : {};
@@ -1971,66 +2607,32 @@ export function buildObsidianInterventionCanvas(summary) {
   const expansionWave = projectContext.expansionWave && typeof projectContext.expansionWave === "object"
     ? projectContext.expansionWave
     : {};
-  const validationOverrides = projectContext.validationOverrides && typeof projectContext.validationOverrides === "object"
-    ? projectContext.validationOverrides
-    : {};
   const validationDecision = projectContext.validationDecision && typeof projectContext.validationDecision === "object"
     ? projectContext.validationDecision
     : {};
+  const phase = buildPluginCurrentPhase(summary);
+  const surfaceGroups = buildPluginSurfaceGroups(summary);
+  const sharedChain = buildPluginSharedTechnicalChain(summary);
+  const blockerText = truncateList(summary.blockers, 5);
+  const fileText = truncateList(summary.candidateFiles, 6);
+  const commandText = truncateList(summary.commands, 4);
   const autoChain = summary.autoChain && typeof summary.autoChain === "object"
     ? summary.autoChain
     : {};
-  const blockerText = truncateList(visualModel.blockers, 5);
-  const fileText = truncateList(visualModel.candidateFiles, 6);
-  const commandText = truncateList(visualModel.commands, 5);
-  const truthText = Array.isArray(currentTruth.excerpt) && currentTruth.excerpt.length > 0
-    ? currentTruth.excerpt.map((item) => `- ${item}`).join("\n")
-    : `- ${currentTruth.summary || "缺少 CURRENT_BACKLOG 当前摘要。"}`;
-  const waveText = [
-    `Wave：${expansionWave.currentWaveName || "-"}`,
-    `状态：${expansionWave.status || "-"}`,
-    `验收：${expansionWave.acceptanceTrack || expansionWave.summary || "-"}`,
-    `In scope：${truncateList(expansionWave.inScopeModules, 5).join("、") || (expansionWave.present ? "未声明" : "缺少 mirror")}`,
-    `Out of scope：${truncateList(expansionWave.outOfScopeModules, 5).join("、") || (expansionWave.present ? "未声明" : "缺少 mirror")}`,
-  ];
-  const validationText = [
-    `Level：${validationDecision.levelLabel || validationDecision.level || "-"}`,
-    `Mirror：${validationOverrides.summary || "-"}`,
-    `域：${truncateList(validationDecision.matchedDomain, 4).join("、") || "-"}`,
-    `覆盖：${truncateList(validationDecision.matchedProjectOverride, 4).join("、") || "-"}`,
-    `显式视觉升级：${truncateList(expansionWave.explicitVisualUpgradeModules, 4).join("、") || "-"}`,
-  ];
-  const autoChainText = [
-    `Gate：${autoChain.gate?.statusLabel || "-"} / ${autoChain.gate?.generatedAt || "-"}`,
-    `Monitor：${autoChain.monitor?.statusLabel || "-"} / ${autoChain.monitor?.generatedAt || "-"}`,
-    `Watch：${autoChain.watch?.statusLabel || "-"} / ${autoChain.watch?.ageText || "-"}`,
-    `E2E：${autoChain.e2e?.statusLabel || "-"} / ${autoChain.e2e?.ageText || "-"}`,
-    `Recovery：${autoChain.watchRecovery?.statusLabel || "-"} / ${autoChain.watchRecovery?.ageText || "-"}`,
-  ];
-  const nextStepText = [
-    `摘要下一步：${summary.summaryNextAction || "-"}`,
-    `可执行：${summary.runnableNextCommand || "-"}`,
-    ...commandText.map((item) => `- ${item}`),
-  ];
-  const evidenceText = [
-    `导航：${visualModel.visualEvidenceFocusSummary || "暂无视觉导航摘要"}`,
-    `候选文件：${fileText.length > 0 ? "" : "暂无"}`,
-    ...fileText.map((item) => `- ${item}`),
-  ].filter(Boolean);
   const helperText = summary.bootstrapShell === true
     ? [
       "初始化占位 shell",
       "",
-      "当前白板不代表真实 gate / monitor 结论。",
+      "当前白板不代表真实插件状态。",
       "下一步必须先执行：",
       "- npm run agent:sync",
     ]
     : [
-      "人工入口与辅助说明",
+      "协作入口",
       "",
-      "10-Zotero-Agent-人工指令窗口.md",
-      "03-Zotero-Agent-人工快速上手.md",
-      "04-Zotero-Agent-高级介入规范.md",
+      "03-模板协作-人工快速上手.md",
+      "04-模板协作-高级介入规范.md",
+      "10-模板协作-人工指令窗口.md",
     ];
 
   const nodes = [
@@ -2038,104 +2640,106 @@ export function buildObsidianInterventionCanvas(summary) {
       "root0001",
       0,
       0,
-      420,
-      210,
-      `当前项目态白板\n\n状态：${visualModel.statusLabel || "待人工介入"}\n来源：${summary.summarySource || "-"}\n结论：${visualModel.headline || "-"}\n${summary.bootstrapShell === true ? "说明：初始化占位，不代表当前结论" : `可执行：${summary.runnableNextCommand || "-"}`}`,
+      430,
+      220,
+      `当前 Zotero 插件白板\n\n状态：${summary.statusLabel || "待人工介入"}\n主线：${phase.label}\n结论：${summary.headline || "-"}\n${summary.bootstrapShell === true ? "说明：初始化占位，不代表当前结论" : `可执行：${summary.runnableNextCommand || "-"}`}`,
       summary.bootstrapShell === true ? "1" : "2",
     ),
     makeNode(
       "meta0002",
       0,
       -220,
-      420,
-      170,
-      `工作台元数据\n\ngeneration_id=${summary.generationId || "-"}\nsummary_source=${summary.summarySource || "-"}\nbootstrap_shell=${summary.bootstrapShell === true ? "true" : "false"}\nstatus_note=01-Zotero-Agent-当前状态总览.md`,
+      430,
+      200,
+      `工作台元数据\n\ngeneration_id=${summary.generationId || "-"}\nsummary_source=${summary.summarySource || "-"}\nbootstrap_shell=${summary.bootstrapShell === true ? "true" : "false"}\nagent_context_generated_at=${summary.agentContext?.generatedAt || "-"}\nagent_context_digest=${summary.agentContext?.budgetMeta?.digest || "-"}\nstatus_note=01-当前Zotero插件-状态总览.md`,
       "5",
     ),
     makeNode(
-      "truth0003",
-      -40,
+      "main0003",
+      0,
       280,
-      360,
-      240,
-      `当前批次 / 当前 truth\n\nActive batch：${currentTruth.activeBatchId || "-"}\n${truthText}`,
+      430,
+      250,
+      `当前主线 / truth\n\nActive batch：${currentTruth.activeBatchId || "-"}\n当前 wave：${expansionWave.currentWaveName || expansionWave.summary || "-"}\nAcceptance：${expansionWave.acceptanceTrack || "-"}\nValidation：${validationDecision.levelLabel || validationDecision.level || "-"}\n摘要：${currentTruth.summary || phase.summary || "-"}\n可见面状态：${phase.surfaceStatus}\n下一焦点：${phase.nextFocus}`,
       "4",
     ),
     makeNode(
-      "wave0004",
+      "surface0004",
+      500,
+      0,
       380,
-      280,
-      360,
-      240,
-      `当前 wave\n\n${waveText.join("\n")}`,
+      210,
+      `${surfaceGroups[0]?.title || "偏好设置与宿主窗格"}\n\n状态：${surfaceGroups[0]?.statusLabel || "-"}\nSurface：${surfaceGroups[0]?.surfaces?.join(" / ") || "-"}\n图：07-当前Zotero插件-偏好设置面板 UI 概念`,
       "4",
     ),
     makeNode(
-      "validation0005",
-      760,
-      280,
-      360,
+      "surface0005",
+      500,
       240,
-      `Validation Profile\n\n${validationText.join("\n")}`,
+      380,
+      210,
+      `${surfaceGroups[1]?.title || "Reader 工具栏与侧栏"}\n\n状态：${surfaceGroups[1]?.statusLabel || "-"}\nSurface：${surfaceGroups[1]?.surfaces?.join(" / ") || "-"}\n图：09-当前Zotero插件-Reader UI 概念`,
+      "4",
+    ),
+    makeNode(
+      "surface0006",
+      500,
+      480,
+      380,
+      220,
+      `${surfaceGroups[2]?.title || "菜单与子菜单"}\n\n状态：${surfaceGroups[2]?.statusLabel || "-"}\nSurface：${surfaceGroups[2]?.surfaces?.join(" / ") || "-"}\n图：11-当前Zotero插件-菜单与子菜单 UI 概念`,
+      "4",
+    ),
+    makeNode(
+      "tech0007",
+      960,
+      0,
+      430,
+      260,
+      `共享技术骨架\n\n${sharedChain.map((item) => `- ${item.title}：${item.detail}`).join("\n")}`,
       "6",
     ),
     makeNode(
-      "chain0006",
-      380,
-      0,
-      360,
-      220,
-      `当前自动链状态\n\n${autoChainText.join("\n")}\n\nGate 结论：${autoChain.gate?.headline || "-"}\nMonitor 结论：${autoChain.monitor?.headline || "-"}`,
-      "3",
-    ),
-    makeNode(
-      "next0007",
-      760,
-      0,
-      360,
-      220,
-      `下一步动作\n\n${nextStepText.join("\n")}`,
-      "2",
-    ),
-    makeNode(
       "evidence0008",
-      1140,
-      0,
-      360,
-      240,
-      `证据与候选文件\n\n${evidenceText.join("\n")}`,
+      960,
+      300,
+      430,
+      250,
+      `证据与风险\n\nGate：${autoChain.gate?.statusLabel || "-"}\nMonitor：${autoChain.monitor?.statusLabel || "-"}\n阻塞：${blockerText.length === 0 ? "暂无明确阻塞项" : ""}\n${blockerText.map((item) => `- ${item}`).join("\n") || ""}\n候选文件：${fileText.length === 0 ? "暂无" : ""}\n${fileText.map((item) => `- ${item}`).join("\n") || ""}`,
       "5",
     ),
     makeNode(
-      "block0009",
-      1140,
-      290,
+      "next0009",
+      1470,
+      0,
       360,
-      220,
-      `当前阻塞\n\n${blockerText.length === 0 ? "暂无明确阻塞项" : blockerText.map((item) => `- ${item}`).join("\n")}`,
-      "1",
+      230,
+      `下一步动作\n\n摘要下一步：${summary.summaryNextAction || "-"}\n可执行：${summary.runnableNextCommand || "-"}\n${commandText.map((item) => `- ${item}`).join("\n")}`,
+      "2",
     ),
     makeNode(
       "helper0010",
-      1520,
-      0,
-      340,
+      1470,
+      280,
+      360,
       220,
       helperText.join("\n"),
-      "4",
+      "3",
     ),
   ];
 
   const edges = [
-    makeEdge("edge0001", "root0001", "truth0003", "当前 truth"),
-    makeEdge("edge0002", "root0001", "chain0006", "自动结论"),
-    makeEdge("edge0003", "truth0003", "wave0004", "当前波次"),
-    makeEdge("edge0004", "wave0004", "validation0005", "验证分层"),
-    makeEdge("edge0005", "chain0006", "next0007", "默认动作"),
-    makeEdge("edge0006", "chain0006", "evidence0008", "证据出口"),
-    makeEdge("edge0007", "evidence0008", "block0009", "阻塞与候选"),
-    makeEdge("edge0008", "next0007", "helper0010", summary.bootstrapShell === true ? "先 sync" : "人工辅助"),
-    makeEdge("edge0009", "meta0002", "root0001", "同轮生成"),
+    makeEdge("edge0001", "meta0002", "root0001", "同轮生成"),
+    makeEdge("edge0002", "root0001", "main0003", "当前主线"),
+    makeEdge("edge0003", "root0001", "surface0004", "pane surfaces"),
+    makeEdge("edge0004", "root0001", "surface0005", "reader surfaces"),
+    makeEdge("edge0005", "root0001", "surface0006", "menu surfaces"),
+    makeEdge("edge0006", "surface0004", "tech0007", "宿主注册"),
+    makeEdge("edge0007", "surface0005", "tech0007", "Reader 事件桥"),
+    makeEdge("edge0008", "surface0006", "tech0007", "state-driven menu"),
+    makeEdge("edge0009", "tech0007", "evidence0008", "surface-local evidence"),
+    makeEdge("edge0010", "main0003", "next0009", "当前动作"),
+    makeEdge("edge0011", "next0009", "helper0010", summary.bootstrapShell === true ? "先 sync" : "协作入口"),
   ];
 
   return {
@@ -2159,10 +2763,10 @@ export function buildHumanInterventionWindowMarkdown(summary, existingContent = 
     "---",
     `generated_at: ${summary.generatedAt}`,
     `status_label: ${summary.statusLabel || "待人工介入"}`,
-    "type: zotero-agent-human-window",
+    "type: template-collaboration-human-window",
     "---",
     "",
-    "# Zotero Agent 人工指令窗口",
+    "# 模板协作人工指令窗口",
     "",
     "## 自动摘要（每次刷新会更新）",
     "",
@@ -2175,7 +2779,7 @@ export function buildHumanInterventionWindowMarkdown(summary, existingContent = 
     `- 视觉采集稳定性：${summary.visualCaptureStabilitySummary || "-"}`,
     `- 视觉主阻断：${summary.visualPrimaryBlockerSummary || "-"}`,
     `- 用尽预算 stage：${exhaustedStageSummary || "暂无"}`,
-    `- 证据入口：[[02-Zotero-Agent-证据索引]]`,
+    `- 证据入口：[[02-当前Zotero插件-证据索引]]`,
     `- 候选文件：${truncateList(summary.candidateFiles, 6).join("、") || "暂无"}`,
     `- 补丁计划：${patchSummary.planStatusLabel || "暂无"}`,
     `- 补丁动作：${patchActionDisplay}`,

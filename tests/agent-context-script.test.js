@@ -133,10 +133,14 @@ describe("Agent Context Scripts", () => {
 
     const contextJSON = readJSON(artifactPath("agent-context.json"));
     const contextMD = readText(artifactPath("agent-context.md"));
-    assert.equal(contextJSON.schemaVersion, 1);
+    assert.equal(contextJSON.schemaVersion, 2);
+    assert.equal(contextJSON.sourceAlignment.status, "repair-required");
+    assert.equal(contextJSON.sourceAlignment.preferredRepairCommand, "npm run agent:gate");
     assert.ok(contextJSON.sourceFreshness.currentTruthUpdatedAt);
     assert.equal(contextJSON.runtimeCompact.budgetMeta.profile, "runtime-compact-v1");
+    assert.equal(contextJSON.runtimeCompact.alignmentRef.status, "repair-required");
     assert.equal(contextJSON.runtimeCompact.artifactRefs.currentTruth, "docs/CURRENT_BACKLOG.md");
+    assert.equal(contextJSON.runtimeCompact.referenceDistillationRef.status, "idle");
     assert.equal(contextJSON.dynamicContext.memory.present, false);
     assert.equal(contextJSON.dynamicContext.gate.present, false);
     assert.ok(contextMD.includes("## Runtime Compact"));
@@ -162,10 +166,15 @@ describe("Agent Context Scripts", () => {
       // blocked gate is expected in this minimal setup
     }
     const secondGate = readJSON(artifactPath("agent-gate.json"));
+    const secondContext = readJSON(artifactPath("agent-context.json"));
 
     assert.equal(firstGate.gatePassed, secondGate.gatePassed);
     assert.equal(firstGate.frontpageSummary?.nextAction, secondGate.frontpageSummary?.nextAction);
     assert.equal(secondGate.agentContext?.present, true);
+    assert.equal(secondContext.sourceAlignment.status, "repair-required");
+    assert.equal(secondContext.sourceAlignment.generationStage, "post-gate");
+    assert.equal(secondContext.sourceAlignment.preferredRepairCommand, "npm run agent:memory");
+    assert.equal(secondContext.sourceFreshness.gateGeneratedAt, secondGate.generatedAt);
   });
 
   it("should surface a unified current-context block in the obsidian handoff", () => {
@@ -187,17 +196,20 @@ describe("Agent Context Scripts", () => {
     execNode(["scripts/agent-context.mjs"]);
     execNode(["scripts/agent-obsidian-handoff.mjs"]);
 
-    const statusNote = readText(path.join(obsidianDir, "01-Zotero-Agent-当前状态总览.md"));
-    const evidenceNote = readText(path.join(obsidianDir, "02-Zotero-Agent-证据索引.md"));
-    assert.ok(statusNote.includes("## 当前上下文"));
+    const statusNote = readText(path.join(obsidianDir, "01-当前Zotero插件-状态总览.md"));
+    const evidenceNote = readText(path.join(obsidianDir, "02-当前Zotero插件-证据索引.md"));
+    const handoff = readJSON(artifactPath("agent-obsidian-handoff.json"));
+    assert.ok(statusNote.includes("## 当前开发上下文"));
     assert.ok(statusNote.includes("Compact Profile"));
+    assert.ok(statusNote.includes("agent_context_digest:"));
     assert.ok(evidenceNote.includes("[[dist/agent-context.md]]"));
+    assert.equal(typeof handoff.sourceAgentContextDigest, "string");
   });
 
   it("should keep agent-context guard in warning mode by default", () => {
     writeJSON(artifactPath("agent-monitor.json"), buildMinimalMonitorSummary());
     writeJSON(artifactPath("agent-context.json"), {
-      schemaVersion: 1,
+      schemaVersion: 2,
       generatedAt: "2026-04-03T00:05:00.000Z",
       sourceFreshness: {
         currentTruthUpdatedAt: "2026-04-03T00:00:00.000Z",
@@ -213,6 +225,12 @@ describe("Agent Context Scripts", () => {
       },
       dynamicContext: {
         dynamicFingerprint: "dynamic-test",
+      },
+      sourceAlignment: {
+        status: "standalone",
+        generationStage: "standalone",
+        preferredRepairCommand: "npm run agent:gate",
+        warningKinds: [],
       },
       decisionHints: {
         nextAction: "npm run agent:obsidian",

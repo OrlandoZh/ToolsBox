@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "mode": "advisory",
+  "gateEffect": "non-blocking",
+  "scenarioName": "performance budget diagnostics",
+  "telemetryBudgets": {
+    "hostReadyDurationMs": {
+      "label": "Host Ready",
+      "warningAbove": 3000,
+      "unit": "ms"
+    },
+    "startupDurationMs": {
+      "label": "Startup",
+      "warningAbove": 4000,
+      "unit": "ms"
+    },
+    "shutdownDurationMs": {
+      "label": "Shutdown",
+      "warningAbove": 1500,
+      "unit": "ms"
+    },
+    "lifecycleSlowOperationCount": {
+      "label": "生命周期慢操作",
+      "warningAbove": 1,
+      "unit": "count"
+    },
+    "httpSlowOperationCount": {
+      "label": "HTTP 慢操作",
+      "warningAbove": 2,
+      "unit": "count"
+    }
+  },
+  "activityBudgets": {
+    "preferences.openPane": {
+      "label": "偏好设置面板打开",
+      "warningAbove": 1600,
+      "unit": "ms"
+    },
+    "itemPane.selectPane": {
+      "label": "条目窗格切换",
+      "warningAbove": 1000,
+      "unit": "ms"
+    },
+    "contextPane.selectPane": {
+      "label": "上下文窗格切换",
+      "warningAbove": 1200,
+      "unit": "ms"
+    },
+    "reader.sidebar.selectView": {
+      "label": "Reader 侧边栏切换",
+      "warningAbove": 1500,
+      "unit": "ms"
+    }
+  }
+}

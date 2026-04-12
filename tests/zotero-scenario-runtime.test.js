@@ -239,4 +239,42 @@ describe("Zotero Scenario Runtime", () => {
     assert.equal(payload.result.error.scenarioName, "cleanup scenario");
     assert.equal(payload.execution.failedCount, 1);
   });
+
+  it("should normalize scenario dom contract payloads through the shared helper", async () => {
+    const scriptedFiles = new Map([
+      ["file:///dom-contract.scenario.js", (scope) => {
+        scope.registerZoteroScenario("dom contract scenario", async ({ helpers }) => ({
+          domContract: {
+            routeId: "reader",
+            adapter: "reader",
+            checks: [
+              helpers.createDomContractCheck("event-doc", true, {
+                label: "reader event doc observed",
+              }),
+            ],
+            summary: "reader dom contract ok",
+          },
+        }));
+      }],
+    ]);
+    const { sandbox } = loadScenarioRuntime(scriptedFiles);
+    await sandbox.loadCleanroomZoteroScenarios({
+      fileHrefs: Array.from(scriptedFiles.keys()),
+      addonConfig: {
+        instanceKey: "TestPlugin",
+      },
+    });
+
+    const payload = JSON.parse(await sandbox.runCleanroomZoteroScenarioByName({
+      name: "dom contract scenario",
+      selectedScenarioNames: ["dom contract scenario"],
+    }));
+
+    assert.equal(payload.result.status, "passed");
+    assert.equal(payload.result.details.domContract.routeId, "reader");
+    assert.equal(payload.result.details.domContract.status, "passed");
+    assert.equal(payload.result.details.domContract.statusLabel, "通过");
+    assert.equal(payload.result.details.domContract.checkCount, 1);
+    assert.equal(payload.result.details.domContract.failedCheckCount, 0);
+  });
 });

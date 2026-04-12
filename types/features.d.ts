@@ -97,6 +97,7 @@ export interface MenuResolvedState extends Record<string, unknown> {
   libraryType: string | null;
   hasCollectionSelection: boolean;
   hasSavedSearchSelection: boolean;
+  collectionTreeRowID: unknown;
   collectionTreeRowType: string | null;
   preferenceFlags: Record<string, unknown>;
   itemKinds: {
@@ -241,11 +242,23 @@ export interface MenuRegisterOptions {
  */
 export interface MenuItemOptions {
   id?: string;
-  label: string;
+  l10nID?: string;
+  l10nArgs?: unknown;
+  label?: string;
   icon?: string;
   enableForTabTypes?: string[];
   onCommand?: (event: Event, context: MenuContext) => void;
   onShowing?: (event: Event, context: MenuContext) => void;
+}
+
+export interface SubmenuOptions {
+  id?: string;
+  target: string;
+  l10nID?: string;
+  l10nArgs?: unknown;
+  label?: string;
+  icon?: string;
+  menus: MenuData[];
 }
 
 export interface MenuManager {
@@ -256,21 +269,23 @@ export interface MenuManager {
   // 核心注册方法
   register(options: MenuRegisterOptions): string | null;
 
-  // 便捷注册方法
+  // 推荐 scene helper
   registerToolsMenuItem(options: MenuItemOptions): string | null;
-  registerContextMenuItem(options: MenuItemOptions): string | null;
+  registerItemMenuItem(options: MenuItemOptions): string | null;
   registerCollectionMenuItem(options: MenuItemOptions): string | null;
+  registerItemPaneInfoRowMenuItem(options: MenuItemOptions): string | null;
+  registerReaderMenubarViewMenuItem(options: MenuItemOptions): string | null;
+  registerItemSubmenu(options: Omit<SubmenuOptions, "target">): string | null;
+  registerCollectionSubmenu(options: Omit<SubmenuOptions, "target">): string | null;
+  registerReaderMenubarViewSubmenu(options: Omit<SubmenuOptions, "target">): string | null;
+
+  // 兼容 alias（默认不作为新代码推荐写法）
+  registerContextMenuItem(options: MenuItemOptions): string | null;
   registerReaderMenuItem(
     config: { target: string },
     options: MenuItemOptions
   ): string | null;
-  registerSubmenu(options: {
-    id?: string;
-    target: string;
-    label: string;
-    icon?: string;
-    menus: MenuData[];
-  }): string | null;
+  registerSubmenu(options: SubmenuOptions): string | null;
   registerStateDrivenMenu(options: StateDrivenMenuOptions): string | null;
   registerSeparator(target: string, id?: string): string | null;
 
@@ -600,6 +615,20 @@ export interface ReaderEvent {
   [key: string]: unknown;
 }
 
+export interface ReaderContextMenuItem {
+  label?: string;
+  l10nID?: string;
+  l10nArgs?: unknown;
+  icon?: string;
+  onCommand?: (...args: unknown[]) => void;
+  [key: string]: unknown;
+}
+
+export type ReaderContextMenuItemSource =
+  | ReaderContextMenuItem
+  | ReaderContextMenuItem[]
+  | ((event: ReaderEvent) => ReaderContextMenuItem | ReaderContextMenuItem[] | null | undefined);
+
 export interface RegisteredReaderEventListener {
   type: string;
   handler: (event: ReaderEvent) => void;
@@ -684,6 +713,8 @@ export interface Reader {
     doc: Document | null;
   };
   isEventAPIAvailable(): boolean;
+  registerViewContextMenuItem(menuItemOrFactory: ReaderContextMenuItemSource, options?: { pluginID?: string }): (() => void) | null;
+  registerAnnotationContextMenuItem(menuItemOrFactory: ReaderContextMenuItemSource, options?: { pluginID?: string }): (() => void) | null;
   registerEventListener(type: string, handler: (event: ReaderEvent) => void, options?: { pluginID?: string }): (() => void) | null;
   unregisterEventListener(type: string, handler: (event: ReaderEvent) => void): number;
   unregisterAllEventListeners(): number;

@@ -1,6 +1,6 @@
 # UI Creation Paths
 
-本指南把本仓库 `reference/plugin/` 中参考项目的 UI 创建方式，抽象成可复用的 clean-room 技术路径，供 agent 在开发或审阅时快速选型。
+本指南把本仓库 `reference/plugin/*` 与 `reference/lajiplugin/*` 中参考项目的 UI 创建方式，抽象成可复用的 clean-room 技术路径，供 agent 在开发或审阅时快速选型。
 
 它回答三个问题：
 
@@ -17,8 +17,9 @@
 ## Authority And Scope
 
 - 本文只沉淀“UI 技术路径”和“关键实现节点”，不定义产品文案、产品布局或阶段真相。
-- 本文允许引用 `reference/plugin/*` 作为只读灵感来源，但不要求复刻其实现。
+- 本文允许引用 `reference/plugin/*` 与 `reference/lajiplugin/*` 作为只读灵感来源，但不要求复刻其实现。
 - 若当前任务不是选 UI 路线，而是抽取窗口、服务、队列、iframe、重资源等跨项目技术链，先看 [docs/REFERENCE_PLUGIN_TECHNICAL_CHAINS.md](./REFERENCE_PLUGIN_TECHNICAL_CHAINS.md)。
+- 若当前任务聚焦在 `item / collection / field / reader` 的右键菜单、子菜单、`popupshowing` 刷新或 repair，先看 [docs/REFERENCE_PLUGIN_MENU_PATTERNS.md](./REFERENCE_PLUGIN_MENU_PATTERNS.md)。
 - 当宿主已有官方 surface 时，优先走官方 surface；不要一上来就 patch 宿主。
 - 当参考项目展示了产品型实现时，只提炼技术路径，不照搬其产品结构、品牌语义或非 clean-room 代码细节。
 
@@ -32,6 +33,7 @@
    优先用统一节点工厂或 `ztoolkit` UI DSL，而不是散落的手写 DOM
 3. 如果是中等复杂度侧栏或对话面板：
    可选 HTML micro-app 路线
+   如果仍想停留在 host surface 内，但状态复杂度已接近独立前端，可先看 default-disabled `react-ui` bundle 的 host-mounted `surface-bridge`，不要直接跳到 iframe 或 host patch
 4. 如果要做独立管理窗口、批量处理窗口或详情窗口：
    优先把窗口 shell 单独建模为 standalone dialog / window shell
 5. 如果要做长期存在的复杂工作台、分栏 pane、自定义宿主元素：
@@ -89,6 +91,10 @@
 - [zotero-pdf-translate-main/src/modules/tabpanel.ts](../reference/plugin/zotero-pdf-translate-main/src/modules/tabpanel.ts)
 - [llm-for-zotero-main/src/modules/contextPanel/index.ts](../reference/plugin/llm-for-zotero-main/src/modules/contextPanel/index.ts)
 - [zotero-format-metadata-main/src/modules/preference.ts](../reference/plugin/zotero-format-metadata-main/src/modules/preference.ts)
+
+菜单补充：
+
+- 若是在做 `menu item / submenu / annotation context menu / popupshowing repair` 的场景细分与方案选择，再看 [docs/REFERENCE_PLUGIN_MENU_PATTERNS.md](./REFERENCE_PLUGIN_MENU_PATTERNS.md)。
 
 ### Path 2. `ztoolkit` 声明式 UI DSL
 
@@ -156,6 +162,7 @@
 - 行为绑定：菜单、下拉、history、picker、preview 在 `setupHandlers` 中增量创建
 - 轻量状态桥：`dataset`、`Map` cache、prefs
 - 跨文档访问：Reader 文档、主窗口文档、note editor iframe 文档显式区分
+- 若 HTML micro-app 已接近“独立组件树 + 高频局部更新”，可升级到 `react-ui` optional bundle 的 `surface-bridge`；保持 JS core 负责 host root / lifecycle，React lane 只负责 mounted tree
 
 优点：
 
@@ -167,6 +174,7 @@
 
 - 需要强纪律地维护 build / handlers / refresh 分层
 - DOM 规模变大后要防止重复绑定和重建过度
+- 若只是为了“写起来更像前端框架”而过早引入 React，会平白扩大依赖和调试面；只有在组件树复杂度真的超过 micro-app 舒适区时才升级
 
 代表参考：
 
@@ -174,6 +182,11 @@
 - [llm-for-zotero-main/src/modules/contextPanel/buildUI.ts](../reference/plugin/llm-for-zotero-main/src/modules/contextPanel/buildUI.ts)
 - [llm-for-zotero-main/src/modules/contextPanel/setupHandlers.ts](../reference/plugin/llm-for-zotero-main/src/modules/contextPanel/setupHandlers.ts)
 - [zotero-AI-Butler-main/src/modules/ItemPaneSection.ts](../reference/plugin/zotero-AI-Butler-main/src/modules/ItemPaneSection.ts)
+
+补充参考：
+
+- `docs/OPTIONAL_BUNDLES.md` 的 `react-ui / surface-bridge`
+- `docs/REFERENCE_AIASSISTANT_REACT_PANEL_PATTERNS.md`
 
 ### Path 4. XUL Custom Element Workspace
 
@@ -377,7 +390,7 @@
 
 代表参考：
 
-- [bibgenie-0.5.7/content/scripts/bibgenie.js](../reference/plugin/bibgenie-0.5.7/content/scripts/bibgenie.js)
+- [bibgenie-0.5.7/content/scripts/bibgenie.js](../reference/lajiplugin/bibgenie-0.5.7/content/scripts/bibgenie.js)
 - [zotero-AI-Butler-main/addon/content/mindmapViewer.html](../reference/plugin/zotero-AI-Butler-main/addon/content/mindmapViewer.html)
 - [zotero-AI-Butler-main/addon/content/mindmap.html](../reference/plugin/zotero-AI-Butler-main/addon/content/mindmap.html)
 - [zotero-addons-main/addon/content/addonDetail.xhtml](../reference/plugin/zotero-addons-main/addon/content/addonDetail.xhtml)
@@ -540,7 +553,7 @@
 
 ## Reference Snapshot Note
 
-- `reference/plugin/*` 是本地只读参考，不是主仓事实源。
+- `reference/plugin/*` 与 `reference/lajiplugin/*` 都是本地只读参考，不是主仓事实源。
 - 当参考项目与 Zotero 当前 authoritative source 冲突时，以本仓 `reference/zotero-main` 和相关 host contract 文档为准。
 - 引用参考项目时，优先提炼“技术路径”和“关键节点”，不要直接复制其产品实现。
 - 需要回溯某个参考项目为什么被映射到某条路线时，再看 [docs/REFERENCE_PLUGIN_UI_ANALYSIS.md](./REFERENCE_PLUGIN_UI_ANALYSIS.md)。

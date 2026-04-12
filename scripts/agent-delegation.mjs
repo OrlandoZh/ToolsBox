@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -15,13 +14,16 @@ import {
   buildDelegationPrompt,
   buildDelegationReview,
   buildMcoRunInvocation,
-  captureProjectSnapshot,
   diffProjectSnapshots,
   loadDelegationManifest,
   loadDelegationRuntimeContext,
+  reviewEphemeralDelegationTask,
   renderDelegationReviewMarkdown,
   resolveDelegationTaskArtifacts,
+  runEphemeralDelegationTask,
+  summarizeDelegationRuntimePreflight,
 } from "./agent-delegation-lib.mjs";
+import { evaluateAgentContextGuard } from "./agent-context-guard-lib.mjs";
 import {
   buildScriptFailureInfo,
   createScriptError,
@@ -123,29 +125,6 @@ function parseArgs(argv) {
   return options;
 }
 
-function tryParseJSON(text) {
-  const normalized = String(text || "").trim();
-  if (!normalized) {
-    return null;
-  }
-  try {
-    return JSON.parse(normalized);
-  }
-  catch {
-    return null;
-  }
-}
-
-function formatCommandLine(command, args) {
-  return [command, ...args].map((part) => {
-    const value = String(part ?? "");
-    if (!value || /[\s"'`]/u.test(value)) {
-      return JSON.stringify(value);
-    }
-    return value;
-  }).join(" ");
-}
-
 function selectTasks(manifest, taskIds) {
   const taskMap = manifest?.taskMap || {};
   return taskIds.map((taskId) => {
@@ -159,7 +138,13 @@ function selectTasks(manifest, taskIds) {
   });
 }
 
+async function writeTaskSnapshot(filePath, payload) {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await writeJSONArtifact(filePath, payload);
+}
+
 async function executeCommand(command, args, { cwd, shell = false } = {}) {
+  const { spawn } = await import("node:child_process");
   return await new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd,
@@ -187,86 +172,15 @@ async function executeCommand(command, args, { cwd, shell = false } = {}) {
   });
 }
 
-async function writeTaskSnapshot(filePath, payload) {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await writeJSONArtifact(filePath, payload);
-}
-
 async function runDelegationTask(task, options = {}) {
-  const artifacts = resolveDelegationTaskArtifacts(projectRoot, task.taskId);
-  await fs.mkdir(artifacts.baseDir, { recursive: true });
-  const runtimeContext = await loadDelegationRuntimeContext(projectRoot);
-
-  const prompt = buildDelegationPrompt(task, {
+  const runRecord = await runEphemeralDelegationTask(projectRoot, task, {
     manifestPath: options.manifestPath,
     inlineContract: options.inlineContract,
-    runtimeContext,
+    runtimeContext: options.runtimeContext || await loadDelegationRuntimeContext(projectRoot),
   });
-  const invocation = buildMcoRunInvocation(task, projectRoot, {
-    prompt,
-    manifestPath: options.manifestPath,
-    inlineContract: options.inlineContract,
-    runtimeContext,
-  });
-  const startedAt = Date.now();
-  const beforeSnapshot = await captureProjectSnapshot(projectRoot);
 
-  await Promise.all([
-    writeTaskSnapshot(artifacts.taskJSON, {
-      savedAt: new Date().toISOString(),
-      task,
-    }),
-    writeTaskSnapshot(artifacts.invocationJSON, {
-      savedAt: new Date().toISOString(),
-      command: invocation.command,
-      args: invocation.args,
-      commandLine: formatCommandLine(invocation.command, invocation.args),
-      cwd: invocation.cwd,
-      prompt,
-      promptMode: invocation.promptMode,
-      contractReference: invocation.contractReference,
-      runtimeContextProfile: invocation.runtimeContextProfile,
-      runtimeContextDigest: invocation.runtimeContextDigest,
-      promptAssembly: invocation.promptAssembly,
-    }),
-    writeTaskSnapshot(artifacts.beforeSnapshotJSON, beforeSnapshot),
-  ]);
-
-  const result = await executeCommand(invocation.command, invocation.args, { cwd: projectRoot });
-  const afterSnapshot = await captureProjectSnapshot(projectRoot);
-  const changedFiles = diffProjectSnapshots(beforeSnapshot, afterSnapshot);
-  const outOfScopeFiles = changedFiles
-    .filter((entry) => !task.scopePaths.some((scope) => entry.path === scope || entry.path.startsWith(`${scope}/`)))
-    .map((entry) => entry.path);
-  const parsedProviderResult = tryParseJSON(result.stdout);
-  const durationMs = Math.max(0, Date.now() - startedAt);
-  const runRecord = {
-    taskId: task.taskId,
-    executedAt: new Date().toISOString(),
-    durationMs,
-    exitCode: result.exitCode,
-    signal: result.signal,
-    commandLine: formatCommandLine(invocation.command, invocation.args),
-    changedFiles,
-    outOfScopeFiles,
-    providerResultPresent: Boolean(parsedProviderResult),
-  };
-
-  await Promise.all([
-    writeTaskSnapshot(artifacts.afterSnapshotJSON, afterSnapshot),
-    fs.writeFile(artifacts.providerStdoutTXT, result.stdout, "utf-8"),
-    fs.writeFile(artifacts.providerStderrTXT, result.stderr, "utf-8"),
-    writeTaskSnapshot(artifacts.providerResultJSON, {
-      capturedAt: new Date().toISOString(),
-      parsed: parsedProviderResult,
-      stdoutFile: path.basename(artifacts.providerStdoutTXT),
-      stderrFile: path.basename(artifacts.providerStderrTXT),
-    }),
-    writeTaskSnapshot(artifacts.runJSON, runRecord),
-  ]);
-
-  if (result.exitCode !== 0) {
-    throw createScriptError("execution", `Delegation task '${task.taskId}' failed with exit code ${result.exitCode ?? "unknown"}`, {
+  if (runRecord.exitCode !== 0) {
+    throw createScriptError("execution", `Delegation task '${task.taskId}' failed with exit code ${runRecord.exitCode ?? "unknown"}`, {
       failedStage: `delegate:${task.taskId}`,
     });
   }
@@ -289,22 +203,15 @@ async function runTestCommand(command) {
 }
 
 async function reviewDelegationTask(task, reviewer) {
-  const artifacts = resolveDelegationTaskArtifacts(projectRoot, task.taskId);
-  const runRecord = JSON.parse(await fs.readFile(artifacts.runJSON, "utf-8"));
   const testResults = [];
   for (const command of task.testCommands) {
     testResults.push(await runTestCommand(command));
   }
 
-  const review = buildDelegationReview(task, runRecord, {
+  const review = await reviewEphemeralDelegationTask(projectRoot, task, {
     reviewer,
     testResults,
   });
-
-  await Promise.all([
-    writeTaskSnapshot(artifacts.reviewJSON, review),
-    fs.writeFile(artifacts.reviewMD, `${renderDelegationReviewMarkdown(review)}\n`, "utf-8"),
-  ]);
 
   if (review.reviewStatus !== "accepted") {
     throw createScriptError("validation", `Delegation review for '${task.taskId}' finished as ${review.reviewStatus}`, {
@@ -386,8 +293,28 @@ async function main() {
 
   if (options.command === "run") {
     assertDelegationBatchSafe(tasks);
+    const runtimeContext = await loadDelegationRuntimeContext(projectRoot);
+    const contextGuard = await evaluateAgentContextGuard(projectRoot, {
+      strict: false,
+    });
+    const runtimePreflight = summarizeDelegationRuntimePreflight(runtimeContext, contextGuard);
+    if (runtimePreflight.blocking) {
+      const recommendationSuffix = runtimePreflight.recommendation
+        ? ` ${runtimePreflight.recommendation}`
+        : "";
+      throw createScriptError("validation", `${runtimePreflight.message}${recommendationSuffix}`, {
+        failedStage: "delegation-context-preflight",
+        details: {
+          blockingKinds: runtimePreflight.blockingKinds,
+          recommendation: runtimePreflight.recommendation,
+        },
+      });
+    }
     for (const task of tasks) {
-      await runDelegationTask(task, options);
+      await runDelegationTask(task, {
+        ...options,
+        runtimeContext,
+      });
       console.log(`Delegation run completed: ${task.taskId}`);
     }
     return;

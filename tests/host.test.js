@@ -227,6 +227,9 @@ describe("ZoteroHost", () => {
     assert.equal(prepared.preferenceSurface.registeredScriptCount, 1);
     assert.equal(prepared.preferenceSurface.registeredStylesheetCount, 1);
     assert.equal(prepared.preferenceSurface.hasLoadBridgeSignature, true);
+    assert.equal(prepared.preferenceSurface.surfaceRootStrategy, "pane-container");
+    assert.equal(prepared.preferenceSurface.layoutMode, "inline");
+    assert.equal(prepared.preferenceSurface.hasHorizontalOverflow, false);
   });
 
   it("should detect interactive preference roots, active tabs, and active panels", async () => {
@@ -306,12 +309,26 @@ describe("ZoteroHost", () => {
       namespaceURI: "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
       childElementCount: 4,
       children: [generalTab, advancedTab, generalPanel, advancedPanel],
+      clientWidth: 560,
+      scrollWidth: 560,
       getAttribute(name) {
         return {
           id: "cleanroomtemplate-preferences-root",
           "data-pref-root": "true",
           "data-active-tab": "advanced",
+          "data-pref-layout": "stacked",
+          "data-pref-width-bucket": "compact",
+          "data-pref-horizontal-overflow": "false",
+          "data-pref-horizontal-overflow-px": "0",
         }[name] || null;
+      },
+      getBoundingClientRect() {
+        return {
+          left: 0,
+          top: 0,
+          width: 560,
+          height: 320,
+        };
       },
       matches(selector) {
         return selector === "[data-pref-root]";
@@ -403,6 +420,12 @@ describe("ZoteroHost", () => {
     });
 
     assert.equal(prepared.preferenceSurface.hasInteractiveRoot, true);
+    assert.equal(prepared.preferenceSurface.surfaceRootStrategy, "pane-root-id");
+    assert.equal(prepared.preferenceSurface.surfaceRootID, "cleanroomtemplate-preferences-root");
+    assert.equal(prepared.preferenceSurface.layoutMode, "stacked");
+    assert.equal(prepared.preferenceSurface.widthBucket, "compact");
+    assert.equal(prepared.preferenceSurface.rootClientWidth, 560);
+    assert.equal(prepared.preferenceSurface.hasHorizontalOverflow, false);
     assert.equal(prepared.preferenceSurface.interactiveRootStrategy, "pane-root-id");
     assert.equal(prepared.preferenceSurface.interactiveRootID, "cleanroomtemplate-preferences-root");
     assert.equal(prepared.preferenceSurface.tabCount, 2);
@@ -847,6 +870,471 @@ describe("ZoteroHost", () => {
     assert.equal(prepared.surfaceElementStrategy, "descendant-root-class");
     assert.equal(prepared.surfaceGeometrySettle?.stable, true);
     assert.equal(prepared.surfaceGeometrySettle?.geometry?.height, 355);
+    assert.equal(prepared.preferenceSurface.surfaceRootStrategy, "descendant-root-class");
+    assert.equal(prepared.preferenceSurface.rootClientWidth, 563);
+    assert.equal(prepared.preferenceSurface.hasHorizontalOverflow, false);
+  });
+
+  it("should treat stable preference pane size as settled even when the window focus path nudges the root position", async () => {
+    let left = 0;
+    setTimeout(() => {
+      left = 3;
+    }, 40);
+
+    const paneElement = {
+      localName: "vbox",
+      namespaceURI: "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
+      childElementCount: 1,
+      children: [{}],
+      clientWidth: 563,
+      scrollWidth: 563,
+      getAttribute(name) {
+        return name === "id" ? "cleanroomtemplate-preferences-root" : null;
+      },
+      getBoundingClientRect() {
+        return {
+          left,
+          top: 0,
+          width: 563,
+          height: 355,
+        };
+      },
+      matches() {
+        return false;
+      },
+      querySelector() {
+        return null;
+      },
+      querySelectorAll(selector) {
+        if (typeof selector === "string" && selector.includes("button")) {
+          return [{}];
+        }
+        return [];
+      },
+    };
+    const pane = {
+      id: "cleanroomtemplate-preferences",
+      container: paneElement,
+      scripts: ["chrome://cleanroomtemplate/content/preference-pane-load-bridge.js"],
+      stylesheets: ["chrome://cleanroomtemplate/content/preferences.css"],
+    };
+    const preferences = {
+      navigation: {
+        value: "cleanroomtemplate-preferences",
+      },
+      panes: {
+        get(id) {
+          return id === "cleanroomtemplate-preferences" ? pane : null;
+        },
+      },
+      async waitForFirstPaneLoad() {},
+      async navigateToPane() {},
+      async waitForPaneSelect() {},
+    };
+    const preferenceWindow = {
+      Zotero_Preferences: preferences,
+      document: {
+        getElementById() {
+          return paneElement;
+        },
+      },
+    };
+
+    globalThis.Zotero = {
+      Utilities: {
+        Internal: {
+          openPreferences() {
+            return preferenceWindow;
+          },
+        },
+      },
+      getMainWindows() {
+        return [];
+      },
+    };
+
+    globalThis.Services = {
+      wm: {
+        getEnumerator() {
+          return {
+            hasMoreElements() {
+              return false;
+            },
+          };
+        },
+      },
+    };
+
+    const host = createZoteroHost({
+      globalScope: globalThis,
+      rootURI: "chrome://cleanroomtemplate/",
+    });
+
+    const prepared = await host.preparePreferencePane({
+      paneID: "cleanroomtemplate-preferences",
+      timeoutMs: 1500,
+    });
+
+    assert.equal(prepared.surfaceGeometrySettle?.stable, true);
+    assert.equal(prepared.surfaceGeometrySettle?.timedOut, false);
+    assert.equal(prepared.surfaceGeometrySettle?.geometry?.width, 563);
+    assert.equal(prepared.surfaceGeometrySettle?.geometry?.height, 355);
+  });
+
+  it("should treat stacked preference pane geometry as settled when width stays stable but height keeps growing", async () => {
+    let height = 205;
+    setTimeout(() => {
+      height = 280;
+    }, 80);
+    setTimeout(() => {
+      height = 330;
+    }, 180);
+    setTimeout(() => {
+      height = 355;
+    }, 280);
+
+    const paneElement = {
+      localName: "vbox",
+      namespaceURI: "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
+      childElementCount: 1,
+      children: [{}],
+      clientWidth: 563,
+      scrollWidth: 563,
+      dataset: {
+        prefLayout: "stacked",
+        prefWidthBucket: "compact",
+      },
+      getAttribute(name) {
+        return name === "id" ? "cleanroomtemplate-preferences-root" : null;
+      },
+      getBoundingClientRect() {
+        return {
+          left: 0,
+          top: 0,
+          width: 563,
+          height,
+        };
+      },
+      matches() {
+        return false;
+      },
+      querySelector() {
+        return null;
+      },
+      querySelectorAll(selector) {
+        if (typeof selector === "string" && selector.includes("button")) {
+          return [{}];
+        }
+        return [];
+      },
+    };
+    const pane = {
+      id: "cleanroomtemplate-preferences",
+      container: paneElement,
+      scripts: ["chrome://cleanroomtemplate/content/preference-pane-load-bridge.js"],
+      stylesheets: ["chrome://cleanroomtemplate/content/preferences.css"],
+    };
+    const preferences = {
+      navigation: {
+        value: "cleanroomtemplate-preferences",
+      },
+      panes: {
+        get(id) {
+          return id === "cleanroomtemplate-preferences" ? pane : null;
+        },
+      },
+      async waitForFirstPaneLoad() {},
+      async navigateToPane() {},
+      async waitForPaneSelect() {},
+    };
+    const preferenceWindow = {
+      Zotero_Preferences: preferences,
+      document: {
+        getElementById() {
+          return paneElement;
+        },
+      },
+    };
+
+    globalThis.Zotero = {
+      Utilities: {
+        Internal: {
+          openPreferences() {
+            return preferenceWindow;
+          },
+        },
+      },
+      getMainWindows() {
+        return [];
+      },
+    };
+
+    globalThis.Services = {
+      wm: {
+        getEnumerator() {
+          return {
+            hasMoreElements() {
+              return false;
+            },
+          };
+        },
+      },
+    };
+
+    const host = createZoteroHost({
+      globalScope: globalThis,
+      rootURI: "chrome://cleanroomtemplate/",
+    });
+
+    const prepared = await host.preparePreferencePane({
+      paneID: "cleanroomtemplate-preferences",
+      timeoutMs: 1500,
+    });
+
+    assert.equal(prepared.preferenceSurface.layoutMode, "stacked");
+    assert.equal(prepared.surfaceGeometrySettle?.stable, true);
+    assert.equal(prepared.surfaceGeometrySettle?.timedOut, false);
+    assert.equal(prepared.surfaceGeometrySettle?.geometry?.width, 563);
+    assert.equal(prepared.surfaceGeometrySettle?.geometry?.height, 355);
+  });
+
+  it("should resize the preference window before final pane settle when a host boundary is requested", async () => {
+    const resizeCalls = [];
+    const paneElement = {
+      localName: "vbox",
+      namespaceURI: "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
+      childElementCount: 1,
+      children: [{}],
+      clientWidth: 560,
+      scrollWidth: 560,
+      getBoundingClientRect() {
+        return {
+          left: 0,
+          top: 0,
+          width: 560,
+          height: 320,
+        };
+      },
+      matches() {
+        return false;
+      },
+      querySelector() {
+        return null;
+      },
+      querySelectorAll(selector) {
+        if (typeof selector === "string" && selector.includes("button")) {
+          return [{}];
+        }
+        return [];
+      },
+    };
+    const pane = {
+      id: "cleanroomtemplate-preferences",
+      container: paneElement,
+      scripts: ["chrome://cleanroomtemplate/content/preference-pane-load-bridge.js"],
+      stylesheets: ["chrome://cleanroomtemplate/content/preferences.css"],
+    };
+    const preferences = {
+      navigation: {
+        value: "cleanroomtemplate-preferences",
+      },
+      panes: {
+        get(id) {
+          return id === "cleanroomtemplate-preferences" ? pane : null;
+        },
+      },
+      async waitForFirstPaneLoad() {},
+      async navigateToPane() {},
+      async waitForPaneSelect() {},
+    };
+    const preferenceWindow = {
+      outerWidth: 1040,
+      outerHeight: 720,
+      screenX: 20,
+      screenY: 30,
+      resizeTo(width, height) {
+        resizeCalls.push({ width, height });
+        this.outerWidth = width;
+        this.outerHeight = height;
+      },
+      Zotero_Preferences: preferences,
+      document: {
+        title: "Zotero Preferences",
+        getElementById() {
+          return paneElement;
+        },
+      },
+    };
+
+    globalThis.Zotero = {
+      Utilities: {
+        Internal: {
+          openPreferences() {
+            return preferenceWindow;
+          },
+        },
+      },
+      getMainWindows() {
+        return [];
+      },
+    };
+
+    globalThis.Services = {
+      wm: {
+        getEnumerator() {
+          return {
+            hasMoreElements() {
+              return false;
+            },
+          };
+        },
+      },
+    };
+
+    const host = createZoteroHost({
+      globalScope: globalThis,
+      rootURI: "chrome://cleanroomtemplate/",
+    });
+
+    const prepared = await host.preparePreferencePane({
+      paneID: "cleanroomtemplate-preferences",
+      windowWidth: 800,
+      windowHeight: 600,
+      timeoutMs: 1000,
+    });
+
+    assert.deepEqual(resizeCalls, [{ width: 800, height: 600 }]);
+    assert.equal(prepared.windowResize?.requestedWidth, 800);
+    assert.equal(prepared.windowResize?.requestedHeight, 600);
+    assert.equal(prepared.windowResize?.targetWidth, 800);
+    assert.equal(prepared.windowResize?.targetHeight, 600);
+    assert.equal(prepared.windowResize?.applied, true);
+    assert.equal(prepared.windowResize?.strategy, "resizeTo");
+    assert.equal(prepared.windowResize?.widthMatched, true);
+    assert.equal(prepared.windowResize?.heightMatched, true);
+    assert.equal(prepared.windowResize?.widthSatisfied, true);
+    assert.equal(prepared.windowResize?.heightSatisfied, true);
+    assert.equal(prepared.windowResize?.boundarySatisfied, true);
+    assert.equal(prepared.windowResize?.settled, true);
+    assert.equal(prepared.windowResize?.timedOut, false);
+    assert.equal(prepared.windowResize?.settleReason, "exact-match");
+    assert.equal(prepared.windowResize?.afterBounds?.width, 800);
+    assert.equal(prepared.windowResize?.afterBounds?.height, 600);
+  });
+
+  it("should accept a stable minimum-height preference window without waiting for an impossible exact outerHeight match", async () => {
+    const paneElement = {
+      localName: "vbox",
+      namespaceURI: "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
+      childElementCount: 1,
+      children: [{}],
+      clientWidth: 563,
+      scrollWidth: 563,
+      getBoundingClientRect() {
+        return {
+          left: 0,
+          top: 0,
+          width: 563,
+          height: 355,
+        };
+      },
+      matches() {
+        return false;
+      },
+      querySelector() {
+        return null;
+      },
+      querySelectorAll(selector) {
+        if (typeof selector === "string" && selector.includes("button")) {
+          return [{}];
+        }
+        return [];
+      },
+    };
+    const pane = {
+      id: "cleanroomtemplate-preferences",
+      container: paneElement,
+      scripts: ["chrome://cleanroomtemplate/content/preference-pane-load-bridge.js"],
+      stylesheets: ["chrome://cleanroomtemplate/content/preferences.css"],
+    };
+    const preferences = {
+      navigation: {
+        value: "cleanroomtemplate-preferences",
+      },
+      panes: {
+        get(id) {
+          return id === "cleanroomtemplate-preferences" ? pane : null;
+        },
+      },
+      async waitForFirstPaneLoad() {},
+      async navigateToPane() {},
+      async waitForPaneSelect() {},
+    };
+    const preferenceWindow = {
+      outerWidth: 1040,
+      outerHeight: 720,
+      screenX: 20,
+      screenY: 30,
+      resizeTo(width, height) {
+        this.outerWidth = width;
+        this.outerHeight = height + 28;
+      },
+      Zotero_Preferences: preferences,
+      document: {
+        title: "Zotero Preferences",
+        getElementById() {
+          return paneElement;
+        },
+      },
+    };
+
+    globalThis.Zotero = {
+      Utilities: {
+        Internal: {
+          openPreferences() {
+            return preferenceWindow;
+          },
+        },
+      },
+      getMainWindows() {
+        return [];
+      },
+    };
+
+    globalThis.Services = {
+      wm: {
+        getEnumerator() {
+          return {
+            hasMoreElements() {
+              return false;
+            },
+          };
+        },
+      },
+    };
+
+    const host = createZoteroHost({
+      globalScope: globalThis,
+      rootURI: "chrome://cleanroomtemplate/",
+    });
+
+    const prepared = await host.preparePreferencePane({
+      paneID: "cleanroomtemplate-preferences",
+      windowWidth: 800,
+      windowHeight: 600,
+      timeoutMs: 1000,
+    });
+
+    assert.equal(prepared.windowResize?.afterBounds?.width, 800);
+    assert.equal(prepared.windowResize?.afterBounds?.height, 628);
+    assert.equal(prepared.windowResize?.widthMatched, true);
+    assert.equal(prepared.windowResize?.heightMatched, false);
+    assert.equal(prepared.windowResize?.widthSatisfied, true);
+    assert.equal(prepared.windowResize?.heightSatisfied, true);
+    assert.equal(prepared.windowResize?.boundarySatisfied, true);
+    assert.equal(prepared.windowResize?.settled, true);
+    assert.equal(prepared.windowResize?.timedOut, false);
+    assert.equal(prepared.windowResize?.settleReason, "stable-min-height");
   });
 
   it("should fall back to direct element screen metrics when window origins are unavailable", () => {
@@ -994,6 +1482,88 @@ describe("ZoteroHost", () => {
     });
   });
 
+  it("should prefer document defaultView over ownerGlobal for reader iframe elements", () => {
+    const mainWindow = {
+      mozInnerScreenX: 120,
+      mozInnerScreenY: 240,
+      screenX: 120,
+      screenY: 220,
+      document: {
+        title: "Main Zotero",
+      },
+    };
+    const frameElement = {
+      ownerDocument: {
+        defaultView: mainWindow,
+      },
+      getBoundingClientRect() {
+        return {
+          left: 40,
+          top: 24,
+          width: 1000,
+          height: 600,
+        };
+      },
+    };
+    const readerWindow = {
+      browsingContext: {
+        embedderElement: frameElement,
+      },
+      document: {
+        title: "PDF.js viewer",
+      },
+    };
+    const element = {
+      ownerGlobal: mainWindow,
+      ownerDocument: {
+        defaultView: readerWindow,
+      },
+      getBoundingClientRect() {
+        return {
+          left: 16,
+          top: 12,
+          width: 180,
+          height: 42,
+        };
+      },
+    };
+
+    globalThis.Zotero = {
+      getMainWindow() {
+        return mainWindow;
+      },
+      getMainWindows() {
+        return [mainWindow];
+      },
+    };
+
+    globalThis.Services = {
+      wm: {
+        getEnumerator() {
+          return {
+            hasMoreElements() {
+              return false;
+            },
+          };
+        },
+      },
+    };
+
+    const host = createZoteroHost({
+      globalScope: globalThis,
+      rootURI: "chrome://cleanroomtemplate/",
+    });
+
+    assert.deepEqual(host.getElementScreenRect(element), {
+      x: 176,
+      y: 276,
+      width: 180,
+      height: 42,
+      title: "PDF.js viewer",
+      source: "element",
+    });
+  });
+
   it("should refresh reader custom menu popups through Zotero MenuManager before replaying popup events", async () => {
     const dispatchedEvents = [];
     const updateCalls = [];
@@ -1087,6 +1657,284 @@ describe("ZoteroHost", () => {
       tabID: "reader-tab-1",
     });
     assert.deepEqual(dispatchedEvents, ["popupshowing", "popupshown"]);
+  });
+
+  it("should prefer native popup opening for reader menubar popups when available", async () => {
+    const dispatchedEvents = [];
+    const updateCalls = [];
+    const openMenuCalls = [];
+    const openPopupCalls = [];
+    const menuElement = {
+      state: "closed",
+      openMenu(force) {
+        openMenuCalls.push(force);
+        this.state = "open";
+      },
+      ownerGlobal: {
+        focus() {},
+      },
+      ownerDocument: {
+        defaultView: {
+          focus() {},
+        },
+      },
+    };
+    const popup = {
+      parentElement: menuElement,
+      state: "closed",
+      screenX: 420,
+      screenY: 280,
+      outerWidth: 180,
+      outerHeight: 240,
+      ownerGlobal: {
+        focus() {},
+      },
+      ownerDocument: {
+        defaultView: {
+          focus() {},
+        },
+      },
+      openPopup(anchor, position, x, y, isContextMenu, attributesOverride, triggerEvent) {
+        openPopupCalls.push({
+          anchor,
+          position,
+          x,
+          y,
+          isContextMenu,
+          attributesOverride,
+          triggerEvent,
+        });
+        this.state = "open";
+      },
+      dispatchEvent(event) {
+        dispatchedEvents.push(event.type);
+      },
+    };
+    const readerWindow = {
+      document: {
+        querySelector(selector) {
+          return selector === "#menu_viewPopup" ? popup : null;
+        },
+      },
+    };
+    const mainWindow = {
+      document: {
+        documentElement: {
+          getAttribute() {
+            return "zotero:main";
+          },
+        },
+      },
+    };
+
+    globalThis.Zotero = {
+      MenuManager: {
+        updateMenuPopup(popupElem, target, args) {
+          updateCalls.push({ popupElem, target, args });
+        },
+      },
+      Items: {
+        get() {
+          return null;
+        },
+      },
+      getMainWindow() {
+        return mainWindow;
+      },
+      getMainWindows() {
+        return [mainWindow];
+      },
+    };
+
+    globalThis.Services = {
+      wm: {
+        getEnumerator() {
+          return {
+            hasMoreElements() {
+              return false;
+            },
+          };
+        },
+      },
+    };
+
+    const host = createZoteroHost({
+      globalScope: globalThis,
+      rootURI: "chrome://cleanroomtemplate/",
+    });
+
+    const resolved = await host.resolveMenuPopup("reader/menubar/view", {
+      reader: {
+        _window: readerWindow,
+      },
+    });
+
+    await resolved.open();
+
+    assert.equal(updateCalls.length, 1);
+    assert.deepEqual(openMenuCalls, [true]);
+    assert.equal(openPopupCalls.length, 1);
+    assert.equal(openPopupCalls[0].anchor, menuElement);
+    assert.equal(openPopupCalls[0].position, "after_start");
+    assert.deepEqual(dispatchedEvents, []);
+  });
+
+  it("should fall back to anchor click when native popup methods are unavailable but popup geometry appears", async () => {
+    const dispatchedEvents = [];
+    class FakeMouseEvent {
+      constructor(type, options = {}) {
+        this.type = type;
+        this.bubbles = options.bubbles ?? false;
+        this.cancelable = options.cancelable ?? false;
+        this.button = options.button ?? 0;
+      }
+    }
+    const anchorEvents = [];
+    const menuElement = {
+      ownerGlobal: {
+        focus() {},
+        MouseEvent: FakeMouseEvent,
+      },
+      ownerDocument: {
+        defaultView: {
+          focus() {},
+          MouseEvent: FakeMouseEvent,
+        },
+      },
+      dispatchEvent(event) {
+        anchorEvents.push(event.type);
+        if (event.type === "click") {
+          popup.screenX = 480;
+          popup.screenY = 320;
+          popup.outerWidth = 200;
+          popup.outerHeight = 160;
+        }
+        return true;
+      },
+    };
+    const popup = {
+      parentElement: menuElement,
+      screenX: 0,
+      screenY: 0,
+      outerWidth: 0,
+      outerHeight: 0,
+      ownerGlobal: {
+        focus() {},
+      },
+      ownerDocument: {
+        defaultView: {
+          focus() {},
+        },
+      },
+      dispatchEvent(event) {
+        dispatchedEvents.push(event.type);
+      },
+    };
+    const readerWindow = {
+      document: {
+        querySelector(selector) {
+          return selector === "#menu_viewPopup" ? popup : null;
+        },
+      },
+    };
+    const mainWindow = {
+      document: {
+        documentElement: {
+          getAttribute() {
+            return "zotero:main";
+          },
+        },
+      },
+    };
+
+    globalThis.Zotero = {
+      MenuManager: {
+        updateMenuPopup() {},
+      },
+      Items: {
+        get() {
+          return null;
+        },
+      },
+      getMainWindow() {
+        return mainWindow;
+      },
+      getMainWindows() {
+        return [mainWindow];
+      },
+    };
+
+    globalThis.Services = {
+      wm: {
+        getEnumerator() {
+          return {
+            hasMoreElements() {
+              return false;
+            },
+          };
+        },
+      },
+    };
+
+    const host = createZoteroHost({
+      globalScope: globalThis,
+      rootURI: "chrome://cleanroomtemplate/",
+    });
+
+    const resolved = await host.resolveMenuPopup("reader/menubar/view", {
+      reader: {
+        _window: readerWindow,
+      },
+    });
+
+    await resolved.open();
+
+    assert.deepEqual(anchorEvents, ["mousedown", "mouseup", "click"]);
+    assert.deepEqual(dispatchedEvents, []);
+  });
+
+  it("should prefer native popup hiding when available", async () => {
+    const dispatchedEvents = [];
+    let hidePopupCalls = 0;
+    const popup = {
+      hidePopup() {
+        hidePopupCalls += 1;
+      },
+      dispatchEvent(event) {
+        dispatchedEvents.push(event.type);
+      },
+    };
+
+    globalThis.Zotero = {
+      getMainWindow() {
+        return null;
+      },
+      getMainWindows() {
+        return [];
+      },
+    };
+
+    globalThis.Services = {
+      wm: {
+        getEnumerator() {
+          return {
+            hasMoreElements() {
+              return false;
+            },
+          };
+        },
+      },
+    };
+
+    const host = createZoteroHost({
+      globalScope: globalThis,
+      rootURI: "chrome://cleanroomtemplate/",
+    });
+
+    await host.simulatePopupClose(popup);
+
+    assert.equal(hidePopupCalls, 1);
+    assert.deepEqual(dispatchedEvents, []);
   });
 
   it("should find item pane buttons by exact data-pane value for CSS-escaped registered ids", async () => {

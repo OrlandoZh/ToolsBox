@@ -8,20 +8,22 @@ import {
   resolveObsidianWorkspaceFiles,
 } from "./agent-obsidian-workspace.mjs";
 import {
+  buildPluginFeatureMapMarkdown,
+  buildPluginUIConceptArtifacts,
   buildObsidianVisualFlowMermaidMarkdown,
   buildObsidianVisualVerdictExcalidrawMarkdown,
   buildObsidianVisualViewModel,
   buildObsidianInterventionCanvas,
   buildObsidianInterventionMarkdown,
   buildObsidianEvidenceMarkdown,
+  buildObsidianTechnicalLineageMarkdown,
   buildHumanAdvancedGuideMarkdown,
   buildHumanQuickstartMarkdown,
   buildHumanInterventionWindowMarkdown,
   summarizeObsidianInterventionContext,
 } from "./agent-obsidian-handoff-lib.mjs";
 import {
-  extractCurrentTruthActiveBatchId,
-  readCurrentTruthSummary,
+  readCurrentTruthState,
 } from "./docs-current-truth-lib.mjs";
 import {
   buildScriptFailureInfo,
@@ -58,15 +60,6 @@ async function readJSONIfExists(filePath) {
     });
 }
 
-function readCurrentTruthActiveBatchId(rootDir) {
-  try {
-    const summary = readCurrentTruthSummary(rootDir);
-    return extractCurrentTruthActiveBatchId(summary);
-  } catch {
-    return null;
-  }
-}
-
 async function readProjectJSONIfExists(relativePath) {
   return await readJSONIfExists(path.join(projectRoot, relativePath));
 }
@@ -84,9 +77,9 @@ async function main() {
     readProjectJSONIfExists(path.join("config", "project-expansion-wave.json")),
     readProjectJSONIfExists(path.join("config", "project-validation-overrides.json")),
   ]);
-  const currentTruthSummary = (() => {
+  const currentTruthState = (() => {
     try {
-      return readCurrentTruthSummary(projectRoot);
+      return readCurrentTruthState(projectRoot);
     } catch {
       return null;
     }
@@ -98,8 +91,8 @@ async function main() {
     monitor,
     e2e,
     agentContext,
-    currentTruthSummary,
-    currentTruthActiveBatchId: readCurrentTruthActiveBatchId(projectRoot),
+    currentTruthSummary: currentTruthState?.summary || null,
+    currentTruthActiveBatchId: currentTruthState?.activeBatchId || null,
     projectExpansionWave,
     projectValidationOverrides,
     bootstrapShell: options.bootstrapShell,
@@ -107,6 +100,9 @@ async function main() {
   const visualViewModel = buildObsidianVisualViewModel(summary);
   const statusMarkdown = buildObsidianInterventionMarkdown(summary);
   const evidenceMarkdown = buildObsidianEvidenceMarkdown(summary);
+  const featureMapMarkdown = buildPluginFeatureMapMarkdown(summary);
+  const technicalLineageMarkdown = buildObsidianTechnicalLineageMarkdown(summary);
+  const conceptArtifacts = buildPluginUIConceptArtifacts(summary);
   const humanQuickstartMarkdown = buildHumanQuickstartMarkdown();
   const humanAdvancedGuideMarkdown = buildHumanAdvancedGuideMarkdown();
   const canvas = buildObsidianInterventionCanvas(summary);
@@ -118,6 +114,12 @@ async function main() {
   await fs.mkdir(workspace.dir, { recursive: true });
   await fs.writeFile(workspace.statusNote, `${statusMarkdown}\n`, "utf-8");
   await fs.writeFile(workspace.evidenceNote, `${evidenceMarkdown}\n`, "utf-8");
+  await fs.writeFile(workspace.featureMapNote, `${featureMapMarkdown}\n`, "utf-8");
+  await fs.writeFile(workspace.technicalLineageNote, `${technicalLineageMarkdown}\n`, "utf-8");
+  await fs.writeFile(workspace.preferencePaneConceptNote, `${conceptArtifacts.preferencePaneMarkdown}\n`, "utf-8");
+  await fs.writeFile(workspace.paneConceptNote, `${conceptArtifacts.paneMarkdown}\n`, "utf-8");
+  await fs.writeFile(workspace.readerConceptNote, `${conceptArtifacts.readerMarkdown}\n`, "utf-8");
+  await fs.writeFile(workspace.menuConceptNote, `${conceptArtifacts.menuMarkdown}\n`, "utf-8");
   await fs.writeFile(workspace.humanQuickstartNote, `${humanQuickstartMarkdown}\n`, "utf-8");
   await fs.writeFile(workspace.humanAdvancedGuideNote, `${humanAdvancedGuideMarkdown}\n`, "utf-8");
   await fs.writeFile(workspace.architectureCanvas, `${JSON.stringify(canvas, null, 2)}\n`, "utf-8");
@@ -128,6 +130,9 @@ async function main() {
   } else {
     await fs.rm(workspace.visualFlowNote, { force: true }).catch(() => {});
     await fs.rm(workspace.visualVerdictExcalidrawNote, { force: true }).catch(() => {});
+  }
+  for (const legacyPath of Array.isArray(workspace.legacyWorkspaceFiles) ? workspace.legacyWorkspaceFiles : []) {
+    await fs.rm(legacyPath, { force: true }).catch(() => {});
   }
   await fs.rm(workspace.legacyHumanGuideNote, { force: true }).catch(() => {});
   const artifactJSONPath = resolveAgentArtifactPath(projectRoot, "agent-obsidian-handoff.json");
@@ -141,8 +146,16 @@ async function main() {
     visualsEnabled,
     statusNote: workspace.statusNote,
     evidenceNote: workspace.evidenceNote,
+    featureMapNote: workspace.featureMapNote,
+    technicalLineageNote: workspace.technicalLineageNote,
     humanWindowNote: workspace.humanWindowNote,
     architectureCanvas: workspace.architectureCanvas,
+    uiConceptNotes: [
+      workspace.preferencePaneConceptNote,
+      workspace.paneConceptNote,
+      workspace.readerConceptNote,
+      workspace.menuConceptNote,
+    ],
     visualFlowNote: visualsEnabled ? workspace.visualFlowNote : null,
     visualVerdictExcalidrawNote: visualsEnabled ? workspace.visualVerdictExcalidrawNote : null,
     summarySource: summary.summarySource || null,
@@ -154,6 +167,8 @@ async function main() {
     sourceMonitorGeneratedAt: summary.sourceMonitorGeneratedAt || null,
     sourceLoopGeneratedAt: summary.sourceLoopGeneratedAt || null,
     sourceAgentContextGeneratedAt: summary.agentContext?.generatedAt || null,
+    sourceAgentContextDigest: summary.agentContext?.budgetMeta?.digest || null,
+    sourceAgentContextAlignmentStatus: summary.agentContext?.alignmentRef?.status || null,
     bootstrapShell: summary.bootstrapShell === true,
     projectContext: summary.projectContext || null,
     durationMs: Math.max(0, Date.now() - scriptStartedAt),

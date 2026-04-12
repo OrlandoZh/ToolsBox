@@ -56,6 +56,8 @@
 ## F. Risk-Control Layer
 - [ ] `SPEC.md` updated before feature coding.
 - [ ] `LEGAL_RISK_CHECKLIST.md` Development Gate completed with evidence before distribution.
+- [ ] `CODE_PROVENANCE.md`、`THIRD_PARTY_NOTICES.md`、`COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md` exist and are ready for release-only review.
 - [ ] `npm run cleanroom:audit` passes and writes `dist/cleanroom-audit.{json,md}`.
 - [ ] Similarity checks executed and reviewed with `npm run cleanroom:sim` when local `reference/` snapshots are mounted.
-- [ ] `npm run release:preflight` enforces release-mode clean-room audit before shipment.
+- [ ] `LEGAL_RISK_CHECKLIST.md` China Commercial Delivery Gate completed with evidence before commercial delivery.
+- [ ] `npm run release:preflight` enforces release-mode clean-room audit plus China Commercial Delivery Gate before shipment.

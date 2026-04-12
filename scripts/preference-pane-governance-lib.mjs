@@ -86,6 +86,18 @@ const REQUIRED_COMPOSER_FRAGMENTS = Object.freeze([
 
 const REQUIRED_TEMPLATE_FRAGMENTS = Object.freeze([
   Object.freeze({
+    label: "preference root id",
+    fragment: 'id="cleanroomtemplate-preferences-root"',
+  }),
+  Object.freeze({
+    label: "preference root marker",
+    fragment: 'data-pref-root="true"',
+  }),
+  Object.freeze({
+    label: "preference root layout state",
+    fragment: 'data-pref-layout="inline"',
+  }),
+  Object.freeze({
     label: "caption l10n id",
     fragment: 'data-l10n-id="cleanroom-pref-caption"',
   }),
@@ -108,6 +120,14 @@ const REQUIRED_TEMPLATE_FRAGMENTS = Object.freeze([
   Object.freeze({
     label: "theme follow host l10n id",
     fragment: 'data-l10n-id="cleanroom-pref-theme-follow-host"',
+  }),
+  Object.freeze({
+    label: "field row class",
+    fragment: 'class="cleanroom-pref-field-row"',
+  }),
+  Object.freeze({
+    label: "control wrap class",
+    fragment: 'class="cleanroom-pref-control-wrap"',
   }),
 ]);
 

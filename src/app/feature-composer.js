@@ -30,8 +30,46 @@ export function createFeatureComposer({
   updateDemoNotifierState,
   optionalBundles,
   openReactDemoWindow,
+  presentReactSurface,
+  renderReactItemPaneSurface,
+  unmountReactItemPaneSurface,
 }) {
   let baselineReady = false;
+  const reactUIBundleEnabled = isOptionalBundleEnabled(optionalBundles, "react-ui");
+  const reactSurfacePresenter = typeof presentReactSurface === "function"
+    ? presentReactSurface
+    : renderReactItemPaneSurface;
+
+  function createItemPaneContractRoot(doc, paneID, children = []) {
+    if (!doc || typeof doc.createElement !== "function") {
+      return null;
+    }
+
+    const root = doc.createElement("vbox");
+    const rootID = `${paneID}-root`;
+    root.id = rootID;
+    root.className = "cleanroom-item-pane-root";
+    if (!root.dataset || typeof root.dataset !== "object") {
+      root.dataset = {};
+    }
+    root.dataset.cleanroomItemPaneRoot = "true";
+    root.dataset.cleanroomPaneID = paneID;
+
+    if (typeof root.setAttribute === "function") {
+      root.setAttribute("data-cleanroom-item-pane-root", "true");
+      root.setAttribute("data-cleanroom-pane-id", paneID);
+      root.setAttribute("class", "cleanroom-item-pane-root");
+      root.setAttribute("id", rootID);
+    }
+
+    children.forEach((child) => {
+      if (typeof root.appendChild === "function") {
+        root.appendChild(child);
+      }
+    });
+
+    return root;
+  }
 
   function getScriptLoader(targetWindow = null) {
     const windowServices = targetWindow?.Services;
@@ -176,7 +214,7 @@ export function createFeatureComposer({
       },
     });
 
-    if (isOptionalBundleEnabled(optionalBundles, "react-ui") && typeof openReactDemoWindow === "function") {
+    if (reactUIBundleEnabled && typeof openReactDemoWindow === "function") {
       commandPalette.registerCommand({
         id: `${config.addonRef}-open-react-ui-demo`,
         label: i18n.t(
@@ -190,7 +228,9 @@ export function createFeatureComposer({
         ),
         condition: () => Boolean(prefs.get("enabled")),
         handler: () => {
-          Promise.resolve(openReactDemoWindow()).catch((error) => {
+          Promise.resolve(openReactDemoWindow({
+            preferredWindowMode: "standalone",
+          })).catch((error) => {
             logger.warn("plugin.reactUIDemo.open.failed", {
               message: String(error?.message || error),
             });
@@ -200,7 +240,7 @@ export function createFeatureComposer({
     }
 
     if (menuManager.isOfficialAPIAvailable()) {
-      menuManager.registerContextMenuItem({
+      menuManager.registerItemMenuItem({
         id: `${config.addonRef}-context-action`,
         l10nID: "cleanroom-menu-label",
         onCommand: (event, context) => {
@@ -212,23 +252,18 @@ export function createFeatureComposer({
         },
       });
 
-      menuManager.registerReaderMenuItem(
-        {
-          target: menuManager.MENU_TARGETS.READER_MENU_VIEW,
+      menuManager.registerReaderMenubarViewMenuItem({
+        id: `${config.addonRef}-reader-summary`,
+        l10nID: "cleanroom-reader-menu-label",
+        onShowing: (event, context) => {
+          if (context && typeof context.setVisible === "function") {
+            context.setVisible(Boolean(reader.getActiveSummary()));
+          }
         },
-        {
-          id: `${config.addonRef}-reader-summary`,
-          l10nID: "cleanroom-reader-menu-label",
-          onShowing: (event, context) => {
-            if (context && typeof context.setVisible === "function") {
-              context.setVisible(Boolean(reader.getActiveSummary()));
-            }
-          },
-          onCommand: () => {
-            runReaderDemo();
-          },
+        onCommand: () => {
+          runReaderDemo();
         },
-      );
+      });
     }
 
     itemTree.registerColumn({
@@ -277,9 +312,18 @@ export function createFeatureComposer({
           demoSectionRefreshers.add(refresh);
         }
       },
-      onDestroy: ({ refresh }) => {
+      onDestroy: ({ refresh, body }) => {
         if (typeof refresh === "function") {
           demoSectionRefreshers.delete(refresh);
+        }
+        if (reactUIBundleEnabled && typeof unmountReactItemPaneSurface === "function") {
+          try {
+            unmountReactItemPaneSurface({ body });
+          } catch (error) {
+            logger.warn?.("plugin.reactUIDemo.itemPane.unmount.failed", {
+              message: String(error?.message || error),
+            });
+          }
         }
       },
       onItemChange: ({ item, setEnabled, setSectionSummary }) => {
@@ -289,7 +333,7 @@ export function createFeatureComposer({
         }
       },
       onRender: ({ doc, body, item, setSectionSummary }) => {
-        body.replaceChildren(
+        const contractRoot = createItemPaneContractRoot(doc, demoSectionID, [
           createSectionLine(
             doc,
             i18n.t("cleanroom-demo-field-item", "Item"),
@@ -310,10 +354,70 @@ export function createFeatureComposer({
             i18n.t("cleanroom-demo-field-status", "Status"),
             i18n.t("cleanroom-demo-status-ready", "Baseline demos ready"),
           ),
-        );
+        ]);
+
+        if (contractRoot) {
+          body.replaceChildren(contractRoot);
+        } else {
+          body.replaceChildren(
+            createSectionLine(
+              doc,
+              i18n.t("cleanroom-demo-field-item", "Item"),
+              getItemSummary(item),
+            ),
+            createSectionLine(
+              doc,
+              i18n.t("cleanroom-demo-field-shortcut", "Shortcut"),
+              `${demoState.shortcutLabel} · ${demoState.shortcutTriggerCount}`,
+            ),
+            createSectionLine(
+              doc,
+              i18n.t("cleanroom-demo-field-notifier", "Notifier"),
+              demoState.lastNotifierEvent,
+            ),
+            createSectionLine(
+              doc,
+              i18n.t("cleanroom-demo-field-status", "Status"),
+              i18n.t("cleanroom-demo-status-ready", "Baseline demos ready"),
+            ),
+          );
+        }
 
         if (item) {
           setSectionSummary(getItemSummary(item));
+        }
+
+        if (reactUIBundleEnabled && typeof reactSurfacePresenter === "function") {
+          Promise.resolve(reactSurfacePresenter({
+            doc,
+            body,
+            preferredWindowMode: "default",
+            props: {
+              title: i18n.t(
+                "cleanroom-react-ui-surface-title",
+                "Optional React Host Surface",
+              ),
+              message: i18n.t(
+                "cleanroom-react-ui-surface-message",
+                "This item pane section proves the optional React lane can mount inside a real Zotero host surface while the JS core keeps ownership of lifecycle and evidence.",
+              ),
+              statusText: i18n.t(
+                "cleanroom-react-ui-surface-status",
+                "Mounted through the item pane section",
+              ),
+              surfaceVariant: "host-pane",
+              items: [
+                `${i18n.t("cleanroom-demo-field-item", "Item")}: ${getItemSummary(item)}`,
+                `${i18n.t("cleanroom-demo-field-shortcut", "Shortcut")}: ${demoState.shortcutLabel} · ${demoState.shortcutTriggerCount}`,
+                `${i18n.t("cleanroom-demo-field-notifier", "Notifier")}: ${demoState.lastNotifierEvent}`,
+                `${i18n.t("cleanroom-demo-field-status", "Status")}: ${i18n.t("cleanroom-demo-status-ready", "Baseline demos ready")}`,
+              ],
+            },
+          })).catch((error) => {
+            logger.warn?.("plugin.reactUIDemo.itemPane.render.failed", {
+              message: String(error?.message || error),
+            });
+          });
         }
       },
     });

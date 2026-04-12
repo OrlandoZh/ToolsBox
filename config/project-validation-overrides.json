@@ -1,10 +1,39 @@
 {
   "schemaVersion": 1,
-  "summary": "Project-local validation overrides for the active ZOTERO-HOST-POLISH-WAVE-001 host-visible polish batch plus the completed OPTIONAL-BUNDLE-WAVE-001 optional bundle baseline.",
+  "summary": "Project-local validation overrides for the active ZOTERO-DOM-CONTRACT-WAVE-001 advisory DOM contract batch, the completed ZOTERO-HOST-POLISH-WAVE-001 host-visible polish baseline, and the completed OPTIONAL-BUNDLE-WAVE-001 optional bundle baseline.",
   "overrides": [
     {
+      "id": "zotero-dom-contract-wave-001",
+      "summary": "DOM contract hardening on the existing preference pane, item pane, and reader surfaces stays advisory-first: keep the real host actions and route-aware DOM checks visible in E2E / monitor / dashboard / gate output, but do not turn route-level DOM contract failures into a new v1 blocker.",
+      "pathMatchers": [
+        "^docs/CURRENT_BACKLOG\\.md$",
+        "^config/project-expansion-wave\\.json$",
+        "^config/project-validation-overrides\\.json$",
+        "^config/project-validation-surfaces\\.json$",
+        "^scripts/zotero-scenario-runtime\\.js$",
+        "^scripts/agent-zotero-(?:e2e|e2e-lib|validation-lib)\\.mjs$",
+        "^scripts/agent-(?:monitor|gate|dashboard)\\.mjs$",
+        "^src/app/(?:feature-composer|host-action-catalog|host-actions|plugin)\\.js$",
+        "^src/platform/zotero-host(?:/|\\.|$)",
+        "^src/features/(?:preference-panes|item-pane|reader)(?:/|\\.|$)",
+        "^types/(?:features|platform|agent)\\.d\\.ts$",
+        "^zotero-scenarios/(?:preferences-control-interaction|item-pane-dom-contract|reader-surface-smoke|reader-fine-grained-hooks|reader-event-hooks)\\.scenario\\.js$",
+        "^tests/(?:agent-zotero-validation-lib|agent-validation-decision-lib|zotero-scenario-runtime|feature-composer|agent-telemetry)\\.test\\.js$"
+      ],
+      "decision": "visual-recommended",
+      "requiredChecks": [
+        "继续通过 `npm run check`、`npm run agent:zotero:e2e`、`npm run agent:monitor` 与 `npm run agent:gate` 完成真实宿主闭环。",
+        "对 `preference pane / item pane / reader` 输出 route-aware DOM contract 摘要，让测试后能直接读到结构化操作日志，不依赖 Error Console。",
+        "DOM contract route 失败在 v1 只记 advisory；除非既有 surface smoke、visual evidence、runtime guard 或 gate 合同失败，否则不单独抬成 blocker。"
+      ],
+      "nonGoals": [
+        "把当前波次重新抬回 strict visual-required",
+        "扩展到 context pane、menu、child window、iframe、XUL custom element 或 virtualized table"
+      ]
+    },
+    {
       "id": "zotero-host-polish-wave-001",
-      "summary": "Host-visible polish work stays visual-required when it touches live interaction consistency, edge-attached geometry, or surface-local evidence on real Zotero surfaces.",
+      "summary": "Host-visible polish work stays visual-required when it touches live interaction consistency, edge-attached geometry, or surface-local evidence on real Zotero surfaces, including collection menu and dynamic submenu verification.",
       "pathMatchers": [
         "^src/app/host-action-(?:catalog|actions)\\.js$",
         "^src/app/plugin-(?:agent|api)\\.js$",
@@ -23,6 +52,7 @@
       "decision": "visual-required",
       "requiredChecks": [
         "完成 in-scope Host Actions 的 surface smoke，并输出逐项 readiness 结果。",
+        "涉及 collection menu 或 dynamic submenu 时，同时证明 live collection context、menuPath/child rebuild 与 surface-local evidence 已成立。",
         "对贴边式 surface 同时证明 live geometry 已跟随宿主 bounds，或在过窄时返回显式 degrade 状态。",
         "为成功的 host-visible surface 采集 surface-local evidence；整窗截图仅作为补充。",
         "继续通过 `npm run check`、`agent:host:guard`、`agent:host:semantic:guard` 与 `agent:gate`。"
@@ -41,9 +71,10 @@
         "^scripts/(?:optional-bundles-lib|build-react-ui)\\.mjs$",
         "^src/app/optional-bundles\\.js$",
         "^src/features/react-ui-demo(?:/|\\.|$)",
+        "^src/utils/(?:react-surface-bridge|surface-window-mode)\\.js$",
         "^src/react-ui(?:/|\\.|$)",
         "^addon-static/content/react-ui(?:/|\\.|$)",
-        "^tests/(?:optional-bundles-lib|build-react-ui)\\.test\\.js$",
+        "^tests/(?:optional-bundles-lib|build-react-ui|react-surface-bridge|surface-window-mode|react-ui-demo)\\.test\\.js$",
         "^tests/(?:feature-composer|host-actions|toolchain|run-all)\\.test\\.js$",
         "^config/project-expansion-wave\\.json$",
         "^config/project-validation-overrides\\.json$",
@@ -55,7 +86,7 @@
       "requiredChecks": [
         "继续先通过 `npm run check` 的 JS-core 主链，不让 default-disabled bundle 破坏现有 build / verify / gate。",
         "确认 `config/optional-bundles.json`、`build:react-ui` 与导出脚手架保持同轮同步。",
-        "当 `react-ui` 被启用或其 shell/host action 改动时，至少补一轮 bundle-local build smoke。"
+        "当 `react-ui` 被启用，或其 window shell / surface bridge / host-mounted demo / host action 改动时，至少补一轮 bundle-local build smoke。"
       ],
       "nonGoals": [
         "在 bundle 默认禁用时把 React 依赖升级成主链强依赖",

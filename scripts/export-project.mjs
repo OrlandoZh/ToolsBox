@@ -5,6 +5,10 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { withBuildLock } from "./build-lock.mjs";
 import {
+  listOptionalBundleRequiredPackages,
+  loadOptionalBundleRegistry,
+} from "./optional-bundles-lib.mjs";
+import {
   assertNonEmptyString,
   buildScriptFailureInfo,
   createScriptError,
@@ -25,6 +29,10 @@ const COPY_PATHS = [
   "config",
   "src",
   "types",
+  "LEGAL_RISK_CHECKLIST.md",
+  "CODE_PROVENANCE.md",
+  "THIRD_PARTY_NOTICES.md",
+  "COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md",
   "scripts/build-lock.mjs",
   "scripts/build-injection-lib.mjs",
   "scripts/build-react-ui.mjs",
@@ -77,7 +85,7 @@ async function copyPath(relativePath, targetRoot) {
   await fs.copyFile(source, target);
 }
 
-function buildExportPackageJSON(sourcePackage) {
+function buildExportPackageJSON(sourcePackage, optionalBundleRegistry = null) {
   const scripts = {
     build: "node scripts/build.mjs",
     package: "node scripts/package.mjs",
@@ -92,7 +100,7 @@ function buildExportPackageJSON(sourcePackage) {
     scripts["build:react-ui"] = sourcePackage.scripts["build:react-ui"];
   }
 
-  return {
+  const exportPackage = {
     name: sourcePackage.name,
     private: true,
     version: sourcePackage.version,
@@ -100,9 +108,36 @@ function buildExportPackageJSON(sourcePackage) {
     license: sourcePackage.license || "UNLICENSED",
     scripts,
   };
+
+  const requiredOptionalPackages = optionalBundleRegistry
+    ? listOptionalBundleRequiredPackages(optionalBundleRegistry)
+    : [];
+  const devDependencies = {};
+  const dependencies = {};
+
+  requiredOptionalPackages.forEach((packageName) => {
+    if (typeof sourcePackage?.devDependencies?.[packageName] === "string") {
+      devDependencies[packageName] = sourcePackage.devDependencies[packageName];
+      return;
+    }
+
+    if (typeof sourcePackage?.dependencies?.[packageName] === "string") {
+      dependencies[packageName] = sourcePackage.dependencies[packageName];
+    }
+  });
+
+  if (Object.keys(devDependencies).length > 0) {
+    exportPackage.devDependencies = devDependencies;
+  }
+
+  if (Object.keys(dependencies).length > 0) {
+    exportPackage.dependencies = dependencies;
+  }
+
+  return exportPackage;
 }
 
-function buildExportReadme(config) {
+function buildExportReadme(config, exportLicense) {
   return `# ${config.addonName} Pure Project Export
 
 这是从主仓库导出的“纯项目”版本，保留插件业务开发与构建所需的最小文件集。
@@ -113,8 +148,9 @@ function buildExportReadme(config) {
 - \`addon-static/\`
 - \`config/\`
 - \`types/\`
+- 中国法商业交付骨架：\`LEGAL_RISK_CHECKLIST.md\`、\`CODE_PROVENANCE.md\`、\`THIRD_PARTY_NOTICES.md\`、\`COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md\`
 - 最小构建脚本：\`build/package/verify/lint/format-check/typecheck\`
-- 可选 bundle 构建脚本：\`build:react-ui\`（默认 disabled，不要求主链安装 React）
+- 可选 bundle 构建脚本：\`build:react-ui\`（默认 disabled，但导出物已声明 \`esbuild / react / react-dom\` 作为 optional lane 的 devDependencies）
 
 ## 静态运行时基线
 
@@ -136,6 +172,12 @@ function buildExportReadme(config) {
 - \`reference/\`、\`docs/\`、\`tests/\`、\`dist/\`、\`.zotero-runtime/\`
 - 当前仓库中的分析性与框架性辅助文档
 
+## 中国法交付提示
+
+- 当前模板根仓库仍是 \`${exportLicense}\`；导出物会沿用该声明，不自动授予第三方再分发模板源码的开放许可。
+- 商业交付前，至少补齐 \`CODE_PROVENANCE.md\`、\`THIRD_PARTY_NOTICES.md\`、\`COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md\` 与 \`LEGAL_RISK_CHECKLIST.md\` 中的 release-only 证据。
+- \`reference/\` 快照、分析笔记、截图基线与 agent 工件不应进入客户交付包或公开发布包。
+
 ## 可用命令
 
 \`\`\`bash
@@ -143,6 +185,7 @@ npm run build
 npm run package
 npm run verify
 npm run check
+npm run build:react-ui
 \`\`\`
 
 导出目标适合继续聚焦插件本体开发；如果需要 agent 闭环、真机 runner、Obsidian 介入包等能力，请回到主仓库。
@@ -187,6 +230,7 @@ export async function main() {
       invalidStage: "read-package-json",
       label: "package.json",
     });
+    const optionalBundleRegistry = loadOptionalBundleRegistry(projectRoot).registry;
     assertNonEmptyString(config?.addonRef, "addon.config.json:addonRef", {
       category: "config",
       failedStage: "validate-config",
@@ -226,14 +270,15 @@ export async function main() {
     }
 
     try {
+      const exportLicense = sourcePackage.license || "UNLICENSED";
       await fs.writeFile(
         path.join(exportRoot, "package.json"),
-        `${JSON.stringify(buildExportPackageJSON(sourcePackage), null, 2)}\n`,
+        `${JSON.stringify(buildExportPackageJSON(sourcePackage, optionalBundleRegistry), null, 2)}\n`,
         "utf-8",
       );
       await fs.writeFile(
         path.join(exportRoot, "README.md"),
-        `${buildExportReadme(config)}\n`,
+        `${buildExportReadme(config, exportLicense)}\n`,
         "utf-8",
       );
       await fs.writeFile(

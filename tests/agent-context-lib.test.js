@@ -13,6 +13,12 @@ function buildCurrentTruth(overrides = {}) {
     present: true,
     sourceFile: "docs/CURRENT_BACKLOG.md",
     updatedAt: "2026-04-03T00:00:00.000Z",
+    meta: {
+      schemaVersion: 1,
+      activeBatchId: "ENG-HIGH-104",
+      currentWaveName: "WAVE-1",
+      acceptanceTrack: "functional-first",
+    },
     activeBatchId: "ENG-HIGH-104",
     currentWaveNameFromTruth: "WAVE-1",
     acceptanceTrackFromTruth: "functional-first",
@@ -174,6 +180,19 @@ function buildGate(overrides = {}) {
   };
 }
 
+function buildReferenceDistillation(overrides = {}) {
+  return {
+    status: "pending",
+    statusLabel: "待整理",
+    summary: "reference distillation pending（1）",
+    pendingCount: 1,
+    lastTopic: "Plugin Menu Patterns",
+    lastDistilledAt: "2026-04-03T00:09:00.000Z",
+    nextSuggestedAction: "npm run agent:sync",
+    ...overrides,
+  };
+}
+
 describe("Agent Context Lib", () => {
   it("should keep stableContextKey tied to governance state instead of runtime outcomes", () => {
     const sources = {
@@ -260,6 +279,9 @@ describe("Agent Context Lib", () => {
     assert.equal(compact.truthRef.activeBatchId, "ENG-HIGH-104");
     assert.equal(compact.truthRef.currentWaveName, "WAVE-1");
     assert.equal(compact.truthRef.validationLevel, "无需视觉验证");
+    assert.equal(compact.alignmentRef.status, "standalone");
+    assert.equal(compact.alignmentRef.generationStage, "standalone");
+    assert.equal(compact.alignmentRef.preferredRepairCommand, "npm run agent:gate");
     assert.equal(compact.actionRef.nextAction, "npm run agent:zotero:e2e");
     assert.equal(compact.statusRef.monitorStatus, "需关注");
     assert.equal(compact.statusRef.gateStatus, "需先处理");
@@ -269,6 +291,10 @@ describe("Agent Context Lib", () => {
     assert.equal(compact.artifactRefs.monitor, "dist/agent-monitor.json");
     assert.equal(compact.artifactRefs.gate, "dist/agent-gate.json");
     assert.equal(compact.artifactRefs.memory, "dist/agent-memory.json");
+    assert.equal(compact.artifactRefs.referenceIntake, "dist/agent-reference-intake/index.json");
+    assert.equal(compact.artifactRefs.referenceDistill, "dist/agent-reference-distill/latest.json");
+    assert.equal(compact.referenceDistillationRef.status, "idle");
+    assert.equal(compact.referenceDistillationRef.pendingCount, 0);
     assert.equal(compactValues.includes(context.stableContext.currentTruth.summary), false);
     assert.equal(compactValues.includes(context.dynamicContext.monitor.summary), false);
     assert.equal(compactValues.includes(context.dynamicContext.memory.summary), false);
@@ -307,11 +333,51 @@ describe("Agent Context Lib", () => {
     const snapshot = summarizeAgentContextSnapshot(context);
 
     assert.equal(snapshot.truthRef.activeBatchId, "ENG-HIGH-104");
+    assert.equal(snapshot.alignmentRef.status, "standalone");
     assert.equal(snapshot.actionRef.nextAction, "npm run agent:zotero:e2e");
     assert.equal(snapshot.statusRef.gateStatus, "需先处理");
     assert.equal(snapshot.driftRef.status, "clear");
     assert.equal(snapshot.artifactRefs.contextJSON, "dist/agent-context.json");
     assert.equal(snapshot.budgetMeta.profile, "runtime-compact-v1");
+    assert.equal(snapshot.referenceDistillationRef.status, "idle");
+  });
+
+  it("should expose reference distillation advisory in dynamic and compact context", () => {
+    const context = buildAgentContext({
+      currentTruth: buildCurrentTruth(),
+      projectExpansionWave: buildExpansionWave(),
+      projectValidationOverrides: buildValidationOverrides(),
+      monitor: buildMonitor(),
+      memory: buildMemory(),
+      gate: buildGate(),
+      referenceDistillation: buildReferenceDistillation(),
+    });
+
+    assert.equal(context.dynamicContext.referenceDistillation.status, "pending");
+    assert.equal(context.runtimeCompact.referenceDistillationRef.status, "pending");
+    assert.equal(context.runtimeCompact.referenceDistillationRef.pendingCount, 1);
+    assert.equal(context.runtimeCompact.referenceDistillationRef.lastTopic, "Plugin Menu Patterns");
+  });
+
+  it("should mark post-gate contexts as aligned and keep business nextAction intact", () => {
+    const context = buildAgentContext({
+      currentTruth: buildCurrentTruth(),
+      projectExpansionWave: buildExpansionWave(),
+      projectValidationOverrides: buildValidationOverrides(),
+      monitor: buildMonitor(),
+      memory: buildMemory(),
+      gate: buildGate(),
+    }, {
+      generationStage: "post-gate",
+    });
+
+    assert.equal(context.schemaVersion, 2);
+    assert.equal(context.sourceAlignment.status, "aligned");
+    assert.equal(context.sourceAlignment.generationStage, "post-gate");
+    assert.equal(context.sourceAlignment.preferredRepairCommand, null);
+    assert.equal(context.decisionHints.nextActionCommand, "npm run agent:zotero:e2e");
+    assert.equal(context.runtimeCompact.alignmentRef.status, "aligned");
+    assert.equal(context.runtimeCompact.alignmentRef.generationStage, "post-gate");
   });
 
   it("should detect freshness and scope drift across truth and source mirrors", () => {

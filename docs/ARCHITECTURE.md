@@ -6,14 +6,16 @@
 
 ### 1. 清洁室架构
 
-**目标**：避免 AGPL3.0 许可证污染
+**目标**：在保证 Zotero 宿主功能可实现的前提下，优先降低第三方开发者著作权 / 开源许可 / 商业交付权利瑕疵风险
 
 **方法**：
 - 从功能需求（而非代码）推导实现
 - 使用 `SPEC.md` 定义行为规格
 - 使用 `npm run cleanroom:audit` 固定开发态 clean-room 门禁
 - 发布前使用 `LEGAL_RISK_CHECKLIST.md` 与 `npm run release:preflight` 检查
+- 中国法口径优先聚焦 `CODE_PROVENANCE.md`、`THIRD_PARTY_NOTICES.md`、`COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md` 与 release-only 的 China Commercial Delivery Gate
 - 在本地挂载 reference 快照时运行 `npm run cleanroom:sim`
+- 宿主接口适配允许按功能可实现优先推进，但不直接复制第三方插件或 reference 项目的实现、文案和静态资源
 
 ### 2. 零外部依赖
 

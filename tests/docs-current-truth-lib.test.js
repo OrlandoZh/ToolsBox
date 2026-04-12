@@ -6,6 +6,8 @@ import {
   applyCurrentTruthSyncPlan,
   buildCurrentTruthSyncPlan,
   extractCurrentTruthActiveBatchId,
+  readCurrentTruthMeta,
+  readCurrentTruthState,
 } from "../scripts/docs-current-truth-lib.mjs";
 import { describe, it, assert } from "./test-framework.js";
 
@@ -31,6 +33,15 @@ function createFixtureProject() {
       "- 当前唯一主线批次已固定为 `ENG-HIGH-103`",
       "- 当前批次收口后，默认下一优先级固定为 `工程化维护文档与自动同步机制`",
       "<!-- CURRENT-TRUTH-SUMMARY:END -->",
+      "",
+      "<!-- CURRENT-TRUTH-META:START -->",
+      JSON.stringify({
+        schemaVersion: 1,
+        activeBatchId: "ENG-HIGH-103",
+        currentWaveName: "WAVE-TEST-001",
+        acceptanceTrack: "functional-first -> gate",
+      }, null, 2),
+      "<!-- CURRENT-TRUTH-META:END -->",
       "",
       "## 其他",
       "",
@@ -87,6 +98,7 @@ describe("Current Truth Sync", () => {
     assert.ok(afterReadme.includes("`ENG-HIGH-103`"));
     assert.ok(afterReadme.includes("前文"));
     assert.ok(afterReadme.includes("尾部"));
+    assert.equal(afterReadme.includes("CURRENT-TRUTH-META"), false);
     assert.equal(beforeReadme.includes("前文"), true);
 
     const noOpPlan = buildCurrentTruthSyncPlan({ rootDir });
@@ -134,6 +146,10 @@ describe("Current Truth Sync", () => {
       "ENG-HIGH-104",
     );
     assert.equal(
+      extractCurrentTruthActiveBatchId("- 当前 active 架构与规划已切到 `ENG-HIGH-104`"),
+      "ENG-HIGH-104",
+    );
+    assert.equal(
       extractCurrentTruthActiveBatchId("- 当前唯一主线批次已固定为 `ENG-HIGH-103`"),
       "ENG-HIGH-103",
     );
@@ -148,5 +164,17 @@ describe("Current Truth Sync", () => {
       extractCurrentTruthActiveBatchId("- 下一步切到 `embeddings`"),
       null,
     );
+  });
+
+  it("should read machine-readable truth meta without syncing it to consumer docs", () => {
+    const rootDir = createFixtureProject();
+    const meta = readCurrentTruthMeta(rootDir);
+    const state = readCurrentTruthState(rootDir);
+
+    assert.equal(meta.schemaVersion, 1);
+    assert.equal(meta.activeBatchId, "ENG-HIGH-103");
+    assert.equal(state.activeBatchId, "ENG-HIGH-103");
+    assert.equal(state.currentWaveName, "WAVE-TEST-001");
+    assert.equal(state.acceptanceTrack, "functional-first -> gate");
   });
 });

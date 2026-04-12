@@ -1,0 +1,198 @@
+{
+  "main": {
+    "id": "b1898059b5451712",
+    "type": "split",
+    "children": [
+      {
+        "id": "4005f17a7a0aedb1",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "28afb5e4846309a9",
+            "type": "leaf",
+            "state": {
+              "type": "excalidraw",
+              "state": {
+                "file": "agent-workbench/09-当前Zotero插件-Reader UI 概念.excalidraw.md"
+              },
+              "icon": "excalidraw-icon",
+              "title": "09-当前Zotero插件-Reader UI 概念.excalidraw"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "88ecea2dda0cc191",
+    "type": "split",
+    "children": [
+      {
+        "id": "858546e81ee3ab5d",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "c1a1b81ccc8fd5eb",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "文件列表"
+            }
+          },
+          {
+            "id": "d64b0a8724c03766",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜索"
+            }
+          },
+          {
+            "id": "cf34a547b8502c06",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "书签"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "f1460f9c957ce4a8",
+    "type": "split",
+    "children": [
+      {
+        "id": "818b3e77a0687a90",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "e88a54242bab618f",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "agent-workbench/00-Zotero-Agent-项目架构与闭环.canvas",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "00-Zotero-Agent-项目架构与闭环 的反向链接列表"
+            }
+          },
+          {
+            "id": "b7bebb0e6e6177dc",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "agent-workbench/00-Zotero-Agent-项目架构与闭环.canvas",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "00-Zotero-Agent-项目架构与闭环 的出链列表"
+            }
+          },
+          {
+            "id": "5741cad85744919d",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "标签"
+            }
+          },
+          {
+            "id": "2174c81dc58cafd9",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "添加笔记属性"
+            }
+          },
+          {
+            "id": "2bb21c98f5d0b1e4",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "agent-workbench/00-Zotero-Agent-项目架构与闭环.canvas",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "00-Zotero-Agent-项目架构与闭环 的大纲"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:新建白板": false,
+      "daily-notes:打开/创建今天的日记": false,
+      "templates:插入模板": false,
+      "command-palette:打开命令面板": false,
+      "bases:新建数据库": false,
+      "obsidian-excalidraw-plugin:新建绘图文件": false
+    }
+  },
+  "active": "28afb5e4846309a9",
+  "lastOpenFiles": [
+    "agent-workbench/11-当前Zotero插件-菜单与子菜单 UI 概念.excalidraw.md",
+    "agent-workbench/08-当前Zotero插件-条目与上下文窗格 UI 概念.excalidraw.md",
+    "agent-workbench/09-当前Zotero插件-Reader UI 概念.excalidraw.md",
+    "agent-workbench/10-模板协作-人工指令窗口.md",
+    "agent-workbench/07-当前Zotero插件-偏好设置面板 UI 概念.excalidraw.md",
+    "agent-workbench/06-当前Zotero插件-技术脉络与宿主接入.md",
+    "agent-workbench/05-当前Zotero插件-功能与可见面地图.md",
+    "agent-workbench/10-Zotero-Agent-人工指令窗口.md",
+    "agent-workbench/04-Zotero-Agent-高级介入规范.md",
+    "agent-workbench/02-Zotero-Agent-证据索引.md"
+  ]
+}

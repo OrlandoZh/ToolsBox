@@ -31,6 +31,7 @@ registerZoteroScenario("reader surface smoke", async ({ assert, helpers, plugin 
   });
   const toolbarSidebarToggleSelector = "#sidebarToggleButton";
   const toolbarInvocations = [];
+  const toolbarMarkerID = `cleanroom-reader-dom-contract-marker-${Date.now()}`;
 
   const unregister = plugin.api.reader.registerEventListener(
     plugin.api.reader.READER_EVENT_TYPES.RENDER_TOOLBAR,
@@ -46,6 +47,7 @@ registerZoteroScenario("reader surface smoke", async ({ assert, helpers, plugin 
       if (record.hasDoc && record.hasAppend) {
         try {
           const marker = doc.createElement("div");
+          marker.id = toolbarMarkerID;
           marker.dataset.cleanroomSurface = "reader-toolbar";
           marker.hidden = true;
           event.append(marker);
@@ -77,6 +79,17 @@ registerZoteroScenario("reader surface smoke", async ({ assert, helpers, plugin 
       message: `Timed out waiting for renderToolbar hook for reader item #${attachment.id}`,
     },
   );
+  const frameWindow = plugin.api.reader.getReaderFrameWindow(attachment.id);
+  const frameDocument = frameWindow?.document || null;
+  const resolveToolbarAnchor = () => frameDocument?.querySelector?.(toolbarSidebarToggleSelector) || null;
+  const toolbarAnchor = await helpers.waitFor(
+    resolveToolbarAnchor,
+    {
+      timeoutMs: 5000,
+      intervalMs: 100,
+      message: `Timed out waiting for reader toolbar anchor ${toolbarSidebarToggleSelector} for item #${attachment.id}`,
+    },
+  );
   const toolbarTrigger = helpers.toSurfaceSmokeResult(
     await helpers.runHostAction("reader.toolbar.triggerButton", {
       itemID: attachment.id,
@@ -89,6 +102,7 @@ registerZoteroScenario("reader surface smoke", async ({ assert, helpers, plugin 
   assert.equal(toolbarHook.hasAppend, true, "toolbarHook.hasAppend");
   assert.equal(toolbarHook.appendError, null, "toolbarHook.appendError");
   assert.equal(toolbarTrigger.ok, true, "toolbarTrigger.ok");
+  const toolbarAnchorAfterReplay = resolveToolbarAnchor();
   const sidebarOpenSignal = await helpers.waitFor(
     () => {
       const frameWindow = plugin.api.reader.getReaderFrameWindow(attachment.id);
@@ -138,6 +152,38 @@ registerZoteroScenario("reader surface smoke", async ({ assert, helpers, plugin 
   assert.equal(sidebarTarget.details?.view, "thumbnails");
   assert.ok(["sidebar-panel", "sidebar-button"].includes(sidebarTarget.details?.surfaceEvidenceElement));
   assertEdgeContract(sidebarSelect, "sidebar-edge-geometry-ready", "sidebar-attached");
+  const domContract = helpers.toDomContractResult({
+    routeId: "reader",
+    adapter: "reader",
+    checks: [
+      helpers.createDomContractCheck("event-doc-observed", toolbarHook.hasDoc === true, {
+        label: "renderToolbar hook receives event.doc",
+      }),
+      helpers.createDomContractCheck("append-available", toolbarHook.hasAppend === true, {
+        label: "renderToolbar hook receives append()",
+      }),
+      helpers.createDomContractCheck("append-postcondition", toolbarHook.appended === true && toolbarHook.appendError === null, {
+        label: "renderToolbar append() succeeds without error",
+      }),
+      helpers.createDomContractCheck("toolbar-anchor-present", Boolean(toolbarAnchor), {
+        label: "reader toolbar host anchor is observable in the reader frame document",
+        actual: toolbarAnchor ? toolbarSidebarToggleSelector : null,
+        expected: toolbarSidebarToggleSelector,
+      }),
+      helpers.createDomContractCheck("toolbar-anchor-owner-document", toolbarAnchor?.ownerDocument === frameDocument && Boolean(frameDocument), {
+        label: "reader toolbar host anchor uses the reader frame document",
+      }),
+      helpers.createDomContractCheck("toolbar-anchor-connected", toolbarAnchorAfterReplay?.isConnected === true, {
+        label: "reader toolbar host anchor stays connected after action replay",
+      }),
+      helpers.createDomContractCheck("sidebar-postcondition", sidebarSelect.observedState.sidebarView === "thumbnails", {
+        label: "reader sidebar postcondition is observable after action replay",
+        actual: sidebarSelect.observedState.sidebarView,
+        expected: "thumbnails",
+      }),
+    ],
+    summary: "Reader DOM contract tracks event.doc, append() success, a stable toolbar host anchor in the frame document, and the sidebar postcondition after live action replay; append visibility is verified in the fine-grained hook route.",
+  });
 
   return {
     attachmentID: attachment.id,
@@ -145,9 +191,12 @@ registerZoteroScenario("reader surface smoke", async ({ assert, helpers, plugin 
     sidebarOpenSignal,
     toolbarObserved: true,
     toolbarHook,
+    toolbarAnchorSelector: toolbarSidebarToggleSelector,
+    toolbarMarkerID,
     surfaceEvidenceTargets: [
       ...toolbarTrigger.surfaceEvidenceTargets,
       ...sidebarSelect.surfaceEvidenceTargets,
     ],
+    domContract,
   };
 });

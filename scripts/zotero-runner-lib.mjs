@@ -42,6 +42,14 @@ const RETRYABLE_RDP_ERROR_CODES = new Set([
   "ECONNRESET",
   "EPIPE",
 ]);
+const FIND_FREE_PORT_HOSTS = Object.freeze([
+  "127.0.0.1",
+  null,
+]);
+const FIND_FREE_PORT_FALLBACK_ERROR_CODES = new Set([
+  "EPERM",
+  "EADDRNOTAVAIL",
+]);
 
 function createRdpEventTimeoutError({
   label = "rdp-event",
@@ -655,11 +663,12 @@ export function buildStartupArgs({
   return [...args, ...startArgs];
 }
 
-export async function findFreePort() {
+async function listenForFreePort({ host = null, createServer = () => net.createServer() } = {}) {
   return await new Promise((resolve, reject) => {
-    const server = net.createServer();
+    const server = createServer();
     server.on("error", reject);
-    server.listen(0, "127.0.0.1", () => {
+    const listenOptions = host ? { port: 0, host } : { port: 0 };
+    server.listen(listenOptions, () => {
       const address = server.address();
       if (!address || typeof address === "string") {
         server.close(() => reject(new Error("Unable to determine free port")));
@@ -675,6 +684,36 @@ export async function findFreePort() {
       });
     });
   });
+}
+
+function shouldRetryFindFreePort(error) {
+  return Boolean(error && FIND_FREE_PORT_FALLBACK_ERROR_CODES.has(String(error.code || "").trim()));
+}
+
+export async function findFreePort(options = {}) {
+  const hosts = Array.isArray(options.hosts) && options.hosts.length > 0
+    ? options.hosts
+    : FIND_FREE_PORT_HOSTS;
+  const createServer = typeof options.createServer === "function"
+    ? options.createServer
+    : () => net.createServer();
+  let lastError = null;
+
+  for (let index = 0; index < hosts.length; index += 1) {
+    const host = hosts[index];
+    try {
+      return await listenForFreePort({ host, createServer });
+    }
+    catch (error) {
+      lastError = error;
+      const hasFallbackHost = index < hosts.length - 1;
+      if (!hasFallbackHost || !shouldRetryFindFreePort(error)) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError || new Error("Unable to determine free port");
 }
 
 export function packageAddon(projectRoot, options = {}) {

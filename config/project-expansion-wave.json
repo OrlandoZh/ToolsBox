@@ -2,55 +2,36 @@
   "schemaVersion": 1,
   "status": "active",
   "currentContractId": "generic-expansion-wave-v1",
-  "currentWaveName": "ZOTERO-HOST-POLISH-WAVE-001",
-  "summary": "Tighten host-visible surface interaction consistency, edge-mode geometry handling, and surface-local evidence while keeping the previous optional bundle lane as a completed baseline and release-only follow-up out of scope.",
+  "currentWaveName": "ZOTERO-DOM-CONTRACT-WAVE-001",
+  "summary": "Active advisory DOM contract hardening wave for the existing preference pane, item pane, and reader host-visible surfaces while keeping release remote distribution, menu/context expansion, and deeper UI route archetypes out of scope.",
   "inScopeModules": [
-    "preference-pane-polish",
-    "context-pane-edge-mode",
-    "item-pane-sidenav-polish",
-    "reader-toolbar-sidebar-polish",
-    "menu-item-polish",
-    "surface-evidence-consistency"
+    "preference-pane-dom-contract",
+    "item-pane-dom-contract",
+    "reader-dom-contract"
   ],
   "outOfScopeModules": [
-    "reader-deeper-event-points",
-    "p1-whitelist-expansion",
-    "agent-runtime-implementation",
-    "ai-service-implementation",
+    "context-pane-dom-contract",
+    "menu-dom-contract",
+    "window-shell-dom-contract",
+    "iframe-app-dom-contract",
+    "xul-custom-element-dom-contract",
+    "virtualized-table-dom-contract",
     "release-remote-distribution"
   ],
   "moduleArchetypes": [
     {
-      "module": "preference-pane-polish",
+      "module": "preference-pane-dom-contract",
       "archetype": "visible-surface"
     },
     {
-      "module": "context-pane-edge-mode",
+      "module": "item-pane-dom-contract",
       "archetype": "visible-surface"
     },
     {
-      "module": "item-pane-sidenav-polish",
+      "module": "reader-dom-contract",
       "archetype": "visible-surface"
-    },
-    {
-      "module": "reader-toolbar-sidebar-polish",
-      "archetype": "visible-surface"
-    },
-    {
-      "module": "menu-item-polish",
-      "archetype": "visible-surface"
-    },
-    {
-      "module": "surface-evidence-consistency",
-      "archetype": "workspace-integration"
     }
   ],
-  "acceptanceTrack": "host-first -> live geometry / interaction consistency -> surface smoke -> surface-local evidence -> full gate",
-  "explicitVisualUpgradeModules": [
-    "preference-pane-polish",
-    "context-pane-edge-mode",
-    "item-pane-sidenav-polish",
-    "reader-toolbar-sidebar-polish",
-    "menu-item-polish"
-  ]
+  "acceptanceTrack": "host-first -> action replay -> route-aware dom contract -> advisory summary",
+  "explicitVisualUpgradeModules": []
 }

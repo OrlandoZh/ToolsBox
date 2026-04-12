@@ -30,6 +30,120 @@ function createSurfaceTargetWithDetails(surfaceId, captureKind, details = {}, re
   };
 }
 
+function createPreferenceGeometrySettleSnapshot(overrides = {}) {
+  return {
+    stable: true,
+    timedOut: false,
+    observedMs: 420,
+    sampleCount: 8,
+    strategy: "pane-root-id",
+    geometry: {
+      left: 0,
+      top: 0,
+      width: 640,
+      height: 360,
+    },
+    ...overrides,
+  };
+}
+
+function createPreferenceWindowResizeSnapshot(overrides = {}) {
+  const requestedWidth = Number.isFinite(Number(overrides.requestedWidth))
+    ? Number(overrides.requestedWidth)
+    : null;
+  const requestedHeight = Number.isFinite(Number(overrides.requestedHeight))
+    ? Number(overrides.requestedHeight)
+    : null;
+  const targetWidth = Number.isFinite(Number(overrides.targetWidth))
+    ? Number(overrides.targetWidth)
+    : requestedWidth;
+  const targetHeight = Number.isFinite(Number(overrides.targetHeight))
+    ? Number(overrides.targetHeight)
+    : requestedHeight;
+  const afterWidth = Number.isFinite(Number(overrides.afterBounds?.width))
+    ? Number(overrides.afterBounds.width)
+    : targetWidth;
+  const afterHeight = Number.isFinite(Number(overrides.afterBounds?.height))
+    ? Number(overrides.afterBounds.height)
+    : targetHeight;
+  const afterBounds = afterWidth && afterHeight
+    ? {
+      x: 10,
+      y: 10,
+      width: afterWidth,
+      height: afterHeight,
+      title: "Preferences",
+      source: "window",
+      ...(overrides.afterBounds || {}),
+    }
+    : null;
+
+  return {
+    requestedWidth,
+    requestedHeight,
+    targetWidth,
+    targetHeight,
+    applied: requestedWidth !== null || requestedHeight !== null,
+    strategy: requestedWidth !== null || requestedHeight !== null ? "resizeTo" : null,
+    beforeBounds: null,
+    afterBounds,
+    widthMatched: requestedWidth === null || afterBounds?.width === requestedWidth,
+    heightMatched: requestedHeight === null || afterBounds?.height === requestedHeight,
+    widthSatisfied: requestedWidth === null || afterBounds?.width === requestedWidth,
+    heightSatisfied: requestedHeight === null || (afterBounds?.height ?? 0) >= requestedHeight,
+    boundarySatisfied: requestedWidth === null || requestedHeight === null
+      ? (requestedWidth === null || afterBounds?.width === requestedWidth)
+        && (requestedHeight === null || (afterBounds?.height ?? 0) >= requestedHeight)
+      : afterBounds?.width === requestedWidth && (afterBounds?.height ?? 0) >= requestedHeight,
+    settled: true,
+    timedOut: false,
+    observedMs: 120,
+    sampleCount: 3,
+    settleReason: "exact-match",
+    ...overrides,
+  };
+}
+
+function createPreferenceSurfaceSnapshot(overrides = {}) {
+  return {
+    rootTagName: "vbox",
+    rootNamespaceURI: "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
+    childElementCount: 3,
+    groupboxCount: 2,
+    headingCount: 2,
+    descriptionCount: 1,
+    coreControlCount: 2,
+    preferenceBindingCount: 2,
+    preferenceDefinitionCount: 3,
+    localizationLinkCount: 0,
+    scriptTagCount: 0,
+    registeredScriptCount: 1,
+    registeredStylesheetCount: 1,
+    hasInlineLoadHook: false,
+    hasLoadBridgeSignature: true,
+    surfaceRootStrategy: "pane-root-id",
+    surfaceRootTagName: "vbox",
+    surfaceRootID: "cleanroomtemplate-preferences-root",
+    layoutMode: "inline",
+    widthBucket: "regular",
+    rootClientWidth: 640,
+    rootScrollWidth: 640,
+    horizontalOverflowPx: 0,
+    hasHorizontalOverflow: false,
+    hasInteractiveRoot: false,
+    interactiveRootStrategy: null,
+    interactiveRootTagName: null,
+    interactiveRootID: null,
+    tabCount: 0,
+    panelCount: 0,
+    activeTabID: null,
+    activePanelID: null,
+    visiblePanelCount: 0,
+    panelCoreControlCount: 0,
+    ...overrides,
+  };
+}
+
 function createFakeSurfaceElement(options = {}) {
   const {
     tagName = "div",
@@ -167,6 +281,7 @@ function createPreferenceControlHarness(options = {}) {
   };
   let pendingThemeValue = null;
   let waitAttemptCount = 0;
+  let lastPrepareOptions = null;
 
   function applyThemeState(value) {
     const nextValue = String(value);
@@ -182,12 +297,23 @@ function createPreferenceControlHarness(options = {}) {
     dataset: {
       cleanroomThemeMode: "follow-host",
       cleanroomTheme: "light",
+      prefLayout: "inline",
+      prefWidthBucket: "regular",
+      prefHorizontalOverflow: "false",
     },
     attributes: {
+      id: "cleanroomtemplate-preferences-root",
       class: "cleanroom-pref-root",
+      "data-pref-root": "true",
+      "data-pref-layout": "inline",
+      "data-pref-width-bucket": "regular",
+      "data-pref-horizontal-overflow": "false",
+      "data-pref-horizontal-overflow-px": "0",
       "data-cleanroom-theme-mode": "follow-host",
       "data-cleanroom-theme": "light",
     },
+    clientWidth: options.rootClientWidth || 640,
+    scrollWidth: options.rootScrollWidth || options.rootClientWidth || 640,
     ownerDocument: null,
     getAttribute(name) {
       return this.attributes[name] || null;
@@ -200,6 +326,14 @@ function createPreferenceControlHarness(options = {}) {
     },
     contains(element) {
       return Object.values(controls).includes(element);
+    },
+    getBoundingClientRect() {
+      return {
+        left: 0,
+        top: 0,
+        width: this.clientWidth,
+        height: 320,
+      };
     },
     parentNode: null,
   };
@@ -454,13 +588,54 @@ function createPreferenceControlHarness(options = {}) {
   };
 
   const host = {
-    async preparePreferencePane() {
+    async preparePreferencePane(prepareOptions = {}) {
+      lastPrepareOptions = prepareOptions;
+      const requestedWidth = Number.isFinite(Number(prepareOptions.windowWidth))
+        ? Number(prepareOptions.windowWidth)
+        : null;
+      const requestedHeight = Number.isFinite(Number(prepareOptions.windowHeight))
+        ? Number(prepareOptions.windowHeight)
+        : null;
       return {
         window,
         paneElement: preparedPaneElement,
         selectedPaneID: `${addonRef}-preferences`,
         paneID: `${addonRef}-preferences`,
-        preferenceSurface: {},
+        preferenceSurface: createPreferenceSurfaceSnapshot({
+          surfaceRootStrategy: options.themeRootOnPaneSelf ? "pane-root-class" : "descendant-root-class",
+          surfaceRootID: "cleanroomtemplate-preferences-root",
+          rootClientWidth: root.clientWidth,
+          rootScrollWidth: root.scrollWidth,
+          layoutMode: root.clientWidth <= 620 ? "stacked" : "inline",
+          widthBucket: root.clientWidth <= 620 ? "compact" : "regular",
+          horizontalOverflowPx: Math.max(0, root.scrollWidth - root.clientWidth),
+          hasHorizontalOverflow: root.scrollWidth - root.clientWidth > 1,
+        }),
+        surfaceGeometrySettle: createPreferenceGeometrySettleSnapshot({
+          strategy: options.themeRootOnPaneSelf ? "pane-root-class" : "descendant-root-class",
+          geometry: {
+            left: 0,
+            top: 0,
+            width: root.clientWidth,
+            height: 320,
+          },
+        }),
+        windowResize: createPreferenceWindowResizeSnapshot({
+          requestedWidth,
+          requestedHeight,
+          targetWidth: requestedWidth,
+          targetHeight: requestedHeight,
+          afterBounds: requestedWidth && requestedHeight
+            ? {
+              x: 10,
+              y: 10,
+              width: requestedWidth,
+              height: requestedHeight,
+              title: "Preferences",
+              source: "window",
+            }
+            : null,
+        }),
       };
     },
     async waitFor(getter) {
@@ -507,6 +682,9 @@ function createPreferenceControlHarness(options = {}) {
     paneElement: preparedPaneElement,
     controls,
     definitions,
+    get lastPrepareOptions() {
+      return lastPrepareOptions;
+    },
   };
 }
 
@@ -692,23 +870,11 @@ describe("Host Actions", () => {
             },
             paneElement: {},
             selectedPaneID: "cleanroomtemplate-preferences",
-            preferenceSurface: {
-              rootTagName: "vbox",
-              rootNamespaceURI: "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
-              childElementCount: 3,
-              groupboxCount: 2,
-              headingCount: 2,
-              descriptionCount: 1,
-              coreControlCount: 2,
-              preferenceBindingCount: 2,
-              preferenceDefinitionCount: 3,
-              localizationLinkCount: 0,
-              scriptTagCount: 0,
+            surfaceGeometrySettle: createPreferenceGeometrySettleSnapshot(),
+            preferenceSurface: createPreferenceSurfaceSnapshot({
               registeredScriptCount: 0,
               registeredStylesheetCount: 0,
-              hasInlineLoadHook: false,
-              hasLoadBridgeSignature: true,
-            },
+            }),
           };
         },
         listPreferenceWindows() {
@@ -731,7 +897,195 @@ describe("Host Actions", () => {
     assert.equal(result.readiness.ok, true);
     assert.equal(result.observedState.selectedPaneID, "cleanroomtemplate-preferences");
     assert.equal(result.observedState.preferenceSurface.preferenceDefinitionCount, 3);
+    assert.equal(result.observedState.layoutMode, "inline");
+    assert.equal(result.observedState.hasHorizontalOverflow, false);
     assert.equal(result.surfaceTarget.surfaceId, "preference-pane");
+  });
+
+  it("should forward host boundary hints to preference pane actions and expose resize diagnostics", async () => {
+    let receivedOptions = null;
+    const runner = createHostActionRunner({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+      host: {
+        async preparePreferencePane(options = {}) {
+          receivedOptions = options;
+          return {
+            window: {
+              focus() {},
+            },
+            paneElement: {},
+            selectedPaneID: "cleanroomtemplate-preferences",
+            surfaceGeometrySettle: createPreferenceGeometrySettleSnapshot({
+              geometry: {
+                left: 0,
+                top: 0,
+                width: 620,
+                height: 360,
+              },
+            }),
+            windowResize: createPreferenceWindowResizeSnapshot({
+              requestedWidth: options.windowWidth,
+              requestedHeight: options.windowHeight,
+              targetWidth: options.windowWidth,
+              targetHeight: options.windowHeight,
+            }),
+            preferenceSurface: createPreferenceSurfaceSnapshot({
+              layoutMode: "stacked",
+              widthBucket: "compact",
+              rootClientWidth: 620,
+              rootScrollWidth: 620,
+            }),
+          };
+        },
+        listPreferenceWindows() {
+          return [{}];
+        },
+        buildSurfaceTarget({ details }) {
+          return createSurfaceTargetWithDetails(
+            "preference-pane",
+            "surface-preference-cleanroomtemplate-preferences",
+            details,
+          );
+        },
+      },
+      reader: {},
+      menuManager: {},
+    });
+
+    const result = await runner.runHostAction("preferences.openPane", {
+      paneID: "cleanroomtemplate-preferences",
+      windowWidth: 800,
+      windowHeight: 600,
+    });
+
+    assert.equal(receivedOptions.windowWidth, 800);
+    assert.equal(receivedOptions.windowHeight, 600);
+    assert.equal(result.ok, true);
+    assert.equal(result.observedState.windowResize.requestedWidth, 800);
+    assert.equal(result.observedState.windowResize.requestedHeight, 600);
+    assert.equal(result.observedState.layoutMode, "stacked");
+    assert.equal(result.surfaceTarget.details.windowResize.requestedWidth, 800);
+    assert.equal(result.surfaceTarget.details.windowResize.requestedHeight, 600);
+  });
+
+  it("should accept preference panes with observed geometry even when settle times out", async () => {
+    const runner = createHostActionRunner({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+      host: {
+        async preparePreferencePane() {
+          return {
+            window: {
+              focus() {},
+            },
+            paneElement: {},
+            selectedPaneID: "cleanroomtemplate-preferences",
+            surfaceGeometrySettle: createPreferenceGeometrySettleSnapshot({
+              stable: false,
+              timedOut: true,
+              observedMs: 1648,
+              sampleCount: 14,
+              geometry: {
+                left: 207,
+                top: 80,
+                width: 563,
+                height: 355,
+              },
+            }),
+            preferenceSurface: createPreferenceSurfaceSnapshot({
+              layoutMode: "stacked",
+              widthBucket: "compact",
+              rootClientWidth: 563,
+              rootScrollWidth: 563,
+              horizontalOverflowPx: 0,
+              hasHorizontalOverflow: false,
+            }),
+          };
+        },
+        listPreferenceWindows() {
+          return [{}];
+        },
+        buildSurfaceTarget({ details }) {
+          return createSurfaceTargetWithDetails(
+            "preference-pane",
+            "surface-preference-cleanroomtemplate-preferences",
+            details,
+          );
+        },
+      },
+      reader: {},
+      menuManager: {},
+    });
+
+    const result = await runner.runHostAction("preferences.openPane", {
+      paneID: "cleanroomtemplate-preferences",
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.readiness.ok, true);
+    assert.equal(result.observedState.surfaceGeometrySettle.stable, false);
+    assert.equal(result.readiness.checks.find((entry) => entry.name === "pane-geometry-ready")?.ok, true);
+    assert.equal(result.readiness.checks.find((entry) => entry.name === "pane-geometry-ready")?.details?.stable, false);
+  });
+
+  it("should fail preference pane readiness when the resolved root still overflows horizontally", async () => {
+    const runner = createHostActionRunner({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+      host: {
+        async preparePreferencePane() {
+          return {
+            window: {
+              focus() {},
+            },
+            paneElement: {},
+            selectedPaneID: "cleanroomtemplate-preferences",
+            surfaceGeometrySettle: createPreferenceGeometrySettleSnapshot({
+              geometry: {
+                left: 0,
+                top: 0,
+                width: 600,
+                height: 360,
+              },
+            }),
+            preferenceSurface: createPreferenceSurfaceSnapshot({
+              layoutMode: "stacked",
+              widthBucket: "compact",
+              rootClientWidth: 600,
+              rootScrollWidth: 648,
+              horizontalOverflowPx: 48,
+              hasHorizontalOverflow: true,
+            }),
+          };
+        },
+        listPreferenceWindows() {
+          return [{}];
+        },
+        buildSurfaceTarget({ details }) {
+          return createSurfaceTargetWithDetails(
+            "preference-pane",
+            "surface-preference-cleanroomtemplate-preferences",
+            details,
+          );
+        },
+      },
+      reader: {},
+      menuManager: {},
+    });
+
+    const result = await runner.runHostAction("preferences.openPane", {
+      paneID: "cleanroomtemplate-preferences",
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(
+      result.readiness.checks.find((entry) => entry.name === "pane-no-horizontal-overflow")?.ok,
+      false,
+    );
   });
 
   it("should run the optional react-ui window host action when the bundle is enabled", async () => {
@@ -804,7 +1158,7 @@ describe("Host Actions", () => {
               },
             },
             selectedPaneID: "cleanroomtemplate-preferences",
-            preferenceSurface: {
+            preferenceSurface: createPreferenceSurfaceSnapshot({
               rootTagName: "div",
               rootNamespaceURI: "http://www.w3.org/1999/xhtml",
               childElementCount: 3,
@@ -814,13 +1168,11 @@ describe("Host Actions", () => {
               coreControlCount: 3,
               preferenceBindingCount: 4,
               preferenceDefinitionCount: 4,
-              localizationLinkCount: 0,
-              scriptTagCount: 0,
-              registeredScriptCount: 1,
-              registeredStylesheetCount: 1,
-              hasInlineLoadHook: false,
-              hasLoadBridgeSignature: true,
-            },
+              surfaceRootStrategy: "descendant-root-class",
+              surfaceRootTagName: "div",
+              rootClientWidth: 563,
+              rootScrollWidth: 563,
+            }),
           };
         },
         listPreferenceWindows() {
@@ -848,6 +1200,7 @@ describe("Host Actions", () => {
     assert.equal(capturedElement, surfaceElement);
     assert.equal(capturedDetails.surfaceRootStrategy, "descendant-root-class");
     assert.equal(capturedDetails.geometrySettled, true);
+    assert.equal(capturedDetails.hasHorizontalOverflow, false);
     assert.equal(result.observedState.surfaceGeometrySettle.geometry.height, 355);
   });
 
@@ -864,9 +1217,8 @@ describe("Host Actions", () => {
             },
             paneElement: {},
             selectedPaneID: "cleanroomtemplate-preferences",
-            preferenceSurface: {
-              rootTagName: "vbox",
-              rootNamespaceURI: "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
+            surfaceGeometrySettle: createPreferenceGeometrySettleSnapshot(),
+            preferenceSurface: createPreferenceSurfaceSnapshot({
               childElementCount: 1,
               groupboxCount: 0,
               headingCount: 1,
@@ -874,13 +1226,9 @@ describe("Host Actions", () => {
               coreControlCount: 0,
               preferenceBindingCount: 0,
               preferenceDefinitionCount: 0,
-              localizationLinkCount: 0,
-              scriptTagCount: 0,
               registeredScriptCount: 1,
               registeredStylesheetCount: 0,
-              hasInlineLoadHook: false,
-              hasLoadBridgeSignature: true,
-            },
+            }),
           };
         },
         listPreferenceWindows() {
@@ -919,9 +1267,8 @@ describe("Host Actions", () => {
             },
             paneElement: {},
             selectedPaneID: "cleanroomtemplate-preferences",
-            preferenceSurface: {
-              rootTagName: "vbox",
-              rootNamespaceURI: "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
+            surfaceGeometrySettle: createPreferenceGeometrySettleSnapshot(),
+            preferenceSurface: createPreferenceSurfaceSnapshot({
               childElementCount: 2,
               groupboxCount: 0,
               headingCount: 1,
@@ -929,12 +1276,8 @@ describe("Host Actions", () => {
               coreControlCount: 0,
               preferenceBindingCount: 0,
               preferenceDefinitionCount: 0,
-              localizationLinkCount: 0,
-              scriptTagCount: 0,
               registeredScriptCount: 1,
               registeredStylesheetCount: 1,
-              hasInlineLoadHook: false,
-              hasLoadBridgeSignature: true,
               hasInteractiveRoot: true,
               interactiveRootStrategy: "data-pref-root",
               interactiveRootTagName: "vbox",
@@ -945,7 +1288,7 @@ describe("Host Actions", () => {
               activePanelID: "general",
               visiblePanelCount: 1,
               panelCoreControlCount: 2,
-            },
+            }),
           };
         },
         listPreferenceWindows() {
@@ -1009,10 +1352,14 @@ describe("Host Actions", () => {
     const textboxResult = await runner.runHostAction("preferences.setTextbox", {
       controlID: "cleanroom-menu-label",
       value: "Scenario Label",
+      windowWidth: 800,
+      windowHeight: 600,
     });
     const menulistResult = await runner.runHostAction("preferences.selectMenulist", {
       preferenceID: "pref-logLevel",
       value: "warn",
+      windowWidth: 800,
+      windowHeight: 600,
     });
 
     assert.equal(textboxResult.ok, true);
@@ -1023,7 +1370,13 @@ describe("Host Actions", () => {
       textboxResult.observedState.prefValueAfter,
       "Scenario Label",
     );
+    assert.equal(textboxResult.observedState.layoutMode, "inline");
+    assert.equal(textboxResult.observedState.hasHorizontalOverflow, false);
+    assert.equal(textboxResult.observedState.windowResize.requestedWidth, 800);
+    assert.equal(textboxResult.observedState.windowResize.requestedHeight, 600);
     assert.equal(textboxResult.surfaceTarget.surfaceId, "preference-control");
+    assert.equal(textboxResult.surfaceTarget.details.layoutMode, "inline");
+    assert.equal(textboxResult.surfaceTarget.details.hasHorizontalOverflow, false);
 
     assert.equal(menulistResult.ok, true);
     assert.equal(menulistResult.readiness.ok, true);
@@ -1034,6 +1387,8 @@ describe("Host Actions", () => {
       harness.prefValues.get("extensions.zotero.cleanroomtemplate.logLevel"),
       "warn",
     );
+    assert.equal(harness.lastPrepareOptions.windowWidth, 800);
+    assert.equal(harness.lastPrepareOptions.windowHeight, 600);
   });
 
   it("should update checkbox controls and fall back to pane evidence when control rect is unavailable", async () => {
@@ -1583,6 +1938,170 @@ describe("Host Actions", () => {
     assert.equal(result.surfaceTarget.details.degradedReason, "width-below-minimum");
   });
 
+  it("should fall back to the live context sidenav when pane and pane button are unavailable", async () => {
+    let capturedTarget = null;
+    const sidenav = createFakeSurfaceElement({
+      localName: "vbox",
+      childElementCount: 1,
+      children: [{}],
+      textContent: "Info",
+      selectorMap: {
+        "*": [{}],
+        "description, .description, p, html\\:p": [{}],
+      },
+    });
+    sidenav.ownerGlobal = {
+      focus() {},
+    };
+
+    const runner = createHostActionRunner({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+      host: {
+        async selectContextPane() {
+          return {
+            tabID: "reader-tab-1",
+            visible: true,
+            pane: null,
+            button: null,
+            container: {
+              sidenav,
+            },
+            activationStrategy: "click",
+            actionElementObserved: true,
+            actionDispatched: true,
+          };
+        },
+        getMainWindow() {
+          return null;
+        },
+        buildSurfaceTarget(input) {
+          capturedTarget = input;
+          return createSurfaceTargetWithDetails(
+            input.surfaceId,
+            input.captureKind,
+            input.details,
+          );
+        },
+      },
+      reader: {},
+      menuManager: {},
+    });
+
+    const result = await runner.runHostAction("contextPane.selectPane", {
+      paneID: "info",
+      activationPolicy: "ui-required",
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(capturedTarget?.element, sidenav);
+    assert.equal(capturedTarget?.window, sidenav.ownerGlobal);
+    assert.equal(result.surfaceTarget.details.surfaceEvidenceElement, "pane-sidenav");
+  });
+
+  it("should clip overflowing context pane surface bounds to the visible window before capture", async () => {
+    const pane = createFakeSurfaceElement({
+      localName: "info-box",
+      childElementCount: 1,
+      children: [{}],
+      textContent: "Context Pane Info",
+      selectorMap: {
+        "*": [{}],
+        "description, .description, p, html\\:p": [{}],
+      },
+    });
+    const paneButton = createFakeSurfaceElement({
+      localName: "toolbarbutton",
+      textContent: "Info",
+      attributes: {
+        "data-pane": "info",
+        role: "tab",
+        "aria-selected": "true",
+      },
+    });
+
+    const runner = createHostActionRunner({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+      host: {
+        async selectContextPane() {
+          return {
+            tabID: "reader-tab-1",
+            visible: true,
+            pane,
+            button: paneButton,
+            container: {
+              sidenav: {
+                querySelectorAll() {
+                  return [paneButton];
+                },
+              },
+            },
+            activationStrategy: "click",
+            actionElementObserved: true,
+            actionDispatched: true,
+          };
+        },
+        getMainWindow() {
+          return {
+            focus() {},
+          };
+        },
+        buildSurfaceTarget(input) {
+          const target = createSurfaceTargetWithDetails(
+            input.surfaceId,
+            input.captureKind,
+            input.details,
+            {
+              x: 1149,
+              y: 688,
+              width: 896,
+              height: 708,
+            },
+          );
+          target.windowBounds = {
+            x: 1141,
+            y: 339,
+            width: 927,
+            height: 628,
+            title: "Host Action Context Pane Smoke - Zotero",
+            source: "window",
+          };
+          return target;
+        },
+      },
+      reader: {},
+      menuManager: {},
+    });
+
+    const result = await runner.runHostAction("contextPane.selectPane", {
+      paneID: "info",
+      activationPolicy: "ui-required",
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.observedState.edgeMode, "pane-attached");
+    assert.equal(result.observedState.boundsSource, "surface-target-rect+window-intersection");
+    assert.equal(result.observedState.degradedReason, null);
+    assert.deepEqual(result.observedState.bounds, {
+      x: 1149,
+      y: 688,
+      width: 896,
+      height: 279,
+    });
+    assert.deepEqual(result.surfaceTarget.rect, {
+      x: 1149,
+      y: 688,
+      width: 896,
+      height: 279,
+      title: "Host Action Context Pane Smoke - Zotero",
+      source: "surface-target-rect+window-intersection",
+    });
+    assert.equal(result.readiness.checks.find((entry) => entry.name === "context-pane-edge-geometry-ready")?.ok, true);
+  });
+
   it("should accept reader sidebar DOM-open evidence when the host uiState flag is stale", async () => {
     const outerContainer = createFakeSurfaceElement({
       localName: "div",
@@ -2093,7 +2612,7 @@ describe("Host Actions", () => {
         buildSurfaceTarget(input) {
           capturedTarget = input;
           return createSurfaceTargetWithDetails(
-            "menu-item",
+            input.surfaceId,
             "surface-menu-reader-view-cleanroomtemplate-reader-summary",
             input.details,
           );
@@ -2133,7 +2652,11 @@ describe("Host Actions", () => {
     assert.equal(triggerResult.observedState.commandDispatched, true);
     assert.equal(triggerResult.observedState.activationStrategy, "command");
     assert.equal(triggerResult.observedState.popupHidden, true);
+    assert.equal(triggerResult.observedState.targetScene, "reader-menubar-view");
+    assert.equal(triggerResult.observedState.menuKind, "menuitem");
+    assert.equal(triggerResult.observedState.menuPathDepth, 1);
     assert.equal(capturedTarget?.element, popupElem);
+    assert.equal(capturedTarget?.surfaceId, "menu-item");
     assert.equal(triggerResult.surfaceTarget.details.surfaceEvidenceElement, "menu-popup");
     assert.ok(clickCount >= 2);
     assert.equal(unknownResult.ok, false);
@@ -2223,7 +2746,7 @@ describe("Host Actions", () => {
         buildSurfaceTarget(input) {
           capturedTarget = input;
           return createSurfaceTargetWithDetails(
-            "menu-item",
+            input.surfaceId,
             "surface-menu-reader-view-cleanroomtemplate-reader-summary",
             input.details,
           );
@@ -2258,6 +2781,343 @@ describe("Host Actions", () => {
 
     assert.equal(result.ok, true);
     assert.equal(capturedTarget?.element, menuElem);
+    assert.equal(capturedTarget?.surfaceId, "menu-item");
     assert.equal(result.surfaceTarget.details.surfaceEvidenceElement, "menu-item");
+  });
+
+  it("should classify main/library/collection actions as collection-menu surfaces", async () => {
+    let capturedTarget = null;
+    const menuElem = {
+      localName: "menuitem",
+      textContent: "Collection Action",
+      dispatchEvent() {},
+      getAttribute(name) {
+        return name === "label" ? "Collection Action" : null;
+      },
+      matches(selector) {
+        return selector === "menuitem, [role='menuitem']";
+      },
+      querySelectorAll() {
+        return [];
+      },
+      ownerGlobal: {
+        focus() {},
+      },
+      ownerDocument: {
+        defaultView: {
+          focus() {},
+        },
+      },
+    };
+    const popupElem = {
+      localName: "menupopup",
+      childElementCount: 1,
+      children: [menuElem],
+      textContent: "Collection Action",
+      getAttribute() {
+        return null;
+      },
+      matches() {
+        return false;
+      },
+      querySelectorAll(selector) {
+        if (selector === "*") {
+          return [menuElem];
+        }
+        if (selector === "menuitem, [role='menuitem']") {
+          return [menuElem];
+        }
+        return [];
+      },
+      ownerGlobal: {
+        focus() {},
+      },
+      ownerDocument: {
+        defaultView: {
+          focus() {},
+        },
+      },
+    };
+
+    const runner = createHostActionRunner({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+      host: {
+        async resolveMenuPopup() {
+          return {
+            async open() {
+              return popupElem;
+            },
+          };
+        },
+        async simulatePopupClose() {
+          return true;
+        },
+        async waitFor(callback) {
+          return await callback();
+        },
+        getElementScreenRect(element) {
+          if (element === popupElem) {
+            return {
+              x: 10,
+              y: 20,
+              width: 240,
+              height: 120,
+            };
+          }
+          return null;
+        },
+        buildSurfaceTarget(input) {
+          capturedTarget = input;
+          return createSurfaceTargetWithDetails(
+            input.surfaceId,
+            "surface-menu-main-library-collection-cleanroomtemplate-collection-action",
+            input.details,
+          );
+        },
+      },
+      reader: {},
+      menuManager: {
+        getMenuRegistrationSnapshot() {
+          return {
+            target: "main/library/collection",
+            menuPaths: ["0"],
+          };
+        },
+        getLiveMenuState() {
+          return {
+            menuElem,
+            popupElem,
+            menuPath: "0",
+            itemCount: 0,
+            phase: "onShowing",
+            collectionTreeRowID: 42,
+            collectionTreeRowType: "collection",
+            resolvedMenu: {
+              menuType: "menuitem",
+              label: "Collection Action",
+            },
+          };
+        },
+      },
+    });
+
+    const result = await runner.runHostAction("menu.trigger", {
+      menuID: "cleanroomtemplate-collection-action",
+      target: "main/library/collection",
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.surfaceTarget.surfaceId, "collection-menu");
+    assert.equal(result.observedState.targetScene, "collection");
+    assert.equal(result.observedState.collectionTreeRowID, 42);
+    assert.equal(result.observedState.collectionTreeRowType, "collection");
+    assert.equal(capturedTarget?.surfaceId, "collection-menu");
+    assert.equal(result.surfaceTarget.details.surfaceEvidenceElement, "menu-popup");
+  });
+
+  it("should classify submenu path actions as menu-submenu surfaces and preserve menuPath metadata", async () => {
+    let capturedTarget = null;
+    const submenuPopup = {
+      localName: "menupopup",
+      childElementCount: 2,
+      children: [{}, {}],
+      textContent: "Rebuild Collection Index Inspect Collection",
+      getAttribute() {
+        return null;
+      },
+      matches() {
+        return false;
+      },
+      querySelectorAll(selector) {
+        if (selector === "*") {
+          return [{}, {}];
+        }
+        if (selector === "menuitem, [role='menuitem']") {
+          return [{}, {}];
+        }
+        return [];
+      },
+      ownerGlobal: {
+        focus() {},
+      },
+      ownerDocument: {
+        defaultView: {
+          focus() {},
+        },
+      },
+    };
+    const menuElem = {
+      localName: "menu",
+      textContent: "Collection Actions",
+      menupopup: submenuPopup,
+      popup: submenuPopup,
+      dispatchEvent() {},
+      getAttribute(name) {
+        return name === "label" ? "Collection Actions" : null;
+      },
+      matches() {
+        return false;
+      },
+      querySelectorAll(selector) {
+        if (selector === "*") {
+          return [{}, {}];
+        }
+        return [];
+      },
+      ownerGlobal: {
+        focus() {},
+      },
+      ownerDocument: {
+        defaultView: {
+          focus() {},
+        },
+      },
+    };
+    const childMenuElem = {
+      localName: "menuitem",
+      textContent: "Rebuild Collection Index",
+      dispatchEvent() {},
+      getAttribute(name) {
+        return name === "label" ? "Rebuild Collection Index" : null;
+      },
+      matches(selector) {
+        return selector === "menuitem, [role='menuitem']";
+      },
+      querySelectorAll() {
+        return [];
+      },
+      ownerGlobal: {
+        focus() {},
+      },
+      ownerDocument: {
+        defaultView: {
+          focus() {},
+        },
+      },
+    };
+    submenuPopup.children = [childMenuElem, {}];
+
+    const rootPopup = {
+      localName: "menupopup",
+      childElementCount: 1,
+      children: [menuElem],
+      textContent: "Collection Actions",
+      getAttribute() {
+        return null;
+      },
+      matches() {
+        return false;
+      },
+      querySelectorAll(selector) {
+        if (selector === "*") {
+          return [menuElem];
+        }
+        return [];
+      },
+      ownerGlobal: {
+        focus() {},
+      },
+      ownerDocument: {
+        defaultView: {
+          focus() {},
+        },
+      },
+    };
+
+    const runner = createHostActionRunner({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+      host: {
+        async resolveMenuPopup() {
+          return {
+            async open() {
+              return rootPopup;
+            },
+          };
+        },
+        async simulatePopupClose() {
+          return true;
+        },
+        async waitFor(callback) {
+          return await callback();
+        },
+        getElementScreenRect(element) {
+          if (element === submenuPopup) {
+            return {
+              x: 10,
+              y: 20,
+              width: 220,
+              height: 90,
+            };
+          }
+          return null;
+        },
+        buildSurfaceTarget(input) {
+          capturedTarget = input;
+          return createSurfaceTargetWithDetails(
+            input.surfaceId,
+            "surface-menu-main-library-collection-cleanroomtemplate-dynamic-submenu",
+            input.details,
+          );
+        },
+      },
+      reader: {},
+      menuManager: {
+        getMenuRegistrationSnapshot() {
+          return {
+            target: "main/library/collection",
+            menuPaths: ["0", "0.0", "0.1"],
+          };
+        },
+        getLiveMenuState(_menuID, menuPath) {
+          if (menuPath === "0.0") {
+            return {
+              menuElem: childMenuElem,
+              popupElem: submenuPopup,
+              menuPath: "0.0",
+              itemCount: 0,
+              phase: "dynamic-rebuild",
+              collectionTreeRowID: 42,
+              collectionTreeRowType: "collection",
+              resolvedMenu: {
+                menuType: "menuitem",
+                label: "Rebuild Collection Index",
+              },
+            };
+          }
+          return {
+            menuElem,
+            popupElem: rootPopup,
+            menuPath: "0",
+            itemCount: 0,
+            phase: "onShowing",
+            collectionTreeRowID: 42,
+            collectionTreeRowType: "collection",
+            resolvedMenu: {
+              menuType: "submenu",
+              label: "Collection Actions",
+            },
+          };
+        },
+      },
+    });
+
+    const result = await runner.runHostAction("menu.trigger", {
+      menuID: "cleanroomtemplate-dynamic-submenu",
+      target: "main/library/collection",
+      menuPath: "0.0",
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.surfaceTarget.surfaceId, "menu-submenu");
+    assert.equal(result.observedState.menuKind, "submenu");
+    assert.equal(result.observedState.menuPath, "0.0");
+    assert.equal(result.observedState.menuPathDepth, 2);
+    assert.equal(result.observedState.targetScene, "collection");
+    assert.equal(capturedTarget?.surfaceId, "menu-submenu");
+    assert.equal(result.surfaceTarget.details.surfaceEvidenceElement, "menu-submenu-popup");
   });
 });

@@ -29,6 +29,7 @@ import {
   assertScript,
   buildScriptFailureInfo,
   createScriptError,
+  wrapScriptError,
 } from "./script-runtime-lib.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -275,7 +276,11 @@ async function main() {
     mode,
     env: channelEnv,
   });
-  const rdpPort = runnerConfig.rdpPort || await findFreePort();
+  const rdpPort = runnerConfig.rdpPort || await findFreePort().catch((error) => {
+    throw wrapScriptError(error, {
+      failedStage: "resolve-rdp-port",
+    });
+  });
   const processLogs = [];
   let child = null;
   let rdp = null;

@@ -24,6 +24,15 @@ function writeCurrentTruth(rootDir, lines = []) {
     ...lines,
     "<!-- CURRENT-TRUTH-SUMMARY:END -->",
     "",
+    "<!-- CURRENT-TRUTH-META:START -->",
+    JSON.stringify({
+      schemaVersion: 1,
+      activeBatchId: "ENG-HIGH-104",
+      currentWaveName: "WAVE-1",
+      acceptanceTrack: "functional-first",
+    }, null, 2),
+    "<!-- CURRENT-TRUTH-META:END -->",
+    "",
   ].join("\n"), "utf-8");
 }
 
@@ -69,7 +78,7 @@ describe("Agent Context Guard", () => {
       writeProjectMirrors(root);
       writeMonitor(root);
       writeJSON(path.join(root, "dist", "agent-context.json"), {
-        schemaVersion: 1,
+        schemaVersion: 2,
         generatedAt: "2026-04-03T00:05:00.000Z",
         sourceFreshness: {
           currentTruthUpdatedAt: "2026-04-03T00:00:00.000Z",
@@ -85,6 +94,12 @@ describe("Agent Context Guard", () => {
         },
         dynamicContext: {
           dynamicFingerprint: "dynamic-test",
+        },
+        sourceAlignment: {
+          status: "standalone",
+          generationStage: "standalone",
+          preferredRepairCommand: "npm run agent:gate",
+          warningKinds: [],
         },
         decisionHints: {
           nextAction: "npm run agent:obsidian",
@@ -141,7 +156,7 @@ describe("Agent Context Guard", () => {
       writeProjectMirrors(root);
       writeMonitor(root);
       writeJSON(path.join(root, "dist", "agent-context.json"), {
-        schemaVersion: 1,
+        schemaVersion: 2,
         generatedAt: "2026-04-03T00:10:00.000Z",
         sourceFreshness: {
           currentTruthUpdatedAt: "2026-04-03T00:00:00.000Z",
@@ -170,6 +185,12 @@ describe("Agent Context Guard", () => {
             summary: "这是一段 gate summary，不应该重新内联。",
           },
         },
+        sourceAlignment: {
+          status: "repair-required",
+          generationStage: "standalone",
+          preferredRepairCommand: "npm run agent:gate",
+          warningKinds: ["freshness-mismatch"],
+        },
         decisionHints: {
           nextAction: "npm run agent:gate",
           mainBlocker: "需要补齐最新工件。",
@@ -195,6 +216,10 @@ describe("Agent Context Guard", () => {
             currentWaveName: "WAVE-1",
             validationLevel: "无需视觉验证",
             leakedSummary: "这是一段完整 current truth summary，不应该回灌到 compact view。",
+          },
+          alignmentRef: {
+            status: "repair-required",
+            generationStage: "standalone",
           },
           actionRef: {
             nextAction: "npm run agent:gate",
@@ -236,7 +261,126 @@ describe("Agent Context Guard", () => {
       assert.equal(result.status, "warning");
       assert.ok(result.warnings.some((item) => item.kind === "compaction-inline-summary"));
       assert.ok(result.warnings.some((item) => item.kind === "missing-artifact-refs"));
+      assert.ok(result.warnings.some((item) => item.id === "runtime-compact-missing-reference-distillation-refs"));
       assert.ok(result.warnings.some((item) => item.kind === "budget-exceeded"));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("should not treat pending reference distillation as a blocker when the compact schema is intact", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "addon-template-context-reference-pending-"));
+    try {
+      writeCurrentTruth(root, [
+        "- 当前已显式进入 `WAVE-1`：保持 host-first 路径。",
+        "- 当前验收主线：`functional-first`",
+      ]);
+      writeProjectMirrors(root);
+      writeMonitor(root);
+      writeJSON(path.join(root, "dist", "agent-context.json"), {
+        schemaVersion: 2,
+        generatedAt: "2026-04-03T00:10:00.000Z",
+        sourceFreshness: {
+          currentTruthUpdatedAt: "2026-04-03T00:00:00.000Z",
+          monitorGeneratedAt: "2026-04-03T00:10:00.000Z",
+          gateGeneratedAt: null,
+          memoryGeneratedAt: null,
+        },
+        stableContext: {
+          stableContextKey: "stable-test",
+          expansionWave: {
+            currentWaveName: "WAVE-1",
+          },
+        },
+        dynamicContext: {
+          dynamicFingerprint: "dynamic-test",
+          referenceDistillation: {
+            status: "pending",
+            pendingCount: 1,
+            lastTopic: "Plugin Menu Patterns",
+            lastDistilledAt: "2026-04-03T00:08:00.000Z",
+            nextSuggestedAction: "npm run agent:sync",
+          },
+        },
+        sourceAlignment: {
+          status: "repair-required",
+          generationStage: "standalone",
+          preferredRepairCommand: "npm run agent:gate",
+          warningKinds: [],
+        },
+        decisionHints: {
+          nextAction: "npm run agent:gate",
+          mainBlocker: "需要补齐最新工件。",
+          recommendedEvidence: [],
+        },
+        driftSignals: {
+          status: "clear",
+          warningCount: 0,
+          signals: [],
+        },
+        runtimeCompact: {
+          truthRef: {
+            activeBatchId: "ENG-HIGH-104",
+            currentWaveName: "WAVE-1",
+            validationLevel: "无需视觉验证",
+          },
+          alignmentRef: {
+            status: "repair-required",
+            generationStage: "standalone",
+          },
+          actionRef: {
+            nextAction: "npm run agent:gate",
+            mainBlocker: "需要补齐最新工件。",
+          },
+          statusRef: {
+            stableContextKey: "stable-test",
+            dynamicFingerprint: "dynamic-test",
+            monitorStatus: "稳定",
+            gateStatus: "缺失",
+            memoryFingerprint: null,
+            releaseStatus: "缺失",
+          },
+          driftRef: {
+            status: "clear",
+            warningCount: 0,
+            warnings: [],
+          },
+          referenceDistillationRef: {
+            status: "pending",
+            pendingCount: 1,
+            lastTopic: "Plugin Menu Patterns",
+            lastDistilledAt: "2026-04-03T00:08:00.000Z",
+            nextSuggestedAction: "npm run agent:sync",
+          },
+          evidenceRefs: [],
+          artifactRefs: {
+            currentTruth: "docs/CURRENT_BACKLOG.md",
+            monitor: "dist/agent-monitor.json",
+            gate: "dist/agent-gate.json",
+            memory: "dist/agent-memory.json",
+            referenceIntake: "dist/agent-reference-intake/index.json",
+            referenceDistill: "dist/agent-reference-distill/latest.json",
+            contextJSON: "dist/agent-context.json",
+            contextMarkdown: "dist/agent-context.md",
+          },
+          freshness: {
+            currentTruthUpdatedAt: "2026-04-03T00:00:00.000Z",
+            monitorGeneratedAt: "2026-04-03T00:10:00.000Z",
+            gateGeneratedAt: null,
+            memoryGeneratedAt: null,
+          },
+          budgetMeta: {
+            profile: "runtime-compact-v1",
+            digest: "digest-test",
+            withinBudget: true,
+            violationCount: 0,
+            violations: [],
+          },
+        },
+      });
+
+      const result = await evaluateAgentContextGuard(root);
+      assert.equal(result.warnings.some((item) => String(item.id || "").includes("reference-distillation")), false);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

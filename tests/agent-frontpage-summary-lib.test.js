@@ -237,6 +237,51 @@ describe("Agent Frontpage Summary Lib", () => {
     assert.equal(String(frontpage.nextAction || "").includes("agent:obsidian"), false);
   });
 
+  it("should surface reference distillation as advisory signals without changing main monitor action", () => {
+    const frontpage = buildMonitorFrontpageSummary({
+      watchStatus: {
+        present: true,
+        status: "healthy",
+        statusLabel: "健康",
+        ageText: "1 分钟",
+      },
+      zoteroValidation: {
+        e2e: {
+          present: true,
+          status: "passed",
+          statusLabel: "通过",
+          ageText: "1 分钟",
+        },
+        autofix: {
+          present: true,
+          status: "clean",
+          statusLabel: "干净",
+          ageText: "1 分钟",
+        },
+        watchRecovery: {
+          present: true,
+          status: "passed",
+          statusLabel: "通过",
+          ageText: "1 分钟",
+        },
+      },
+      referenceDistillation: {
+        status: "queued",
+        statusLabel: "后台排队中",
+        summary: "reference distillation queued in background",
+        pendingCount: 1,
+        lastTopic: "Plugin Menu Patterns",
+        lastDistilledAt: "2026-04-08T04:00:00.000Z",
+        nextSuggestedAction: "等待后台 reference distillation 完成。",
+      },
+    });
+
+    assert.equal(frontpage.status, "stable");
+    assert.equal(frontpage.nextAction, "npm run agent:gate");
+    assert.equal(frontpage.referenceDistillation.status, "queued");
+    assert.ok(frontpage.advisorySignals.some((item) => item.includes("queued in background")));
+  });
+
   it("should prefer concrete watch recovery action over generic validation pipeline guidance", () => {
     const frontpage = buildGateFrontpageSummary({
       gatePassed: false,

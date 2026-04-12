@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "status": "active",
-  "summary": "Current project host-visible surfaces for ZOTERO-HOST-POLISH-WAVE-001. Surface smoke plus live geometry or explicit narrow-width degrade is authoritative before whole-window screenshots are treated as proof.",
+  "summary": "Current project host-visible surfaces shared by the completed ZOTERO-HOST-POLISH-WAVE-001 baseline and the active ZOTERO-DOM-CONTRACT-WAVE-001 advisory hardening wave. Surface smoke plus live geometry, narrow-width degrade, and interaction replay remains authoritative before whole-window screenshots are treated as proof.",
   "surfaces": [
     {
       "id": "cleanroom-preferences-pane",
       "contractSurfaceId": "preference-pane",
-      "summary": "Open the cleanroom preference pane from Zotero preferences, prove structure smoke, and require at least one live control interaction when pane behavior or pref writeback changes.",
+      "summary": "Open the cleanroom preference pane from Zotero preferences, prove structure smoke under Zotero's `800x600` host boundary, and require at least one live control interaction when pane behavior or pref writeback changes.",
       "ownerPaths": [
         "src/app/host-action-catalog.js",
         "src/app/host-actions.js",
@@ -16,10 +16,13 @@
         "zotero-scenarios/preferences-control-interaction.scenario.js"
       ],
       "smokeChecks": [
-        "Host Action `preferences.openPane` opens the preferences window and selects the requested pane.",
+        "Host Action `preferences.openPane` opens the preferences window, can constrain it to Zotero's minimum `800x600` host boundary, and selects the requested pane.",
         "The target preference pane root is visible and the pane fragment is structurally observable after mounting.",
         "The target preference pane exposes core controls, preference bindings, or load/localization bridge signals.",
+        "The resolved preference pane root settles to a positive width and remains free of horizontal overflow after layout settle.",
+        "If the resolved preference root width is `<=620px`, the pane explicitly degrades to the `stacked-first` layout instead of overflowing horizontally.",
         "When a change touches preference pane control behavior, pref writeback, or theme mode, at least one live control interaction replays the real control and verifies writeback.",
+        "The same live control interaction keeps the pane geometry settled and the resolved root free of horizontal overflow.",
         "A surface-local evidence target is returned for the selected preference pane."
       ],
       "visualEvidencePolicy": "required"
@@ -118,6 +121,47 @@
         "The popup exposes real menu structure or item content once opened.",
         "Host Action `menu.trigger` replays the live menu action and a follow-up result becomes observable.",
         "A surface-local evidence target is returned for the triggered menu item."
+      ],
+      "visualEvidencePolicy": "required"
+    },
+    {
+      "id": "cleanroom-live-collection-menu",
+      "contractSurfaceId": "collection-menu",
+      "summary": "Show a live Zotero collection menu target, verify collection context is active, and replay the registered action through Host Actions.",
+      "ownerPaths": [
+        "src/app/host-action-catalog.js",
+        "src/app/host-actions.js",
+        "src/features/menu-manager.js",
+        "src/platform/zotero-host.js",
+        "scripts/zotero-scenario-runtime.js",
+        "zotero-scenarios/collection-menu-surface-smoke.scenario.js"
+      ],
+      "smokeChecks": [
+        "Scenario helpers create and select a real collection row before the host menu is opened.",
+        "Host Action `menu.show` opens `main/library/collection` and reports collection-scoped live menu metadata.",
+        "The registered collection menu action becomes visible and actionable in the live host popup.",
+        "Host Action `menu.trigger` replays the collection menu action and a follow-up result becomes observable.",
+        "A surface-local evidence target is returned for the triggered collection menu surface."
+      ],
+      "visualEvidencePolicy": "required"
+    },
+    {
+      "id": "cleanroom-live-menu-submenu",
+      "contractSurfaceId": "menu-submenu",
+      "summary": "Show a live submenu surface, verify child rebuild or lazy submenu content, and replay a submenu child through Host Actions with menuPath evidence.",
+      "ownerPaths": [
+        "src/app/host-action-catalog.js",
+        "src/app/host-actions.js",
+        "src/features/menu-manager.js",
+        "scripts/zotero-scenario-runtime.js",
+        "zotero-scenarios/menu-submenu-surface-smoke.scenario.js"
+      ],
+      "smokeChecks": [
+        "A state-driven submenu is registered against a live host menu target and resolves its state during `onShowing`.",
+        "Host Action `menu.show` observes the submenu root or submenu popup rather than only the parent host popup shell.",
+        "Dynamic submenu children are rebuilt from live state before child assertions run.",
+        "Host Action `menu.trigger` replays a submenu child through an explicit `menuPath` and the follow-up result becomes observable.",
+        "A surface-local evidence target is returned for the submenu root or submenu popup."
       ],
       "visualEvidencePolicy": "required"
     }

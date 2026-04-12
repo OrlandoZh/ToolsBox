@@ -1,12 +1,16 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { resolveAgentArtifactPath, resolveAgentArtifactsDir } from "./agent-artifacts.mjs";
 import {
   buildGateFrontpageSummary,
 } from "./agent-frontpage-summary-lib.mjs";
 import {
+  buildAgentContext,
+  loadAgentContextSources,
   summarizeAgentContextSnapshot,
+  writeAgentContextArtifacts,
 } from "./agent-context-lib.mjs";
 import {
   DEFAULT_WATCH_STALE_AFTER_MINUTES,
@@ -34,6 +38,7 @@ import {
   assertScript,
   buildScriptFailureInfo,
   createScriptError,
+  isExecutedAsScript,
   writeJSONArtifact,
 } from "./script-runtime-lib.mjs";
 import { summarizeEngineeringHardening } from "./engineering-hardening-lib.mjs";
@@ -859,6 +864,7 @@ function evaluateGate(summary, policy, watchStatus = null, obsidianGuard = null,
     obsidianGuard,
     zoteroValidation: zoteroValidationCheck,
     validationDecision,
+    releaseMatrix: releaseMatrixCheck,
   });
   frontpageSummary.agentContext = contextSummary;
 
@@ -1076,6 +1082,23 @@ function buildMarkdown(report) {
       lines.push(`- Canonical 覆盖类型: \`${e2e.visualCanonicalCoverageKindLabel || e2e.visualCanonicalCoverageKind || "-"}\``);
       lines.push(`- Canonical 覆盖摘要: ${e2e.visualCanonicalCoverageSummary || "-"}`);
       lines.push(`- Canonical 未对齐目标: ${(e2e.visualCanonicalMismatchedTargets || []).join("、") || "-"}`);
+      if (e2e.domContractReport && typeof e2e.domContractReport === "object") {
+        lines.push(`- DOM Contract: \`${e2e.domContractReport.statusLabel || e2e.domContractReport.status || "缺失"}\``);
+        lines.push(`- DOM Contract Advisory: \`${e2e.domContractReport.advisory ? "是" : "否"}\``);
+        lines.push(`- DOM Contract Route 覆盖: \`${e2e.domContractReport.passedRouteCount ?? 0}/${e2e.domContractReport.routeCount ?? 0}\``);
+        lines.push(`- DOM Contract 异常 Route: \`${e2e.domContractReport.failedRouteCount ?? 0}\``);
+        lines.push(`- DOM Contract 缺失 Route: \`${e2e.domContractReport.missingRouteCount ?? 0}\``);
+        lines.push(`- DOM Contract 摘要: ${e2e.domContractReport.summary || "-"}`);
+        const domContractRoutes = Array.isArray(e2e.domContractReport.routes) ? e2e.domContractReport.routes : [];
+        if (domContractRoutes.length > 0) {
+          lines.push("- DOM Contract Route:");
+          domContractRoutes.forEach((route) => {
+            lines.push(`- Route 项: ${(route.routeId || route.adapter || "-")} / ${route.statusLabel || route.status || "-"} / ${(route.scenarioNames || []).join("、") || "-"}`);
+            lines.push(`- Route 摘要: ${route.summary || "-"}`);
+            lines.push(`- 失败检查: ${(route.failedChecks || []).join("；") || "-"}`);
+          });
+        }
+      }
       if (e2e.readerEventReport && typeof e2e.readerEventReport === "object") {
         lines.push(`- Reader 事件桥: \`${e2e.readerEventReport.status || "unknown"}\` (${e2e.readerEventReport.statusLabel || "未知"})`);
         lines.push(`- 事件 API: \`${e2e.readerEventReport.available === null ? "-" : (e2e.readerEventReport.available ? "可用" : "不可用")}\``);
@@ -1084,6 +1107,24 @@ function buildMarkdown(report) {
         lines.push(`- synthetic-fallback: \`${e2e.readerEventReport.syntheticFallbackAvailable === null ? "-" : (e2e.readerEventReport.syntheticFallbackAvailable ? "可用" : "不可用")}\``);
         lines.push(`- Hook 场景: \`${e2e.readerEventReport.hookScenarioStatusLabel || "缺失"}\``);
         lines.push(`- 细粒度 Hook: \`${e2e.readerEventReport.fineGrainedScenarioStatusLabel || "缺失"}\``);
+        if (
+          e2e.toolbarDispatchMode
+          || e2e.toolbarAppendedItemCount !== null
+          || e2e.selectionPopupAppendedItemCount !== null
+          || e2e.sidebarHeaderAppendedItemCount !== null
+          || e2e.contextMenuProbeCount !== null
+          || Array.isArray(e2e.contextMenuObservedTypes) && e2e.contextMenuObservedTypes.length > 0
+          || Array.isArray(e2e.contextMenuSyntheticFallbackTypes) && e2e.contextMenuSyntheticFallbackTypes.length > 0
+        ) {
+          lines.push(`- Reader 深层事件点: ${e2e.readerDispatchSummary || "-"}`);
+          lines.push(`- 工具栏分发: \`${e2e.toolbarDispatchMode ?? "-"}\``);
+          lines.push(`- 工具栏追加项: \`${e2e.toolbarAppendedItemCount ?? "-"}\``);
+          lines.push(`- 文本浮层追加项: \`${e2e.selectionPopupAppendedItemCount ?? "-"}\``);
+          lines.push(`- 侧栏批注头追加项: \`${e2e.sidebarHeaderAppendedItemCount ?? "-"}\``);
+          lines.push(`- 上下文菜单探针数: \`${e2e.contextMenuProbeCount ?? "-"}\``);
+          lines.push(`- 上下文菜单已观测类型: ${(e2e.contextMenuObservedTypes || []).join("、") || "-"}`);
+          lines.push(`- 上下文菜单 fallback 类型: ${(e2e.contextMenuSyntheticFallbackTypes || []).join("、") || "-"}`);
+        }
       }
       lines.push(`- 能力地图观测: \`${e2e.capabilityObserved ? "已观测" : "未观测"}\``);
       lines.push(`- 需场景覆盖能力: \`${e2e.capabilityScenarioBoundTotal ?? 0}\``);
@@ -1157,6 +1198,11 @@ function buildMarkdown(report) {
     lines.push(`- 生命周期慢阈值: \`${report.engineeringHardening.lifecycleSlowThresholdMs ?? 0}ms\``);
     lines.push(`- 最近生命周期慢阶段: \`${report.engineeringHardening.lifecycleLastSlowStage || "-"}\``);
     lines.push(`- 边界事件: ${(report.engineeringHardening.errorBoundaryEvents || []).map((item) => `${item.event} x${item.count}`).join("；") || "-"}`);
+    lines.push(`- 性能预算: \`${report.engineeringHardening.performanceBudget?.statusLabel || report.engineeringHardening.performanceBudget?.status || "-"} / ${report.engineeringHardening.performanceBudget?.budgetMode || "-"}\``);
+    lines.push(`- 预算摘要: ${report.engineeringHardening.performanceBudget?.summary || "-"}`);
+    lines.push(`- 预算活动: \`${report.engineeringHardening.performanceBudget?.measuredActivityCount ?? 0}/${report.engineeringHardening.performanceBudget?.expectedActivityCount ?? 0}\``);
+    lines.push(`- 超预算项: \`${report.engineeringHardening.performanceBudget?.violationCount ?? 0}\``);
+    lines.push(`- 预算告警: ${report.engineeringHardening.performanceBudget?.violationSummary || "-"}`);
   }
 
   lines.push("", "## 本地发布矩阵", "");
@@ -1228,6 +1274,28 @@ function buildMarkdown(report) {
   return lines.join("\n");
 }
 
+export async function writeGateArtifacts(gateJSONPath, gateMDPath, report) {
+  await writeJSONArtifact(gateJSONPath, report);
+  await fs.writeFile(gateMDPath, `${buildMarkdown(report)}\n`, "utf-8");
+}
+
+export async function refreshGateObsidianGuardSnapshot(targetProjectRoot, options = {}) {
+  const gateJSONPath = resolveAgentArtifactPath(targetProjectRoot, "agent-gate.json");
+  const gateMDPath = resolveAgentArtifactPath(targetProjectRoot, "agent-gate.md");
+  const report = await loadJSONIfExists(gateJSONPath);
+  if (!report || typeof report !== "object") {
+    return null;
+  }
+
+  report.obsidianGuard = await evaluateObsidianWorkspaceGuard(targetProjectRoot, {
+    strict: true,
+    scope: "path",
+    env: options.env || process.env,
+  });
+  await writeGateArtifacts(gateJSONPath, gateMDPath, report);
+  return report;
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const policy = resolvePolicy(options);
@@ -1284,8 +1352,18 @@ async function main() {
     gate: report,
   });
   await fs.mkdir(resolveAgentArtifactsDir(projectRoot), { recursive: true });
-  await writeJSONArtifact(gateJSONPath, report);
-  await fs.writeFile(gateMDPath, `${buildMarkdown(report)}\n`, "utf-8");
+  await writeGateArtifacts(gateJSONPath, gateMDPath, report);
+
+  const refreshedContext = buildAgentContext(
+    await loadAgentContextSources(projectRoot),
+    { generationStage: "post-gate" },
+  );
+  await writeAgentContextArtifacts(projectRoot, refreshedContext);
+  report.agentContext = summarizeAgentContextSnapshot(refreshedContext);
+  if (report.frontpageSummary && typeof report.frontpageSummary === "object") {
+    report.frontpageSummary.agentContext = report.agentContext;
+  }
+  await writeGateArtifacts(gateJSONPath, gateMDPath, report);
 
   console.log(`Agent gate generated: ${gateJSONPath}`);
   if (!report.gatePassed) {
@@ -1293,36 +1371,38 @@ async function main() {
   }
 }
 
-main().catch(async (error) => {
-  const failureInfo = buildScriptFailureInfo(error, {
-    durationMs: Math.max(0, Date.now() - scriptStartedAt),
+if (isExecutedAsScript(import.meta.url)) {
+  main().catch(async (error) => {
+    const failureInfo = buildScriptFailureInfo(error, {
+      durationMs: Math.max(0, Date.now() - scriptStartedAt),
+    });
+    const gateJSONPath = resolveAgentArtifactPath(projectRoot, "agent-gate.json");
+    const gateMDPath = resolveAgentArtifactPath(projectRoot, "agent-gate.md");
+    const failureReport = {
+      generatedAt: new Date().toISOString(),
+      gatePassed: false,
+      issues: [failureInfo.errorMessage],
+      recommendations: ["先修复 gate 脚本异常，再重新执行 agent:gate。"],
+      durationMs: failureInfo.durationMs,
+      ...failureInfo,
+    };
+    try {
+      await fs.mkdir(resolveAgentArtifactsDir(projectRoot), { recursive: true });
+      await writeJSONArtifact(gateJSONPath, failureReport);
+      await fs.writeFile(gateMDPath, [
+        "# Agent Gate",
+        "",
+        `- 状态: 失败`,
+        `- 分类: ${failureInfo.errorCategoryLabel}`,
+        `- 阶段: ${failureInfo.failedStage}`,
+        `- 信息: ${failureInfo.errorMessage}`,
+        `- 耗时: ${failureInfo.durationMs}ms`,
+        "",
+      ].join("\n"), "utf-8");
+    } catch {
+      // ignore secondary failure
+    }
+    console.error(error?.message || String(error));
+    process.exit(1);
   });
-  const gateJSONPath = resolveAgentArtifactPath(projectRoot, "agent-gate.json");
-  const gateMDPath = resolveAgentArtifactPath(projectRoot, "agent-gate.md");
-  const failureReport = {
-    generatedAt: new Date().toISOString(),
-    gatePassed: false,
-    issues: [failureInfo.errorMessage],
-    recommendations: ["先修复 gate 脚本异常，再重新执行 agent:gate。"],
-    durationMs: failureInfo.durationMs,
-    ...failureInfo,
-  };
-  try {
-    await fs.mkdir(resolveAgentArtifactsDir(projectRoot), { recursive: true });
-    await writeJSONArtifact(gateJSONPath, failureReport);
-    await fs.writeFile(gateMDPath, [
-      "# Agent Gate",
-      "",
-      `- 状态: 失败`,
-      `- 分类: ${failureInfo.errorCategoryLabel}`,
-      `- 阶段: ${failureInfo.failedStage}`,
-      `- 信息: ${failureInfo.errorMessage}`,
-      `- 耗时: ${failureInfo.durationMs}ms`,
-      "",
-    ].join("\n"), "utf-8");
-  } catch {
-    // ignore secondary failure
-  }
-  console.error(error?.message || String(error));
-  process.exit(1);
-});
+}

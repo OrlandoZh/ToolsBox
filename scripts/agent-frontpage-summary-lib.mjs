@@ -54,6 +54,61 @@ function isVisualFocusedAction(text) {
   return /agent:obsidian|agent:zotero:e2e:update-baseline/u.test(String(text || ""));
 }
 
+function findRunnableRecommendation(recommendations, pattern) {
+  const list = Array.isArray(recommendations) ? recommendations : [];
+  const matched = list.find((item) => pattern.test(String(item || "")));
+  return normalizeRunnableAction(matched) || null;
+}
+
+function selectReleaseNextAction(recommendations, issues = [], releaseMatrix = null) {
+  const list = Array.isArray(recommendations) ? recommendations.filter(Boolean) : [];
+  const normalizedIssues = Array.isArray(issues) ? issues.filter(Boolean) : [];
+  const matrix = releaseMatrix && typeof releaseMatrix === "object" ? releaseMatrix : {};
+  const profiles = Array.isArray(matrix.profiles) ? matrix.profiles : [];
+  const remoteVerification = matrix.remoteVerification && typeof matrix.remoteVerification === "object"
+    ? matrix.remoteVerification
+    : null;
+
+  if (
+    normalizedIssues.some((item) => String(item).includes("release-plan"))
+    || matrix.present === false
+    || matrix.status === "missing"
+  ) {
+    return findRunnableRecommendation(list, /npm run agent:release/u) || "npm run agent:release";
+  }
+
+  const installSmokeTargets = profiles.filter((profile) => {
+    if (!profile || typeof profile !== "object") {
+      return false;
+    }
+    return profile.installSmokePresent !== true || profile.installSmokePassed !== true;
+  });
+  if (installSmokeTargets.length > 0) {
+    const stableMissing = installSmokeTargets.some((profile) => profile.id === "stable");
+    const betaMissing = installSmokeTargets.some((profile) => profile.id === "beta");
+    if (stableMissing) {
+      return findRunnableRecommendation(list, /npm run release:install-smoke:stable/u)
+        || "npm run release:install-smoke:stable";
+    }
+    if (betaMissing) {
+      return findRunnableRecommendation(list, /npm run release:install-smoke:beta/u)
+        || "npm run release:install-smoke:beta";
+    }
+  }
+
+  if (remoteVerification && (remoteVerification.status !== "passed" || remoteVerification.releaseReady !== true)) {
+    return findRunnableRecommendation(list, /npm run release:preflight -- --verify-remote/u)
+      || "npm run release:preflight -- --verify-remote";
+  }
+
+  if (matrix.status && matrix.status !== "passed") {
+    return findRunnableRecommendation(list, /npm run release:matrix/u) || "npm run release:matrix";
+  }
+
+  return findRunnableRecommendation(list, /npm run agent:release|npm run release:matrix|npm run release:prepare|npm run release:preflight/u)
+    || null;
+}
+
 function buildValidationPipelineAction(level, deferredEvidenceAction = null) {
   if (level === "visual-not-needed") {
     return "当前批次默认无需视觉阻断；先执行 `npm run check` -> `npm run agent:zotero:e2e` -> `npm run agent:monitor` / `npm run agent:gate` 完成功能闭环。";
@@ -78,6 +133,20 @@ function isReaderEventRelevant(e2e) {
     ? e2e.capabilityStatuses
     : [];
   return capabilityStatuses.some((item) => item?.id === "reader-event-hooks" && item?.status !== "uncovered");
+}
+
+function normalizeReferenceDistillationSlice(source) {
+  const record = source && typeof source === "object" ? source : {};
+  const status = String(record.status || "").trim() || "idle";
+  return {
+    status,
+    statusLabel: String(record.statusLabel || "").trim() || "空闲",
+    pendingCount: Math.max(0, Number(record.pendingCount || 0)),
+    lastTopic: String(record.lastTopic || "").trim() || null,
+    lastDistilledAt: String(record.lastDistilledAt || "").trim() || null,
+    nextSuggestedAction: String(record.nextSuggestedAction || "").trim() || null,
+    summary: String(record.summary || "").trim() || "reference distillation idle",
+  };
 }
 
 export function selectAgentNextAction(recommendations, context = {}) {
@@ -160,6 +229,7 @@ export function buildGateFrontpageSummary({
   watchStatus,
   zoteroValidation,
   validationDecision = null,
+  releaseMatrix = null,
 }) {
   const normalizedIssues = Array.isArray(issues) ? issues.filter(Boolean) : [];
   const normalizedRecommendations = Array.isArray(recommendations) ? recommendations.filter(Boolean) : [];
@@ -174,15 +244,17 @@ export function buildGateFrontpageSummary({
   const actionCandidates = validationDecision?.level && validationDecision.level !== "visual-required"
     ? normalizedRecommendations.filter((item) => !isVisualFocusedAction(item))
     : normalizedRecommendations;
-  const selectedNextAction = selectAgentNextAction(actionCandidates, {
-    watchStatus: watch.status,
-    e2eStatus: e2e.status,
-    watchRecoveryStatus: recovery.status,
-    readerEventStatus: readerEvent.status,
-    pureVisualReaderFailure,
-    visualPrimaryBlockerKind: e2e.visualPrimaryBlockerKind || null,
-    visualCanonicalCoverageKind: e2e.visualCanonicalCoverageKind || null,
-  });
+  const selectedNextAction = profile === "release"
+    ? selectReleaseNextAction(actionCandidates, normalizedIssues, releaseMatrix)
+    : selectAgentNextAction(actionCandidates, {
+      watchStatus: watch.status,
+      e2eStatus: e2e.status,
+      watchRecoveryStatus: recovery.status,
+      readerEventStatus: readerEvent.status,
+      pureVisualReaderFailure,
+      visualPrimaryBlockerKind: e2e.visualPrimaryBlockerKind || null,
+      visualCanonicalCoverageKind: e2e.visualCanonicalCoverageKind || null,
+    });
   const normalizedSelectedNextAction = normalizeRunnableAction(selectedNextAction) || selectedNextAction;
   const validationPipelineAction = (!gatePassed && watch.status === "healthy" && validationDecision?.level !== "visual-required")
     ? buildValidationPipelineAction(validationDecision?.level, validationDecision?.deferredEvidenceAction)
@@ -274,6 +346,7 @@ export function buildMonitorFrontpageSummary(summary) {
   const validationDecision = summary.validationDecision && typeof summary.validationDecision === "object"
     ? summary.validationDecision
     : null;
+  const referenceDistillation = normalizeReferenceDistillationSlice(summary.referenceDistillation);
   const visualPrimaryBlockerSummary = buildPureVisualReaderFailureSummary(e2e)
     || buildVisualPrimaryBlockerSummary(e2e);
   const pureVisualNextAction = pureVisualReaderFailure
@@ -332,6 +405,14 @@ export function buildMonitorFrontpageSummary(summary) {
   if (!stable && autofix.present && autofix.status === "unrecovered") {
     primarySignals.push("最近自动修复未恢复成功，建议回看补丁计划与诊断。");
   }
+  const advisorySignals = [];
+  if (referenceDistillation.status === "pending" && referenceDistillation.pendingCount > 0) {
+    advisorySignals.push(`reference distillation pending：${referenceDistillation.pendingCount} 个 topic 等待在 fresh sync 后整理。`);
+  } else if (referenceDistillation.status === "queued") {
+    advisorySignals.push("reference distillation queued in background。");
+  } else if (referenceDistillation.status === "failed") {
+    advisorySignals.push("last reference distillation failed。");
+  }
   const incomplete = primarySignals.length > 0
     && primarySignals.every((item) => item.includes("缺少"));
 
@@ -364,6 +445,7 @@ export function buildMonitorFrontpageSummary(summary) {
     statusLabel,
     headline,
     primarySignals: primarySignals.slice(0, 5),
+    advisorySignals: advisorySignals.slice(0, 3),
     nextAction: pickMonitorNextAction({
       watch,
       e2e,
@@ -419,6 +501,7 @@ export function buildMonitorFrontpageSummary(summary) {
       patchPlanStatusLabel: autofix.patchPlanStatusLabel || "缺失",
     },
     watchRecovery: normalizeStatusSlice(watchRecovery),
+    referenceDistillation,
     latestRun: summary.latest
       ? {
         runName: summary.latest.runName || null,

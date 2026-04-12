@@ -406,7 +406,7 @@ async function main() {
       ),
     );
     await writeReport(report);
-    console.log(`Zotero agent loop report generated: ${loopArtifacts.reportJSON}`);
+    console.log(`当前 Zotero 插件编排报告已生成: ${loopArtifacts.reportJSON}`);
     process.exit(2);
   }
 
@@ -471,7 +471,7 @@ async function main() {
 
   await writeReport(report);
   await refreshObsidianWorkspace();
-  console.log(`Zotero agent loop report generated: ${loopArtifacts.reportJSON}`);
+  console.log(`当前 Zotero 插件编排报告已生成: ${loopArtifacts.reportJSON}`);
   if (!report.loopPassed && !options.dryRun) {
     process.exit(1);
   }

@@ -7,7 +7,7 @@ import { createPreferenceStore } from "../../src/core/prefs.js";
 import { createLifecycleManager } from "../../src/core/lifecycle.js";
 import { createI18n } from "../../src/core/i18n.js";
 import { createNotifier, EVENTS } from "../../src/core/notifier.js";
-import { createMenuManager, MENU_TARGETS } from "../../src/features/menu-manager.js";
+import { createMenuManager } from "../../src/features/menu-manager.js";
 import { createItemPane } from "../../src/features/item-pane.js";
 import { createReader } from "../../src/features/reader.js";
 import { createProgressNotifier, NOTIFICATION_TYPES } from "../../src/utils/progress-window.js";
@@ -115,8 +115,8 @@ export function createExamplePlugin(options = {}) {
       }
     });
 
-    // 右键菜单
-    menu.registerContextMenuItem({
+    // 条目菜单项
+    menu.registerItemMenuItem({
       label: "Process Selected Items",
       onCommand: async (event, context) => {
         const items = context.items || [];
@@ -128,16 +128,12 @@ export function createExamplePlugin(options = {}) {
       }
     });
 
-    // 使用官方 API 注册收藏集菜单
-    menu.register({
-      target: MENU_TARGETS.LIBRARY_COLLECTION,
-      menus: [{
-        menuType: "menuitem",
-        label: "Process Collection",
-        onCommand: (event, context) => {
-          logger.debug("Process collection clicked");
-        }
-      }]
+    // 收藏集菜单
+    menu.registerCollectionMenuItem({
+      label: "Process Collection",
+      onCommand: (event, context) => {
+        logger.debug("Process collection clicked");
+      }
     });
   }
 

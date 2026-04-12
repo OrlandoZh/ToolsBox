@@ -80,6 +80,10 @@ function summarizeReport(report) {
     strictMinVersion: report.strictMinVersion,
     strictMaxVersion: report.strictMaxVersion,
     remoteVerification: report.remoteVerification || null,
+    chinaLegalStatus: report.chinaLegal?.status || null,
+    chinaCommercialDeliveryGateOK: report.chinaLegal?.deliveryGateOK ?? null,
+    chinaLegalMissingDocs: Array.isArray(report.chinaLegal?.missingDocs) ? report.chinaLegal.missingDocs : [],
+    chinaLegalSummary: report.chinaLegal?.summary || null,
   };
 }
 
@@ -255,6 +259,7 @@ async function main() {
     details: {
       blockers: Array.isArray(cleanroomAudit.blockers) ? cleanroomAudit.blockers : [],
       similarityStatus: cleanroomAudit?.similarity?.status || null,
+      chinaLegal: cleanroomAudit?.chinaLegal || null,
     },
   });
 
@@ -283,6 +288,7 @@ async function main() {
     strictMinVersion: config.strictMinVersion,
     strictMaxVersion: config.strictMaxVersion,
     remoteVerification,
+    chinaLegal: cleanroomAudit.chinaLegal,
   });
   preflightReport.cleanroomAuditStatus = cleanroomAudit.status;
   preflightReport.cleanroomAuditMode = cleanroomAudit.mode;
@@ -308,6 +314,7 @@ main().catch(async (error) => {
   const preflightPath = path.join(resolveFailureProjectRoot(), "dist", "release-preflight.json");
   try {
     await fs.mkdir(path.dirname(preflightPath), { recursive: true });
+    const chinaLegal = failureInfo.details?.chinaLegal || null;
     await writeJSONArtifact(preflightPath, {
       generatedAt: new Date().toISOString(),
       status: "failed",
@@ -319,6 +326,10 @@ main().catch(async (error) => {
       updateLink: null,
       strictMinVersion: null,
       strictMaxVersion: null,
+      chinaLegalStatus: chinaLegal?.status || null,
+      chinaCommercialDeliveryGateOK: chinaLegal?.deliveryGateOK ?? null,
+      chinaLegalMissingDocs: Array.isArray(chinaLegal?.missingDocs) ? chinaLegal.missingDocs : [],
+      chinaLegalSummary: chinaLegal?.summary || null,
       ...failureInfo,
     });
   } catch {

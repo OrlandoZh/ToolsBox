@@ -32,7 +32,9 @@ describe("Build React UI", () => {
 
       assert.equal(result.status, "skipped");
       assert.equal(result.reason, "disabled");
+      assert.deepEqual(result.artifacts, []);
       assert.equal(fs.existsSync(path.join(buildRoot, "content", "scripts", "react-ui-demo.js")), false);
+      assert.equal(fs.existsSync(path.join(buildRoot, "content", "scripts", "react-ui-surface-bridge.js")), false);
     } finally {
       fs.rmSync(buildRoot, { recursive: true, force: true });
     }
@@ -68,10 +70,53 @@ describe("Build React UI", () => {
       });
 
       assert.equal(result.status, "built");
-      assert.equal(fs.existsSync(result.scriptPath), true);
-      assert.equal(fs.existsSync(result.stylePath), true);
-      assert.ok(fs.readFileSync(result.scriptPath, "utf-8").includes("__REACT_UI_DEMO__"));
-      assert.ok(fs.readFileSync(result.stylePath, "utf-8").includes(".react-ui-demo-shell"));
+      assert.equal(result.artifacts.length, 2);
+      const demoArtifact = result.artifacts.find((artifact) => artifact.artifactId === "demo-window");
+      const bridgeArtifact = result.artifacts.find((artifact) => artifact.artifactId === "surface-bridge");
+
+      assert.ok(demoArtifact);
+      assert.ok(bridgeArtifact);
+      assert.equal(fs.existsSync(demoArtifact.scriptPath), true);
+      assert.equal(fs.existsSync(demoArtifact.stylePath), true);
+      assert.equal(fs.existsSync(bridgeArtifact.scriptPath), true);
+      assert.equal(fs.existsSync(bridgeArtifact.stylePath), true);
+      assert.ok(fs.readFileSync(demoArtifact.scriptPath, "utf-8").includes("__REACT_UI_DEMO__"));
+      assert.ok(fs.readFileSync(bridgeArtifact.scriptPath, "utf-8").includes("__REACT_UI_DEMO__"));
+      assert.ok(fs.readFileSync(demoArtifact.stylePath, "utf-8").includes(".react-ui-demo-shell"));
+      assert.ok(fs.readFileSync(bridgeArtifact.stylePath, "utf-8").includes(".react-surface-bridge-shell"));
+    } finally {
+      fs.rmSync(buildRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("should build react-ui artifacts with the installed optional lane dependencies", async () => {
+    const { registry } = loadOptionalBundleRegistry(projectRoot);
+    const enabledRegistry = clone(registry);
+    enabledRegistry.bundles = enabledRegistry.bundles.map((bundle) => (
+      bundle.id === "react-ui"
+        ? {
+            ...bundle,
+            enabled: true,
+          }
+        : bundle
+    ));
+    const buildRoot = fs.mkdtempSync(path.join(os.tmpdir(), "react-ui-build-real-"));
+
+    try {
+      const result = await buildReactUI({
+        config: makeConfig(),
+        buildRoot,
+        registry: enabledRegistry,
+      });
+
+      assert.equal(result.status, "built");
+      assert.equal(result.artifacts.length, 2);
+      const demoArtifact = result.artifacts.find((artifact) => artifact.artifactId === "demo-window");
+      const bridgeArtifact = result.artifacts.find((artifact) => artifact.artifactId === "surface-bridge");
+      assert.ok(demoArtifact);
+      assert.ok(bridgeArtifact);
+      assert.ok(fs.readFileSync(demoArtifact.scriptPath, "utf-8").includes("React UI Demo"));
+      assert.ok(fs.readFileSync(bridgeArtifact.scriptPath, "utf-8").includes("__CleanroomTemplateReactSurface__"));
     } finally {
       fs.rmSync(buildRoot, { recursive: true, force: true });
     }

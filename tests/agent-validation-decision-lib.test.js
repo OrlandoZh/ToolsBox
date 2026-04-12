@@ -36,7 +36,7 @@ describe("Agent Validation Decision", () => {
     assert.equal(Array.isArray(registry.overrides), true);
   });
 
-  it("should classify host wrapper changes as visual-required in the active host wave", () => {
+  it("should classify DOM contract wave paths as visual-recommended in the active advisory wave", () => {
     const decision = buildValidationDecision({
       projectRoot,
       changedPaths: ["src/features/reader.js"],
@@ -46,12 +46,31 @@ describe("Agent Validation Decision", () => {
       },
     });
 
-    assert.equal(decision.level, "visual-required");
+    assert.equal(decision.level, "visual-recommended");
     assert.equal(decision.decisionSource, "project-override");
     assert.ok(decision.matchedDomain.includes("host-wrapper"));
-    assert.ok(decision.matchedProjectOverride.includes("zotero-host-polish-wave-001"));
-    assert.equal(decision.blocking, true);
-    assert.equal(typeof decision.issue, "string");
+    assert.ok(decision.matchedProjectOverride.includes("zotero-dom-contract-wave-001"));
+    assert.equal(decision.blocking, false);
+    assert.equal(typeof decision.deferredEvidenceAction, "string");
+  });
+
+  it("should keep the active DOM contract wave advisory when completed baseline paths coexist", () => {
+    const decision = buildValidationDecision({
+      projectRoot,
+      changedPaths: [
+        "src/features/reader.js",
+        "config/zotero-host-interface-contracts.json",
+      ],
+      e2e: {
+        present: false,
+        status: "missing",
+      },
+    });
+
+    assert.equal(decision.level, "visual-recommended");
+    assert.equal(decision.decisionSource, "project-override");
+    assert.deepEqual(decision.matchedProjectOverride, ["zotero-dom-contract-wave-001"]);
+    assert.equal(decision.blocking, false);
   });
 
   it("should classify visual-not-needed for runtime and settings-only changes", () => {
@@ -250,7 +269,7 @@ describe("Agent Validation Decision", () => {
       },
     });
 
-    assert.equal(decision.level, "visual-required");
+    assert.equal(decision.level, "visual-recommended");
     assert.equal(decision.blocking, false);
     assert.equal(decision.issue, null);
   });

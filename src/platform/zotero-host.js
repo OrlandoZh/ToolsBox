@@ -13,9 +13,19 @@ function normalizeActivationPolicy(value) {
   return value === "ui-required" ? "ui-required" : "host-first";
 }
 
+const PREFERENCE_COMPACT_LAYOUT_MAX_WIDTH = 620;
+
 function toFiniteNumber(value) {
   const normalized = Number(value);
   return Number.isFinite(normalized) ? normalized : null;
+}
+
+function normalizePositiveInteger(value) {
+  const normalized = toFiniteNumber(value);
+  if (normalized === null || normalized <= 0) {
+    return null;
+  }
+  return Math.round(normalized);
 }
 
 function sanitizeCaptureToken(value, fallback = "surface") {
@@ -122,6 +132,16 @@ function readElementBooleanState(element, names = []) {
     catch {}
   }
   return false;
+}
+
+function readElementTagName(element) {
+  if (typeof element?.localName === "string" && element.localName.trim()) {
+    return element.localName.trim().toLowerCase();
+  }
+  if (typeof element?.tagName === "string" && element.tagName.trim()) {
+    return element.tagName.trim().toLowerCase();
+  }
+  return null;
 }
 
 function hasClassToken(element, token) {
@@ -263,6 +283,91 @@ function resolvePreferenceSurfaceRoot(paneElement, pane = null) {
   };
 }
 
+function readElementBoxMetric(element, propertyName, rectDimension = "width") {
+  const directValue = toFiniteNumber(element?.[propertyName]);
+  if (directValue !== null && directValue >= 0) {
+    return Math.round(directValue);
+  }
+
+  if (typeof element?.getBoundingClientRect === "function") {
+    try {
+      const rect = element.getBoundingClientRect();
+      const fallbackValue = toFiniteNumber(rect?.[rectDimension]);
+      if (fallbackValue !== null && fallbackValue >= 0) {
+        return Math.round(fallbackValue);
+      }
+    }
+    catch {}
+  }
+
+  return 0;
+}
+
+function normalizePreferenceLayoutMode(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "inline" || normalized === "stacked") {
+    return normalized;
+  }
+  return null;
+}
+
+function inspectPreferenceSurfaceRoot(paneElement, pane = null) {
+  const resolved = resolvePreferenceSurfaceRoot(paneElement, pane);
+  const surfaceRootElement = resolved.element || paneElement || null;
+  if (!surfaceRootElement) {
+    return {
+      element: null,
+      surfaceRootStrategy: null,
+      surfaceRootTagName: null,
+      surfaceRootID: null,
+      layoutMode: null,
+      widthBucket: null,
+      rootClientWidth: 0,
+      rootScrollWidth: 0,
+      horizontalOverflowPx: 0,
+      hasHorizontalOverflow: false,
+    };
+  }
+
+  const rootClientWidth = readElementBoxMetric(surfaceRootElement, "clientWidth", "width");
+  const measuredScrollWidth = readElementBoxMetric(surfaceRootElement, "scrollWidth", "width");
+  const rootScrollWidth = Math.max(rootClientWidth, measuredScrollWidth);
+  const overflowAttributePx = toFiniteNumber(
+    readElementAttribute(surfaceRootElement, ["data-pref-horizontal-overflow-px"]),
+  );
+  const computedHorizontalOverflowPx = Math.max(0, rootScrollWidth - rootClientWidth);
+  const horizontalOverflowPx = Math.max(
+    0,
+    Math.round(overflowAttributePx ?? computedHorizontalOverflowPx),
+  );
+  const overflowAttributeState = readElementAttribute(surfaceRootElement, [
+    "data-pref-horizontal-overflow",
+  ]);
+  const layoutMode = normalizePreferenceLayoutMode(
+    readElementAttribute(surfaceRootElement, ["data-pref-layout"]),
+  ) || (
+    rootClientWidth > 0 && rootClientWidth <= PREFERENCE_COMPACT_LAYOUT_MAX_WIDTH
+      ? "stacked"
+      : "inline"
+  );
+  const widthBucket = readElementAttribute(surfaceRootElement, [
+    "data-pref-width-bucket",
+  ]) || (layoutMode === "stacked" ? "compact" : "regular");
+
+  return {
+    element: surfaceRootElement,
+    surfaceRootStrategy: resolved.strategy || "pane-container",
+    surfaceRootTagName: readElementTagName(surfaceRootElement),
+    surfaceRootID: readElementAttribute(surfaceRootElement, ["id"]),
+    layoutMode,
+    widthBucket,
+    rootClientWidth,
+    rootScrollWidth,
+    horizontalOverflowPx,
+    hasHorizontalOverflow: overflowAttributeState === "true" || horizontalOverflowPx > 1,
+  };
+}
+
 function readElementClientRectSnapshot(element) {
   if (!element || typeof element.getBoundingClientRect !== "function") {
     return null;
@@ -296,6 +401,44 @@ function hasSameElementClientRect(leftRect, rightRect) {
     && leftRect.height === rightRect.height;
 }
 
+function hasSameElementClientRectSize(leftRect, rightRect) {
+  if (!leftRect || !rightRect) {
+    return false;
+  }
+
+  return leftRect.width === rightRect.width
+    && leftRect.height === rightRect.height;
+}
+
+function hasSameElementClientRectWidth(leftRect, rightRect) {
+  if (!leftRect || !rightRect) {
+    return false;
+  }
+
+  return leftRect.width === rightRect.width;
+}
+
+function hasSameElementClientRectWidthAndPosition(leftRect, rightRect) {
+  if (!leftRect || !rightRect) {
+    return false;
+  }
+
+  return leftRect.left === rightRect.left
+    && leftRect.top === rightRect.top
+    && leftRect.width === rightRect.width;
+}
+
+function hasSameWindowBounds(leftBounds, rightBounds) {
+  if (!leftBounds || !rightBounds) {
+    return false;
+  }
+
+  return leftBounds.x === rightBounds.x
+    && leftBounds.y === rightBounds.y
+    && leftBounds.width === rightBounds.width
+    && leftBounds.height === rightBounds.height;
+}
+
 async function settlePreferenceSurfaceGeometry(resolveSurface, options = {}) {
   const timeoutMs = Number.isFinite(Number(options.timeoutMs))
     ? Math.max(0, Number(options.timeoutMs))
@@ -309,6 +452,8 @@ async function settlePreferenceSurfaceGeometry(resolveSurface, options = {}) {
   const quietWindowMs = Number.isFinite(Number(options.quietWindowMs))
     ? Math.max(0, Number(options.quietWindowMs))
     : 250;
+  const ignorePosition = options.ignorePosition === true;
+  const ignoreHeight = options.ignoreHeight === true;
 
   const startedAt = Date.now();
   let firstObservedAt = null;
@@ -336,7 +481,14 @@ async function settlePreferenceSurfaceGeometry(resolveSurface, options = {}) {
         lastChangeAt = now;
       }
 
-      const geometryChanged = element !== lastElement || !hasSameElementClientRect(geometry, lastGeometry);
+      const sameGeometry = ignorePosition
+        ? ignoreHeight
+          ? hasSameElementClientRectWidth(geometry, lastGeometry)
+          : hasSameElementClientRectSize(geometry, lastGeometry)
+        : ignoreHeight
+          ? hasSameElementClientRectWidthAndPosition(geometry, lastGeometry)
+          : hasSameElementClientRect(geometry, lastGeometry);
+      const geometryChanged = element !== lastElement || !sameGeometry;
       if (geometryChanged) {
         lastChangeAt = now;
       }
@@ -468,11 +620,7 @@ function resolveActivePreferenceState(root) {
 }
 
 function inspectPreferencePaneSurface(paneElement, pane = null) {
-  const rootTagName = typeof paneElement?.localName === "string" && paneElement.localName.trim()
-    ? paneElement.localName.trim()
-    : typeof paneElement?.tagName === "string" && paneElement.tagName.trim()
-      ? paneElement.tagName.trim().toLowerCase()
-      : null;
+  const rootTagName = readElementTagName(paneElement);
   const rootNamespaceURI = typeof paneElement?.namespaceURI === "string" && paneElement.namespaceURI.trim()
     ? paneElement.namespaceURI.trim()
     : null;
@@ -512,13 +660,10 @@ function inspectPreferencePaneSurface(paneElement, pane = null) {
     preferenceBindingCount > 0,
     preferenceDefinitionCount > 0,
   ].some(Boolean);
+  const surfaceRoot = inspectPreferenceSurfaceRoot(paneElement, pane);
   const interactiveRoot = resolvePreferenceInteractiveRoot(paneElement, pane);
   const interactiveRootElement = interactiveRoot.element;
-  const interactiveRootTagName = typeof interactiveRootElement?.localName === "string" && interactiveRootElement.localName.trim()
-    ? interactiveRootElement.localName.trim()
-    : typeof interactiveRootElement?.tagName === "string" && interactiveRootElement.tagName.trim()
-      ? interactiveRootElement.tagName.trim().toLowerCase()
-      : null;
+  const interactiveRootTagName = readElementTagName(interactiveRootElement);
   const interactiveRootID = readElementAttribute(interactiveRootElement, ["id"]);
   const activePreferenceState = resolveActivePreferenceState(interactiveRootElement);
   const panelCoreControlCount = activePreferenceState.activePanelElement
@@ -551,6 +696,15 @@ function inspectPreferencePaneSurface(paneElement, pane = null) {
     registeredStylesheetCount,
     hasInlineLoadHook,
     hasLoadBridgeSignature,
+    surfaceRootStrategy: surfaceRoot.surfaceRootStrategy,
+    surfaceRootTagName: surfaceRoot.surfaceRootTagName,
+    surfaceRootID: surfaceRoot.surfaceRootID,
+    layoutMode: surfaceRoot.layoutMode,
+    widthBucket: surfaceRoot.widthBucket,
+    rootClientWidth: surfaceRoot.rootClientWidth,
+    rootScrollWidth: surfaceRoot.rootScrollWidth,
+    horizontalOverflowPx: surfaceRoot.horizontalOverflowPx,
+    hasHorizontalOverflow: surfaceRoot.hasHorizontalOverflow,
     hasInteractiveRoot,
     interactiveRootStrategy: interactiveRoot.strategy,
     interactiveRootTagName,
@@ -875,6 +1029,189 @@ export function createZoteroHost({ globalScope, rootURI = "" }) {
     throw new Error(message);
   }
 
+  async function resizePreferenceWindow(window, options = {}) {
+    const requestedWidth = normalizePositiveInteger(options.windowWidth);
+    const requestedHeight = normalizePositiveInteger(options.windowHeight);
+    const beforeBounds = getWindowBounds(window);
+
+    const summarizeResizeBoundary = (bounds) => {
+      const observedWidth = bounds?.width ?? normalizePositiveInteger(window?.outerWidth);
+      const observedHeight = bounds?.height ?? normalizePositiveInteger(window?.outerHeight);
+      const widthMatched = requestedWidth === null || observedWidth === requestedWidth;
+      const heightMatched = requestedHeight === null || observedHeight === requestedHeight;
+      const widthSatisfied = requestedWidth === null || widthMatched;
+      const heightSatisfied = requestedHeight === null
+        || heightMatched
+        || (observedHeight !== null && observedHeight >= requestedHeight);
+      return {
+        widthMatched,
+        heightMatched,
+        widthSatisfied,
+        heightSatisfied,
+        boundarySatisfied: widthSatisfied && heightSatisfied,
+      };
+    };
+
+    if (!window || (requestedWidth === null && requestedHeight === null)) {
+      const boundary = summarizeResizeBoundary(beforeBounds);
+      return {
+        requestedWidth,
+        requestedHeight,
+        targetWidth: requestedWidth,
+        targetHeight: requestedHeight,
+        applied: false,
+        strategy: null,
+        beforeBounds,
+        afterBounds: beforeBounds,
+        widthMatched: boundary.widthMatched,
+        heightMatched: boundary.heightMatched,
+        widthSatisfied: boundary.widthSatisfied,
+        heightSatisfied: boundary.heightSatisfied,
+        boundarySatisfied: boundary.boundarySatisfied,
+        settled: true,
+        timedOut: false,
+        observedMs: 0,
+        sampleCount: 0,
+        settleReason: null,
+      };
+    }
+
+    const currentWidth = beforeBounds?.width ?? normalizePositiveInteger(window?.outerWidth);
+    const currentHeight = beforeBounds?.height ?? normalizePositiveInteger(window?.outerHeight);
+    const targetWidth = requestedWidth ?? currentWidth;
+    const targetHeight = requestedHeight ?? currentHeight;
+
+    let applied = false;
+    let strategy = null;
+    if (
+      targetWidth !== null
+      && targetHeight !== null
+      && typeof window.resizeTo === "function"
+    ) {
+      try {
+        window.resizeTo(targetWidth, targetHeight);
+        applied = true;
+        strategy = "resizeTo";
+      }
+      catch {}
+    }
+
+    if (!applied) {
+      let assigned = false;
+      if (targetWidth !== null) {
+        try {
+          window.outerWidth = targetWidth;
+          assigned = true;
+        }
+        catch {}
+      }
+      if (targetHeight !== null) {
+        try {
+          window.outerHeight = targetHeight;
+          assigned = true;
+        }
+        catch {}
+      }
+      if (assigned) {
+        applied = true;
+        strategy = "outer-dimension-assignment";
+      }
+    }
+
+    let afterBounds = getWindowBounds(window);
+    let settled = false;
+    let timedOut = false;
+    let observedMs = 0;
+    let sampleCount = 0;
+    let settleReason = null;
+    if (applied && (requestedWidth !== null || requestedHeight !== null)) {
+      const settleTimeoutMs = Math.min(1000, Math.max(250, Math.floor((options.timeoutMs ?? 800) * 0.25)));
+      const quietWindowMs = Math.min(220, Math.max(120, Math.floor(settleTimeoutMs * 0.2)));
+      const startedAt = Date.now();
+      let lastBounds = afterBounds;
+      let lastChangeAt = afterBounds ? startedAt : null;
+
+      while ((Date.now() - startedAt) <= settleTimeoutMs) {
+        const currentBounds = getWindowBounds(window);
+        const now = Date.now();
+        if (currentBounds) {
+          sampleCount += 1;
+          if (!lastBounds || !hasSameWindowBounds(currentBounds, lastBounds)) {
+            lastBounds = currentBounds;
+            lastChangeAt = now;
+          }
+          const boundary = summarizeResizeBoundary(currentBounds);
+          if (boundary.widthMatched && boundary.heightMatched) {
+            afterBounds = currentBounds;
+            settled = true;
+            observedMs = now - startedAt;
+            settleReason = "exact-match";
+            break;
+          }
+          if (
+            boundary.boundarySatisfied
+            && lastChangeAt !== null
+            && (now - lastChangeAt) >= quietWindowMs
+          ) {
+            afterBounds = currentBounds;
+            settled = true;
+            observedMs = now - startedAt;
+            settleReason = boundary.heightMatched ? "stable-boundary" : "stable-min-height";
+            break;
+          }
+        }
+        await sleep(50);
+      }
+
+      if (!settled) {
+        timedOut = true;
+        observedMs = Date.now() - startedAt;
+        settleReason = "timeout";
+        afterBounds = lastBounds || afterBounds;
+      }
+    }
+
+    if (!afterBounds) {
+      const fallbackWidth = normalizePositiveInteger(window?.outerWidth) ?? targetWidth;
+      const fallbackHeight = normalizePositiveInteger(window?.outerHeight) ?? targetHeight;
+      if (fallbackWidth !== null && fallbackHeight !== null) {
+        afterBounds = {
+          x: normalizePositiveInteger(window?.screenX) ?? 0,
+          y: normalizePositiveInteger(window?.screenY) ?? 0,
+          width: fallbackWidth,
+          height: fallbackHeight,
+          title: typeof window?.document?.title === "string" && window.document.title.trim()
+            ? window.document.title.trim()
+            : null,
+          source: "window-fallback",
+        };
+      }
+    }
+
+    const boundary = summarizeResizeBoundary(afterBounds);
+
+    return {
+      requestedWidth,
+      requestedHeight,
+      targetWidth,
+      targetHeight,
+      applied,
+      strategy,
+      beforeBounds,
+      afterBounds,
+      widthMatched: boundary.widthMatched,
+      heightMatched: boundary.heightMatched,
+      widthSatisfied: boundary.widthSatisfied,
+      heightSatisfied: boundary.heightSatisfied,
+      boundarySatisfied: boundary.boundarySatisfied,
+      settled: settled || !applied,
+      timedOut,
+      observedMs,
+      sampleCount,
+      settleReason,
+    };
+  }
+
   function getActiveTabID(window = getMainWindow()) {
     const selectedID = window?.Zotero_Tabs?.selectedID;
     return typeof selectedID === "string" && selectedID.trim()
@@ -933,7 +1270,7 @@ export function createZoteroHost({ globalScope, rootURI = "" }) {
   }
 
   function getElementOwnerWindow(element) {
-    return element?.ownerGlobal || element?.ownerDocument?.defaultView || null;
+    return element?.ownerDocument?.defaultView || element?.ownerGlobal || null;
   }
 
   function getEmbeddingElement(window) {
@@ -1181,12 +1518,131 @@ export function createZoteroHost({ globalScope, rootURI = "" }) {
     return true;
   }
 
+  function getPopupAnchorElement(popup) {
+    return popup?.parentElement
+      || popup?.parentNode
+      || popup?.triggerNode
+      || popup?.anchorNode
+      || null;
+  }
+
+  async function tryOpenPopupWithNativeAPIs(popup) {
+    if (!popup) {
+      return false;
+    }
+
+    const ownerWindow = popup.ownerDocument?.defaultView || popup.ownerGlobal || null;
+    const anchor = getPopupAnchorElement(popup);
+    let opened = false;
+
+    try {
+      ownerWindow?.focus?.();
+      anchor?.ownerDocument?.defaultView?.focus?.();
+      anchor?.ownerGlobal?.focus?.();
+    }
+    catch {}
+
+    try {
+      if (typeof anchor?.openMenu === "function") {
+        anchor.openMenu(true);
+        opened = true;
+      }
+      else if (Object.prototype.hasOwnProperty.call(anchor || {}, "open")) {
+        anchor.open = true;
+        opened = true;
+      }
+    }
+    catch {}
+
+    try {
+      if (typeof popup.openPopup === "function") {
+        popup.openPopup(
+          anchor || null,
+          anchor ? "after_start" : "overlap",
+          0,
+          0,
+          false,
+          false,
+          null,
+        );
+        opened = true;
+      }
+      else if (typeof popup.openPopupAtScreen === "function") {
+        const anchorRect = anchor ? getElementScreenRect(anchor) : null;
+        if (anchorRect) {
+          popup.openPopupAtScreen(
+            Math.round(anchorRect.x),
+            Math.round(anchorRect.y + anchorRect.height),
+            false,
+          );
+          opened = true;
+        }
+      }
+    }
+    catch {}
+
+    if (!opened) {
+      try {
+        const anchorWindow = anchor?.ownerDocument?.defaultView || anchor?.ownerGlobal || ownerWindow || null;
+        const MouseEventCtor = anchorWindow?.MouseEvent || globalScope.MouseEvent || null;
+        if (typeof anchor?.dispatchEvent === "function" && MouseEventCtor) {
+          anchor.dispatchEvent(new MouseEventCtor("mousedown", {
+            bubbles: true,
+            cancelable: true,
+            button: 0,
+          }));
+          anchor.dispatchEvent(new MouseEventCtor("mouseup", {
+            bubbles: true,
+            cancelable: true,
+            button: 0,
+          }));
+          anchor.dispatchEvent(new MouseEventCtor("click", {
+            bubbles: true,
+            cancelable: true,
+            button: 0,
+          }));
+          opened = true;
+        }
+        else if (typeof anchor?.click === "function") {
+          anchor.click();
+          opened = true;
+        }
+      }
+      catch {}
+    }
+
+    if (!opened) {
+      return false;
+    }
+
+    try {
+      await waitFor(() => {
+        const rect = getElementScreenRect(popup);
+        if (rect) {
+          return rect;
+        }
+        return null;
+      }, {
+        timeoutMs: 500,
+        intervalMs: 25,
+        message: "Timed out waiting for native menu popup to become visible",
+      });
+      return true;
+    }
+    catch {
+      return false;
+    }
+  }
+
   async function simulatePopupOpen(popup) {
     await waitFor(() => popup, {
       timeoutMs: 3000,
       intervalMs: 25,
       message: "Timed out waiting for live menu popup",
     });
+    if (await tryOpenPopupWithNativeAPIs(popup)) {
+      return popup;
+    }
     simulatePopupEvent(popup, "popupshowing");
     simulatePopupEvent(popup, "popupshown");
     return popup;
@@ -1194,6 +1650,24 @@ export function createZoteroHost({ globalScope, rootURI = "" }) {
 
   async function simulatePopupClose(popup) {
     if (!popup) {
+      return;
+    }
+    let closed = false;
+    try {
+      if (typeof popup.hidePopup === "function") {
+        popup.hidePopup();
+        closed = true;
+      }
+      else {
+        const anchor = getPopupAnchorElement(popup);
+        if (Object.prototype.hasOwnProperty.call(anchor || {}, "open")) {
+          anchor.open = false;
+          closed = true;
+        }
+      }
+    }
+    catch {}
+    if (closed) {
       return;
     }
     simulatePopupEvent(popup, "popuphiding");
@@ -1392,6 +1866,8 @@ export function createZoteroHost({ globalScope, rootURI = "" }) {
       ? options.scrollTo.trim()
       : undefined;
     const timeoutMs = Number.isFinite(Number(options.timeoutMs)) ? Number(options.timeoutMs) : 8000;
+    const windowWidth = normalizePositiveInteger(options.windowWidth);
+    const windowHeight = normalizePositiveInteger(options.windowHeight);
     const window = await openPreferences(paneID, {
       scrollTo,
       timeoutMs,
@@ -1417,6 +1893,11 @@ export function createZoteroHost({ globalScope, rootURI = "" }) {
     if (typeof preferences.waitForFirstPaneLoad === "function") {
       await preferences.waitForFirstPaneLoad();
     }
+    const windowResize = await resizePreferenceWindow(preferenceWindow, {
+      windowWidth,
+      windowHeight,
+      timeoutMs,
+    });
     if (paneID && typeof preferences.navigateToPane === "function") {
       await preferences.navigateToPane(paneID, { scrollTo });
     }
@@ -1462,15 +1943,23 @@ export function createZoteroHost({ globalScope, rootURI = "" }) {
         strategy: resolved.strategy || (prepared.paneElement ? "pane-container" : null),
       };
     };
+    const isStackedPreferenceSurface = prepared.preferenceSurface?.layoutMode === "stacked";
     const settleBudgetMs = Math.min(
       1500,
-      Math.max(350, Math.floor(timeoutMs * 0.2)),
+      Math.max(
+        isStackedPreferenceSurface ? 450 : 350,
+        Math.floor(timeoutMs * (isStackedPreferenceSurface ? 0.3 : 0.2)),
+      ),
     );
     const surfaceGeometrySettle = await settlePreferenceSurfaceGeometry(surfaceResolution, {
       timeoutMs: settleBudgetMs,
       intervalMs: 50,
-      minObservationMs: Math.min(800, Math.max(250, Math.floor(settleBudgetMs * 0.6))),
+      minObservationMs: isStackedPreferenceSurface
+        ? Math.min(900, Math.max(320, Math.floor(settleBudgetMs * 0.7)))
+        : Math.min(800, Math.max(250, Math.floor(settleBudgetMs * 0.6))),
       quietWindowMs: Math.min(320, Math.max(120, Math.floor(settleBudgetMs * 0.25))),
+      ignorePosition: true,
+      ignoreHeight: isStackedPreferenceSurface,
     });
     const finalSurfaceResolution = surfaceResolution();
 
@@ -1480,6 +1969,7 @@ export function createZoteroHost({ globalScope, rootURI = "" }) {
       surfaceElement: finalSurfaceResolution.element || prepared.paneElement,
       surfaceElementStrategy: finalSurfaceResolution.strategy || null,
       surfaceGeometrySettle,
+      windowResize,
     };
   }
 

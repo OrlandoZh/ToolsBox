@@ -445,6 +445,57 @@ function isActionableSurface(snapshot = {}) {
   return snapshot.hidden !== true && snapshot.disabled !== true;
 }
 
+function getMenuPathDepth(menuPath) {
+  const normalizedPath = toPlainString(menuPath);
+  if (!normalizedPath) {
+    return null;
+  }
+  return normalizedPath.split(".").filter(Boolean).length || null;
+}
+
+function inferMenuTargetScene(target) {
+  switch (toPlainString(target)) {
+    case "main/library/item":
+      return "item";
+    case "main/library/collection":
+      return "collection";
+    case "itemPane/info/row":
+      return "item-pane-info-row";
+    case "reader/menubar/view":
+      return "reader-menubar-view";
+    default:
+      return null;
+  }
+}
+
+function inferMenuKind(liveState = {}, menuPathDepth = null) {
+  const resolvedMenuType = toPlainString(liveState?.resolvedMenu?.menuType);
+  if (resolvedMenuType === "submenu") {
+    return "submenu";
+  }
+  const localName = toPlainString(
+    liveState?.menuElem?.localName
+    || liveState?.menuElem?.tagName,
+  );
+  if (localName && localName.toLowerCase() === "menu") {
+    return "submenu";
+  }
+  if (Number(menuPathDepth) > 1) {
+    return "submenu";
+  }
+  return "menuitem";
+}
+
+function resolveMenuSurfaceKind(targetScene, menuKind, menuPathDepth) {
+  if (menuKind === "submenu" || Number(menuPathDepth) > 1) {
+    return "menu-submenu";
+  }
+  if (targetScene === "collection") {
+    return "collection-menu";
+  }
+  return "menu-item";
+}
+
 function normalizeActivationPolicy(value) {
   return value === "ui-required" ? "ui-required" : "host-first";
 }
@@ -506,6 +557,37 @@ function buildWindowAnchoredEdgeBounds({
   };
 }
 
+function intersectEdgeBounds(bounds = null, windowBounds = null) {
+  const normalizedBounds = normalizeEdgeBounds(bounds);
+  const normalizedWindowBounds = normalizeEdgeBounds(windowBounds);
+  if (!normalizedBounds || !normalizedWindowBounds) {
+    return normalizedBounds;
+  }
+
+  const left = Math.max(normalizedBounds.x, normalizedWindowBounds.x);
+  const top = Math.max(normalizedBounds.y, normalizedWindowBounds.y);
+  const right = Math.min(
+    normalizedBounds.x + normalizedBounds.width,
+    normalizedWindowBounds.x + normalizedWindowBounds.width,
+  );
+  const bottom = Math.min(
+    normalizedBounds.y + normalizedBounds.height,
+    normalizedWindowBounds.y + normalizedWindowBounds.height,
+  );
+  const width = right - left;
+  const height = bottom - top;
+  if (width <= 0 || height <= 0) {
+    return null;
+  }
+
+  return {
+    x: left,
+    y: top,
+    width,
+    height,
+  };
+}
+
 function buildEdgeAttachmentState({
   edgeMode = null,
   surfaceTarget = null,
@@ -529,10 +611,26 @@ function buildEdgeAttachmentState({
     };
   }
 
+  const normalizedWindowBounds = normalizeEdgeBounds(surfaceTarget?.windowBounds || null);
   let bounds = normalizeEdgeBounds(surfaceTarget?.rect || null);
   let boundsSource = bounds
     ? toPlainString(surfaceTarget?.rect?.source) || "surface-target-rect"
     : null;
+  if (bounds && normalizedWindowBounds) {
+    const intersectedBounds = intersectEdgeBounds(bounds, normalizedWindowBounds);
+    if (!intersectedBounds) {
+      bounds = null;
+      boundsSource = null;
+    } else if (
+      intersectedBounds.x !== bounds.x
+      || intersectedBounds.y !== bounds.y
+      || intersectedBounds.width !== bounds.width
+      || intersectedBounds.height !== bounds.height
+    ) {
+      bounds = intersectedBounds;
+      boundsSource = `${boundsSource || "surface-target-rect"}+window-intersection`;
+    }
+  }
 
   if (!bounds && Number.isFinite(Number(fallbackWidth)) && Number(fallbackWidth) > 0) {
     const windowAnchoredBounds = buildWindowAnchoredEdgeBounds({
@@ -579,21 +677,19 @@ function attachEdgeStateToSurfaceTarget(surfaceTarget, edgeState = {}) {
     return surfaceTarget;
   }
 
-  if (!surfaceTarget.rect) {
-    const normalizedEdgeRect = normalizeEdgeBounds(edgeState?.bounds || null);
-    if (
-      normalizedEdgeRect
-      && Number.isFinite(normalizedEdgeRect.x)
-      && Number.isFinite(normalizedEdgeRect.y)
-      && Number.isFinite(normalizedEdgeRect.width)
-      && Number.isFinite(normalizedEdgeRect.height)
-    ) {
-      surfaceTarget.rect = {
-        ...normalizedEdgeRect,
-        title: toPlainString(surfaceTarget?.windowBounds?.title) || null,
-        source: edgeState.boundsSource || null,
-      };
-    }
+  const normalizedEdgeRect = normalizeEdgeBounds(edgeState?.bounds || null);
+  if (
+    normalizedEdgeRect
+    && Number.isFinite(normalizedEdgeRect.x)
+    && Number.isFinite(normalizedEdgeRect.y)
+    && Number.isFinite(normalizedEdgeRect.width)
+    && Number.isFinite(normalizedEdgeRect.height)
+  ) {
+    surfaceTarget.rect = {
+      ...normalizedEdgeRect,
+      title: toPlainString(surfaceTarget?.windowBounds?.title) || null,
+      source: edgeState.boundsSource || null,
+    };
   }
 
   surfaceTarget.details = {
@@ -1253,12 +1349,103 @@ function doesThemeStateMatch(themeState, expectedThemeState = null) {
   return Boolean(toPlainString(themeState?.paneTheme));
 }
 
+function toFiniteCount(value, fallback = 0) {
+  const normalized = Number(value);
+  return Number.isFinite(normalized) ? Number(normalized) : fallback;
+}
+
+function extractPreferenceSurfaceDiagnostics(preferenceSurface = {}) {
+  const horizontalOverflowPx = Math.max(0, toFiniteCount(preferenceSurface.horizontalOverflowPx));
+  return {
+    surfaceRootStrategy: toPlainString(preferenceSurface.surfaceRootStrategy),
+    surfaceRootTagName: toPlainString(preferenceSurface.surfaceRootTagName),
+    surfaceRootID: toPlainString(preferenceSurface.surfaceRootID),
+    layoutMode: toPlainString(preferenceSurface.layoutMode),
+    widthBucket: toPlainString(preferenceSurface.widthBucket),
+    rootClientWidth: Math.max(0, toFiniteCount(preferenceSurface.rootClientWidth)),
+    rootScrollWidth: Math.max(0, toFiniteCount(preferenceSurface.rootScrollWidth)),
+    horizontalOverflowPx,
+    hasHorizontalOverflow: preferenceSurface.hasHorizontalOverflow === true || horizontalOverflowPx > 1,
+  };
+}
+
+function buildPreferenceSurfaceObservedState(prepared) {
+  const preferenceSurface = prepared?.preferenceSurface && typeof prepared.preferenceSurface === "object"
+    ? prepared.preferenceSurface
+    : {};
+  return {
+    preferenceSurface,
+    surfaceGeometrySettle: prepared?.surfaceGeometrySettle || null,
+    windowResize: prepared?.windowResize || null,
+    ...extractPreferenceSurfaceDiagnostics(preferenceSurface),
+  };
+}
+
+function createPreferenceSurfaceLayoutChecks(prepared, surfaceDiagnostics = {}) {
+  const surfaceGeometry = prepared?.surfaceGeometrySettle?.geometry || null;
+  const surfaceGeometryWidth = toFiniteCount(surfaceGeometry?.width);
+  const surfaceGeometryHeight = toFiniteCount(surfaceGeometry?.height);
+  const geometrySettled = prepared?.surfaceGeometrySettle?.stable === true;
+  const geometryReady = geometrySettled || (surfaceGeometryWidth > 0 && surfaceGeometryHeight > 0);
+  const rootClientWidth = Math.max(0, toFiniteCount(surfaceDiagnostics.rootClientWidth));
+  const rootScrollWidth = Math.max(0, toFiniteCount(surfaceDiagnostics.rootScrollWidth));
+  const horizontalOverflowPx = Math.max(0, toFiniteCount(surfaceDiagnostics.horizontalOverflowPx));
+  const rootWidthObserved = rootClientWidth > 0 || surfaceGeometryWidth > 0;
+
+  return [
+    createCheck("pane-geometry-ready", geometryReady, {
+      surfaceRootStrategy: surfaceDiagnostics.surfaceRootStrategy || prepared?.surfaceElementStrategy || null,
+      surfaceGeometry,
+      stable: geometrySettled,
+      sampleCount: toFiniteCount(prepared?.surfaceGeometrySettle?.sampleCount),
+      observedMs: toFiniteCount(prepared?.surfaceGeometrySettle?.observedMs),
+      timedOut: prepared?.surfaceGeometrySettle?.timedOut === true,
+    }),
+    createCheck("pane-root-width-observed", rootWidthObserved, {
+      rootClientWidth,
+      surfaceGeometryWidth,
+      surfaceRootStrategy: surfaceDiagnostics.surfaceRootStrategy || prepared?.surfaceElementStrategy || null,
+      surfaceRootID: surfaceDiagnostics.surfaceRootID || null,
+      layoutMode: surfaceDiagnostics.layoutMode || null,
+      widthBucket: surfaceDiagnostics.widthBucket || null,
+    }),
+    createCheck("pane-no-horizontal-overflow", rootWidthObserved ? surfaceDiagnostics.hasHorizontalOverflow !== true : false, {
+      rootClientWidth,
+      rootScrollWidth,
+      horizontalOverflowPx,
+      layoutMode: surfaceDiagnostics.layoutMode || null,
+      widthBucket: surfaceDiagnostics.widthBucket || null,
+      surfaceRootStrategy: surfaceDiagnostics.surfaceRootStrategy || prepared?.surfaceElementStrategy || null,
+      surfaceRootID: surfaceDiagnostics.surfaceRootID || null,
+    }),
+  ];
+}
+
+function buildPreferenceSurfaceDetails(prepared, paneID, surfaceDiagnostics = {}) {
+  return {
+    paneID,
+    surfaceRootStrategy: surfaceDiagnostics.surfaceRootStrategy || prepared?.surfaceElementStrategy || null,
+    surfaceRootID: surfaceDiagnostics.surfaceRootID || null,
+    surfaceRootTagName: surfaceDiagnostics.surfaceRootTagName || null,
+    geometrySettled: prepared?.surfaceGeometrySettle?.stable === true,
+    surfaceGeometry: prepared?.surfaceGeometrySettle?.geometry || null,
+    layoutMode: surfaceDiagnostics.layoutMode || null,
+    widthBucket: surfaceDiagnostics.widthBucket || null,
+    rootClientWidth: Math.max(0, toFiniteCount(surfaceDiagnostics.rootClientWidth)),
+    rootScrollWidth: Math.max(0, toFiniteCount(surfaceDiagnostics.rootScrollWidth)),
+    horizontalOverflowPx: Math.max(0, toFiniteCount(surfaceDiagnostics.horizontalOverflowPx)),
+    hasHorizontalOverflow: surfaceDiagnostics.hasHorizontalOverflow === true,
+    windowResize: prepared?.windowResize || null,
+  };
+}
+
 function buildPreferenceControlSurfaceTarget(host, prepared, control, locator, fallbackDetails = {}) {
   const paneID = prepared?.selectedPaneID || prepared?.paneID || null;
   const captureToken = locator.controlID || locator.preferenceID || locator.selector || "control";
   const hasControlRect = typeof host?.getElementScreenRect === "function"
     ? Boolean(host.getElementScreenRect(control))
     : false;
+  const surfaceDiagnostics = buildPreferenceSurfaceObservedState(prepared);
   return host.buildSurfaceTarget({
     surfaceId: "preference-control",
     captureKind: `preference-control-${paneID}-${captureToken}`,
@@ -1266,7 +1453,7 @@ function buildPreferenceControlSurfaceTarget(host, prepared, control, locator, f
     element: hasControlRect ? control : prepared?.paneElement || null,
     window: prepared?.window || null,
     details: {
-      paneID,
+      ...buildPreferenceSurfaceDetails(prepared, paneID, surfaceDiagnostics),
       controlID: locator.controlID || null,
       preferenceID: locator.preferenceID || null,
       selector: locator.selector || null,
@@ -1302,15 +1489,16 @@ export function createHostActionRunner({
       const prepared = await host.preparePreferencePane({
         paneID,
         scrollTo: toPlainString(payload.scrollTo) || undefined,
+        windowWidth: payload.windowWidth,
+        windowHeight: payload.windowHeight,
         timeoutMs: payload.timeoutMs,
       });
       try {
         prepared.window?.focus?.();
       }
       catch {}
-      const preferenceSurface = prepared.preferenceSurface && typeof prepared.preferenceSurface === "object"
-        ? prepared.preferenceSurface
-        : {};
+      const preferenceSurfaceState = buildPreferenceSurfaceObservedState(prepared);
+      const preferenceSurface = preferenceSurfaceState.preferenceSurface;
       const coreControlCount = Number.isFinite(Number(preferenceSurface.coreControlCount))
         ? Number(preferenceSurface.coreControlCount)
         : 0;
@@ -1358,8 +1546,7 @@ export function createHostActionRunner({
         preferenceWindowCount: Array.isArray(host.listPreferenceWindows?.())
           ? host.listPreferenceWindows().length
           : null,
-        preferenceSurface,
-        surfaceGeometrySettle: prepared.surfaceGeometrySettle || null,
+        ...preferenceSurfaceState,
       };
       const surfaceElement = prepared.surfaceElement || prepared.paneElement;
       const readinessChecks = [
@@ -1405,6 +1592,7 @@ export function createHostActionRunner({
           panelCount,
           panelCoreControlCount,
         }),
+        ...createPreferenceSurfaceLayoutChecks(prepared, preferenceSurfaceState),
       ];
       const surfaceTarget = host.buildSurfaceTarget({
         surfaceId: "preference-pane",
@@ -1412,12 +1600,7 @@ export function createHostActionRunner({
         label: `Preference Pane ${paneID}`,
         element: surfaceElement,
         window: prepared.window,
-        details: {
-          paneID,
-          surfaceRootStrategy: prepared.surfaceElementStrategy || null,
-          geometrySettled: prepared.surfaceGeometrySettle?.stable === true,
-          surfaceGeometry: prepared.surfaceGeometrySettle?.geometry || null,
-        },
+        details: buildPreferenceSurfaceDetails(prepared, paneID, preferenceSurfaceState),
       });
       return buildResult({
         actionId,
@@ -1457,6 +1640,8 @@ export function createHostActionRunner({
     try {
       const prepared = await host.preparePreferencePane({
         paneID,
+        windowWidth: payload.windowWidth,
+        windowHeight: payload.windowHeight,
         timeoutMs: payload.timeoutMs,
       });
       try {
@@ -1658,6 +1843,8 @@ export function createHostActionRunner({
     try {
       const prepared = await host.preparePreferencePane({
         paneID,
+        windowWidth: payload.windowWidth,
+        windowHeight: payload.windowHeight,
         timeoutMs: payload.timeoutMs,
       });
       try {
@@ -1835,6 +2022,7 @@ export function createHostActionRunner({
           matchedBy: located.matchedBy,
         },
       );
+      const preferenceSurfaceState = buildPreferenceSurfaceObservedState(prepared);
       const observedState = {
         paneID,
         selectedPaneID: prepared.selectedPaneID,
@@ -1847,6 +2035,7 @@ export function createHostActionRunner({
         prefType: binding.preferenceType,
         prefValueBefore,
         prefValueAfter,
+        ...preferenceSurfaceState,
         ...themeState,
         controlSurfaceFallback: surfaceTarget?.details?.controlSurfaceFallback === true,
       };
@@ -1884,6 +2073,7 @@ export function createHostActionRunner({
           expected: expectedValue,
           actual: prefValueAfter,
         }),
+        ...createPreferenceSurfaceLayoutChecks(prepared, preferenceSurfaceState),
       ];
       if (expectedThemeState) {
         readinessChecks.push(
@@ -2187,20 +2377,36 @@ export function createHostActionRunner({
         host.getMainWindow?.()?.focus?.();
       }
       catch {}
-      const paneButton = result?.button || findPaneButton(result?.container?.sidenav || null, paneID);
+      const contextSidenav = result?.container?.sidenav || null;
+      const paneButton = result?.button || findPaneButton(contextSidenav, paneID);
       const paneSurface = inspectElementSurface(result?.pane || null);
       const paneButtonSurface = inspectElementSurface(paneButton);
+      const contextSidenavSurface = inspectElementSurface(contextSidenav);
       const activationStrategy = toPlainString(result?.activationStrategy);
       const actionDispatched = Boolean(result?.actionDispatched);
       const actionElementObserved = result?.actionElementObserved ?? Boolean(paneButton);
       const liveUiActivation = activationPolicy !== "ui-required" || isLiveClickActivationStrategy(activationStrategy);
-      const surfaceEvidenceElement = result?.pane || paneButton || null;
+      const surfaceEvidenceElement = result?.pane || paneButton || contextSidenav;
+      const fallbackSurface = surfaceEvidenceElement === contextSidenav
+        ? contextSidenavSurface
+        : surfaceEvidenceElement === paneButton
+          ? paneButtonSurface
+          : paneSurface;
+      const paneStructureReady = hasSurfaceStructure(paneSurface)
+        || (!result?.pane && surfaceEvidenceElement === contextSidenav && hasSurfaceStructure(contextSidenavSurface));
+      const paneContentReady = hasSurfaceContent(paneSurface)
+        || (!result?.pane && hasSurfaceContent(fallbackSurface));
       const surfaceTarget = host.buildSurfaceTarget({
         surfaceId: "context-pane",
         captureKind: `surface-context-pane-${paneID}`,
         label: `Context Pane ${paneID}`,
         element: surfaceEvidenceElement,
-        window: host.getMainWindow?.() || null,
+        window: (
+          surfaceEvidenceElement?.ownerGlobal
+          || surfaceEvidenceElement?.ownerDocument?.defaultView
+          || host.getMainWindow?.()
+          || null
+        ),
         details: {
           paneID,
           tabID: result.tabID || null,
@@ -2208,6 +2414,8 @@ export function createHostActionRunner({
             ? "pane-fragment"
             : surfaceEvidenceElement === paneButton
               ? "pane-button"
+              : surfaceEvidenceElement === result?.container?.sidenav
+                ? "pane-sidenav"
               : null,
         },
       });
@@ -2227,6 +2435,7 @@ export function createHostActionRunner({
           visible: Boolean(result.visible),
           paneSurface,
           paneButtonSurface,
+          contextSidenavSurface,
           ...edgeState,
         }, {
           activationPolicy,
@@ -2239,16 +2448,19 @@ export function createHostActionRunner({
             paneID,
             tabID: result.tabID || tabID,
           }),
-          createCheck("pane-fragment-mounted", hasSurfaceStructure(paneSurface), {
+          createCheck("pane-fragment-mounted", paneStructureReady, {
             paneSurface,
+            fallbackSurface,
           }),
-          createCheck("pane-content-observed", hasSurfaceContent(paneSurface), {
+          createCheck("pane-content-observed", paneContentReady, {
             paneSurface,
+            fallbackSurface,
           }),
-          createCheck("sidenav-button-observed", Boolean(paneButton), {
+          createCheck("sidenav-button-observed", Boolean(paneButton) || hasSurfaceStructure(contextSidenavSurface), {
             paneID,
             tabID: result.tabID || tabID,
             paneButtonSurface,
+            contextSidenavSurface,
           }),
           createCheck("activation-strategy-observed", Boolean(activationStrategy), {
             activationPolicy,
@@ -2740,19 +2952,51 @@ export function createHostActionRunner({
       const popupSurface = inspectElementSurface(liveState?.popupElem || popup || null);
       const popupElement = liveState?.popupElem || popup || null;
       const menuElement = liveState?.menuElem || null;
+      const resolvedMenuPath = liveState?.menuPath || menuPath || null;
+      const menuPathDepth = getMenuPathDepth(resolvedMenuPath);
+      const targetScene = inferMenuTargetScene(target);
+      const menuKind = inferMenuKind(liveState, menuPathDepth);
+      const submenuPopupElement = menuKind === "submenu"
+        ? menuElement?.menupopup || menuElement?.popup || popupElement || null
+        : Number(menuPathDepth) > 1
+          ? popupElement || null
+          : null;
       const popupRect = typeof host?.getElementScreenRect === "function"
         ? host.getElementScreenRect(popupElement)
+        : null;
+      const submenuPopupRect = typeof host?.getElementScreenRect === "function"
+        ? host.getElementScreenRect(submenuPopupElement)
         : null;
       const menuRect = typeof host?.getElementScreenRect === "function"
         ? host.getElementScreenRect(menuElement)
         : null;
-      const surfaceElement = popupRect
-        ? popupElement
-        : menuRect
-          ? menuElement
-          : popupElement || menuElement || null;
+      const surfaceKind = resolveMenuSurfaceKind(targetScene, menuKind, menuPathDepth);
+      const surfaceElement = surfaceKind === "menu-submenu"
+        ? submenuPopupRect
+          ? submenuPopupElement
+          : menuRect
+            ? menuElement
+            : submenuPopupElement || popupElement || menuElement || null
+        : popupRect
+          ? popupElement
+          : menuRect
+            ? menuElement
+            : popupElement || menuElement || null;
+      const surfaceEvidenceElement = surfaceKind === "menu-submenu"
+        ? surfaceElement === submenuPopupElement
+          ? "menu-submenu-popup"
+          : surfaceElement === menuElement
+            ? "menu-submenu"
+            : surfaceElement === popupElement
+              ? "menu-submenu-popup"
+              : null
+        : surfaceElement === popupElement
+          ? "menu-popup"
+          : surfaceElement === menuElement
+            ? "menu-item"
+            : null;
       const surfaceTarget = host.buildSurfaceTarget({
-        surfaceId: "menu-item",
+        surfaceId: surfaceKind,
         captureKind: `surface-menu-${target}-${menuID}`,
         label: `Menu ${menuID}`,
         element: surfaceElement,
@@ -2768,12 +3012,13 @@ export function createHostActionRunner({
         details: {
           menuID,
           target,
-          menuPath: menuPath || null,
-          surfaceEvidenceElement: surfaceElement === popupElement
-            ? "menu-popup"
-            : surfaceElement === menuElement
-              ? "menu-item"
-              : null,
+          targetScene,
+          menuKind,
+          menuPath: resolvedMenuPath,
+          menuPathDepth,
+          collectionTreeRowID: liveState?.collectionTreeRowID ?? null,
+          collectionTreeRowType: liveState?.collectionTreeRowType ?? null,
+          surfaceEvidenceElement,
         },
       });
       return buildResult({
@@ -2788,11 +3033,17 @@ export function createHostActionRunner({
         observedState: {
           menuID,
           target,
-          menuPath: liveState?.menuPath || menuPath || null,
+          targetScene,
+          menuKind,
+          menuPath: resolvedMenuPath,
+          menuPathDepth,
           phase: liveState?.phase || null,
           itemCount: liveState?.itemCount ?? null,
           tabID: liveState?.tabID ?? null,
           tabType: liveState?.tabType ?? null,
+          tabSubType: liveState?.tabSubType ?? null,
+          collectionTreeRowID: liveState?.collectionTreeRowID ?? null,
+          collectionTreeRowType: liveState?.collectionTreeRowType ?? null,
           popupOpen: Boolean(popup),
           menuSurface,
           popupSurface,

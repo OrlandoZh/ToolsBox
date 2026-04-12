@@ -16,6 +16,8 @@
   Evidence: `scripts/cleanroom-similarity.mjs` 与 `scripts/cleanroom-audit.mjs` 统一输出 `dist/cleanroom-*.{json,md}`，缺少本地 `reference/` 时记录 `status = unavailable`。
 - [x] 发布态额外要求 similarity 报告可用，避免“未挂载 reference 快照”直接进入发布检查。
   Evidence: `scripts/release-preflight.mjs` 会调用 `runCleanroomAudit({ mode: "release" })`，发布态要求 `cleanroom-similarity.json` 为 `available`。
+- [x] 中国法商业交付骨架文档已预留，且会随 pure-project 导出一起携带。
+  Evidence: `CODE_PROVENANCE.md`、`THIRD_PARTY_NOTICES.md`、`COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md` 已纳入主仓与 `export:project` 输出。
 
 ## Release Gate (release-only)
 
@@ -29,3 +31,14 @@
   Evidence: 以本次 release 的依赖审计记录、发布说明与 notices 清单为准。
 - [ ] Final legal review completed before shipping.
   Evidence: 以正式发布审批记录或法务签字结论为准。
+
+## China Commercial Delivery Gate (release-only)
+
+- [x] `CODE_PROVENANCE.md` 已覆盖模块来源摘要、reference 使用边界与发布包排除项。
+  Evidence: `CODE_PROVENANCE.md`
+- [x] `THIRD_PARTY_NOTICES.md` 已覆盖当前发布包内第三方项与未进入发布包的研究材料。
+  Evidence: `THIRD_PARTY_NOTICES.md`
+- [x] `COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md` 已说明 `UNLICENSED` 模板仓库与商业交付边界。
+  Evidence: `COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md`
+- [x] reference 使用记录、similarity 复核入口与商业交付权利瑕疵审查入口均已留档。
+  Evidence: `dist/cleanroom-similarity.{json,md}`、正式 release 审批记录、商业交付 review 记录

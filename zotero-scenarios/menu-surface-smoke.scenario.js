@@ -22,22 +22,17 @@ registerZoteroScenario("live menu surface smoke", async ({ assert, addonConfig, 
   const markerID = `cleanroom-menu-followup-${Date.now()}`;
   const menuID = `${addonConfig.addonRef}-scenario-menu-followup-${Date.now()}`;
   const target = "reader/menubar/view";
-  const registeredMenuID = plugin.api.menuManager.registerReaderMenuItem(
-    {
-      target: plugin.api.menuManager.MENU_TARGETS.READER_MENU_VIEW,
+  const registeredMenuID = plugin.api.menuManager.registerReaderMenubarViewMenuItem({
+    id: menuID,
+    label: "Scenario Menu Follow-up",
+    onShowing: (_event, context) => {
+      context?.setVisible?.(true);
     },
-    {
-      id: menuID,
-      label: "Scenario Menu Follow-up",
-      onShowing: (_event, context) => {
-        context?.setVisible?.(true);
-      },
-      onCommand: () => {
-        const mainWindow = plugin.api.host.getMainWindow();
-        mainWindow?.document?.documentElement?.setAttribute("data-cleanroom-menu-followup", markerID);
-      },
+    onCommand: () => {
+      const mainWindow = plugin.api.host.getMainWindow();
+      mainWindow?.document?.documentElement?.setAttribute("data-cleanroom-menu-followup", markerID);
     },
-  );
+  });
   helpers.addCleanup(() => {
     if (registeredMenuID) {
       plugin.api.menuManager.unregister(registeredMenuID);

@@ -81,6 +81,7 @@ function listMissingTopLevelSections(payload) {
     "sourceFreshness",
     "stableContext",
     "dynamicContext",
+    "sourceAlignment",
     "decisionHints",
     "driftSignals",
   ];
@@ -193,6 +194,25 @@ export async function evaluateAgentContextGuard(projectRoot, options = {}) {
         "补齐 compact view 的 truth / monitor / gate / memory / context artifact refs。",
       ));
     }
+    if (Array.isArray(compactBudget.missingAlignmentFields) && compactBudget.missingAlignmentFields.length > 0) {
+      warnings.push(buildSignal(
+        "runtime-compact-missing-alignment-refs",
+        "missing-required-section",
+        `runtime compact 缺少 alignment refs：${compactBudget.missingAlignmentFields.join("、")}。`,
+        "补齐 compact view 的 source alignment 摘要，确保 delegation / obsidian / gate 消费同一份对齐信号。",
+      ));
+    }
+    if (
+      Array.isArray(compactBudget.missingReferenceDistillationFields)
+      && compactBudget.missingReferenceDistillationFields.length > 0
+    ) {
+      warnings.push(buildSignal(
+        "runtime-compact-missing-reference-distillation-refs",
+        "missing-required-section",
+        `runtime compact 缺少 reference distillation refs：${compactBudget.missingReferenceDistillationFields.join("、")}。`,
+        "补齐 compact view 的 reference distillation advisory ref，但不要把 pending 状态升级为 blocker。",
+      ));
+    }
     if (!compactBudget.withinBudget) {
       warnings.push(buildSignal(
         "runtime-compact-budget-exceeded",
@@ -204,12 +224,21 @@ export async function evaluateAgentContextGuard(projectRoot, options = {}) {
 
     const contextGeneratedAtMs = parseGeneratedAtMs(payload.generatedAt);
     const monitorGeneratedAtMs = parseGeneratedAtMs(sources.monitor?.generatedAt);
+    const gateGeneratedAtMs = parseGeneratedAtMs(sources.gate?.generatedAt);
     if (contextGeneratedAtMs !== null && monitorGeneratedAtMs !== null && contextGeneratedAtMs < monitorGeneratedAtMs) {
       warnings.push(buildSignal(
         "context-older-than-monitor",
         "freshness-mismatch",
         "agent-context 早于最新 monitor，当前上下文工件已经过期。",
         "先执行 `npm run agent:context`，让上下文重新对齐最新 monitor。",
+      ));
+    }
+    if (contextGeneratedAtMs !== null && gateGeneratedAtMs !== null && contextGeneratedAtMs < gateGeneratedAtMs) {
+      warnings.push(buildSignal(
+        "context-older-than-gate",
+        "freshness-mismatch",
+        "agent-context 早于最新 gate，当前上下文工件不是 post-gate aligned 版本。",
+        "先执行 `npm run agent:gate`，让 gate 在写入结论后重新生成 agent-context。",
       ));
     }
 
@@ -221,6 +250,15 @@ export async function evaluateAgentContextGuard(projectRoot, options = {}) {
         "freshness-mismatch",
         "current truth 已更新，但 agent-context 仍在引用旧的 truth 时间戳。",
         "先同步 `docs/CURRENT_BACKLOG.md`，再执行 `npm run agent:context`。",
+      ));
+    }
+    const contextGateUpdatedAtMs = parseGeneratedAtMs(payload.sourceFreshness?.gateGeneratedAt);
+    if (contextGateUpdatedAtMs !== null && gateGeneratedAtMs !== null && contextGateUpdatedAtMs < gateGeneratedAtMs) {
+      warnings.push(buildSignal(
+        "context-gate-reference-stale",
+        "freshness-mismatch",
+        "agent-context 记录的 gate 时间戳早于最新 gate 工件，说明当前 compact refs 仍在引用旧 gate。",
+        "先执行 `npm run agent:gate`，刷新 post-gate context。",
       ));
     }
 
@@ -246,6 +284,16 @@ export async function evaluateAgentContextGuard(projectRoot, options = {}) {
         "next-action-conflict",
         `agent-context 的 nextAction 为 ${contextNextAction}，但最新 gate / monitor 建议为 ${latestNextAction}。`,
         "重新执行 `npm run agent:context`，让 nextAction 与最新工件重新对齐。",
+      ));
+    }
+
+    const alignmentStage = String(payload.sourceAlignment?.generationStage || "").trim() || null;
+    if (gateGeneratedAtMs !== null && alignmentStage && alignmentStage !== "post-gate") {
+      warnings.push(buildSignal(
+        "context-not-post-gate-aligned",
+        "freshness-mismatch",
+        `agent-context 当前 generation stage 为 ${alignmentStage}，尚未与最新 gate 绑定为 post-gate aligned。`,
+        "执行 `npm run agent:gate`，让 gate 在写入结论后重新生成 context。",
       ));
     }
   }

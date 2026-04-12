@@ -10,6 +10,24 @@ import {
 } from "../src/features/reader.js";
 import { normalizeDiagnosisFingerprint } from "./agent-zotero-diagnosis-lib.mjs";
 
+const DOM_CONTRACT_EXPECTED_ROUTES = Object.freeze([
+  {
+    routeId: "preference-pane",
+    adapter: "preference-pane",
+    label: "preference pane",
+  },
+  {
+    routeId: "item-pane",
+    adapter: "item-pane",
+    label: "item pane",
+  },
+  {
+    routeId: "reader",
+    adapter: "reader",
+    label: "reader",
+  },
+]);
+
 function parseDate(dateLike) {
   if (!dateLike) {
     return null;
@@ -312,6 +330,63 @@ const SEVERITY_RANK = {
   low: 1,
 };
 
+const PERFORMANCE_BUDGET_SCENARIO_NAME = "performance budget diagnostics";
+const DEFAULT_PERFORMANCE_BUDGET_CONFIG = Object.freeze({
+  version: 1,
+  mode: "advisory",
+  gateEffect: "non-blocking",
+  scenarioName: PERFORMANCE_BUDGET_SCENARIO_NAME,
+  telemetryBudgets: Object.freeze({
+    hostReadyDurationMs: Object.freeze({
+      label: "Host Ready",
+      warningAbove: 3000,
+      unit: "ms",
+    }),
+    startupDurationMs: Object.freeze({
+      label: "Startup",
+      warningAbove: 4000,
+      unit: "ms",
+    }),
+    shutdownDurationMs: Object.freeze({
+      label: "Shutdown",
+      warningAbove: 1500,
+      unit: "ms",
+    }),
+    lifecycleSlowOperationCount: Object.freeze({
+      label: "生命周期慢操作",
+      warningAbove: 1,
+      unit: "count",
+    }),
+    httpSlowOperationCount: Object.freeze({
+      label: "HTTP 慢操作",
+      warningAbove: 2,
+      unit: "count",
+    }),
+  }),
+  activityBudgets: Object.freeze({
+    "preferences.openPane": Object.freeze({
+      label: "偏好设置面板打开",
+      warningAbove: 1600,
+      unit: "ms",
+    }),
+    "itemPane.selectPane": Object.freeze({
+      label: "条目窗格切换",
+      warningAbove: 1000,
+      unit: "ms",
+    }),
+    "contextPane.selectPane": Object.freeze({
+      label: "上下文窗格切换",
+      warningAbove: 1200,
+      unit: "ms",
+    }),
+    "reader.sidebar.selectView": Object.freeze({
+      label: "Reader 侧边栏切换",
+      warningAbove: 1500,
+      unit: "ms",
+    }),
+  }),
+});
+
 function uniqueStrings(values) {
   return Array.from(new Set(
     (Array.isArray(values) ? values : [])
@@ -322,6 +397,266 @@ function uniqueStrings(values) {
 
 function isBlockingSeverity(severity) {
   return (SEVERITY_RANK[String(severity || "").toLowerCase()] || 0) >= SEVERITY_RANK.high;
+}
+
+function normalizeNonNegativeNumber(value, fallback = 0) {
+  const normalized = Number(value);
+  return Number.isFinite(normalized) && normalized >= 0 ? normalized : fallback;
+}
+
+function normalizePerformanceBudgetRule(rule, fallback, unitFallback = "ms") {
+  const source = rule && typeof rule === "object" && !Array.isArray(rule) ? rule : {};
+  const defaults = fallback && typeof fallback === "object" ? fallback : {};
+  const label = String(source.label || defaults.label || "").trim() || "未命名预算";
+  const warningAbove = normalizeNonNegativeNumber(source.warningAbove, normalizeNonNegativeNumber(defaults.warningAbove, 0));
+  const unit = String(source.unit || defaults.unit || unitFallback).trim() || unitFallback;
+  return {
+    label,
+    warningAbove,
+    unit,
+  };
+}
+
+function normalizePerformanceBudgetConfig(config = null) {
+  const source = config && typeof config === "object" && !Array.isArray(config) ? config : {};
+  const telemetryDefaults = DEFAULT_PERFORMANCE_BUDGET_CONFIG.telemetryBudgets;
+  const activityDefaults = DEFAULT_PERFORMANCE_BUDGET_CONFIG.activityBudgets;
+  const telemetryBudgets = {};
+  const activityBudgets = {};
+
+  Object.keys(telemetryDefaults).forEach((metricId) => {
+    telemetryBudgets[metricId] = normalizePerformanceBudgetRule(
+      source.telemetryBudgets?.[metricId],
+      telemetryDefaults[metricId],
+      telemetryDefaults[metricId].unit,
+    );
+  });
+  Object.keys(activityDefaults).forEach((actionId) => {
+    activityBudgets[actionId] = normalizePerformanceBudgetRule(
+      source.activityBudgets?.[actionId],
+      activityDefaults[actionId],
+      activityDefaults[actionId].unit,
+    );
+  });
+
+  return {
+    version: normalizeNonNegativeNumber(source.version, DEFAULT_PERFORMANCE_BUDGET_CONFIG.version),
+    mode: String(source.mode || DEFAULT_PERFORMANCE_BUDGET_CONFIG.mode).trim() || DEFAULT_PERFORMANCE_BUDGET_CONFIG.mode,
+    gateEffect: String(source.gateEffect || DEFAULT_PERFORMANCE_BUDGET_CONFIG.gateEffect).trim() || DEFAULT_PERFORMANCE_BUDGET_CONFIG.gateEffect,
+    scenarioName: String(source.scenarioName || DEFAULT_PERFORMANCE_BUDGET_CONFIG.scenarioName).trim() || DEFAULT_PERFORMANCE_BUDGET_CONFIG.scenarioName,
+    telemetryBudgets,
+    activityBudgets,
+  };
+}
+
+function pickPerformanceBudgetStatusLabel(status) {
+  switch (String(status || "").trim()) {
+    case "passed":
+      return "通过";
+    case "attention":
+      return "需关注";
+    case "missing":
+      return "缺失";
+    default:
+      return "未知";
+  }
+}
+
+function findScenarioResultByName(results, name) {
+  const expected = String(name || "").trim();
+  if (!expected) {
+    return null;
+  }
+  return (Array.isArray(results) ? results : []).find((item) => String(item?.name || "").trim() === expected) || null;
+}
+
+function formatPerformanceBudgetViolation(violation) {
+  if (!violation || typeof violation !== "object") {
+    return null;
+  }
+  const label = String(violation.label || violation.id || "").trim() || "未命名预算";
+  if (violation.kind === "missing-activity-measurement") {
+    return `${label} 缺少测量`;
+  }
+  if (violation.kind === "activity-not-ready") {
+    return `${label} 未达到 ready`;
+  }
+  const observedValue = Number.isFinite(Number(violation.observedValue))
+    ? Number(violation.observedValue)
+    : null;
+  const warningAbove = Number.isFinite(Number(violation.warningAbove))
+    ? Number(violation.warningAbove)
+    : null;
+  const unit = String(violation.unit || "").trim();
+  if (observedValue === null || warningAbove === null) {
+    return label;
+  }
+  return `${label} ${observedValue}${unit} > ${warningAbove}${unit}`;
+}
+
+function summarizePerformanceBudget(report, latestCycle, options = {}) {
+  const config = normalizePerformanceBudgetConfig(
+    options.performanceBudgetConfig
+    || report?.performanceBudget?.configSnapshot
+    || null,
+  );
+  const latestChecks = latestCycle?.checks && typeof latestCycle.checks === "object"
+    ? latestCycle.checks
+    : {};
+  const scenarioResults = Array.isArray(latestCycle?.scenarios?.results)
+    ? latestCycle.scenarios.results
+    : [];
+  const scenario = findScenarioResultByName(scenarioResults, config.scenarioName);
+  const scenarioObserved = Boolean(scenario);
+  const scenarioStatus = scenarioObserved
+    ? (String(scenario?.status || "").trim() === "passed" ? "passed" : "failed")
+    : "missing";
+  const scenarioStatusLabel = scenarioStatus === "passed"
+    ? "通过"
+    : scenarioStatus === "failed"
+      ? "异常"
+      : "缺失";
+  const rawActivities = Array.isArray(scenario?.details?.activities)
+    ? scenario.details.activities
+    : [];
+  const measuredActivities = rawActivities
+    .map((entry) => {
+      const actionId = String(entry?.actionId || "").trim();
+      if (!actionId) {
+        return null;
+      }
+      const durationMs = normalizeNonNegativeNumber(entry?.durationMs, 0);
+      return {
+        actionId,
+        label: String(entry?.label || actionId).trim() || actionId,
+        durationMs,
+        ready: entry?.ready !== false,
+        surfaceId: String(entry?.surfaceId || "").trim() || null,
+        captureKind: String(entry?.captureKind || "").trim() || null,
+      };
+    })
+    .filter(Boolean);
+  const measuredActivityMap = new Map(measuredActivities.map((entry) => [entry.actionId, entry]));
+  const telemetryChecks = Object.entries(config.telemetryBudgets).map(([metricId, rule]) => {
+    const observedValue = normalizeNonNegativeNumber(latestChecks?.[metricId], 0);
+    const warningAbove = normalizeNonNegativeNumber(rule.warningAbove, 0);
+    return {
+      metricId,
+      label: rule.label,
+      observedValue,
+      warningAbove,
+      unit: rule.unit,
+      passed: observedValue <= warningAbove,
+    };
+  });
+  const activityChecks = Object.entries(config.activityBudgets).map(([actionId, rule]) => {
+    const measured = measuredActivityMap.get(actionId) || null;
+    const durationMs = measured ? normalizeNonNegativeNumber(measured.durationMs, 0) : null;
+    const warningAbove = normalizeNonNegativeNumber(rule.warningAbove, 0);
+    const missing = measured === null;
+    const ready = measured ? measured.ready !== false : null;
+    return {
+      actionId,
+      label: rule.label,
+      durationMs,
+      warningAbove,
+      unit: rule.unit,
+      missing,
+      ready,
+      surfaceId: measured?.surfaceId || null,
+      captureKind: measured?.captureKind || null,
+      passed: !missing && ready !== false && durationMs <= warningAbove,
+    };
+  });
+
+  const telemetryViolations = telemetryChecks
+    .filter((entry) => entry.passed === false)
+    .map((entry) => ({
+      kind: "warning-above-threshold",
+      scope: "runtime-telemetry",
+      id: entry.metricId,
+      label: entry.label,
+      observedValue: entry.observedValue,
+      warningAbove: entry.warningAbove,
+      unit: entry.unit,
+    }));
+  const activityViolations = scenarioObserved
+    ? activityChecks
+      .filter((entry) => entry.passed === false)
+      .map((entry) => ({
+        kind: entry.missing
+          ? "missing-activity-measurement"
+          : entry.ready === false
+            ? "activity-not-ready"
+            : "warning-above-threshold",
+        scope: "host-action",
+        id: entry.actionId,
+        label: entry.label,
+        observedValue: entry.durationMs,
+        warningAbove: entry.warningAbove,
+        unit: entry.unit,
+      }))
+    : [];
+  const violations = [
+    ...telemetryViolations,
+    ...activityViolations,
+  ];
+  const expectedActivityCount = Object.keys(config.activityBudgets).length;
+  const measuredActivityCount = measuredActivities.length;
+  const violationSummary = violations
+    .map((entry) => formatPerformanceBudgetViolation(entry))
+    .filter(Boolean)
+    .slice(0, 4)
+    .join("；");
+
+  let status = "passed";
+  if (!scenarioObserved) {
+    status = "missing";
+  } else if (scenarioStatus !== "passed" || violations.length > 0) {
+    status = "attention";
+  }
+
+  const summaryParts = [
+    `${config.mode === "advisory" ? "dev-only advisory" : config.mode}`,
+    `场景${scenarioStatusLabel}`,
+    `活动 ${measuredActivityCount}/${expectedActivityCount}`,
+  ];
+  if (violations.length > 0) {
+    summaryParts.push(`超预算 ${violations.length} 项`);
+  } else if (status === "passed") {
+    summaryParts.push("未发现超预算项");
+  }
+  if (scenarioStatus !== "passed" && String(scenario?.error?.message || "").trim()) {
+    summaryParts.push(String(scenario.error.message).trim());
+  }
+
+  return {
+    present: true,
+    observed: scenarioObserved || telemetryChecks.length > 0,
+    status,
+    statusLabel: pickPerformanceBudgetStatusLabel(status),
+    budgetMode: config.mode,
+    gateEffect: config.gateEffect,
+    scenarioName: config.scenarioName,
+    scenarioObserved,
+    scenarioStatus,
+    scenarioStatusLabel,
+    scenarioErrorMessage: String(scenario?.error?.message || "").trim() || null,
+    expectedActivityCount,
+    measuredActivityCount,
+    telemetryCheckCount: telemetryChecks.length,
+    activityCheckCount: activityChecks.length,
+    telemetryViolationCount: telemetryViolations.length,
+    activityViolationCount: activityViolations.length,
+    violationCount: violations.length,
+    violationSummary: violationSummary || null,
+    summary: summaryParts.join("；"),
+    telemetryChecks,
+    activityChecks,
+    violations,
+    measuredActivities,
+    configSnapshot: config,
+  };
 }
 
 function summarizeDiagnosis(diagnosis) {
@@ -742,6 +1077,121 @@ function pickReaderEventStatusLabel(status) {
     default:
       return "未知";
   }
+}
+
+function pickDomContractStatusLabel(status) {
+  switch (status) {
+    case "passed":
+      return "通过";
+    case "failed":
+      return "异常";
+    case "partial":
+      return "部分缺失";
+    case "missing":
+      return "缺失";
+    default:
+      return "未知";
+  }
+}
+
+function formatDomContractFailedCheck(check, scenarioName) {
+  const label = String(check?.label || check?.id || "check").trim() || "check";
+  const note = typeof check?.note === "string" && check.note.trim()
+    ? ` (${check.note.trim()})`
+    : "";
+  return `${scenarioName || "scenario"}: ${label}${note}`;
+}
+
+function summarizeDomContractReport(latestCycle) {
+  const scenarioResults = Array.isArray(latestCycle?.scenarios?.results)
+    ? latestCycle.scenarios.results
+    : [];
+  const observedEntries = scenarioResults
+    .filter((item) => item?.details?.domContract && typeof item.details.domContract === "object")
+    .map((item) => ({
+      scenarioName: String(item?.name || "").trim() || "scenario",
+      domContract: item.details.domContract,
+    }));
+
+  const routes = DOM_CONTRACT_EXPECTED_ROUTES.map((expectedRoute) => {
+    const matching = observedEntries.filter((entry) => entry.domContract?.routeId === expectedRoute.routeId);
+    if (matching.length === 0) {
+      return {
+        routeId: expectedRoute.routeId,
+        adapter: expectedRoute.adapter,
+        status: "missing",
+        statusLabel: pickDomContractStatusLabel("missing"),
+        scenarioNames: [],
+        checkCount: 0,
+        failedCheckCount: 0,
+        failedChecks: [],
+        summary: `当前未采集 ${expectedRoute.label} DOM contract。`,
+      };
+    }
+
+    const scenarioNames = uniqueStrings(matching.map((entry) => entry.scenarioName)).slice(0, 6);
+    const checkCount = matching.reduce((sum, entry) => sum + Number(entry.domContract?.checkCount || 0), 0);
+    const failedChecks = uniqueStrings(matching.flatMap((entry) => {
+      const checks = Array.isArray(entry.domContract?.failedChecks) ? entry.domContract.failedChecks : [];
+      return checks.map((check) => formatDomContractFailedCheck(check, entry.scenarioName));
+    })).slice(0, 12);
+    const failedCheckCount = failedChecks.length;
+    const status = failedCheckCount > 0
+      ? "failed"
+      : (matching.some((entry) => String(entry.domContract?.status || "").trim() === "missing") ? "missing" : "passed");
+    const matchingSummaries = uniqueStrings(matching.map((entry) => entry.domContract?.summary).filter(Boolean));
+    const summary = status === "failed"
+      ? `${expectedRoute.label} 存在 ${failedCheckCount}/${checkCount} 项 DOM contract 异常；场景：${scenarioNames.join("、") || "-"}。`
+      : (status === "missing"
+        ? `当前未完整采集 ${expectedRoute.label} DOM contract。`
+        : (matchingSummaries[0] || `${expectedRoute.label} DOM contract 已通过。`));
+
+    return {
+      routeId: expectedRoute.routeId,
+      adapter: String(matching[0]?.domContract?.adapter || expectedRoute.adapter).trim() || expectedRoute.adapter,
+      status,
+      statusLabel: pickDomContractStatusLabel(status),
+      scenarioNames,
+      checkCount,
+      failedCheckCount,
+      failedChecks,
+      summary,
+    };
+  });
+
+  const present = observedEntries.length > 0;
+  const passedRouteCount = routes.filter((entry) => entry.status === "passed").length;
+  const failedRouteCount = routes.filter((entry) => entry.status === "failed").length;
+  const missingRouteCount = routes.filter((entry) => entry.status === "missing").length;
+
+  let status = "missing";
+  if (present) {
+    status = failedRouteCount > 0
+      ? "failed"
+      : (missingRouteCount > 0 ? "partial" : "passed");
+  }
+
+  let summary = "当前未采集 DOM contract route 摘要。";
+  if (status === "passed") {
+    summary = `DOM contract 通过 ${passedRouteCount}/${routes.length} 条 route；当前保持 advisory + non-blocking。`;
+  } else if (status === "partial") {
+    summary = `DOM contract 已覆盖 ${passedRouteCount}/${routes.length} 条 route，仍有 ${missingRouteCount} 条待补证；当前保持 advisory + non-blocking。`;
+  } else if (status === "failed") {
+    summary = `DOM contract 观测到 ${failedRouteCount}/${routes.length} 条 route 异常；当前保持 advisory + non-blocking。`;
+  }
+
+  return {
+    present,
+    status,
+    statusLabel: pickDomContractStatusLabel(status),
+    advisory: true,
+    routeCount: routes.length,
+    passedRouteCount,
+    failedRouteCount,
+    missingRouteCount,
+    summary,
+    routes,
+  };
 }
 
 function summarizeReaderEventBridge(report, latestCycle) {
@@ -1390,9 +1840,12 @@ function summarizeVisualCaptureAttemptDiagnosis(cycles) {
     };
   }
 
-  const commandFailureItems = items.filter((item) => isVisualCaptureCommandFailure(item));
-  const exhaustedItems = items.filter((item) => item.selectionReason === "max-attempt-reached");
-  const lowDriftItems = items.filter((item) => item.selectionReason === "stable-low-drift-pair");
+  const sortedItems = [...items].sort((left, right) => {
+    return getVisualCaptureAttemptPriority(left) - getVisualCaptureAttemptPriority(right);
+  });
+  const commandFailureItems = sortedItems.filter((item) => isVisualCaptureCommandFailure(item));
+  const exhaustedItems = sortedItems.filter((item) => item.selectionReason === "max-attempt-reached");
+  const lowDriftItems = sortedItems.filter((item) => item.selectionReason === "stable-low-drift-pair");
   const summaryParts = [`已观测 ${items.length} 个 stage capture attempt 诊断`];
 
   if (commandFailureItems.length > 0) {
@@ -1427,7 +1880,7 @@ function summarizeVisualCaptureAttemptDiagnosis(cycles) {
     observed: true,
     itemCount: items.length,
     summary: summaryParts.join("；"),
-    items,
+    items: sortedItems,
   };
 }
 
@@ -1662,6 +2115,8 @@ export function pickVisualCaptureFailureKindLabel(kind) {
   switch (String(kind || "").trim()) {
     case "capture-command-failed":
       return "截图调用失败";
+    case "capture-target-collision":
+      return "截图命中错误窗口";
     case "window-bounds-unavailable":
       return "窗口 bounds 不可用";
     case "window-activation-failed":
@@ -1688,9 +2143,23 @@ function isVisualCaptureCommandFailure(entry) {
   const failureKind = String(entry.failureKind || "").trim();
   return (
     failureKind === "capture-command-failed"
+    || failureKind === "capture-target-collision"
     || failureKind === "window-bounds-unavailable"
     || failureKind === "window-activation-failed"
   );
+}
+
+function getVisualCaptureAttemptPriority(entry) {
+  if (isVisualCaptureCommandFailure(entry)) {
+    return 0;
+  }
+  if (entry?.selectionReason === "max-attempt-reached") {
+    return 1;
+  }
+  if (entry?.selectionReason === "stable-low-drift-pair") {
+    return 2;
+  }
+  return 3;
 }
 
 function summarizeVisualCaptureStability(latestCycle) {
@@ -2069,6 +2538,7 @@ function summarizeReaderHostState(report, latestCycle) {
     ? latestCycle.scenarios.results
     : [];
   const interactionScenario = scenarioResults.find((item) => item?.name === "reader interaction diagnostics") || null;
+  const fineGrainedScenario = scenarioResults.find((item) => item?.name === "reader fine-grained hook diagnostics") || null;
   const interaction = interactionScenario?.details?.interaction && typeof interactionScenario.details.interaction === "object"
     ? interactionScenario.details.interaction
     : null;
@@ -2093,6 +2563,16 @@ function summarizeReaderHostState(report, latestCycle) {
   const selectionPopupAppendedItemCount = typeof interactionDetails?.selectionPopupAppendedItemCount === "number"
     ? interactionDetails.selectionPopupAppendedItemCount
     : null;
+  const toolbarDispatchMode = hasObservedReaderHostValue(interactionDetails?.toolbarDispatchMode)
+    ? interactionDetails.toolbarDispatchMode
+    : (hasObservedReaderHostValue(fineGrainedScenario?.details?.toolbarProbe?.dispatchMode)
+      ? fineGrainedScenario.details.toolbarProbe.dispatchMode
+      : null);
+  const toolbarAppendedItemCount = typeof interactionDetails?.toolbarAppendedItemCount === "number"
+    ? interactionDetails.toolbarAppendedItemCount
+    : (typeof fineGrainedScenario?.details?.toolbarProbe?.appendedItemCount === "number"
+      ? fineGrainedScenario.details.toolbarProbe.appendedItemCount
+      : null);
   const sidebarHeaderDispatchMode = hasObservedReaderHostValue(interactionDetails?.sidebarHeaderDispatchMode)
     ? interactionDetails.sidebarHeaderDispatchMode
     : null;
@@ -2136,8 +2616,18 @@ function summarizeReaderHostState(report, latestCycle) {
     : (readerHostStateObserved
       ? `已从 Reader interaction diagnostics 场景读回 ${observedCount} 项深层宿主状态。`
       : "Reader interaction diagnostics 已执行，但尚未读回可用的深层宿主状态。");
-  const readerDispatchSummary = (selectionPopupDispatchMode || sidebarHeaderDispatchMode)
-    ? `文本浮层 ${selectionPopupDispatchMode ?? "-"}；侧栏批注头 ${sidebarHeaderDispatchMode ?? "-"}`
+  const readerDispatchParts = [];
+  if (toolbarDispatchMode) {
+    readerDispatchParts.push(`工具栏 ${toolbarDispatchMode}`);
+  }
+  if (selectionPopupDispatchMode) {
+    readerDispatchParts.push(`文本浮层 ${selectionPopupDispatchMode}`);
+  }
+  if (sidebarHeaderDispatchMode) {
+    readerDispatchParts.push(`侧栏批注头 ${sidebarHeaderDispatchMode}`);
+  }
+  const readerDispatchSummary = readerDispatchParts.length > 0
+    ? readerDispatchParts.join("；")
     : null;
   const contextMenuSummary = contextMenuObservedTypes.length > 0 || contextMenuSyntheticFallbackTypes.length > 0
     ? `已观测 ${contextMenuObservedTypes.length} 类；synthetic-fallback ${contextMenuSyntheticFallbackTypes.length} 类`
@@ -2157,6 +2647,8 @@ function summarizeReaderHostState(report, latestCycle) {
     readerHostStateNote,
     selectionPopupDispatchMode,
     selectionPopupAppendedItemCount,
+    toolbarDispatchMode,
+    toolbarAppendedItemCount,
     sidebarHeaderDispatchMode,
     sidebarHeaderAppendedItemCount,
     contextMenuProbeCount,
@@ -2248,6 +2740,33 @@ export function summarizeE2EReport(report, options = {}) {
       lifecycleSlowThresholdMs: 2000,
       lifecycleLastSlowStage: null,
       lifecycleBoundaryEvents: [],
+      performanceBudget: {
+        present: false,
+        observed: false,
+        status: "missing",
+        statusLabel: pickPerformanceBudgetStatusLabel("missing"),
+        budgetMode: DEFAULT_PERFORMANCE_BUDGET_CONFIG.mode,
+        gateEffect: DEFAULT_PERFORMANCE_BUDGET_CONFIG.gateEffect,
+        scenarioName: DEFAULT_PERFORMANCE_BUDGET_CONFIG.scenarioName,
+        scenarioObserved: false,
+        scenarioStatus: "missing",
+        scenarioStatusLabel: "缺失",
+        scenarioErrorMessage: null,
+        expectedActivityCount: Object.keys(DEFAULT_PERFORMANCE_BUDGET_CONFIG.activityBudgets).length,
+        measuredActivityCount: 0,
+        telemetryCheckCount: Object.keys(DEFAULT_PERFORMANCE_BUDGET_CONFIG.telemetryBudgets).length,
+        activityCheckCount: Object.keys(DEFAULT_PERFORMANCE_BUDGET_CONFIG.activityBudgets).length,
+        telemetryViolationCount: 0,
+        activityViolationCount: 0,
+        violationCount: 0,
+        violationSummary: null,
+        summary: "dev-only advisory；场景缺失；活动 0/4",
+        telemetryChecks: [],
+        activityChecks: [],
+        violations: [],
+        measuredActivities: [],
+        configSnapshot: normalizePerformanceBudgetConfig(),
+      },
       registrationObserved: false,
       officialMenuAPIAvailable: null,
       primaryActionCommandRegistered: null,
@@ -2299,6 +2818,8 @@ export function summarizeE2EReport(report, options = {}) {
       readerHostStateNote: "当前报告未采集 Reader 深层宿主状态",
       selectionPopupDispatchMode: null,
       selectionPopupAppendedItemCount: null,
+      toolbarDispatchMode: null,
+      toolbarAppendedItemCount: null,
       sidebarHeaderDispatchMode: null,
       sidebarHeaderAppendedItemCount: null,
       contextMenuProbeCount: null,
@@ -2316,6 +2837,28 @@ export function summarizeE2EReport(report, options = {}) {
       visualCaptureAttemptDiagnosisItemCount: 0,
       visualCaptureAttemptDiagnosisSummary: null,
       visualCaptureAttemptDiagnosisItems: [],
+      domContractReport: {
+        present: false,
+        status: "missing",
+        statusLabel: pickDomContractStatusLabel("missing"),
+        advisory: true,
+        routeCount: DOM_CONTRACT_EXPECTED_ROUTES.length,
+        passedRouteCount: 0,
+        failedRouteCount: 0,
+        missingRouteCount: DOM_CONTRACT_EXPECTED_ROUTES.length,
+        summary: "当前未采集 DOM contract route 摘要。",
+        routes: DOM_CONTRACT_EXPECTED_ROUTES.map((entry) => ({
+          routeId: entry.routeId,
+          adapter: entry.adapter,
+          status: "missing",
+          statusLabel: pickDomContractStatusLabel("missing"),
+          scenarioNames: [],
+          checkCount: 0,
+          failedCheckCount: 0,
+          failedChecks: [],
+          summary: `当前未采集 ${entry.label} DOM contract。`,
+        })),
+      },
       readerEventReport: {
         present: false,
         status: "missing",
@@ -2422,6 +2965,9 @@ export function summarizeE2EReport(report, options = {}) {
       }))
       .filter((entry) => entry.count > 0)
     : [];
+  const performanceBudget = summarizePerformanceBudget(report, latestCycle, {
+    performanceBudgetConfig: options.performanceBudgetConfig,
+  });
   const status = report.passed === true ? "passed" : "failed";
   const { ageMinutes, ageText } = summarizeAge(report.generatedAt, now);
   const rawDiagnoses = Array.isArray(report.diagnostics)
@@ -2448,6 +2994,7 @@ export function summarizeE2EReport(report, options = {}) {
     ? report.capabilitySummary
     : summarizeCapabilityCoverage(report);
   const readerEventReport = summarizeReaderEventBridge(report, latestCycle);
+  const domContractReport = summarizeDomContractReport(latestCycle);
   const readerHostState = summarizeReaderHostState(report, latestCycle);
   const toolbarEvidenceSummary = summarizeToolbarEvidence(readerEventReport);
   const visualEvidence = summarizeVisualEvidenceItems(cycles);
@@ -2602,6 +3149,7 @@ export function summarizeE2EReport(report, options = {}) {
     lifecycleSlowThresholdMs,
     lifecycleLastSlowStage,
     lifecycleBoundaryEvents,
+    performanceBudget,
     registrationObserved: registrationHealth.registrationObserved,
     officialMenuAPIAvailable: registrationHealth.officialMenuAPIAvailable,
     primaryActionCommandRegistered: registrationHealth.primaryActionCommandRegistered,
@@ -2651,6 +3199,7 @@ export function summarizeE2EReport(report, options = {}) {
       launchFailure: reportDetails.launchFailure || null,
       runtimeSanitization: reportDetails.runtimeSanitization || null,
     },
+    domContractReport,
     readerEventReport,
     toolbarEvidenceSummary,
     visualEvidenceObserved: visualEvidence.observed,

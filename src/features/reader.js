@@ -1573,6 +1573,56 @@ export function createReader(options = {}) {
     };
   }
 
+  function normalizeAppendedMenuItems(value) {
+    const candidates = Array.isArray(value) ? value : [value];
+    return candidates.filter((entry) => entry && typeof entry === "object");
+  }
+
+  function registerContextMenuItemForEvent(type, menuItemOrFactory, options = {}) {
+    return registerEventListener(type, (event) => {
+      if (!event || typeof event.append !== "function") {
+        return;
+      }
+
+      const resolved = typeof menuItemOrFactory === "function"
+        ? menuItemOrFactory(event)
+        : menuItemOrFactory;
+      const menuItems = normalizeAppendedMenuItems(resolved);
+
+      if (menuItems.length > 0) {
+        event.append(...menuItems);
+      }
+    }, options);
+  }
+
+  /**
+   * 注册 Reader 视图区上下文菜单项（createViewContextMenu）
+   * @param {Object|Object[]|Function} menuItemOrFactory - 菜单项或菜单项工厂
+   * @param {Object} [options] - 注册选项
+   * @returns {Function|null} cleanup 函数
+   */
+  function registerViewContextMenuItem(menuItemOrFactory, options = {}) {
+    return registerContextMenuItemForEvent(
+      READER_EVENT_TYPES.CREATE_VIEW_CONTEXT_MENU,
+      menuItemOrFactory,
+      options,
+    );
+  }
+
+  /**
+   * 注册 Reader 批注上下文菜单项（createAnnotationContextMenu）
+   * @param {Object|Object[]|Function} menuItemOrFactory - 菜单项或菜单项工厂
+   * @param {Object} [options] - 注册选项
+   * @returns {Function|null} cleanup 函数
+   */
+  function registerAnnotationContextMenuItem(menuItemOrFactory, options = {}) {
+    return registerContextMenuItemForEvent(
+      READER_EVENT_TYPES.CREATE_ANNOTATION_CONTEXT_MENU,
+      menuItemOrFactory,
+      options,
+    );
+  }
+
   /**
    * 注册 Reader 官方事件监听器
    * @param {string} type - Reader 事件类型
@@ -1899,6 +1949,8 @@ export function createReader(options = {}) {
     getReaderInteractionSnapshot,
     getActiveSummary,
     isEventAPIAvailable,
+    registerViewContextMenuItem,
+    registerAnnotationContextMenuItem,
     registerEventListener,
     unregisterEventListener,
     unregisterAllEventListeners,
