@@ -2,6 +2,12 @@
 
 这份文档只记录 AIAssistant 项目里已经真实踩过、并且值得固化到 Zotero 插件模板的坑，不记录产品级业务决策。
 
+## 当前 authoritative 入口
+
+- 当前 Preference Pane contract 以 [PREFERENCE_PANE_GUIDE.md](./PREFERENCE_PANE_GUIDE.md) 为准
+- 当前 host-visible 验收成熟度标签以 [UI_VALIDATION_PATHS.md](./UI_VALIDATION_PATHS.md) 为准
+- 本文只负责解释这些 guardrail 为什么存在，不替代 project truth、validation override 或 gate 结论
+
 ## 结论
 
 从 AIAssistant 回看，最容易反复踩坑的不是业务逻辑，而是 Zotero 宿主 contract、XUL/Fluent 细节和 host-visible 验证路径。模板层最该做的不是“帮你写完整产品”，而是尽早把这些坑变成默认护栏。

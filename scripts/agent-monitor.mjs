@@ -287,6 +287,163 @@ async function loadReleaseMatrixSummary() {
   return await loadJSONIfExists(releaseMatrixPath);
 }
 
+function readDeadChainAuditCount(report, keys = [], fallback = 0) {
+  for (const key of keys) {
+    const value = Number(report?.[key] ?? report?.findings?.[key]);
+    if (Number.isFinite(value) && value >= 0) {
+      return Math.max(0, value);
+    }
+  }
+  return Math.max(0, Number(fallback || 0));
+}
+
+function resolveDeadChainAuditStatusLabel(report, status, actionableRetiredChainCount, retiredChainCount) {
+  const explicitStatusLabel = String(report?.statusLabel || "").trim();
+  if (explicitStatusLabel) {
+    return explicitStatusLabel;
+  }
+  if (status === "warning") {
+    return "发现硬死链";
+  }
+  if (status === "advisory") {
+    return actionableRetiredChainCount > 0
+      ? "建议收口"
+      : retiredChainCount > 0
+        ? "历史保留"
+        : "建议收口";
+  }
+  if (status === "clean") {
+    return "干净";
+  }
+  return "未知";
+}
+
+async function loadDeadChainAuditSummary() {
+  const deadChainAuditPath = resolveAgentArtifactPath(projectRoot, "agent-dead-chain-audit.json");
+  const report = await loadJSONIfExists(deadChainAuditPath);
+  if (!report || typeof report !== "object") {
+    return {
+      present: false,
+      status: "missing",
+      statusLabel: "缺失",
+      summary: "尚未生成 dead-chain audit 报告。",
+      hardDeadCount: 0,
+      retiredChainCount: 0,
+      actionableRetiredChainCount: 0,
+      historyRetainedCount: 0,
+      supersededBundleCount: 0,
+      safeDeleteCandidateCount: 0,
+      items: [],
+    };
+  }
+  const hardDeadCount = readDeadChainAuditCount(report, ["hardDeadCount"]);
+  const retiredChainCount = readDeadChainAuditCount(report, ["retiredChainCount"]);
+  const historyRetainedCount = readDeadChainAuditCount(
+    report,
+    ["historyRetainedCount", "supersededBundleCount"],
+    (Array.isArray(report.items) ? report.items : []).filter((item) => item?.kind === "superseded-framework-bundle").length,
+  );
+  const actionableRetiredChainCount = readDeadChainAuditCount(
+    report,
+    ["actionableRetiredChainCount", "delegationRetiredChainCount"],
+    Math.max(0, retiredChainCount - historyRetainedCount),
+  );
+  const supersededBundleCount = readDeadChainAuditCount(
+    report,
+    ["supersededBundleCount"],
+    historyRetainedCount,
+  );
+  return {
+    present: true,
+    generatedAt: report.generatedAt || null,
+    status: report.status || "unknown",
+    statusLabel: resolveDeadChainAuditStatusLabel(
+      report,
+      report.status || "unknown",
+      actionableRetiredChainCount,
+      retiredChainCount,
+    ),
+    summary: report.summary || "-",
+    hardDeadCount,
+    retiredChainCount,
+    actionableRetiredChainCount,
+    historyRetainedCount,
+    supersededBundleCount,
+    safeDeleteCandidateCount: readDeadChainAuditCount(report, ["safeDeleteCandidateCount"]),
+    prunePlan: report?.prunePlan && typeof report.prunePlan === "object"
+      ? {
+        summary: report.prunePlan.summary || null,
+        nextWave: report.prunePlan.nextWave && typeof report.prunePlan.nextWave === "object"
+          ? {
+            waveId: report.prunePlan.nextWave.waveId || null,
+            title: report.prunePlan.nextWave.title || null,
+            strategy: report.prunePlan.nextWave.strategy || null,
+            candidateCount: Number(report.prunePlan.nextWave.candidateCount || 0),
+            taskIds: Array.isArray(report.prunePlan.nextWave.taskIds) ? report.prunePlan.nextWave.taskIds.slice(0, 10) : [],
+            summary: report.prunePlan.nextWave.summary || null,
+          }
+          : null,
+        nextWaveProposal: report.prunePlan.nextWaveProposal && typeof report.prunePlan.nextWaveProposal === "object"
+          ? {
+            advisory: report.prunePlan.nextWaveProposal.advisory !== false,
+            manifestPath: report.prunePlan.nextWaveProposal.manifestPath || null,
+            waveId: report.prunePlan.nextWaveProposal.waveId || null,
+            action: report.prunePlan.nextWaveProposal.action || null,
+            removeTaskIds: Array.isArray(report.prunePlan.nextWaveProposal.removeTaskIds)
+              ? report.prunePlan.nextWaveProposal.removeTaskIds.slice(0, 20)
+              : [],
+            chainCollapseProposals: (Array.isArray(report.prunePlan.nextWaveProposal.chainCollapseProposals)
+              ? report.prunePlan.nextWaveProposal.chainCollapseProposals
+              : []).slice(0, 10).map((proposal) => ({
+              proposalId: proposal.proposalId || null,
+              removableTaskIds: Array.isArray(proposal.removableTaskIds) ? proposal.removableTaskIds.slice(0, 10) : [],
+              upstreamAnchorTaskIds: Array.isArray(proposal.upstreamAnchorTaskIds) ? proposal.upstreamAnchorTaskIds.slice(0, 10) : [],
+              exitTaskIds: Array.isArray(proposal.exitTaskIds) ? proposal.exitTaskIds.slice(0, 10) : [],
+              downstreamBoundaryTaskIds: Array.isArray(proposal.downstreamBoundaryTaskIds) ? proposal.downstreamBoundaryTaskIds.slice(0, 10) : [],
+              suggestedDependencyRewrites: (Array.isArray(proposal.suggestedDependencyRewrites) ? proposal.suggestedDependencyRewrites : []).slice(0, 10),
+              summary: proposal.summary || null,
+            })),
+            summary: report.prunePlan.nextWaveProposal.summary || null,
+            preconditions: Array.isArray(report.prunePlan.nextWaveProposal.preconditions)
+              ? report.prunePlan.nextWaveProposal.preconditions.slice(0, 5)
+              : [],
+            verificationCommands: Array.isArray(report.prunePlan.nextWaveProposal.verificationCommands)
+              ? report.prunePlan.nextWaveProposal.verificationCommands.slice(0, 5)
+              : [],
+          }
+          : null,
+        reviewWaves: (Array.isArray(report.prunePlan.reviewWaves) ? report.prunePlan.reviewWaves : []).slice(0, 4).map((wave) => ({
+          waveId: wave.waveId || null,
+          title: wave.title || null,
+          strategy: wave.strategy || null,
+          candidateCount: Number(wave.candidateCount || 0),
+          taskIds: Array.isArray(wave.taskIds) ? wave.taskIds.slice(0, 10) : [],
+          summary: wave.summary || null,
+        })),
+        chainCollapseProposalCount: Number(report.prunePlan.chainCollapseProposalCount || 0),
+        chainCollapseProposals: (Array.isArray(report.prunePlan.chainCollapseProposals) ? report.prunePlan.chainCollapseProposals : []).slice(0, 10).map((proposal) => ({
+          proposalId: proposal.proposalId || null,
+          removableTaskIds: Array.isArray(proposal.removableTaskIds) ? proposal.removableTaskIds.slice(0, 10) : [],
+          upstreamAnchorTaskIds: Array.isArray(proposal.upstreamAnchorTaskIds) ? proposal.upstreamAnchorTaskIds.slice(0, 10) : [],
+          exitTaskIds: Array.isArray(proposal.exitTaskIds) ? proposal.exitTaskIds.slice(0, 10) : [],
+          downstreamBoundaryTaskIds: Array.isArray(proposal.downstreamBoundaryTaskIds) ? proposal.downstreamBoundaryTaskIds.slice(0, 10) : [],
+          suggestedDependencyRewrites: (Array.isArray(proposal.suggestedDependencyRewrites) ? proposal.suggestedDependencyRewrites : []).slice(0, 10),
+          summary: proposal.summary || null,
+        })),
+        staleScopeCandidateCount: Number(report.prunePlan.staleScopeCandidateCount || 0),
+        leafReviewCandidateCount: Number(report.prunePlan.leafReviewCandidateCount || 0),
+        retiredChainOnlyCount: Number(report.prunePlan.retiredChainOnlyCount || 0),
+        blockedByActiveCount: Number(report.prunePlan.blockedByActiveCount || 0),
+        staleScopeCandidates: (Array.isArray(report.prunePlan.staleScopeCandidates) ? report.prunePlan.staleScopeCandidates : []).slice(0, 5),
+        leafReviewCandidates: (Array.isArray(report.prunePlan.leafReviewCandidates) ? report.prunePlan.leafReviewCandidates : []).slice(0, 5),
+        retiredChainOnlyCandidates: (Array.isArray(report.prunePlan.retiredChainOnlyCandidates) ? report.prunePlan.retiredChainOnlyCandidates : []).slice(0, 5),
+        blockedByActiveCandidates: (Array.isArray(report.prunePlan.blockedByActiveCandidates) ? report.prunePlan.blockedByActiveCandidates : []).slice(0, 5),
+      }
+      : null,
+    items: (Array.isArray(report.items) ? report.items : []).slice(0, 8),
+  };
+}
+
 async function loadAgentMemorySummary(signalTrends = null) {
   const zoteroAutofixArtifacts = resolveZoteroAutofixArtifacts(projectRoot);
   const [e2eReport, autofixReport, historyEntries] = await Promise.all([
@@ -326,6 +483,7 @@ function buildMarkdown(summary) {
     `- 自动修复: \`${summary.frontpageSummary?.autofix?.statusLabel || "缺失"}\` / ${summary.frontpageSummary?.autofix?.ageText || "-"}`,
     `- 恢复回归: \`${summary.frontpageSummary?.watchRecovery?.statusLabel || "缺失"}\` / ${summary.frontpageSummary?.watchRecovery?.ageText || "-"}`,
     `- Reference Distillation: \`${summary.frontpageSummary?.referenceDistillation?.statusLabel || "缺失"}\` / pending \`${summary.frontpageSummary?.referenceDistillation?.pendingCount ?? 0}\` / topic \`${summary.frontpageSummary?.referenceDistillation?.lastTopic || "-"}\``,
+    `- Dead-Chain Audit: \`${summary.frontpageSummary?.deadChainAudit?.statusLabel || "缺失"}\` / hard-dead \`${summary.frontpageSummary?.deadChainAudit?.hardDeadCount ?? 0}\` / retired \`${summary.frontpageSummary?.deadChainAudit?.retiredChainCount ?? 0}\``,
     "",
     "## 验证策略判定",
     "",
@@ -614,6 +772,63 @@ function buildMarkdown(summary) {
     lines.push(`- 预算告警: \`${summary.engineeringHardening.performanceBudget?.violationSummary || "-"}\``);
     lines.push("");
   }
+
+  if (summary.deadChainAudit) {
+    lines.push("## 死链与旧链路审计", "");
+    lines.push(`- 状态: \`${summary.deadChainAudit.statusLabel || summary.deadChainAudit.status || "缺失"}\``);
+    lines.push(`- 摘要: ${summary.deadChainAudit.summary || "-"}`);
+    lines.push(`- 硬死链: \`${summary.deadChainAudit.hardDeadCount ?? 0}\``);
+    lines.push(`- 已退休旧链路: \`${summary.deadChainAudit.retiredChainCount ?? 0}\``);
+    lines.push(`- 可继续收缩 delegation 链: \`${summary.deadChainAudit.actionableRetiredChainCount ?? 0}\``);
+    lines.push(`- 历史治理保留项: \`${summary.deadChainAudit.historyRetainedCount ?? 0}\``);
+    lines.push(`- Superseded bundle: \`${summary.deadChainAudit.supersededBundleCount ?? 0}\``);
+    lines.push(`- Safe delete 候选: \`${summary.deadChainAudit.safeDeleteCandidateCount ?? 0}\``);
+    if (summary.deadChainAudit.prunePlan) {
+      lines.push(`- 裁剪摘要: ${summary.deadChainAudit.prunePlan.summary || "-"}`);
+      lines.push(`- 下一波建议: \`${summary.deadChainAudit.prunePlan.nextWave?.waveId || "-"}\` / ${summary.deadChainAudit.prunePlan.nextWave?.title || "-"} / \`${summary.deadChainAudit.prunePlan.nextWave?.candidateCount ?? 0}\``);
+      lines.push(`- 手工收缩提案: \`${summary.deadChainAudit.prunePlan.nextWaveProposal?.action || "-"}\` / ${(summary.deadChainAudit.prunePlan.nextWaveProposal?.removeTaskIds || []).join("、") || "-"}`);
+      lines.push(`- 历史链桥接提案: \`${summary.deadChainAudit.prunePlan.chainCollapseProposalCount ?? 0}\``);
+      lines.push(`- 叶子优先复核: \`${summary.deadChainAudit.prunePlan.leafReviewCandidateCount ?? 0}\``);
+      lines.push(`- 仅历史链引用: \`${summary.deadChainAudit.prunePlan.retiredChainOnlyCount ?? 0}\``);
+      lines.push(`- 被 active 依赖阻塞: \`${summary.deadChainAudit.prunePlan.blockedByActiveCount ?? 0}\``);
+    }
+    lines.push("");
+    if (summary.deadChainAudit.prunePlan?.nextWaveProposal) {
+      lines.push("### 手工收缩提案", "");
+      lines.push(`- Manifest: \`${summary.deadChainAudit.prunePlan.nextWaveProposal.manifestPath || "-"}\``);
+      lines.push(`- 动作: \`${summary.deadChainAudit.prunePlan.nextWaveProposal.action || "-"}\``);
+      lines.push(`- 建议移除: ${(summary.deadChainAudit.prunePlan.nextWaveProposal.removeTaskIds || []).join("、") || "-"}`);
+      lines.push(`- 摘要: ${summary.deadChainAudit.prunePlan.nextWaveProposal.summary || "-"}`);
+      lines.push(`- 复核命令: ${(summary.deadChainAudit.prunePlan.nextWaveProposal.verificationCommands || []).join(" -> ") || "-"}`);
+      lines.push("");
+    }
+    if (summary.deadChainAudit.prunePlan && Array.isArray(summary.deadChainAudit.prunePlan.chainCollapseProposals) && summary.deadChainAudit.prunePlan.chainCollapseProposals.length > 0) {
+      lines.push("### 历史链桥接提案", "");
+      summary.deadChainAudit.prunePlan.chainCollapseProposals.forEach((proposal) => {
+        lines.push(`- ${proposal.proposalId || "chain-collapse"}: ${(proposal.removableTaskIds || []).join(" -> ") || "-"}`);
+        lines.push(`  - 上游锚点: ${(proposal.upstreamAnchorTaskIds || []).join("、") || "-"}`);
+        lines.push(`  - 下游边界: ${(proposal.downstreamBoundaryTaskIds || []).join("、") || "-"}`);
+        lines.push(`  - 摘要: ${proposal.summary || "-"}`);
+      });
+      lines.push("");
+    }
+    if (summary.deadChainAudit.prunePlan && Array.isArray(summary.deadChainAudit.prunePlan.leafReviewCandidates) && summary.deadChainAudit.prunePlan.leafReviewCandidates.length > 0) {
+      lines.push("### 叶子优先裁剪候选", "");
+      summary.deadChainAudit.prunePlan.leafReviewCandidates.forEach((item) => {
+        lines.push(`- ${item.taskId || "-"}: ${item.recommendedAction || item.summary || "-"}`);
+      });
+      lines.push("");
+    }
+    if (Array.isArray(summary.deadChainAudit.items) && summary.deadChainAudit.items.length > 0) {
+      lines.push("### 审计发现", "");
+      summary.deadChainAudit.items.forEach((item) => {
+        lines.push(`- [${item.kind || "unknown"}] ${item.summary || "-"}`);
+        lines.push(`- 位置: ${item.path || "-"}`);
+        lines.push(`- 建议: ${item.recommendedAction || "-"}`);
+      });
+      lines.push("");
+    }
+  }
   if (summary.zoteroValidation?.watchRecovery?.summaryNote) {
     lines.push(`- 恢复回归说明: ${summary.zoteroValidation.watchRecovery.summaryNote}`, "");
   }
@@ -843,7 +1058,7 @@ function buildMarkdown(summary) {
 async function main() {
   const runs = await listRunRecords();
   const summary = summarizeRuns(runs);
-  const [watchStatus, zoteroValidation, gateReport, releaseMatrix, validationContext, provenance, referenceDistillation] = await Promise.all([
+  const [watchStatus, zoteroValidation, gateReport, releaseMatrix, validationContext, provenance, referenceDistillation, deadChainAudit] = await Promise.all([
     loadWatchStatusSummary(),
     loadZoteroValidationSummary(),
     loadJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-gate.json")),
@@ -851,6 +1066,7 @@ async function main() {
     collectValidationContext(projectRoot),
     evaluateArtifactProvenance(projectRoot, runs, { env: process.env }),
     loadReferenceDistillationState(projectRoot),
+    loadDeadChainAuditSummary(),
   ]);
   const signalTrends = await archiveAgentSignalHistory(projectRoot, {
     watch: watchStatus,
@@ -874,6 +1090,7 @@ async function main() {
   });
   summary.provenance = provenance;
   summary.referenceDistillation = referenceDistillation;
+  summary.deadChainAudit = deadChainAudit;
   summary.engineeringHardening = summarizeEngineeringHardening({
     e2e: zoteroValidation.e2e,
     autofix: zoteroValidation.autofix,

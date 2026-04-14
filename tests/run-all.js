@@ -77,6 +77,7 @@ import './agent-obsidian-handoff-lib.test.js';
 import './agent-obsidian-workspace.test.js';
 import './agent-telemetry.test.js';
 import './agent-validation-decision-lib.test.js';
+import './agent-dead-chain-audit-lib.test.js';
 import './agent-zotero-loop-lib.test.js';
 import './agent-zotero-capture-window-lib.test.js';
 import './agent-zotero-e2e-lib.test.js';

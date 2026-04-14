@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "status": "active",
+  "status": "completed",
   "currentContractId": "generic-expansion-wave-v1",
   "currentWaveName": "ZOTERO-DOM-CONTRACT-WAVE-001",
   "summary": "Active advisory DOM contract hardening wave for the existing preference pane, item pane, and reader host-visible surfaces while keeping release remote distribution, menu/context expansion, and deeper UI route archetypes out of scope.",

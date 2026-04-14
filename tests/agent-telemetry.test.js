@@ -79,6 +79,11 @@ function writeReleaseMatrix(report) {
   fs.writeFileSync(target, `${JSON.stringify(report, null, 2)}\n`, "utf-8");
 }
 
+function writeDeadChainAudit(report) {
+  const target = artifactPath("agent-dead-chain-audit.json");
+  fs.writeFileSync(target, `${JSON.stringify(report, null, 2)}\n`, "utf-8");
+}
+
 function removeAutofixReport() {
   const target = artifactPath("agent-zotero-autofix.json");
   if (fs.existsSync(target)) {
@@ -523,6 +528,71 @@ describe("Agent Telemetry", () => {
       ],
       issues: [],
     });
+    writeDeadChainAudit({
+      generatedAt: new Date().toISOString(),
+      status: "advisory",
+      summary: "未发现硬死链；发现 1 个已退休旧链路候选。",
+      findings: {
+        hardDeadCount: 0,
+        retiredChainCount: 1,
+        safeDeleteCandidateCount: 0,
+      },
+      prunePlan: {
+        summary: "建议先处理 0 个 scope 全失效候选，再人工复核 1 个 retired leaf；另有 0 个仅被历史链引用、0 个仍被 active 依赖。",
+        nextWave: {
+          waveId: "retired-leaf-review",
+          title: "优先复核 retired leaf",
+          strategy: "leaf-first-review",
+          candidateCount: 1,
+          taskIds: ["READER-HIGH-101"],
+          summary: "这些历史任务已无任何下游依赖，是最适合先做人工收缩确认的一波。",
+        },
+        nextWaveProposal: {
+          advisory: true,
+          manifestPath: "config/agent-delegation-tasks.json",
+          waveId: "retired-leaf-review",
+          action: "review-and-remove-task-ids",
+          removeTaskIds: ["READER-HIGH-101"],
+          summary: "这些历史任务已是叶子节点，适合先做手工确认后从 manifest 收缩。",
+          preconditions: [
+            "确认这些 taskId 不再被当前 truth、README 或其他治理文档作为 active 任务引用。",
+          ],
+          verificationCommands: [
+            "node scripts/agent-dead-chain-audit.mjs",
+            "node scripts/agent-monitor.mjs",
+            "node scripts/agent-gate.mjs --profile dev",
+          ],
+        },
+        reviewWaves: [
+          {
+            waveId: "retired-leaf-review",
+            title: "优先复核 retired leaf",
+            strategy: "leaf-first-review",
+            candidateCount: 1,
+            taskIds: ["READER-HIGH-101"],
+            summary: "这些历史任务已无任何下游依赖，是最适合先做人工收缩确认的一波。",
+          },
+        ],
+        staleScopeCandidateCount: 0,
+        leafReviewCandidateCount: 1,
+        retiredChainOnlyCount: 0,
+        blockedByActiveCount: 0,
+        leafReviewCandidates: [
+          {
+            taskId: "READER-HIGH-101",
+            recommendedAction: "该历史任务当前已是叶子节点；可优先人工复核是否从 manifest 收缩。",
+          },
+        ],
+      },
+      items: [
+        {
+          kind: "superseded-framework-bundle",
+          path: "config/framework-backfill-bundles.json",
+          summary: "治理 bundle `validation-decision-v1` 已被 superseded，替代者为 `validation-decision-v2`",
+          recommendedAction: "保留为历史治理记录，或在确认没有消费者后再收缩相关 mirror/说明文本。",
+        },
+      ],
+    });
 
     execNode(["scripts/agent-runner.mjs", "telemetry-test", "--", "node", "-e", "process.exit(0)"]);
 
@@ -550,6 +620,13 @@ describe("Agent Telemetry", () => {
     assert.equal(monitorJSON.frontpageSummary?.e2e?.status, "passed");
     assert.equal(monitorJSON.frontpageSummary?.autofix?.status, "clean");
     assert.equal(monitorJSON.frontpageSummary?.watchRecovery?.status, "passed");
+    assert.equal(monitorJSON.frontpageSummary?.deadChainAudit?.status, "advisory");
+    assert.equal(monitorJSON.frontpageSummary?.deadChainAudit?.retiredChainCount, 1);
+    assert.equal(monitorJSON.frontpageSummary?.deadChainAudit?.leafReviewCandidateCount, 1);
+    assert.equal(monitorJSON.frontpageSummary?.deadChainAudit?.nextWaveId, "retired-leaf-review");
+    assert.equal(monitorJSON.frontpageSummary?.deadChainAudit?.nextWaveProposalAction, "review-and-remove-task-ids");
+    assert.equal(monitorJSON.frontpageSummary?.deadChainAudit?.nextWaveProposalTaskCount, 1);
+    assert.ok(monitorJSON.frontpageSummary?.advisorySignals?.some((item) => item.includes("dead-chain audit advisory")));
     assert.ok(Array.isArray(monitorJSON.frontpageSummary?.primarySignals));
     assert.equal(monitorJSON.frontpageSummary?.primarySignals?.length, 0);
     assert.equal(monitorJSON.readinessSummary?.status, "stable");
@@ -650,6 +727,14 @@ describe("Agent Telemetry", () => {
     assert.equal(monitorJSON.engineeringHardening?.lifecycleSlowThresholdMs, 2000);
     assert.equal(monitorJSON.engineeringHardening?.lifecycleLastSlowStage, "startup");
     assert.ok(Array.isArray(monitorJSON.engineeringHardening?.errorBoundaryEvents));
+    assert.equal(monitorJSON.deadChainAudit?.status, "advisory");
+    assert.equal(monitorJSON.deadChainAudit?.retiredChainCount, 1);
+    assert.equal(monitorJSON.deadChainAudit?.prunePlan?.leafReviewCandidateCount, 1);
+    assert.equal(monitorJSON.deadChainAudit?.prunePlan?.nextWave?.waveId, "retired-leaf-review");
+    assert.equal(monitorJSON.deadChainAudit?.prunePlan?.nextWaveProposal?.action, "review-and-remove-task-ids");
+    assert.equal(monitorJSON.deadChainAudit?.prunePlan?.nextWaveProposal?.removeTaskIds?.[0], "READER-HIGH-101");
+    assert.equal(monitorJSON.deadChainAudit?.prunePlan?.leafReviewCandidates?.[0]?.taskId, "READER-HIGH-101");
+    assert.equal(monitorJSON.deadChainAudit?.items?.[0]?.kind, "superseded-framework-bundle");
     assert.equal(memoryJSON.totalEntries, 2);
     assert.equal(memoryJSON.archive?.latestJSON, "agent-memory/latest.json");
     assert.equal(memoryJSON.signalTrends?.signals?.[1]?.signalId, "e2e");
@@ -688,6 +773,9 @@ describe("Agent Telemetry", () => {
     assert.ok(monitorMD.includes("生命周期慢操作"));
     assert.ok(monitorMD.includes("最近生命周期慢阶段"));
     assert.ok(monitorMD.includes("恢复回归"));
+    assert.ok(monitorMD.includes("Dead-Chain Audit"));
+    assert.ok(monitorMD.includes("## 死链与旧链路审计"));
+    assert.ok(monitorMD.includes("superseded-framework-bundle"));
     assert.ok(monitorMD.includes("session-restart-recovery"));
     assert.ok(monitorMD.includes("### 最近恢复步骤"));
     assert.ok(monitorMD.includes("### 自动修复失败步骤分布"));
@@ -3723,6 +3811,71 @@ describe("Agent Telemetry", () => {
       entries: [],
       issues: [],
     });
+    writeDeadChainAudit({
+      generatedAt: new Date().toISOString(),
+      status: "advisory",
+      summary: "未发现硬死链；发现 1 个已退休旧链路候选。",
+      findings: {
+        hardDeadCount: 0,
+        retiredChainCount: 1,
+        safeDeleteCandidateCount: 0,
+      },
+      prunePlan: {
+        summary: "建议先处理 0 个 scope 全失效候选，再人工复核 1 个 retired leaf；另有 0 个仅被历史链引用、0 个仍被 active 依赖。",
+        nextWave: {
+          waveId: "retired-leaf-review",
+          title: "优先复核 retired leaf",
+          strategy: "leaf-first-review",
+          candidateCount: 1,
+          taskIds: ["READER-HIGH-101"],
+          summary: "这些历史任务已无任何下游依赖，是最适合先做人工收缩确认的一波。",
+        },
+        nextWaveProposal: {
+          advisory: true,
+          manifestPath: "config/agent-delegation-tasks.json",
+          waveId: "retired-leaf-review",
+          action: "review-and-remove-task-ids",
+          removeTaskIds: ["READER-HIGH-101"],
+          summary: "这些历史任务已是叶子节点，适合先做手工确认后从 manifest 收缩。",
+          preconditions: [
+            "确认这些 taskId 不再被当前 truth、README 或其他治理文档作为 active 任务引用。",
+          ],
+          verificationCommands: [
+            "node scripts/agent-dead-chain-audit.mjs",
+            "node scripts/agent-monitor.mjs",
+            "node scripts/agent-gate.mjs --profile dev",
+          ],
+        },
+        reviewWaves: [
+          {
+            waveId: "retired-leaf-review",
+            title: "优先复核 retired leaf",
+            strategy: "leaf-first-review",
+            candidateCount: 1,
+            taskIds: ["READER-HIGH-101"],
+            summary: "这些历史任务已无任何下游依赖，是最适合先做人工收缩确认的一波。",
+          },
+        ],
+        staleScopeCandidateCount: 0,
+        leafReviewCandidateCount: 1,
+        retiredChainOnlyCount: 0,
+        blockedByActiveCount: 0,
+        leafReviewCandidates: [
+          {
+            taskId: "READER-HIGH-101",
+            recommendedAction: "该历史任务当前已是叶子节点；可优先人工复核是否从 manifest 收缩。",
+          },
+        ],
+      },
+      items: [
+        {
+          kind: "superseded-framework-bundle",
+          path: "config/framework-backfill-bundles.json",
+          summary: "治理 bundle `validation-decision-v1` 已被 superseded，替代者为 `validation-decision-v2`",
+          recommendedAction: "保留为历史治理记录，或在确认没有消费者后再收缩相关 mirror/说明文本。",
+        },
+      ],
+    });
 
     execNode(["scripts/agent-runner.mjs", "gate-pass-case", "--", "node", "-e", "process.exit(0)"]);
     execNode(["scripts/agent-monitor.mjs"]);
@@ -3756,6 +3909,13 @@ describe("Agent Telemetry", () => {
     assert.equal(gateJSON.frontpageSummary?.e2e?.status, "passed");
     assert.equal(gateJSON.frontpageSummary?.e2e?.readerEvent?.status, "passed");
     assert.equal(gateJSON.frontpageSummary?.watchRecovery?.status, "passed");
+    assert.equal(gateJSON.frontpageSummary?.deadChainAudit?.status, "advisory");
+    assert.equal(gateJSON.frontpageSummary?.deadChainAudit?.retiredChainCount, 1);
+    assert.equal(gateJSON.frontpageSummary?.deadChainAudit?.leafReviewCandidateCount, 1);
+    assert.equal(gateJSON.frontpageSummary?.deadChainAudit?.nextWaveId, "retired-leaf-review");
+    assert.equal(gateJSON.frontpageSummary?.deadChainAudit?.nextWaveProposalAction, "review-and-remove-task-ids");
+    assert.equal(gateJSON.frontpageSummary?.deadChainAudit?.nextWaveProposalTaskCount, 1);
+    assert.ok(gateJSON.frontpageSummary?.advisorySignals?.some((item) => item.includes("dead-chain audit advisory")));
     assert.equal(gateJSON.zoteroValidation?.e2e?.toolbarDispatchMode, "customEvent");
     assert.equal(gateJSON.zoteroValidation?.e2e?.toolbarAppendedItemCount, 2);
     assert.equal(gateJSON.zoteroValidation?.e2e?.selectionPopupAppendedItemCount, 1);
@@ -3763,11 +3923,23 @@ describe("Agent Telemetry", () => {
     assert.equal(gateJSON.zoteroValidation?.e2e?.contextMenuProbeCount, 3);
     assert.ok(typeof gateJSON.frontpageSummary?.headline === "string");
     assert.ok(typeof gateJSON.frontpageSummary?.nextAction === "string");
+    assert.equal(gateJSON.deadChainAudit?.status, "advisory");
+    assert.equal(gateJSON.deadChainAudit?.retiredChainCount, 1);
+    assert.equal(gateJSON.deadChainAudit?.prunePlan?.leafReviewCandidateCount, 1);
+    assert.equal(gateJSON.deadChainAudit?.prunePlan?.nextWave?.waveId, "retired-leaf-review");
+    assert.equal(gateJSON.deadChainAudit?.prunePlan?.nextWaveProposal?.action, "review-and-remove-task-ids");
+    assert.equal(gateJSON.deadChainAudit?.prunePlan?.nextWaveProposal?.removeTaskIds?.[0], "READER-HIGH-101");
+    assert.equal(gateJSON.deadChainAudit?.prunePlan?.leafReviewCandidates?.[0]?.taskId, "READER-HIGH-101");
     assert.ok(gateJSON.requiredChecks.some((item) => item.runName === "gate-pass-case" && item.ok === true));
     assert.ok(gateMD.includes("# Agent 质量闸门报告"));
     assert.ok(gateMD.includes("## 关键任务检查"));
     assert.ok(gateMD.includes("## Zotero Watch"));
     assert.ok(gateMD.includes("## 恢复韧性摘要"));
+    assert.ok(gateMD.includes("## 死链与旧链路审计"));
+    assert.ok(gateMD.includes("下一波建议"));
+    assert.ok(gateMD.includes("手工收缩提案"));
+    assert.ok(gateMD.includes("叶子优先复核"));
+    assert.ok(gateMD.includes("叶子优先裁剪候选"));
     assert.ok(gateMD.includes("## Zotero 真机验证"));
     assert.ok(gateMD.includes("Reader 事件桥"));
     assert.ok(gateMD.includes("Reader 深层事件点"));
@@ -3777,6 +3949,7 @@ describe("Agent Telemetry", () => {
     assert.ok(gateMD.includes("自动修复总耗时"));
     assert.ok(gateMD.includes("恢复回归"));
     assert.ok(gateMD.includes("恢复回归最新触发"));
+    assert.ok(gateMD.includes("superseded-framework-bundle"));
   });
 
   it("should fail gate when required run latest status is failed", () => {

@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Worker Response",
+  "description": "结构化简报 schema，用于所有 worker 回传给 controller 的统一格式。",
+  "type": "object",
+  "required": [
+    "status",
+    "owner_role",
+    "summary",
+    "changed_files",
+    "checks_run",
+    "risks",
+    "blockers",
+    "next_action"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["success", "partial", "failed", "blocked"],
+      "description": "任务执行状态。success=全部完成，partial=部分完成，failed=执行失败，blocked=被外部因素阻塞"
+    },
+    "owner_role": {
+      "type": "string",
+      "enum": ["architect", "implementer", "reviewer", "tester"],
+      "description": "worker 在本轮任务中承担的角色"
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 10,
+      "description": "不超过 200 字的执行摘要，描述做了什么、结果如何"
+    },
+    "changed_files": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "本轮改动涉及的文件路径列表（相对项目根目录）"
+    },
+    "checks_run": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "本轮已跑的验证命令列表，如 check、test、agent:gate 等"
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["level", "description"],
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"],
+            "description": "风险等级"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 10,
+            "description": "风险描述及建议"
+          }
+        }
+      },
+      "description": "已识别风险列表"
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["description", "resolution_suggestion"],
+        "properties": {
+          "description": {
+            "type": "string",
+            "minLength": 10,
+            "description": "阻塞项描述"
+          },
+          "resolution_suggestion": {
+            "type": "string",
+            "minLength": 10,
+            "description": "解除阻塞的建议"
+          }
+        }
+      },
+      "description": "当前阻塞项列表，controller 据此决定是否升级或扩 scope"
+    },
+    "next_action": {
+      "type": "string",
+      "minLength": 10,
+      "description": "建议 controller 采取的下一步行动"
+    },
+    "scopePaths": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "本轮任务声明的 scope 路径，用于验证 changed_files 是否越界"
+    },
+    "deviation_notes": {
+      "type": "string",
+      "description": "如果本轮偏离了默认工具顺序或 scope，必须在此说明原因"
+    }
+  },
+  "additionalProperties": false
+}

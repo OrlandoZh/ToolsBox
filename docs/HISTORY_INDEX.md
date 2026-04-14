@@ -1,7 +1,7 @@
 # HISTORY_INDEX.md
 
 > 历史索引页。这里只记录历史动机、已吸收经验、研究归档与替代关系，不记录当前状态。
-> 更新时间：2026-04-08
+> 更新时间：2026-04-14
 
 ## Milestones / Decision Records
 
@@ -16,6 +16,7 @@
 |------|------|-------|-----------------|----------------|---------------|------|
 | 2026-04-08 | capability | AIAssistant 踩坑经验模板化 | 把宿主 contract、Fluent、ItemPane 和 preference pane 的真实坑点转成模板护栏 | 保留“为什么要有这些 guardrail”的历史原因 | [CURRENT_BACKLOG.md](./CURRENT_BACKLOG.md), [PREFERENCE_PANE_GUIDE.md](./PREFERENCE_PANE_GUIDE.md), [API.md](./API.md) | [AIASSISTANT_PITFALLS.md](./AIASSISTANT_PITFALLS.md) |
 | 2026-04-08 | capability | React 面板创建与切换经验抽取 | 把 `AIAssistant` 的 host-mounted React surface 与 window mode 经验抽成 clean-room 模式 | 保留通用模式来源与不应直接模板化的产品边界 | [UI_CREATION_PATHS.md](./UI_CREATION_PATHS.md), [OPTIONAL_BUNDLES.md](./OPTIONAL_BUNDLES.md) | [REFERENCE_AIASSISTANT_REACT_PANEL_PATTERNS.md](./REFERENCE_AIASSISTANT_REACT_PANEL_PATTERNS.md) |
+| 2026-04-14 | capability | AIAssistant 经验吸收表达层收口 | 把下游项目里仍有价值的偏好页验证语言和 host-visible 成熟度标签，收口到模板 guide/router，而不是再造一套新产品能力 | 保留当前 authoritative guide、router 和文档 vocabulary 的来源说明 | [PREFERENCE_PANE_GUIDE.md](./PREFERENCE_PANE_GUIDE.md), [UI_VALIDATION_PATHS.md](./UI_VALIDATION_PATHS.md), [AGENT_INDEX.md](./AGENT_INDEX.md) | [PREFERENCE_PANE_GUIDE.md](./PREFERENCE_PANE_GUIDE.md) |
 
 ## Research / Archive Routes
 

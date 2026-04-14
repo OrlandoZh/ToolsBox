@@ -43,6 +43,7 @@
 - worker 只在 `scopePaths` 内执行，不越权扩面，不代替 controller 改策略或重写当前 truth
 - 需要联网、GUI、宿主启动、越 sandbox，或 scope 必须扩张时，不自行绕过；只回传 blocker、建议命令和原因
 - worker 默认回传结构化简报，至少包含 `status`、`owner_role`、`summary`、`changed_files`、`checks_run`、`risks`、`blockers`、`next_action`
+- worker 回传格式须对齐 `config/worker-response.schema.json` 定义的 JSON Schema；controller 可按此 schema 验证回传完整性
 
 ## Default Flow
 

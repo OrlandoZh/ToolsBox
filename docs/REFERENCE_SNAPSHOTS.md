@@ -49,8 +49,8 @@
 
 ## 适用场景
 
-- 复核 [Reference 对比](docs/REFERENCE_COMPARISON.md) 的结论
-- 复核 [BibGenie 架构借鉴分析](docs/REFERENCE_BIBGENIE_ANALYSIS.md) 的观察来源
+- 复核 [Reference 对比](REFERENCE_COMPARISON.md) 的结论
+- 复核 [BibGenie 架构借鉴分析](REFERENCE_BIBGENIE_ANALYSIS.md) 的观察来源
 - 进行本地人工 spot-check 或相似度排查
 - 刷新 manifest 中已声明的 git-backed authoritative/reference 快照
 

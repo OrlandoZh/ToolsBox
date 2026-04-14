@@ -115,6 +115,11 @@ export function normalizeValidationSurfacesRegistry(registry) {
   if (!summary) {
     fail("Validation surfaces registry must declare a non-empty summary.");
   }
+  const documentationNotes = ensureArrayOfStrings(
+    registry.documentationNotes || [],
+    "Validation surfaces registry documentationNotes",
+    { allowEmpty: true },
+  );
   if (!Array.isArray(registry.surfaces) || registry.surfaces.length === 0) {
     fail("Validation surfaces registry must declare at least one surface.");
   }
@@ -131,6 +136,7 @@ export function normalizeValidationSurfacesRegistry(registry) {
   return {
     schemaVersion: registry.schemaVersion,
     summary,
+    documentationNotes,
     surfaces,
   };
 }
@@ -279,6 +285,7 @@ export function renderValidationSurfacesMarkdown(registry) {
     "> Generated from `config/validation-surfaces.json`. Edit the registry and run `npm run docs:sync-validation-surfaces`.",
     "",
     `- Summary: ${normalized.summary}`,
+    ...normalized.documentationNotes.map((note) => `- ${note}`),
     "",
     "## Contract Surfaces",
     "",

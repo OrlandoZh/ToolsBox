@@ -3,6 +3,7 @@
 > Generated from `config/validation-surfaces.json`. Edit the registry and run `npm run docs:sync-validation-surfaces`.
 
 - Summary: Template-level host-visible surface contract. Real host-visible surfaces should pass surface smoke before visual baselines or whole-window screenshots are treated as authoritative.
+- Documentation-only maturity labels such as `behavior-ready` / `interaction-proved` / `manual-confirmed` are defined in [UI Validation Paths](./UI_VALIDATION_PATHS.md); they do not change blocking verdicts by themselves.
 
 ## Contract Surfaces
 

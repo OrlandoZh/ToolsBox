@@ -8,6 +8,13 @@ import { describe, it, assert } from "./test-framework.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
+const currentProjectExpansionWave = JSON.parse(
+  fs.readFileSync(path.join(projectRoot, "config", "project-expansion-wave.json"), "utf-8"),
+);
+const currentProjectWaveStatus = String(currentProjectExpansionWave.status || "").trim() || "not-entered";
+const currentProjectWaveName = String(currentProjectExpansionWave.currentWaveName || "").trim() || "null";
+const currentProjectWaveContractId = String(currentProjectExpansionWave.currentContractId || "").trim() || "null";
+const currentProjectAcceptanceTrack = String(currentProjectExpansionWave.acceptanceTrack || "").trim() || "null";
 
 function readJSON(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf-8"));
@@ -686,16 +693,16 @@ describe("Toolchain Scripts", () => {
       assert.ok(auditJSON.bundles.every((bundle) => typeof bundle.bundleVersion === "number"));
       const expansionWaveBundle = auditJSON.bundles.find((bundle) => bundle.id === "expansion-wave-scaffold-v1");
       assert.ok(expansionWaveBundle);
-      assert.equal(expansionWaveBundle.expansionWaveDetails.projectWaveStatus, "active");
-      assert.ok(result.stdout.includes("expansion-wave: active / generic-expansion-wave-v1 / ZOTERO-DOM-CONTRACT-WAVE-001 / host-first -> action replay -> route-aware dom contract -> advisory summary"));
+      assert.equal(expansionWaveBundle.expansionWaveDetails.projectWaveStatus, currentProjectWaveStatus);
+      assert.ok(result.stdout.includes(`expansion-wave: ${currentProjectWaveStatus} / ${currentProjectWaveContractId} / ${currentProjectWaveName} / ${currentProjectAcceptanceTrack}`));
       assert.ok(auditMarkdown.includes("Framework Backfill Audit"));
       assert.ok(auditMarkdown.includes("Expansion Wave Overview"));
       assert.ok(auditMarkdown.includes("Surface Verification Overview"));
       assert.ok(auditMarkdown.includes("Registry Mirror"));
       assert.ok(auditMarkdown.includes("Matched AGENTS Rule"));
-      assert.ok(auditMarkdown.includes("Project Wave Status: `active`"));
+      assert.ok(auditMarkdown.includes(`Project Wave Status: \`${currentProjectWaveStatus}\``));
       assert.ok(auditMarkdown.includes("| Bundle | Adoption | Mirror | Wave | Checks |"));
-      assert.ok(auditMarkdown.includes("projectWaveStatus=`active`"));
+      assert.ok(auditMarkdown.includes(`projectWaveStatus=\`${currentProjectWaveStatus}\``));
       assert.ok(auditMarkdown.includes("workspace-init-guard-v1"));
       assert.ok(auditMarkdown.includes("validation-decision-v1"));
       assert.ok(auditMarkdown.includes("validation-decision-v2"));

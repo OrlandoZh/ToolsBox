@@ -56,10 +56,11 @@
    - 当前不再把 host-visible polish 视为开发态 blocker；后续只在新增宿主 surface、truth 变化或 fresh rerun 再次出现新 blocker kind 时重开
 2. 当前唯一未收口主线：远端发布编排与远端 `updateURL` 闭环验证
    - release-only follow-up 固定为 `ENG-HIGH-104 / ENG-LOW-211~213`
-3. 当前 active hardening wave：`ZOTERO-DOM-CONTRACT-WAVE-001`
+3. 已收口 hardening wave：`ZOTERO-DOM-CONTRACT-WAVE-001`
    - 范围固定为 `preference pane / item pane / reader`
-   - 当前验收主线为 `host-first -> action replay -> route-aware dom contract -> advisory summary`
-   - 当前产物固定写入 `domContractReport`，由 `agent:zotero:e2e -> agent:monitor / dashboard / gate` 展示 route 级结构化操作日志；v1 保持 advisory + non-blocking
+   - 验收主线为 `host-first -> action replay -> route-aware dom contract -> advisory summary`
+   - 产物固定写入 `domContractReport`，由 `agent:zotero:e2e -> agent:monitor / dashboard / gate` 展示 route 级结构化操作日志；v1 保持 advisory + non-blocking
+   - 三条 route 均已完成：preference pane 6 项检查（root marker / ownerDocument / 连接态 / 控件归属 / pref writeback / 无横向溢出）、item pane 7 项检查（action postcondition / root 存在 / 唯一性 / ownerDocument / 连接态 / marker / paneID）、reader 12 项检查（event.doc / append / toolbar anchor / sidebar postcondition / selection popup / menu append / listener cleanup），wave 已收口
 4. 非阻断后续：Reader 更深事件点补强与 `P1` 白名单扩面
 5. 已完成 wave 基线：`ZOTERO-HOST-POLISH-WAVE-001` 与 `OPTIONAL-BUNDLE-WAVE-001`
    - `ZOTERO-HOST-POLISH-WAVE-001` 已完成 `preference pane / context pane / item pane sidenav / reader renderToolbar & sidebar view / menu item` 的 live geometry、surface smoke 与 surface-local evidence 收口
@@ -254,7 +255,7 @@
 - 当前真实完成度仍约为 `99%`；`ENG-HIGH-103` 的启动诊断 + runtime 清理 + `pre-capture settle`、`READER-HIGH-124 / READER-LOW-261~263` 的 capture / freshness 收口、`READER-HIGH-125` 的 library-only 根因边界冻结、以及 `READER-HIGH-126` 的 library host-noise 修复继续保留为历史契约 / review artifact；`2026-04-08` fresh `watch -> e2e -> monitor -> gate` 已把当前开发态重新拉回 `stable / ready`
 - `HOST-HIGH-201 / HOST-LOW-301~303` 已在 `2026-04-08T01:26:26.211Z` 的 fresh compare 模式 `agent:zotero:e2e` 与 `2026-04-08T01:29:27.786Z` 的 `agent:gate` 中收口：当前 `preference pane`、`context pane`、`item pane sidenav`、`reader renderToolbar / sidebar view`、`menu item / collection menu / dynamic submenu` 的 live geometry、surface-local evidence 与基线比对均已通过，不再作为开发态 blocker
 - 当前唯一未收口主线已切到 release-only 的 `ENG-HIGH-104 / ENG-LOW-211~213`：继续沿 `release:plan -> release:upload 计划壳 -> 手动远端上传 -> release:preflight --verify-remote -> release:prepare -> release:matrix -> agent:gate:release` 推进远端发布编排与远端 `updateURL` 闭环验证，不回写插件 runtime 或 host-visible polish 主线
-- 当前 active wave 已切到 `ZOTERO-DOM-CONTRACT-WAVE-001`：仅覆盖 `preference pane / item pane / reader` 三条既有宿主面，新增 `domContractReport` route-aware 摘要接入 `agent:zotero:e2e -> agent:monitor / dashboard / gate`，用于在测试后直接读取结构化操作日志；当前保持 advisory + non-blocking，不重开旧的 host-polish blocker
+- `ZOTERO-DOM-CONTRACT-WAVE-001` 已收口完成：覆盖 `preference pane / item pane / reader` 三条既有宿主面，新增 `domContractReport` route-aware 摘要接入 `agent:zotero:e2e -> agent:monitor / dashboard / gate`，三条 route 均通过；当前保持 advisory + non-blocking，不重开旧的 host-polish blocker
 - 当前 `preference pane` 窄宽度 hardening 与右侧 host-visible surface capture 链已全部对齐：以 Zotero 偏好设置宿主窗口最小尺寸 `800x600` 为 host boundary，当前接受“geometry ready + root width observed + no horizontal overflow”的稳定证据，不再把短暂的 geometry settle 超时单独抬成 blocker
 - latest live rerun 现已刷新到 `2026-04-08T01:24:38.171Z` 的 `agent:zotero:e2e:update-baseline` 与 `2026-04-08T01:26:26.211Z` 的 fresh compare 模式 `agent:zotero:e2e`：本轮在确认 host-visible polish 行为链稳定后，受控刷新了一次 surface-local baseline；`restart` 与 `hot-reload` 两轮均通过，`tests/scenarios` 保持 `0` 失败，`visualEvidenceFailingItemCount` 已回到 `0`
 - 当前 `visual-required` host-polish 判据已回到“blocking `surface-local` evidence 优先”：whole-window `library / reader` 漂移继续保留为 supplemental `capture-unstable` 诊断与归档样本，不再单独阻断 `HOST-HIGH-201 / HOST-LOW-301~303` 这轮 gate
@@ -264,10 +265,10 @@
 - 当前已新增 dev-only `performanceBudget` advisory：latest direct E2E `2026-04-06T06:35:06.375Z` 已把 lifecycle/http 与代表性 host actions 的预算结果写入 `agent-zotero-e2e / monitor / gate`；当前预算状态已回到 `passed`，`preferences.openPane` 已降到 `1113ms / 1600ms`，活动 `4/4` 全部通过，同时继续保持非阻断，不向下游项目注入额外 runtime profiler 开销
 - 最新 focused live probe `reader surface smoke` 已在 `2026-04-04T10:03:46.084Z` 通过，说明 Reader surface smoke 不只停留在历史 E2E 工件，而是继续可在真机单场景复现
 - `agent:context` 已新增统一只读上下文层：当前会输出 `dist/agent-context.{json,md}`，汇总 stable / dynamic context、decision hints 与 drift signals；本轮已新增 `runtime-compact-v1` 只读派生视图，默认只暴露 truth/action/status/drift/evidence/artifact refs + freshness/budget，并已接入 gate、Obsidian 工作台、dashboard 与 delegation runtime prompt；`agent:context:guard` 当前继续保持 warning-only
-- `ZOTERO-HOST-POLISH-WAVE-001` 已在 `2026-04-08` 收口完成：以 `config/project-validation-surfaces.json` 与现有 host action / surface smoke 为主轴的 live interaction consistency、edge-attached geometry 与 surface-local evidence 已完成模板级闭环；当前 active `ZOTERO-DOM-CONTRACT-WAVE-001` 则在这个完成基线之上追加 route-aware DOM contract advisory，不把上一轮已完成结论重新拉回 blocker
+- `ZOTERO-HOST-POLISH-WAVE-001` 已在 `2026-04-08` 收口完成：以 `config/project-validation-surfaces.json` 与现有 host action / surface smoke 为主轴的 live interaction consistency、edge-attached geometry 与 surface-local evidence 已完成模板级闭环；`ZOTERO-DOM-CONTRACT-WAVE-001` 也已完成，在这个完成基线之上追加 route-aware DOM contract advisory，不把上一轮已完成结论重新拉回 blocker
 - 已完成的 host polish baseline 验收主线仍固定为 `host-first -> live geometry / interaction consistency -> surface smoke -> surface-local evidence -> full gate`，当前只把这条完成链当作 DOM contract wave 的上游稳定基线，不重开 strict visual 争论
 - `OPTIONAL-BUNDLE-WAVE-001` 继续视为已完成基线：`react-ui` 仍保持 implemented + default-disabled，`agent-runtime` / `ai-service` 继续保持 spec-only，不把 optional bundle lane 回灌到当前 DOM contract 主线
-- 当前 active wave 验收主线：`host-first -> action replay -> route-aware dom contract -> advisory summary`
+- 当前已完成 wave 验收主线：`host-first -> action replay -> route-aware dom contract -> advisory summary`
 - 当前唯一 optional bundle registry 仍是 `config/optional-bundles.json`；`react-ui` 当前固定为 `ts-isolated + implemented + enabled=false`，`agent-runtime` 固定为 `ts-isolated + planned + enabled=false`，`ai-service` 固定为 `js-core + planned + enabled=false`，本轮不把它们重新拉回当前扩波主线
 - 当前模板已把 Lisianthus 抽出的 `file-state-store`、`task-runner`、`task-queue`、`zotero-file-storage`、`zotero-json-state-store` 与 `window-shell + theme-manager + host action gating` 视为已入基线的 JS-core 能力；同时把 default-disabled `react surface bridge + surface-window-mode` 收到 optional bundle 基线里；`build:react-ui` 当前继续只服务默认禁用的 demo lane + host-mounted surface bridge lane，并已由主仓 / pure-project 显式声明 `esbuild + react + react-dom` 作为 optional-lane devDependencies，不把 React/TS 依赖回灌进模板核心
 - 本 wave 当前 in-scope surfaces 继续写入 `config/project-validation-surfaces.json`：覆盖 `preference pane`、`context pane`、`item pane sidenav`、`reader renderToolbar`、`reader sidebar view`、`menu item`、`collection menu` 与 `menu submenu`，当前批次只补这些已声明 surface 的 polish，不新开产品 surface
@@ -293,7 +294,8 @@
   "schemaVersion": 1,
   "activeBatchId": "ENG-HIGH-104",
   "currentWaveName": "ZOTERO-DOM-CONTRACT-WAVE-001",
-  "acceptanceTrack": "host-first -> action replay -> route-aware dom contract -> advisory summary"
+  "acceptanceTrack": "host-first -> action replay -> route-aware dom contract -> advisory summary",
+  "waveStatus": "completed"
 }
 <!-- CURRENT-TRUTH-META:END -->
 

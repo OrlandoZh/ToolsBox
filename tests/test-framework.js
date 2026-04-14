@@ -170,6 +170,18 @@ export const assert = {
   },
 
   /**
+   * 断言匹配正则
+   */
+  match(actual, pattern, message = '') {
+    if (!(pattern instanceof RegExp)) {
+      throw new Error('assert.match expects a RegExp pattern');
+    }
+    if (!pattern.test(String(actual))) {
+      throw new Error(`${message}\nExpected ${JSON.stringify(actual)} to match ${String(pattern)}`);
+    }
+  },
+
+  /**
    * 断言大于
    */
   greaterThan(actual, expected, message = '') {

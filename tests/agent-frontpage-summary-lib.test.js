@@ -282,6 +282,98 @@ describe("Agent Frontpage Summary Lib", () => {
     assert.ok(frontpage.advisorySignals.some((item) => item.includes("queued in background")));
   });
 
+  it("should surface dead-chain audit as advisory signals without changing stable next action", () => {
+    const frontpage = buildMonitorFrontpageSummary({
+      watchStatus: {
+        present: true,
+        status: "healthy",
+        statusLabel: "健康",
+        ageText: "1 分钟",
+      },
+      zoteroValidation: {
+        e2e: {
+          present: true,
+          status: "passed",
+          statusLabel: "通过",
+          ageText: "1 分钟",
+        },
+        autofix: {
+          present: true,
+          status: "clean",
+          statusLabel: "干净",
+          ageText: "1 分钟",
+        },
+        watchRecovery: {
+          present: true,
+          status: "passed",
+          statusLabel: "通过",
+          ageText: "1 分钟",
+        },
+      },
+      deadChainAudit: {
+        status: "warning",
+        summary: "发现 2 个硬死链入口，另有 1 个已退休旧链路候选。",
+        hardDeadCount: 2,
+        retiredChainCount: 1,
+        safeDeleteCandidateCount: 0,
+      },
+    });
+
+    assert.equal(frontpage.status, "stable");
+    assert.equal(frontpage.nextAction, "npm run agent:gate");
+    assert.equal(frontpage.deadChainAudit.status, "warning");
+    assert.equal(frontpage.deadChainAudit.hardDeadCount, 2);
+    assert.ok(frontpage.advisorySignals.some((item) => item.includes("dead-chain audit warning")));
+  });
+
+  it("should surface dead-chain audit in gate frontpage summary without turning it into a blocker", () => {
+    const frontpage = buildGateFrontpageSummary({
+      gatePassed: true,
+      profile: "dev",
+      issues: [],
+      recommendations: [
+        "当前已满足 agent 质量闸门，可继续推进后续开发或发布流程。",
+      ],
+      watchStatus: {
+        status: "healthy",
+        statusLabel: "健康",
+        ageText: "1 分钟",
+      },
+      zoteroValidation: {
+        e2e: {
+          present: true,
+          status: "passed",
+          statusLabel: "通过",
+          ageText: "1 分钟",
+        },
+        watchRecovery: {
+          present: true,
+          status: "passed",
+          statusLabel: "通过",
+          ageText: "1 分钟",
+        },
+      },
+      deadChainAudit: {
+        status: "advisory",
+        summary: "未发现硬死链，也没有待收缩的 delegation 历史链；另有 1 个历史治理保留项（superseded framework bundle）。",
+        hardDeadCount: 0,
+        retiredChainCount: 1,
+        actionableRetiredChainCount: 0,
+        historyRetainedCount: 1,
+        supersededBundleCount: 1,
+        safeDeleteCandidateCount: 0,
+      },
+    });
+
+    assert.equal(frontpage.status, "ready");
+    assert.equal(frontpage.primaryBlockers.length, 0);
+    assert.equal(frontpage.deadChainAudit.status, "advisory");
+    assert.equal(frontpage.deadChainAudit.statusLabel, "历史保留");
+    assert.equal(frontpage.deadChainAudit.retiredChainCount, 1);
+    assert.equal(frontpage.deadChainAudit.historyRetainedCount, 1);
+    assert.ok(frontpage.advisorySignals.some((item) => item.includes("dead-chain audit advisory")));
+  });
+
   it("should prefer concrete watch recovery action over generic validation pipeline guidance", () => {
     const frontpage = buildGateFrontpageSummary({
       gatePassed: false,

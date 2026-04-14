@@ -11,6 +11,10 @@ import {
 } from "../scripts/framework-backfill-bundles-lib.mjs";
 
 const projectRoot = path.resolve(".");
+const currentProjectExpansionWave = JSON.parse(
+  fs.readFileSync(path.join(projectRoot, "config", "project-expansion-wave.json"), "utf-8"),
+);
+const currentProjectWaveStatus = String(currentProjectExpansionWave.status || "").trim() || "not-entered";
 const PROJECT_FILE_FIXTURES = new Set([
   "config/expansion-wave-contracts.json",
   "config/project-expansion-wave.json",
@@ -272,7 +276,7 @@ describe("Framework Backfill Bundles Lib", () => {
       assert.equal(adopted.bundles.every((bundle) => bundle.adoptionStatus === "adopted"), true);
       assert.equal(adopted.mirrorStatus, "current");
       assert.ok(expansionWaveBundle);
-      assert.equal(expansionWaveBundle.expansionWaveDetails.projectWaveStatus, "active");
+      assert.equal(expansionWaveBundle.expansionWaveDetails.projectWaveStatus, currentProjectWaveStatus);
       assert.equal(partial.bundles.some((bundle) => bundle.adoptionStatus === "partial"), true);
       assert.equal(missing.bundles.every((bundle) => bundle.adoptionStatus === "missing"), true);
       assert.equal(missing.mirrorStatus, "missing-local-registry");
@@ -374,9 +378,9 @@ describe("Framework Backfill Bundles Lib", () => {
       const markdown = renderFrameworkBackfillAuditMarkdown(report);
 
       assert.ok(markdown.includes("## Expansion Wave Overview"));
-      assert.ok(markdown.includes("Project Wave Status: `active`"));
+      assert.ok(markdown.includes(`Project Wave Status: \`${currentProjectWaveStatus}\``));
       assert.ok(markdown.includes("| Bundle | Adoption | Mirror | Wave | Checks |"));
-      assert.ok(markdown.includes("projectWaveStatus=`active`"));
+      assert.ok(markdown.includes(`projectWaveStatus=\`${currentProjectWaveStatus}\``));
     } finally {
       fs.rmSync(adoptedRoot, { recursive: true, force: true });
     }

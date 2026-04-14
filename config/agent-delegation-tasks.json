@@ -101,83 +101,6 @@
       ]
     },
     {
-      "taskId": "P1-HIGH-101",
-      "title": "冻结 Reader canonical fingerprint 策略（历史契约源）",
-      "lane": "codex-architecture-planning",
-      "scopePaths": [
-        "config/agent-delegation-tasks.json",
-        "scripts/agent-zotero-diagnosis-lib.mjs",
-        "scripts/agent-zotero-patch-lib.mjs",
-        "tests/agent-delegation.test.js",
-        "tests/agent-zotero-patch-lib.test.js",
-        "tests/agent-zotero-validation-lib.test.js",
-        "tests/agent-memory-lib.test.js",
-        "tests/agent-telemetry.test.js",
-        "tests/agent-obsidian-handoff-lib.test.js",
-        "tests/docs-consistency.test.js"
-      ],
-      "dependsOn": [
-        "P1-HIGH-001"
-      ],
-      "promptTemplate": "该任务仅供 Codex 跟踪。Reader canonical fingerprint 策略已落地，当前仅作为历史契约源保留。固定 canonical 指纹为 reader-entry:declarative-reader-mapping-drift、reader-event:toolbar-bridge-registration-drift、reader-event:fine-grained-hook-declaration-drift；legacy alias 只保留为运行时输入兼容层。后续 diagnosis、patchPlan、archive、monitor、memory、dashboard、Obsidian 默认继续只写 canonical fingerprint；不得新增 alias 专用 rule，不得放宽 patch sandbox 或 verification kind。",
-      "reviewChecklist": [
-        "legacy alias 只能保留为输入兼容，不得继续作为默认输出",
-        "不得新增 alias 专用 ruleId",
-        "不得放宽 patch sandbox 或 verification kind"
-      ],
-      "testCommands": [],
-      "handoffArtifacts": [
-        "dist/agent-zotero-e2e.json",
-        "dist/agent-zotero-autofix.json",
-        "dist/agent-memory.json"
-      ]
-    },
-    {
-      "taskId": "READER-HIGH-101",
-      "title": "冻结 Toolbar 宿主观测与视觉证据对齐边界（历史契约源）",
-      "lane": "codex-architecture-planning",
-      "scopePaths": [
-        "config/agent-delegation-tasks.json",
-        "src/features/reader.js",
-        "zotero-scenarios/baseline.scenario.js",
-        "zotero-scenarios/reader-event-hooks.scenario.js",
-        "zotero-scenarios/reader-fine-grained-hooks.scenario.js",
-        "scripts/agent-zotero-e2e-lib.mjs",
-        "scripts/agent-zotero-validation-lib.mjs",
-        "scripts/agent-monitor.mjs",
-        "scripts/agent-dashboard.mjs",
-        "scripts/agent-obsidian-handoff-lib.mjs",
-        "tests/plugin-agent.test.js",
-        "tests/agent-zotero-validation-lib.test.js",
-        "tests/agent-telemetry.test.js",
-        "tests/agent-obsidian-handoff-lib.test.js",
-        "tests/agent-delegation.test.js",
-        "tests/docs-consistency.test.js",
-        "README.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md"
-      ],
-      "dependsOn": [
-        "READER-HIGH-001",
-        "ENG-HIGH-101"
-      ],
-      "promptTemplate": "该任务仅供 Codex 跟踪。该边界已落地，当前仅作为历史契约源保留：统一 `renderToolbar` 宿主观测、dispatch mode、fine-grained hook 证据与 library/reader 视觉基线差异的解释口径；不得重复已落地的 7 个深层宿主状态字段，不得新增 DOM-heavy 自动补丁，不得扩大白名单 patch / gate / visual gate 语义。",
-      "reviewChecklist": [
-        "不得重复开发已落地的 7 个 Reader 深层字段",
-        "不得把 DOM-heavy 自动补丁或新视觉 gate 混入当前 Reader 批次",
-        "Toolbar 宿主观测与视觉差异必须共用同一套证据解释口径",
-        "不得改 P1 白名单、Engineering 错误枚举或 watch stale 优先级"
-      ],
-      "testCommands": [],
-      "handoffArtifacts": [
-        "dist/agent-zotero-e2e.json",
-        "dist/agent-monitor.json",
-        "dist/agent-gate.json"
-      ]
-    },
-    {
       "taskId": "ENG-HIGH-101",
       "title": "冻结 watch freshness 与 validation-exit 工件消费语义",
       "lane": "codex-architecture-planning",
@@ -245,7 +168,8 @@
         "docs/AGENT_AUTONOMY_ROADMAP.md"
       ],
       "dependsOn": [
-        "READER-HIGH-101"
+        "READER-HIGH-001",
+        "ENG-HIGH-101"
       ],
       "promptTemplate": "该任务仅供 Codex 跟踪。冻结本轮 Reader 视觉阻断收口边界：保持 visual gate 阈值、错误分类和 patch 语义不变，仅将 capture 流程收紧为“固定窗口几何 + 固定 stage 预热 + 固定采集顺序 + stage 内有限重试选稳图”。新增字段只做加法，继续沿用现有 e2e/validation/monitor/dashboard/obsidian 输出链；不新增 DOM-heavy 自动补丁，不放宽 gate，不把“刷新 baseline”当默认主修复路径。",
       "reviewChecklist": [
@@ -311,39 +235,6 @@
       ]
     },
     {
-      "taskId": "READER-HIGH-104",
-      "title": "冻结受控 Reader baseline refresh 准入与边界（历史契约源）",
-      "lane": "codex-architecture-planning",
-      "scopePaths": [
-        "config/agent-delegation-tasks.json",
-        "README.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md",
-        "tests/agent-delegation.test.js",
-        "tests/docs-consistency.test.js"
-      ],
-      "dependsOn": [
-        "READER-HIGH-103"
-      ],
-      "promptTemplate": "该任务仅供 Codex 跟踪。受控 Reader baseline refresh 的准入与边界已在上一批完成并转入历史：仅在 `watch.latestStatus === healthy`、`primaryDiagnosis.fingerprint === 'reader-ui:reader-visual-drift'`、`visualPrimaryBlockerKind === 'baseline-geometry-mismatch'`、`testFailed === 0`、`scenarioFailed === 0`、`logErrorCount === 0`、`readerEventReport.status === 'passed'`、`readerEventReport.hookScenarioStatus === 'passed'`、`readerEventReport.fineGrainedScenarioStatus === 'passed'`、所有 visual stage `stable === true`、`visualGeometryMismatchCount > 0` 时允许执行一次 `npm run agent:zotero:e2e:update-baseline`。当前只将该任务保留为历史契约源，不再作为 active batch。",
-      "reviewChecklist": [
-        "只在 fresh evidence 满足全部准入条件时允许 baseline refresh",
-        "刷新目标只允许落在 tests/visual-baselines/agent-zotero-e2e/ 的现有 canonical baseline",
-        "不得新增 CLI、compare 阈值变更、gate 枚举或 patch/autofix 语义变更",
-        "若 refresh 后仍失败，不得自动进入第二轮 baseline refresh"
-      ],
-      "testCommands": [],
-      "handoffArtifacts": [
-        "dist/agent-zotero-e2e.json",
-        "dist/agent-monitor.json",
-        "dist/agent-gate.json",
-        "dist/agent-dashboard.html",
-        "dist/obsidian/AGENT_HANDOFF.md"
-      ]
-    },
-    {
       "taskId": "READER-HIGH-105",
       "title": "冻结 Reader canonical baseline coverage 语义",
       "lane": "codex-architecture-planning",
@@ -375,7 +266,7 @@
         "docs/AGENT_AUTONOMY_ROADMAP.md"
       ],
       "dependsOn": [
-        "READER-HIGH-104"
+        "READER-HIGH-103"
       ],
       "promptTemplate": "该任务仅供 Codex 跟踪。本轮只冻结 Reader canonical baseline coverage 语义：主诊断指纹继续保持 `reader-ui:reader-visual-drift`，`visualPrimaryBlockerKind` 与现有枚举不变，不新增 CLI、不改 compare threshold、不改 patch/autofix 语义、不做第二次自动 baseline refresh。新增结构化字段固定为 `visualCanonicalCoverageKind`、`visualCanonicalCoverageKindLabel`、`visualCanonicalExpectedTargets`、`visualCanonicalMismatchedTargets`、`visualCanonicalCoverageSummary`；其期望 target 集合固定来自本次命令实际观测到的 cycle `bootMode × kind`。当纯视觉 Reader 失败且 `visualPrimaryBlockerKind === 'baseline-geometry-mismatch'` 且 coverage 为 `partial` 时，`frontpage / gate / loop` 默认 nextAction 改为 `npm run agent:obsidian`，不再自循环推荐 `npm run agent:zotero:e2e:update-baseline`。",
       "reviewChecklist": [
@@ -391,96 +282,6 @@
         "dist/agent-gate.json",
         "dist/agent-dashboard.html",
         "dist/obsidian/AGENT_HANDOFF.md"
-      ]
-    },
-    {
-      "taskId": "READER-HIGH-106",
-      "title": "冻结 Reader ui-regression-candidate 的人工复核分流语义（历史契约源）",
-      "lane": "codex-architecture-planning",
-      "scopePaths": [
-        "config/agent-delegation-tasks.json",
-        "scripts/agent-zotero-validation-lib.mjs",
-        "scripts/agent-frontpage-summary-lib.mjs",
-        "scripts/agent-monitor.mjs",
-        "scripts/agent-gate.mjs",
-        "scripts/agent-dashboard.mjs",
-        "scripts/agent-zotero-loop-lib.mjs",
-        "scripts/agent-zotero-loop.mjs",
-        "scripts/agent-obsidian-handoff-lib.mjs",
-        "tests/agent-frontpage-summary-lib.test.js",
-        "tests/agent-zotero-loop-lib.test.js",
-        "tests/agent-telemetry.test.js",
-        "tests/agent-obsidian-handoff-lib.test.js",
-        "tests/agent-delegation.test.js",
-        "tests/docs-consistency.test.js",
-        "README.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md"
-      ],
-      "dependsOn": [
-        "READER-HIGH-105"
-      ],
-      "promptTemplate": "该任务仅供 Codex 跟踪。`ui-regression-candidate + complete` 的人工复核分流语义已经落地，当前只保留为历史契约源：当纯视觉 Reader 失败、`visualPrimaryBlockerKind === 'ui-regression-candidate'`、`visualCanonicalCoverageKind === 'complete'`、watch healthy 且 Reader hooks/fine-grained 全通过时，默认分流必须转向人工 Reader 复核，而不是继续推荐 baseline refresh 或 autofix。保持主诊断指纹 `reader-ui:reader-visual-drift`、现有 gate 枚举、visual threshold、patch/autofix 语义与 CLI 不变；只允许在 monitor / gate / loop / dashboard / Obsidian 既有输出链上收紧 nextAction 与摘要语义。memory 历史经验在该路径上只能作为辅证，不得盖过当前 fresh evidence 的主结论。当前人工 verdict 产出前，manifest 只保留架构与规划源，不再保留新的 active Reader low-task。",
-      "reviewChecklist": [
-        "不得新增新的 visual diagnosis fingerprint、gate 枚举或 CLI",
-        "ui-regression-candidate + complete 只能分流到人工 Reader 复核，不得默认回退到 update-baseline 或 autofix",
-        "watch stale 优先级与 validation exit 2 工件有效语义必须保持不变",
-        "memory 历史经验只能保留为辅证，不得覆盖 fresh evidence"
-      ],
-      "testCommands": [],
-      "handoffArtifacts": [
-        "dist/agent-zotero-e2e.json",
-        "dist/agent-monitor.json",
-        "dist/agent-gate.json",
-        "dist/agent-dashboard.html",
-        "dist/obsidian/AGENT_HANDOFF.md"
-      ]
-    },
-    {
-      "taskId": "READER-HIGH-109",
-      "title": "冻结 Reader 视觉证据导航边界（历史契约源）",
-      "lane": "codex-architecture-planning",
-      "scopePaths": [
-        "config/agent-delegation-tasks.json",
-        "scripts/agent-zotero-validation-lib.mjs",
-        "scripts/agent-zotero-e2e-lib.mjs",
-        "scripts/agent-monitor.mjs",
-        "scripts/agent-gate.mjs",
-        "scripts/agent-dashboard.mjs",
-        "scripts/agent-obsidian-handoff-lib.mjs",
-        "tests/agent-zotero-e2e-lib.test.js",
-        "tests/agent-zotero-validation-lib.test.js",
-        "tests/agent-telemetry.test.js",
-        "tests/agent-obsidian-handoff-lib.test.js",
-        "tests/agent-delegation.test.js",
-        "tests/docs-consistency.test.js",
-        "README.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md"
-      ],
-      "dependsOn": [
-        "READER-HIGH-106"
-      ],
-      "promptTemplate": "该任务仅供 Codex 跟踪。Reader 视觉证据导航层已在上一轮完成，当前仅作为历史契约源保留：继续沿用 `visualEvidenceObserved`、`visualEvidenceItemCount`、`visualEvidenceFailingItemCount`、`visualEvidenceSummary`、`visualEvidenceItems` 及其条目字段，不新增采集步骤、不新增 diff 热图、不改 compare threshold、gate 枚举、patch/autofix、baseline refresh 语义，也不改变 `primaryDiagnosis`、`visualPrimaryBlockerKind`、`visualCanonicalCoverageKind` 与 `nextAction` 主结论。当前产品阶段已切到先复核视觉采集稳定性并重跑 E2E；本任务不再代表 active low-task。",
-      "reviewChecklist": [
-        "不得新增新的 CLI、schema version、diagnosis fingerprint、错误枚举或 verdict schema",
-        "证据导航层只能做现有输出链加法，不得改变 primaryDiagnosis、visual blocker 或 nextAction 主结论",
-        "不得把缺失截图误判成需要新增采集步骤或 diff 热图",
-        "monitor / gate / obsidian 只能抬升证据导航，不得回退到默认 baseline refresh 或 autofix"
-      ],
-      "testCommands": [],
-      "handoffArtifacts": [
-        "dist/agent-zotero-e2e.json",
-        "dist/agent-zotero-e2e.md",
-        "dist/agent-monitor.json",
-        "dist/agent-gate.json",
-        "obsidian/agent-workbench/01-当前Zotero插件-状态总览.md",
-        "obsidian/agent-workbench/02-当前Zotero插件-证据索引.md",
-        "obsidian/agent-workbench/10-模板协作-人工指令窗口.md"
       ]
     },
     {
@@ -511,7 +312,7 @@
         "docs/AGENT_AUTONOMY_ROADMAP.md"
       ],
       "dependsOn": [
-        "READER-HIGH-109"
+        "READER-HIGH-105"
       ],
       "promptTemplate": "该任务仅供 Codex 跟踪。本轮只冻结 `capture-unstable + complete` 的保守收紧边界：主诊断继续保持 `reader-ui:reader-visual-drift`，`visualPrimaryBlockerKind` / `visualCanonicalCoverageKind` 枚举不变，不新增 CLI、schema version、diagnosis fingerprint、错误枚举，也不改 baseline refresh、patch、autofix、gate 主语义。允许实现面仅限 `agent:zotero:e2e` 的 stage 采集流程与选图逻辑，以及 `frontpage / monitor / gate / dashboard / obsidian / loop` 对 `capture-unstable` 路径的展示和动作分流；保持现有结构化字段为主，不新增新的顶层报告字段，不调视觉阈值，不放宽 gate，不新增 DOM-heavy / iframe-heavy 探针，也不把人工 verdict 重新抬成当前默认主路径。",
       "reviewChecklist": [
@@ -630,182 +431,6 @@
       ]
     },
     {
-      "taskId": "READER-HIGH-113",
-      "title": "冻结 Reader 人工 verdict 轻量同步收口边界（历史契约源）",
-      "lane": "codex-architecture-planning",
-      "scopePaths": [
-        "config/agent-delegation-tasks.json",
-        "scripts/agent-obsidian-handoff-lib.mjs",
-        "tests/agent-delegation.test.js",
-        "tests/docs-consistency.test.js",
-        "tests/agent-obsidian-handoff-lib.test.js",
-        "tests/agent-telemetry.test.js",
-        "README.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md",
-        "obsidian/agent-workbench/01-当前Zotero插件-状态总览.md",
-        "obsidian/agent-workbench/10-模板协作-人工指令窗口.md"
-      ],
-      "dependsOn": [
-        "READER-HIGH-112"
-      ],
-      "promptTemplate": "该任务仅供 Codex 跟踪。`READER-HIGH-113 / READER-LOW-237~239` 的轻量同步收口已经完成，当前仅作为历史契约源保留：manifest、正式文档、Obsidian 工作台与测试口径都已统一到 `ui-regression-candidate + complete -> npm run agent:obsidian` 的人工 Reader verdict 阶段；`READER-HIGH-112 / READER-LOW-234~236` 与更早自动代码批次也均已转入历史。当前不得再把 113 批次继续写成 active 开发批次，也不得继续默认生成新的 Reader low-task。",
-      "reviewChecklist": [
-        "113 批次只能保留为历史契约源，不得继续写成当前 active 开发批次",
-        "不得回退到 capture-unstable、rerun E2E-first、baseline refresh 或 autofix 默认主路径",
-        "ui-regression-candidate + complete 的默认 nextAction 必须继续保持 npm run agent:obsidian",
-        "不得新增新的 Reader 实现批次、CLI、schema 或 verdict 字段"
-      ],
-      "testCommands": [],
-      "handoffArtifacts": [
-        "config/agent-delegation-tasks.json",
-        "dist/agent-monitor.json",
-        "dist/agent-gate.json",
-        "obsidian/agent-workbench/01-当前Zotero插件-状态总览.md",
-        "obsidian/agent-workbench/10-模板协作-人工指令窗口.md"
-      ]
-    },
-    {
-      "taskId": "READER-HIGH-114",
-      "title": "冻结 Reader 人工 verdict 架构与规划待命与单分支后续边界（历史契约源）",
-      "lane": "codex-architecture-planning",
-      "scopePaths": [
-        "config/agent-delegation-tasks.json",
-        "scripts/agent-obsidian-handoff-lib.mjs",
-        "README.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md",
-        "docs/CURRENT_BACKLOG.md",
-        "tests/agent-delegation.test.js",
-        "tests/docs-consistency.test.js",
-        "tests/agent-obsidian-handoff-lib.test.js",
-        "tests/agent-telemetry.test.js",
-        "obsidian/agent-workbench/01-当前Zotero插件-状态总览.md",
-        "obsidian/agent-workbench/10-模板协作-人工指令窗口.md"
-      ],
-      "dependsOn": [
-        "READER-HIGH-113"
-      ],
-      "promptTemplate": "该任务仅供 Codex 跟踪。`READER-HIGH-114` 的人工 verdict 待命语义只保留为历史契约源：它代表上一轮基于 `ui-regression-candidate + complete -> npm run agent:obsidian` 的待命判断。`2026-03-26` fresh rerun 已把真实 blocker 拉回到 `capture-unstable + complete`，且当前 rerun 中 `library` / `reader` 两个 stage 都继续 `max-attempt-reached`；因此 114 不再代表当前 active 批次，不得继续把“等待人工 Reader verdict”写成当前主线。",
-      "reviewChecklist": [
-        "114 只能保留为历史契约源，不得继续写成当前 active Reader 批次",
-        "不得继续把等待人工 Reader verdict 写成当前主线",
-        "fresh evidence 偏离 ui-regression-candidate + complete 时，必须重新生成新的架构与规划批次",
-        "不得把 115/116/117 或 240~248 这类预留 verdict 分支提前落仓"
-      ],
-      "testCommands": [],
-      "handoffArtifacts": [
-        "config/agent-delegation-tasks.json",
-        "dist/zotero-watch-status.json",
-        "dist/agent-zotero-e2e.json",
-        "dist/agent-monitor.json",
-        "dist/agent-gate.json",
-        "README.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md",
-        "obsidian/agent-workbench/01-当前Zotero插件-状态总览.md",
-        "obsidian/agent-workbench/10-模板协作-人工指令窗口.md"
-      ]
-    },
-    {
-      "taskId": "READER-HIGH-118",
-      "title": "冻结 Reader 单 stage capture stability 收口边界（历史契约源）",
-      "lane": "codex-architecture-planning",
-      "scopePaths": [
-        "config/agent-delegation-tasks.json",
-        "scripts/agent-frontpage-summary-lib.mjs",
-        "scripts/agent-gate.mjs",
-        "scripts/agent-zotero-e2e.mjs",
-        "scripts/agent-dashboard.mjs",
-        "scripts/agent-obsidian-handoff-lib.mjs",
-        "scripts/agent-zotero-loop-lib.mjs",
-        "tests/agent-frontpage-summary-lib.test.js",
-        "tests/agent-telemetry.test.js",
-        "tests/agent-zotero-validation-lib.test.js",
-        "tests/agent-zotero-e2e-lib.test.js",
-        "tests/agent-obsidian-handoff-lib.test.js",
-        "tests/agent-zotero-loop-lib.test.js",
-        "tests/agent-delegation.test.js",
-        "tests/docs-consistency.test.js",
-        "README.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md"
-      ],
-      "dependsOn": [
-        "READER-HIGH-114"
-      ],
-      "promptTemplate": "该任务仅供 Codex 跟踪。Reader 单 stage capture stability 收口批次已经完成并只保留为历史契约源。其固定事实是：只要任一 visual stage 仍 `max-attempt-reached`，消费者必须统一落到 `capture-unstable -> npm run agent:zotero:e2e`；实现面已在历史批次中收口到消费者真相一致化与 visual stage deterministic choreography 收紧。本任务不再作为当前 active 开发批次，只保留架构与规划边界与 review artifact 语义。",
-      "reviewChecklist": [
-        "历史契约源不得再被写成当前 active 批次",
-        "不得把 118 的历史结论误回退成当前产品阶段",
-        "历史批次的 blocker / nextAction 语义只能作为对照，不得覆盖 fresh truth"
-      ],
-      "testCommands": [],
-      "handoffArtifacts": [
-        "dist/agent-zotero-e2e.json",
-        "dist/agent-monitor.json",
-        "dist/agent-gate.json",
-        "dist/agent-dashboard.html",
-        "obsidian/agent-workbench/01-当前Zotero插件-状态总览.md",
-        "obsidian/agent-workbench/10-模板协作-人工指令窗口.md"
-      ]
-    },
-    {
-      "taskId": "READER-HIGH-119",
-      "title": "冻结 Reader capture stability 根因定位边界（历史契约源）",
-      "lane": "codex-architecture-planning",
-      "scopePaths": [
-        "config/agent-delegation-tasks.json",
-        "scripts/agent-zotero-validation-lib.mjs",
-        "scripts/agent-zotero-e2e.mjs",
-        "scripts/agent-zotero-e2e-lib.mjs",
-        "scripts/agent-monitor.mjs",
-        "scripts/agent-gate.mjs",
-        "scripts/agent-dashboard.mjs",
-        "scripts/agent-obsidian-handoff-lib.mjs",
-        "tests/agent-zotero-validation-lib.test.js",
-        "tests/agent-zotero-e2e-lib.test.js",
-        "tests/agent-telemetry.test.js",
-        "tests/agent-obsidian-handoff-lib.test.js",
-        "tests/agent-zotero-loop-lib.test.js",
-        "tests/agent-delegation.test.js",
-        "tests/docs-consistency.test.js",
-        "README.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md"
-      ],
-      "dependsOn": [
-        "READER-HIGH-118"
-      ],
-      "promptTemplate": "该任务仅供 Codex 跟踪。Reader capture stability 根因定位批次已经完成，当前仅作为历史契约源保留：diagnosis-only 的 `visualCaptureAttemptDiagnosis*` 解释层已接入 validation / e2e / monitor / gate / dashboard / loop / obsidian，并未改变 blocker、nextAction、阈值、预算或 schema。当前 active 主线已不再停留在 119，而是继续以 fresh evidence 为准进入后续分支或人工 verdict 待命。",
-      "reviewChecklist": [
-        "attempt 诊断字段只能来自现有 attempts 与 stage metadata，不得新增采集步骤",
-        "新字段只能作为解释层，不能成为新的 blocker 或 nextAction 判定源",
-        "只要任一 stage 仍 max-attempt-reached，默认动作必须继续保持 npm run agent:zotero:e2e",
-        "low-task 必须严格串行为 252 -> 253 -> 254，不得并行写重叠范围"
-      ],
-      "testCommands": [],
-      "handoffArtifacts": [
-        "dist/agent-zotero-e2e.json",
-        "dist/agent-zotero-e2e.md",
-        "dist/agent-monitor.json",
-        "dist/agent-gate.json",
-        "dist/agent-dashboard.html",
-        "obsidian/agent-workbench/01-当前Zotero插件-状态总览.md",
-        "obsidian/agent-workbench/02-当前Zotero插件-证据索引.md",
-        "obsidian/agent-workbench/10-模板协作-人工指令窗口.md"
-      ]
-    },
-    {
       "taskId": "READER-LOW-252",
       "title": "接入 capture attempt 诊断到 E2E summary 与 markdown",
       "lane": "opencode-implementation-delivery",
@@ -817,7 +442,7 @@
         "tests/agent-zotero-e2e-lib.test.js"
       ],
       "dependsOn": [
-        "READER-HIGH-119"
+        "READER-HIGH-112"
       ],
       "promptTemplate": "该实施与交付任务只把现有 raw attempt 线索接入 validation / e2e summary / markdown。固定新增字段仅限 `visualCaptureAttemptDiagnosisObserved`、`visualCaptureAttemptDiagnosisItemCount`、`visualCaptureAttemptDiagnosisSummary`、`visualCaptureAttemptDiagnosisItems`，且条目字段固定为 `cycleIndex`、`bootMode`、`kind`、`selectionReason`、`selectedAttempt`、`attemptCount`、`allHashesUnique`、`boundsStable`、`rasterSizeStable`、`attemptHashes`、`attemptBounds`、`attemptRasterSizes`、`stabilityMetrics`。必须只从现有 `stages[*].attempts` 与 stage-level `stabilityMetrics` 派生，不新增采集步骤，不改 blocker 判定，不改 nextAction。",
       "reviewChecklist": [
@@ -848,7 +473,7 @@
         "tests/agent-zotero-loop-lib.test.js"
       ],
       "dependsOn": [
-        "READER-HIGH-119",
+        "READER-HIGH-112",
         "READER-LOW-252"
       ],
       "promptTemplate": "该实施与交付任务只把 attempt 诊断抬升到 monitor / gate / dashboard / loop / obsidian。固定要求：`capture-unstable + complete` 时默认动作继续保持 `npm run agent:zotero:e2e`；headline / summary / human window 必须直接回答哪些 stage 仍 `max-attempt-reached`、这些 stage 是否呈现固定 bounds + 固定 raster size + hash 全变，以及当前为什么仍不能进入 verdict / baseline refresh / autofix。Obsidian 至少更新 `01-当前Zotero插件-状态总览.md`、`02-当前Zotero插件-证据索引.md`、`10-模板协作-人工指令窗口.md`；不得新增命令，不扩 `AGENT_OBSIDIAN_VISUALS=1` 职责。",
@@ -885,12 +510,12 @@
         "tests/docs-consistency.test.js"
       ],
       "dependsOn": [
-        "READER-HIGH-119",
+        "READER-HIGH-112",
         "READER-LOW-253"
       ],
-      "promptTemplate": "该实施与交付任务只做 manifest / 正式文档 / docs consistency / review artifact 的阶段重基线：`READER-HIGH-118 / READER-LOW-249~251` 已完成并转入历史契约 / review artifact，当前 active batch 固定切到 `READER-HIGH-119 / READER-LOW-252~254`。正式文档必须明确：当前产品阶段是 Reader capture stability 根因定位，默认 nextAction 继续保持 `npm run agent:zotero:e2e`，当前主线不是人工 verdict、baseline refresh 或 autofix；不得提前写入任何后续强修复或人工 verdict 分支。",
+      "promptTemplate": "该实施与交付任务只做 manifest / 正式文档 / docs consistency / review artifact 的阶段重基线：`READER-HIGH-118 / READER-LOW-249~251` 已完成并转入历史契约 / review artifact，当前剩余桥接依赖已压到 `READER-HIGH-112 -> READER-LOW-252~254`。正式文档必须明确：当前产品阶段是 Reader capture stability 根因定位，默认 nextAction 继续保持 `npm run agent:zotero:e2e`，当前主线不是人工 verdict、baseline refresh 或 autofix；不得提前写入任何后续强修复或人工 verdict 分支。",
       "reviewChecklist": [
-        "manifest active batch 必须切到 READER-HIGH-119 / READER-LOW-252~254",
+        "manifest 剩余桥接依赖必须对齐到 READER-HIGH-112 -> READER-LOW-252~254",
         "正式文档必须把 READER-HIGH-118 写成历史，而不是当前 active",
         "当前主线必须明确为 capture stability 根因定位，不得继续写成 rerun 收口或人工 verdict",
         "必须补齐 252~254 的 run.json、review.json、review.md"
@@ -911,150 +536,6 @@
       ]
     },
     {
-      "taskId": "READER-HIGH-120",
-      "title": "冻结 fresh truth 刷新与单分支选择边界（历史契约源）",
-      "lane": "codex-architecture-planning",
-      "scopePaths": [
-        "config/agent-delegation-tasks.json",
-        "dist/zotero-watch-status.json",
-        "dist/agent-zotero-e2e.json",
-        "dist/agent-monitor.json",
-        "dist/agent-gate.json",
-        "obsidian/agent-workbench/01-当前Zotero插件-状态总览.md",
-        "obsidian/agent-workbench/10-模板协作-人工指令窗口.md",
-        "README.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md",
-        "tests/agent-delegation.test.js",
-        "tests/docs-consistency.test.js"
-      ],
-      "dependsOn": [
-        "READER-HIGH-119"
-      ],
-      "promptTemplate": "该任务仅供 Codex 跟踪。本轮已完成一次受控 fresh truth 刷新与单分支选择：先重基线到 refresh-first，再按 `zotero:watch -> agent:zotero:e2e -> agent:monitor -> agent:gate -> agent:obsidian` 的固定顺序刷新工件；刷新确认 `watch = healthy`、`reader-ui:reader-visual-drift`、`capture-unstable + complete` 后，只选中了后续的最小 capture-stability 修复分支。当前该任务仅保留为历史契约源，不再作为 active 主线。",
-      "reviewChecklist": [
-        "历史 refresh-first 批次不得再被写成当前 active 主线",
-        "未被选中的后续分支不得补写进仓库",
-        "该任务的唯一产物是新鲜工件与单分支选择，不包含新的长期判定语义"
-      ],
-      "testCommands": [],
-      "handoffArtifacts": [
-        "dist/zotero-watch-status.json",
-        "dist/agent-zotero-e2e.json",
-        "dist/agent-monitor.json",
-        "dist/agent-gate.json",
-        "obsidian/agent-workbench/01-当前Zotero插件-状态总览.md",
-        "obsidian/agent-workbench/10-模板协作-人工指令窗口.md"
-      ]
-    },
-    {
-      "taskId": "READER-LOW-255",
-      "title": "同步 refresh-first 待执行阶段的 manifest 与文档口径",
-      "lane": "opencode-implementation-delivery",
-      "scopePaths": [
-        "config/agent-delegation-tasks.json",
-        "README.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md",
-        "tests/agent-delegation.test.js",
-        "tests/docs-consistency.test.js"
-      ],
-      "dependsOn": [
-        "READER-HIGH-120"
-      ],
-      "promptTemplate": "该实施与交付任务已完成并仅保留为历史工件：它把正式口径先切到 refresh-first，明确 `READER-HIGH-119 / READER-LOW-252~254` 已转历史，并等待 fresh truth 决定唯一后续分支。",
-      "reviewChecklist": [
-        "只允许重基线阶段口径，不得提前写入未选中的后续分支",
-        "不得把 diagnosis-only 批次继续写成当前 active 主线"
-      ],
-      "testCommands": [
-        "node --input-type=module -e \"import './tests/agent-delegation.test.js'; import './tests/docs-consistency.test.js'; import { runTests } from './tests/test-framework.js'; await runTests();\""
-      ],
-      "handoffArtifacts": [
-        "config/agent-delegation-tasks.json",
-        "README.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md"
-      ]
-    },
-    {
-      "taskId": "READER-LOW-256",
-      "title": "执行 fresh truth 刷新并落盘最新 watch/e2e/monitor/gate/obsidian 工件",
-      "lane": "opencode-implementation-delivery",
-      "scopePaths": [
-        "dist/zotero-watch-status.json",
-        "dist/agent-zotero-e2e.json",
-        "dist/agent-zotero-e2e.md",
-        "dist/agent-monitor.json",
-        "dist/agent-gate.json",
-        "obsidian/agent-workbench/01-当前Zotero插件-状态总览.md",
-        "obsidian/agent-workbench/10-模板协作-人工指令窗口.md"
-      ],
-      "dependsOn": [
-        "READER-HIGH-120",
-        "READER-LOW-255"
-      ],
-      "promptTemplate": "该实施与交付任务已完成并仅保留为历史工件：固定按 `npm run zotero:watch -> npm run agent:zotero:e2e -> node scripts/agent-monitor.mjs -> node scripts/agent-gate.mjs -> npm run agent:obsidian` 刷新 fresh truth，不新增判定语义。",
-      "reviewChecklist": [
-        "刷新顺序必须固定，且只写最新工件",
-        "不得借刷新阶段引入新的 schema、枚举或 CLI"
-      ],
-      "testCommands": [
-        "npm run zotero:watch",
-        "npm run agent:zotero:e2e",
-        "node scripts/agent-monitor.mjs",
-        "node scripts/agent-gate.mjs",
-        "npm run agent:obsidian"
-      ],
-      "handoffArtifacts": [
-        "dist/zotero-watch-status.json",
-        "dist/agent-zotero-e2e.json",
-        "dist/agent-monitor.json",
-        "dist/agent-gate.json",
-        "obsidian/agent-workbench/01-当前Zotero插件-状态总览.md",
-        "obsidian/agent-workbench/10-模板协作-人工指令窗口.md"
-      ]
-    },
-    {
-      "taskId": "READER-LOW-257",
-      "title": "按 fresh truth 只选择一个后续 Reader 分支",
-      "lane": "opencode-implementation-delivery",
-      "scopePaths": [
-        "config/agent-delegation-tasks.json",
-        "README.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md",
-        "tests/agent-delegation.test.js",
-        "tests/docs-consistency.test.js"
-      ],
-      "dependsOn": [
-        "READER-HIGH-120",
-        "READER-LOW-256"
-      ],
-      "promptTemplate": "该实施与交付任务已完成并仅保留为历史工件：fresh truth 选中了 `capture-unstable + complete` 的最小 capture-stability 修复分支，未被选中的 verdict / baseline refresh / 其他分支都没有提前写入仓库。",
-      "reviewChecklist": [
-        "仓库内只能存在一个被选中的后续分支",
-        "未选中的 Reader 分支不得提前落仓"
-      ],
-      "testCommands": [
-        "node scripts/agent-delegation.mjs list --json"
-      ],
-      "handoffArtifacts": [
-        "config/agent-delegation-tasks.json",
-        "dist/agent-delegation/READER-LOW-255/review.json",
-        "dist/agent-delegation/READER-LOW-256/review.json",
-        "dist/agent-delegation/READER-LOW-257/review.json"
-      ]
-    },
-    {
       "taskId": "READER-HIGH-121",
       "title": "冻结 Reader 单 reader-stage capture stability 最小修复边界（历史契约源）",
       "lane": "codex-architecture-planning",
@@ -1072,7 +553,7 @@
         "tests/docs-consistency.test.js"
       ],
       "dependsOn": [
-        "READER-HIGH-120"
+        "READER-HIGH-112"
       ],
       "promptTemplate": "该任务仅供 Codex 跟踪。本轮已完成最小、保守的 reader-stage capture stability 修复：只收紧 `scripts/agent-zotero-e2e.mjs` 中 reader 的 prepare/open/settle 链，避免每次 attempt 把界面重新拉回 library/reader 切换态，同时在 gate headline 中优先抬升 pure visual blocker 摘要。未改 threshold、retry、warmup 常量、schema、CLI、枚举或 baseline/autofix 主语义。fresh rerun 后，live blocker 已自然切到 `ui-regression-candidate + complete`，因此本任务现仅保留为历史契约源。",
       "reviewChecklist": [
@@ -1088,91 +569,6 @@
         "dist/agent-monitor.json",
         "dist/agent-gate.json",
         "obsidian/agent-workbench/10-模板协作-人工指令窗口.md"
-      ]
-    },
-    {
-      "taskId": "READER-LOW-258",
-      "title": "收紧 reader stage 的 prepare/open/settle 采集链",
-      "lane": "opencode-implementation-delivery",
-      "scopePaths": [
-        "scripts/agent-zotero-e2e.mjs"
-      ],
-      "dependsOn": [
-        "READER-HIGH-121"
-      ],
-      "promptTemplate": "该实施与交付任务已完成并仅保留为历史工件：它只在 `scripts/agent-zotero-e2e.mjs` 中收紧 reader stage 的 prepare/open/settle 时序，复用已打开 reader、等待 primary iframe ready，并避免额外改动阈值、预算、schema 或判定语义。",
-      "reviewChecklist": [
-        "不得改 threshold、retry、warmup 常量",
-        "不得改 selectionReason 枚举或 summary 语义",
-        "改动必须限制在 reader stage 的 prepare/open/settle 链"
-      ],
-      "testCommands": [
-        "npm run agent:zotero:e2e"
-      ],
-      "handoffArtifacts": [
-        "scripts/agent-zotero-e2e.mjs",
-        "dist/agent-zotero-e2e.json"
-      ]
-    },
-    {
-      "taskId": "READER-LOW-259",
-      "title": "对齐 gate headline 到最新 pure visual blocker 摘要",
-      "lane": "opencode-implementation-delivery",
-      "scopePaths": [
-        "scripts/agent-gate.mjs",
-        "tests/agent-telemetry.test.js"
-      ],
-      "dependsOn": [
-        "READER-HIGH-121",
-        "READER-LOW-258"
-      ],
-      "promptTemplate": "该实施与交付任务已完成并仅保留为历史工件：它只把 gate headline 的 issue 优先级收紧到最新 pure visual blocker 摘要，使 gate 在 `ui-regression-candidate + complete` 路径下与 monitor / obsidian 一致显示 `npm run agent:obsidian`，不改 gate 主语义。",
-      "reviewChecklist": [
-        "只能调整 headline/issue 优先级，不得改 gate 通过条件",
-        "nextAction 必须继续从 fresh truth 自然推导"
-      ],
-      "testCommands": [
-        "node --input-type=module -e \"import './tests/agent-telemetry.test.js'; import { runTests } from './tests/test-framework.js'; await runTests();\""
-      ],
-      "handoffArtifacts": [
-        "scripts/agent-gate.mjs",
-        "dist/agent-gate.json"
-      ]
-    },
-    {
-      "taskId": "READER-LOW-260",
-      "title": "同步手动 verdict 待命态的 manifest 与正式文档口径",
-      "lane": "opencode-implementation-delivery",
-      "scopePaths": [
-        "config/agent-delegation-tasks.json",
-        "README.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md",
-        "tests/agent-delegation.test.js",
-        "tests/docs-consistency.test.js"
-      ],
-      "dependsOn": [
-        "READER-HIGH-121",
-        "READER-LOW-259"
-      ],
-      "promptTemplate": "该实施与交付任务已完成并仅保留为历史工件：它把正式口径从 capture-stability 修复分支再收口到 `ui-regression-candidate + complete` 的人工 Reader verdict 待命态，明确 `READER-HIGH-122` 为当前 active 架构与规划待命任务，不再挂新的 active low-task。",
-      "reviewChecklist": [
-        "文档必须明确当前主线已切到人工 Reader verdict",
-        "不得继续把 121 或更早批次写成当前 active",
-        "当前默认 nextAction 必须写成 npm run agent:obsidian"
-      ],
-      "testCommands": [
-        "node --input-type=module -e \"import './tests/agent-delegation.test.js'; import './tests/docs-consistency.test.js'; import { runTests } from './tests/test-framework.js'; await runTests();\""
-      ],
-      "handoffArtifacts": [
-        "config/agent-delegation-tasks.json",
-        "README.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md"
       ]
     },
     {
@@ -1214,99 +610,6 @@
       ]
     },
     {
-      "taskId": "ENG-LOW-204",
-      "title": "收紧 watch startup health 采样时序（历史工件）",
-      "lane": "opencode-implementation-delivery",
-      "scopePaths": [
-        "scripts/zotero.mjs",
-        "scripts/zotero-watch-health-lib.mjs",
-        "tests/zotero-watch-health-lib.test.js",
-        "tests/zotero-watch-report-lib.test.js"
-      ],
-      "dependsOn": [
-        "ENG-HIGH-102"
-      ],
-      "promptTemplate": "该实施与交付任务已完成并仅保留为历史工件：它在 `ensurePluginReady()` 之后补上有上限的 baseline settle poll，并把 watch startup health 的 summaryNote 改成 truth-aligned；若注册计数在窗口内恢复则记为 healthy，若未恢复则保持 failed，且不得再写成“通过健康检查”。",
-      "reviewChecklist": [
-        "只允许新增 bounded settle helper，不得改 E2E threshold / retry / warmup",
-        "failed watch 的 summaryNote 不得再写成通过健康检查",
-        "startup / reload / recovery 都必须复用同一条 truth-aligned 路径"
-      ],
-      "testCommands": [
-        "node --input-type=module -e \"import './tests/zotero-watch-health-lib.test.js'; import './tests/zotero-watch-report-lib.test.js'; import { runTests } from './tests/test-framework.js'; await runTests();\""
-      ],
-      "handoffArtifacts": [
-        "scripts/zotero.mjs",
-        "scripts/zotero-watch-health-lib.mjs",
-        "dist/zotero-watch-status.json",
-        "dist/zotero-watch-status.md"
-      ]
-    },
-    {
-      "taskId": "ENG-LOW-205",
-      "title": "收口 watch failed 时的 gate consumer 优先级（历史工件）",
-      "lane": "opencode-implementation-delivery",
-      "scopePaths": [
-        "scripts/agent-gate.mjs",
-        "tests/agent-frontpage-summary-lib.test.js",
-        "tests/agent-telemetry.test.js"
-      ],
-      "dependsOn": [
-        "ENG-HIGH-102",
-        "ENG-LOW-204"
-      ],
-      "promptTemplate": "该实施与交付任务已完成并仅保留为历史工件：它只把 watch failed / stale 时与 fresh truth 冲突的 consumer 建议降级，确保 gate / monitor 在 fresh watch truth 不健康时继续优先回到 `npm run zotero:watch`，不再让旧的 `agent:obsidian` 或 baseline refresh 口径盖过当前 watch 事实。",
-      "reviewChecklist": [
-        "watch failed 时默认动作必须继续回到 npm run zotero:watch",
-        "不得改变 watch stale / watch recovery / pure visual Reader 的主语义",
-        "只允许过滤与 fresh watch truth 冲突的建议，不得改 gate schema"
-      ],
-      "testCommands": [
-        "node --input-type=module -e \"import './tests/agent-frontpage-summary-lib.test.js'; import './tests/agent-telemetry.test.js'; import { runTests } from './tests/test-framework.js'; await runTests();\""
-      ],
-      "handoffArtifacts": [
-        "scripts/agent-gate.mjs",
-        "dist/agent-monitor.json",
-        "dist/agent-gate.json"
-      ]
-    },
-    {
-      "taskId": "ENG-LOW-206",
-      "title": "同步 watch startup health recovery 批次与成功回切口径（历史工件）",
-      "lane": "opencode-implementation-delivery",
-      "scopePaths": [
-        "config/agent-delegation-tasks.json",
-        "README.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md",
-        "tests/agent-delegation.test.js",
-        "tests/docs-consistency.test.js"
-      ],
-      "dependsOn": [
-        "ENG-HIGH-102",
-        "ENG-LOW-205"
-      ],
-      "promptTemplate": "该实施与交付任务已完成并仅保留为历史工件：它先把任务源切到 `ENG-HIGH-102 / ENG-LOW-204~206` 处理 watch startup health truth split，再在 fresh rerun 成功回到 `watch = healthy` 与 `ui-regression-candidate + complete` 后，立即把当前 active 架构与规划待命态再重基线到 `READER-HIGH-123`，并停止继续挂新的 active Reader low-task。",
-      "reviewChecklist": [
-        "文档必须明确 ENG-HIGH-102 / ENG-LOW-204~206 已完成并转历史",
-        "成功路径必须把当前 active 架构与规划待命态切到 READER-HIGH-123",
-        "不得继续把 READER-HIGH-122 写成当前 active 主线"
-      ],
-      "testCommands": [
-        "node --input-type=module -e \"import './tests/agent-delegation.test.js'; import './tests/docs-consistency.test.js'; import { runTests } from './tests/test-framework.js'; await runTests();\""
-      ],
-      "handoffArtifacts": [
-        "config/agent-delegation-tasks.json",
-        "README.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md"
-      ]
-    },
-    {
       "taskId": "ENG-HIGH-102",
       "title": "冻结 Watch startup health recovery 边界（历史契约源）",
       "lane": "codex-architecture-planning",
@@ -1340,45 +643,6 @@
       ]
     },
     {
-      "taskId": "READER-HIGH-123",
-      "title": "冻结 Reader 唯一 verdict 收口边界（历史契约源）",
-      "lane": "codex-architecture-planning",
-      "scopePaths": [
-        "config/agent-delegation-tasks.json",
-        "dist/zotero-watch-status.json",
-        "dist/agent-zotero-e2e.json",
-        "dist/agent-monitor.json",
-        "dist/agent-gate.json",
-        "obsidian/agent-workbench/01-当前Zotero插件-状态总览.md",
-        "obsidian/agent-workbench/10-模板协作-人工指令窗口.md",
-        "README.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md",
-        "tests/agent-delegation.test.js",
-        "tests/docs-consistency.test.js"
-      ],
-      "dependsOn": [
-        "ENG-HIGH-102"
-      ],
-      "promptTemplate": "该任务仅供 Codex 跟踪。它代表上一轮 Reader 主线的最终历史收口：`2026-03-28` 的 fresh `watch -> e2e -> monitor -> gate -> obsidian` 已确认 `watch = healthy`、`agent:zotero:e2e = passed`、`agent:gate = passed`，人工窗口也已给出唯一 verdict `预期 UI 变化 -> ready / force-next / npm run agent:zotero:e2e:update-baseline`，并只执行了一次受控 baseline refresh。因此 `READER-HIGH-123` 继续仅保留为历史契约 / 工件来源，不再作为当前 active 架构与规划主线；后续当前主线已切到 `ENG-HIGH-103` 的工程化长期增强第一批。",
-      "reviewChecklist": [
-        "必须明确 `READER-HIGH-123` 只保留为历史契约源",
-        "不得再把 `READER-HIGH-123` 写成当前 active 架构与规划主线",
-        "需要与后续 `ENG-HIGH-103` 的单一事实源口径兼容"
-      ],
-      "testCommands": [],
-      "handoffArtifacts": [
-        "dist/zotero-watch-status.json",
-        "dist/agent-zotero-e2e.json",
-        "dist/agent-monitor.json",
-        "dist/agent-gate.json",
-        "obsidian/agent-workbench/01-当前Zotero插件-状态总览.md",
-        "obsidian/agent-workbench/10-模板协作-人工指令窗口.md"
-      ]
-    },
-    {
       "taskId": "ENG-HIGH-103",
       "title": "冻结工程化长期增强第一批边界（历史契约源）",
       "lane": "codex-architecture-planning",
@@ -1393,7 +657,7 @@
         "tests/docs-consistency.test.js"
       ],
       "dependsOn": [
-        "READER-HIGH-123"
+        "ENG-HIGH-102"
       ],
       "promptTemplate": "该任务仅供 Codex 跟踪。它代表上一轮工程化长期增强第一批的最终收口边界：本批已把启动诊断、runtime 清理、RDP 失败分类、进程日志尾部归一化与 `pre-capture settle` 基础设施接入既有 E2E / validation / monitor / gate / markdown 展示链，并完成独立收口。`ENG-HIGH-103` 现仅保留为后续 `READER-HIGH-124` 的前置历史契约源，不再继续承载新的 active Reader 视觉采集修复批次。",
       "reviewChecklist": [
@@ -1710,172 +974,6 @@
         "FRAMEWORK_CHECKLIST.md",
         "FRAMEWORK_ASSESSMENT.md",
         "docs/AGENT_AUTONOMY_ROADMAP.md"
-      ]
-    },
-    {
-      "taskId": "READER-LOW-261",
-      "title": "结构化 library / reader capture command failure stage 记录",
-      "lane": "opencode-implementation-delivery",
-      "scopePaths": [
-        "scripts/agent-zotero-e2e.mjs",
-        "scripts/agent-zotero-e2e-lib.mjs",
-        "tests/agent-zotero-e2e-lib.test.js",
-        "tests/agent-zotero-validation-lib.test.js",
-        "tests/agent-telemetry.test.js"
-      ],
-      "dependsOn": [
-        "READER-HIGH-124"
-      ],
-      "promptTemplate": "该实施与交付任务已完成并仅保留为历史工件：它在现有 E2E capture 流程中把 library 与 reader 两个 stage 的失败拆成 stage-scoped 结构化结果。无论成功、超时还是 `screencapture -R` / rect / window 激活失败，都能写出稳定的 stage 记录，并继续复用现有 `visuals.captureStability.stages` 与 `visualCaptureAttemptDiagnosisItems` 链；当前不得再把新的 root-cause 排查继续挂在这个已完成的 capture 结构化批次之下。",
-      "reviewChecklist": [
-        "每个 stage 失败都必须落到结构化 stage 记录，不得只保留 warning 字符串",
-        "结构化 failure 只能复用现有 `visuals.captureStability.stages` 与 `visualCaptureAttemptDiagnosisItems` 链",
-        "library 与 reader stage 必须各自独立记录成功 / 超时 / command failure"
-      ],
-      "testCommands": [
-        "node --input-type=module -e \"import './tests/agent-zotero-e2e-lib.test.js'; import './tests/agent-zotero-validation-lib.test.js'; import './tests/agent-telemetry.test.js'; import { runTests } from './tests/test-framework.js'; await runTests();\""
-      ],
-      "gitClosure": {
-        "milestone": "module-feature",
-        "summary": "capture command failure 结构化 stage 记录",
-        "commitMessage": "feat: 结构化 Reader 视觉 capture failure stage 记录"
-      },
-      "handoffArtifacts": [
-        "scripts/agent-zotero-e2e.mjs",
-        "scripts/agent-zotero-e2e-lib.mjs",
-        "dist/agent-zotero-e2e.json"
-      ]
-    },
-    {
-      "taskId": "READER-LOW-262",
-      "title": "把截图调用失败纳入视觉 blocker 语义与 consumer 分支",
-      "lane": "opencode-implementation-delivery",
-      "scopePaths": [
-        "scripts/agent-zotero-validation-lib.mjs",
-        "scripts/agent-frontpage-summary-lib.mjs",
-        "scripts/agent-gate.mjs",
-        "scripts/agent-zotero-loop-lib.mjs",
-        "scripts/agent-obsidian-handoff-lib.mjs",
-        "scripts/agent-dashboard.mjs",
-        "tests/agent-zotero-validation-lib.test.js",
-        "tests/agent-frontpage-summary-lib.test.js",
-        "tests/agent-obsidian-handoff-lib.test.js",
-        "tests/agent-telemetry.test.js"
-      ],
-      "dependsOn": [
-        "READER-HIGH-124",
-        "READER-LOW-261"
-      ],
-      "promptTemplate": "该实施与交付任务已完成并仅保留为历史工件：它为 validation / consumer 语义新增 `visualPrimaryBlockerKind = capture-command-failed`，并把 monitor、gate、dashboard/frontpage、loop、obsidian handoff、E2E markdown 的视觉 blocker 分支全部对齐到新枚举。优先级固定为 `capture-command-failed > capture-unstable > baseline-geometry-mismatch > ui-regression-candidate > unknown`；watch stale 继续保持最高优先级，当前不得再把 library-only root-cause 排查回退成 consumer 语义批次。",
-      "reviewChecklist": [
-        "新 blocker 标签必须固定为“截图调用失败”",
-        "只要 latest cycle 任一视觉 stage 落下 command / rect / window capture failure，就不得再落成 `unknown`",
-        "watch stale 必须继续压过视觉 blocker，watch fresh 才允许下钻到 capture blocker"
-      ],
-      "testCommands": [
-        "node --input-type=module -e \"import './tests/agent-zotero-validation-lib.test.js'; import './tests/agent-frontpage-summary-lib.test.js'; import './tests/agent-obsidian-handoff-lib.test.js'; import './tests/agent-telemetry.test.js'; import { runTests } from './tests/test-framework.js'; await runTests();\""
-      ],
-      "gitClosure": {
-        "milestone": "module-feature",
-        "summary": "capture-command-failed blocker 与 consumer 语义",
-        "commitMessage": "feat: 接通 capture-command-failed blocker 语义"
-      },
-      "handoffArtifacts": [
-        "scripts/agent-zotero-validation-lib.mjs",
-        "scripts/agent-frontpage-summary-lib.mjs",
-        "scripts/agent-gate.mjs",
-        "scripts/agent-zotero-loop-lib.mjs",
-        "scripts/agent-obsidian-handoff-lib.mjs",
-        "scripts/agent-dashboard.mjs"
-      ]
-    },
-    {
-      "taskId": "READER-LOW-263",
-      "title": "统一 freshest-valid Zotero validation 消费与 truth 同步",
-      "lane": "opencode-implementation-delivery",
-      "scopePaths": [
-        "config/agent-delegation-tasks.json",
-        "scripts/agent-monitor.mjs",
-        "scripts/agent-gate.mjs",
-        "scripts/agent-frontpage-summary-lib.mjs",
-        "scripts/agent-zotero-loop-lib.mjs",
-        "scripts/agent-obsidian-handoff-lib.mjs",
-        "README.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md",
-        "tests/agent-delegation.test.js",
-        "tests/docs-consistency.test.js",
-        "tests/agent-telemetry.test.js"
-      ],
-      "dependsOn": [
-        "READER-HIGH-124",
-        "READER-LOW-261",
-        "READER-LOW-262"
-      ],
-      "promptTemplate": "该实施与交付任务已完成并仅保留为历史工件：它让 monitor / gate / frontpage / loop / obsidian 优先消费磁盘上最新有效的 `dist/agent-zotero-e2e.json` 摘要，而不是沿用旧 monitor/gate 或汇总中的嵌入 E2E 块。`agent:zotero:e2e` 即使以 validation 失败退出，只要报告完整，也继续视为 valid artifact；同时它已把 manifest、CURRENT truth、镜像文档与 docs consistency 对齐到同一口径。当前不得再把新的 library-only 回归分支重新退回 freshness / consumer 选源批次。",
-      "reviewChecklist": [
-        "consumer 不得因为 E2E exit code `2` 或旧 monitor 快照而回退到更老 E2E",
-        "truth 文档、delegation manifest 与 docs consistency 必须引用同一层 current truth",
-        "当前 active 架构与规划必须从 `ENG-HIGH-103` 重基线到 `READER-HIGH-124 / READER-LOW-261~263`"
-      ],
-      "testCommands": [
-        "node --input-type=module -e \"import './tests/agent-delegation.test.js'; import './tests/docs-consistency.test.js'; import './tests/agent-telemetry.test.js'; import { runTests } from './tests/test-framework.js'; await runTests();\""
-      ],
-      "gitClosure": {
-        "milestone": "batch-closure",
-        "summary": "freshest-valid artifact 消费与 truth 同步",
-        "commitMessage": "chore: 同步 freshest-valid artifact 消费与 current truth"
-      },
-      "handoffArtifacts": [
-        "config/agent-delegation-tasks.json",
-        "README.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md",
-        "dist/agent-monitor.json",
-        "dist/agent-gate.json"
-      ]
-    },
-    {
-      "taskId": "OBSIDIAN-HIGH-101",
-      "title": "冻结 Obsidian visual enhancement 的可选增强边界（历史契约源）",
-      "lane": "codex-architecture-planning",
-      "scopePaths": [
-        "config/agent-delegation-tasks.json",
-        "scripts/agent-obsidian-handoff.mjs",
-        "scripts/agent-obsidian-handoff-lib.mjs",
-        "scripts/agent-obsidian-workspace.mjs",
-        "README.md",
-        "docs/OBSIDIAN_INTERVENTION.md",
-        "docs/CURRENT_BACKLOG.md",
-        "FRAMEWORK_CHECKLIST.md",
-        "FRAMEWORK_ASSESSMENT.md",
-        "docs/AGENT_AUTONOMY_ROADMAP.md",
-        "tests/agent-delegation.test.js",
-        "tests/agent-obsidian-handoff-lib.test.js",
-        "tests/agent-obsidian-workspace.test.js",
-        "tests/agent-telemetry.test.js",
-        "tests/docs-consistency.test.js"
-      ],
-      "dependsOn": [
-        "READER-HIGH-106"
-      ],
-      "promptTemplate": "该任务仅供 Codex 跟踪。Obsidian visual enhancement 已在上一轮完成，当前仅作为历史契约源保留：Mermaid / Canvas / Excalidraw 只作为 Obsidian 人工介入工作台的 companion 视图，不改变 watch / e2e / monitor / gate / loop / autofix 的判定语义，也不新增 diagnosis fingerprint、错误枚举、delegation schema 或人工 verdict schema。继续沿用 `npm run agent:obsidian` 作为唯一入口；repo 内必须直接固化生成逻辑，不能依赖开发者本机是否已安装 visual skill。唯一允许新增的接口仍是 `AGENT_OBSIDIAN_VISUALS=1`，用于开启 Mermaid / Excalidraw 可选产物；默认 Markdown + Canvas + 人工指令窗口行为保持不变。在人工 Reader verdict 明确前，manifest 只保留历史架构与规划契约源，不再保留新的 active low-task。",
-      "reviewChecklist": [
-        "Mermaid / Excalidraw 只能作为可选增强层，不得替换默认 Markdown + Canvas 链",
-        "不得改 watch / e2e / gate / loop / autofix 语义",
-        "不得新增 diagnosis fingerprint、错误枚举、delegation schema 或人工 verdict schema",
-        "不得让运行时依赖 Codex 本机安装的外部 skill"
-      ],
-      "testCommands": [],
-      "handoffArtifacts": [
-        "obsidian/agent-workbench/00-当前Zotero插件-功能与技术脉络.canvas",
-        "obsidian/agent-workbench/01-当前Zotero插件-状态总览.md",
-        "obsidian/agent-workbench/12-当前Zotero插件-交互流转图.md",
-        "obsidian/agent-workbench/13-当前Zotero插件-功能版图.excalidraw.md"
       ]
     },
     {

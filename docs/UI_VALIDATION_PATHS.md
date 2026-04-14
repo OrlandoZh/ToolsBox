@@ -66,6 +66,28 @@
 - 当前 standalone dialog 是否只是“窗口弹出来了”，但 ready gate / focus / cleanup 已经开始失控
 - 当前 host patch 是否具备最小 patch 面、可恢复性与 restore contract
 
+## Validation Vocabulary
+
+以下标签只是一层 documentation vocabulary，用来描述 host-visible 验收成熟度。
+
+它们不进入 `agent:gate` 阻断逻辑，也不覆盖 `visual-required / visual-recommended / visual-not-needed`。
+
+- `behavior-ready`
+  - runtime、surface smoke、以及适用时的 `domContract` 已通过
+  - 但还没有 live interaction 级证据，或尚未完成人工复核
+- `interaction-proved`
+  - host action replay、live control evidence 或等价的宿主交互证据，已经证明行为闭环成立
+  - 这是当前模板在开发态最推荐的 host-visible 收口形态
+- `manual-confirmed`
+  - 人类已在真实 Zotero UI 上完成手工矩阵，并记录日期、构建、场景或样本
+  - 该标签用于补充“最后一层真实可见面确认”，不是替代 host action / scenario 证据
+
+建议的使用方式：
+
+- `preferences.openPane` 这类 structure smoke，通常只够支撑 `behavior-ready`
+- `preferences.setTextbox / selectMenulist` 这类 live control evidence，更接近 `interaction-proved`
+- 手工矩阵、产品验收回放或专门的人类可见面复核，才应升级为 `manual-confirmed`
+
 ## Coverage Matrix
 
 ### Path 1. 宿主注册式 Surface

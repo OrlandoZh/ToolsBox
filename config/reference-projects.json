@@ -54,19 +54,6 @@
       "notes": "plugin rolling snapshot"
     },
     {
-      "id": "gemini-zotero-main",
-      "label": "Gemini Zotero",
-      "enabled": true,
-      "targetPath": "reference/plugin/gemini-zotero-main",
-      "source": {
-        "type": "git",
-        "url": "https://github.com/aben/gemini-zotero.git",
-        "ref": "main",
-        "refType": "branch"
-      },
-      "notes": "plugin rolling snapshot"
-    },
-    {
       "id": "jasminum-main",
       "label": "Jasminum",
       "enabled": true,
@@ -145,7 +132,7 @@
       "notes": "plugin rolling snapshot"
     },
     {
-      "id": "zoplicate-main",
+      "id": "zoplicate",
       "label": "Zoplicate",
       "enabled": true,
       "targetPath": "reference/plugin/zoplicate",
@@ -217,7 +204,7 @@
       "source": {
         "type": "git",
         "url": "https://github.com/justinfjx/zotero-ai-collection.git",
-        "ref": "main",
+        "ref": "bootstrap",
         "refType": "branch"
       },
       "notes": "plugin rolling snapshot"
@@ -301,14 +288,14 @@
       "notes": "plugin rolling snapshot"
     },
     {
-      "id": "zotero-gpt-master",
+      "id": "zotero-gpt",
       "label": "Zotero GPT",
       "enabled": true,
       "targetPath": "reference/plugin/zotero-gpt",
       "source": {
         "type": "git",
         "url": "https://github.com/MuiseDestiny/zotero-gpt.git",
-        "ref": "master",
+        "ref": "bootstrap",
         "refType": "branch"
       },
       "notes": "plugin rolling snapshot"
@@ -364,6 +351,97 @@
         "refType": "branch"
       },
       "notes": "plugin rolling snapshot"
+    },
+    {
+      "id": "chartero",
+      "label": "Chartero (Charts for Zotero)",
+      "enabled": false,
+      "targetPath": "reference/plugin/Chartero-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/steven-jianhao-li/zotero-charts.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "Vue + Vite + Worker 架构，git URL 待确认；当前 enabled=false 需手动修正 upstream 后才可参与 git-backed 更新"
+    },
+    {
+      "id": "gemini-zotero",
+      "label": "Gemini Zotero",
+      "enabled": false,
+      "targetPath": "reference/plugin/gemini-zotero-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/OrlandoZh/gemini-zotero.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "Gemini PDF 分析管线，git URL 待确认"
+    },
+    {
+      "id": "zotero-plugin-scaffold",
+      "label": "Zotero Plugin Scaffold",
+      "enabled": false,
+      "targetPath": "reference/Templetereference/zotero-plugin-scaffold-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/windingwind/zotero-plugin-scaffold.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "官方开发脚手架 v0.8.3，用于对比当前 build.mjs / 测试 / 发布流程差异"
+    },
+    {
+      "id": "zotero-plugin-template",
+      "label": "Zotero Plugin Template",
+      "enabled": false,
+      "targetPath": "reference/Templetereference/zotero-plugin-template-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/windingwind/zotero-plugin-template.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "官方标准模板 v3.1.0，用于对比与当前模板的差异"
+    },
+    {
+      "id": "zotero-pdfjs-types",
+      "label": "Zotero PDF.js Types",
+      "enabled": false,
+      "targetPath": "reference/Templetereference/zotero-pdfjs-types-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/northword/zotero-types.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "PDF.js 类型定义（来自 zotero-types），用于类型声明参考"
+    },
+    {
+      "id": "know-ur-zotero",
+      "label": "Know Ur Zotero",
+      "enabled": false,
+      "targetPath": "reference/Templetereference/know-ur-zotero-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/muisedestiny/know-ur-zotero.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "Zotero 状态监控工具 v0.0.6，activity-oriented 采样思路已在 CURRENT_BACKLOG 中引用"
+    },
+    {
+      "id": "actions-and-tags-for-zotero",
+      "label": "Actions and Tags for Zotero",
+      "enabled": false,
+      "targetPath": "reference/plugin/actions-and-tags-for-zotero",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/windingwind/zotero-actions-tags.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "动作和标签管理 v2.4.0，git URL 待确认"
     }
   ]
 }

@@ -5,7 +5,7 @@
 说明：
 
 - 主仓默认不跟踪 `reference/` 目录。
-- 如果你需要在本地复核本文中的对照材料，可按 [本地 Reference 快照说明](docs/REFERENCE_SNAPSHOTS.md) 单独放置只读快照。
+- 如果你需要在本地复核本文中的对照材料，可按 [本地 Reference 快照说明](REFERENCE_SNAPSHOTS.md) 单独放置只读快照。
 - 本文的结论面向“功能行为与开发体验对照”，不要求主仓必须携带 reference 源码副本。
 
 ## 结论

@@ -66,6 +66,7 @@
     "agent:reference:distill": "node scripts/agent-reference-distill.mjs",
     "agent:reference:drain": "node scripts/agent-reference-drain.mjs",
     "agent:reference:update": "node scripts/agent-reference-update.mjs",
+    "agent:dead-chain:audit": "node scripts/agent-dead-chain-audit.mjs",
     "agent:ui:design": "node scripts/agent-ui-design.mjs",
     "agent:delegate:list": "node scripts/agent-delegation.mjs list",
     "agent:delegate:run": "node scripts/agent-delegation.mjs run",
@@ -81,7 +82,10 @@
     "zotero:watch": "node scripts/zotero.mjs watch",
     "zotero:smoke": "node scripts/zotero.mjs smoke",
     "zotero:test": "node scripts/zotero.mjs test",
-    "zotero:scenario": "node scripts/zotero.mjs scenario"
+    "zotero:scenario": "node scripts/zotero.mjs scenario",
+    "zotero:scenario:preferences-surface": "node scripts/zotero.mjs scenario --scenario \"preference pane surface smoke\"",
+    "zotero:scenario:preferences-controls": "node scripts/zotero.mjs scenario --scenario \"preference pane control interaction\"",
+    "scenario:coverage": "node scripts/scenario-runner.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.21.5",

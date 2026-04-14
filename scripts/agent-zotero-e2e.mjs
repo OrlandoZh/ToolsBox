@@ -3944,7 +3944,7 @@ async function main() {
 
     console.log(`Agent Zotero E2E report generated: ${zoteroArtifacts.reportJSON}`);
     if (!report.passed) {
-      process.exit(2);
+      process.exitCode = 2;
     }
   } finally {
     await buildLock.release();
@@ -3976,5 +3976,5 @@ main().catch(async (error) => {
     // ignore secondary failure
   }
   console.error(error?.stack || error?.message || String(error));
-  process.exit(1);
+  process.exitCode = 1;
 });

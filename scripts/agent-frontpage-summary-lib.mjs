@@ -149,6 +149,96 @@ function normalizeReferenceDistillationSlice(source) {
   };
 }
 
+function normalizeDeadChainCount(record, keys = [], fallback = 0) {
+  for (const key of keys) {
+    const value = Number(record?.[key] ?? record?.findings?.[key]);
+    if (Number.isFinite(value) && value >= 0) {
+      return Math.max(0, value);
+    }
+  }
+  return Math.max(0, Number(fallback || 0));
+}
+
+function resolveDeadChainStatusLabel(status, actionableRetiredChainCount, retiredChainCount, fallbackLabel = null) {
+  const normalizedFallback = String(fallbackLabel || "").trim();
+  if (normalizedFallback) {
+    return normalizedFallback;
+  }
+  if (status === "warning") {
+    return "发现硬死链";
+  }
+  if (status === "advisory") {
+    return actionableRetiredChainCount > 0
+      ? "建议收口"
+      : retiredChainCount > 0
+        ? "历史保留"
+        : "建议收口";
+  }
+  if (status === "clean") {
+    return "干净";
+  }
+  return "缺失";
+}
+
+function normalizeDeadChainAuditSlice(source) {
+  const record = source && typeof source === "object" ? source : {};
+  const status = String(record.status || "").trim() || "missing";
+  const prunePlan = record.prunePlan && typeof record.prunePlan === "object" ? record.prunePlan : {};
+  const hardDeadCount = normalizeDeadChainCount(record, ["hardDeadCount"]);
+  const retiredChainCount = normalizeDeadChainCount(record, ["retiredChainCount"]);
+  const actionableRetiredChainCount = normalizeDeadChainCount(
+    record,
+    ["actionableRetiredChainCount", "delegationRetiredChainCount"],
+    Math.max(
+      0,
+      retiredChainCount - normalizeDeadChainCount(record, ["historyRetainedCount", "supersededBundleCount"]),
+    ),
+  );
+  const historyRetainedCount = normalizeDeadChainCount(
+    record,
+    ["historyRetainedCount", "supersededBundleCount"],
+    Math.max(0, retiredChainCount - actionableRetiredChainCount),
+  );
+  const supersededBundleCount = normalizeDeadChainCount(
+    record,
+    ["supersededBundleCount"],
+    historyRetainedCount,
+  );
+  const statusLabel = resolveDeadChainStatusLabel(
+    status,
+    actionableRetiredChainCount,
+    retiredChainCount,
+    record.statusLabel,
+  );
+  return {
+    status,
+    statusLabel,
+    summary: String(record.summary || "").trim() || (status === "missing" ? "dead-chain audit missing" : "dead-chain audit ready"),
+    hardDeadCount,
+    retiredChainCount,
+    actionableRetiredChainCount,
+    historyRetainedCount,
+    supersededBundleCount,
+    safeDeleteCandidateCount: normalizeDeadChainCount(record, ["safeDeleteCandidateCount"]),
+    prunePlanSummary: String(record.prunePlanSummary || prunePlan.summary || "").trim() || null,
+    nextWaveId: String(record.nextWaveId || prunePlan.nextWave?.waveId || "").trim() || null,
+    nextWaveTitle: String(record.nextWaveTitle || prunePlan.nextWave?.title || "").trim() || null,
+    nextWaveCandidateCount: Math.max(0, Number(record.nextWaveCandidateCount ?? prunePlan.nextWave?.candidateCount ?? 0)),
+    nextWaveProposalAction: String(record.nextWaveProposalAction || prunePlan.nextWaveProposal?.action || "").trim() || null,
+    nextWaveProposalTaskCount: Math.max(0, Number(
+      record.nextWaveProposalTaskCount
+      ?? prunePlan.nextWaveProposal?.removeTaskIds?.length
+      ?? prunePlan.nextWaveProposal?.chainCollapseProposals?.length
+      ?? 0,
+    )),
+    chainCollapseProposalCount: Math.max(0, Number(record.chainCollapseProposalCount ?? prunePlan.chainCollapseProposalCount ?? 0)),
+    staleScopeCandidateCount: Math.max(0, Number(record.staleScopeCandidateCount ?? prunePlan.staleScopeCandidateCount ?? 0)),
+    leafReviewCandidateCount: Math.max(0, Number(record.leafReviewCandidateCount ?? prunePlan.leafReviewCandidateCount ?? 0)),
+    retiredChainOnlyCount: Math.max(0, Number(record.retiredChainOnlyCount ?? prunePlan.retiredChainOnlyCount ?? 0)),
+    blockedByActiveCount: Math.max(0, Number(record.blockedByActiveCount ?? prunePlan.blockedByActiveCount ?? 0)),
+  };
+}
+
 export function selectAgentNextAction(recommendations, context = {}) {
   const list = Array.isArray(recommendations) ? recommendations.filter(Boolean) : [];
   if (list.length === 0) {
@@ -230,6 +320,7 @@ export function buildGateFrontpageSummary({
   zoteroValidation,
   validationDecision = null,
   releaseMatrix = null,
+  deadChainAudit = null,
 }) {
   const normalizedIssues = Array.isArray(issues) ? issues.filter(Boolean) : [];
   const normalizedRecommendations = Array.isArray(recommendations) ? recommendations.filter(Boolean) : [];
@@ -241,6 +332,7 @@ export function buildGateFrontpageSummary({
   const readerEvent = getReaderEventSlice(e2e);
   const pureVisualReaderFailure = isPureVisualReaderFailure(e2e);
   const pureVisualReaderSummary = buildPureVisualReaderFailureSummary(e2e);
+  const deadChain = normalizeDeadChainAuditSlice(deadChainAudit);
   const actionCandidates = validationDecision?.level && validationDecision.level !== "visual-required"
     ? normalizedRecommendations.filter((item) => !isVisualFocusedAction(item))
     : normalizedRecommendations;
@@ -268,12 +360,20 @@ export function buildGateFrontpageSummary({
     headline = "watch、真机验证与恢复回归均已通过，当前闭环状态稳定。";
   }
 
+  const advisorySignals = [];
+  if (deadChain.status === "warning") {
+    advisorySignals.push(`dead-chain audit warning：${deadChain.summary}`);
+  } else if (deadChain.status === "advisory") {
+    advisorySignals.push(`dead-chain audit advisory：${deadChain.summary}`);
+  }
+
   return {
     gatePassed,
     profile: profile || "dev",
     status: gatePassed ? "ready" : "blocked",
     statusLabel: gatePassed ? "可继续" : "需先处理",
     headline,
+    advisorySignals: advisorySignals.slice(0, 3),
     blockerCount: normalizedIssues.length,
     recommendationCount: normalizedRecommendations.length,
     primaryBlockers: normalizedIssues.slice(0, 5),
@@ -315,6 +415,7 @@ export function buildGateFrontpageSummary({
         : [],
     }),
     watchRecovery: normalizeStatusSlice(recovery),
+    deadChainAudit: deadChain,
   };
 }
 
@@ -347,6 +448,7 @@ export function buildMonitorFrontpageSummary(summary) {
     ? summary.validationDecision
     : null;
   const referenceDistillation = normalizeReferenceDistillationSlice(summary.referenceDistillation);
+  const deadChainAudit = normalizeDeadChainAuditSlice(summary.deadChainAudit);
   const visualPrimaryBlockerSummary = buildPureVisualReaderFailureSummary(e2e)
     || buildVisualPrimaryBlockerSummary(e2e);
   const pureVisualNextAction = pureVisualReaderFailure
@@ -412,6 +514,11 @@ export function buildMonitorFrontpageSummary(summary) {
     advisorySignals.push("reference distillation queued in background。");
   } else if (referenceDistillation.status === "failed") {
     advisorySignals.push("last reference distillation failed。");
+  }
+  if (deadChainAudit.status === "warning") {
+    advisorySignals.push(`dead-chain audit warning：${deadChainAudit.summary}`);
+  } else if (deadChainAudit.status === "advisory") {
+    advisorySignals.push(`dead-chain audit advisory：${deadChainAudit.summary}`);
   }
   const incomplete = primarySignals.length > 0
     && primarySignals.every((item) => item.includes("缺少"));
@@ -502,6 +609,7 @@ export function buildMonitorFrontpageSummary(summary) {
     },
     watchRecovery: normalizeStatusSlice(watchRecovery),
     referenceDistillation,
+    deadChainAudit,
     latestRun: summary.latest
       ? {
         runName: summary.latest.runName || null,

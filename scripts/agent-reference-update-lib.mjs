@@ -128,8 +128,25 @@ function execFileText(command, args, options = {}) {
 }
 
 async function runGitCommand(args, options = {}) {
-  return await execFileText("git", args, {
+  const env = {
+    ...process.env,
+    ...(options.env || {}),
+  };
+  if (!Object.prototype.hasOwnProperty.call(env, "GIT_LFS_SKIP_SMUDGE")) {
+    env.GIT_LFS_SKIP_SMUDGE = "1";
+  }
+  const commandArgs = [
+    "-c",
+    "filter.lfs.smudge=",
+    "-c",
+    "filter.lfs.process=",
+    "-c",
+    "filter.lfs.required=false",
+    ...args,
+  ];
+  return await execFileText("git", commandArgs, {
     ...options,
+    env,
     failedStage: options.failedStage || "reference-git",
   });
 }

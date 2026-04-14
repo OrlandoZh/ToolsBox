@@ -865,6 +865,7 @@ function evaluateGate(summary, policy, watchStatus = null, obsidianGuard = null,
     zoteroValidation: zoteroValidationCheck,
     validationDecision,
     releaseMatrix: releaseMatrixCheck,
+    deadChainAudit: summary.deadChainAudit || null,
   });
   frontpageSummary.agentContext = contextSummary;
 
@@ -900,6 +901,7 @@ function evaluateGate(summary, policy, watchStatus = null, obsidianGuard = null,
     releaseMatrix: releaseMatrixCheck,
     validationDecision,
     provenance: summary.provenance || null,
+    deadChainAudit: summary.deadChainAudit || null,
     agentContext: contextSummary,
     readinessSummary: frontpageSummary,
     frontpageSummary,
@@ -998,6 +1000,58 @@ function buildMarkdown(report) {
     lines.push(`- 所需检查: ${(report.validationDecision.requiredChecks || []).join("；") || "-"}`);
     lines.push(`- 所需证据: ${(report.validationDecision.requiredEvidence || []).join("；") || "-"}`);
     lines.push(`- 补证动作: ${report.validationDecision.deferredEvidenceAction || "-"}`);
+  }
+
+  lines.push("", "## 死链与旧链路审计", "");
+  if (!report.deadChainAudit) {
+    lines.push("- 当前未读取 dead-chain audit 摘要。");
+  } else {
+    lines.push(`- 状态: \`${report.deadChainAudit.statusLabel || report.deadChainAudit.status || "缺失"}\``);
+    lines.push(`- 摘要: ${report.deadChainAudit.summary || "-"}`);
+    lines.push(`- 硬死链: \`${report.deadChainAudit.hardDeadCount ?? 0}\``);
+    lines.push(`- 已退休旧链路: \`${report.deadChainAudit.retiredChainCount ?? 0}\``);
+    lines.push(`- 可继续收缩 delegation 链: \`${report.deadChainAudit.actionableRetiredChainCount ?? 0}\``);
+    lines.push(`- 历史治理保留项: \`${report.deadChainAudit.historyRetainedCount ?? 0}\``);
+    lines.push(`- Superseded bundle: \`${report.deadChainAudit.supersededBundleCount ?? 0}\``);
+    lines.push(`- Safe delete 候选: \`${report.deadChainAudit.safeDeleteCandidateCount ?? 0}\``);
+    if (report.deadChainAudit.prunePlan) {
+      lines.push(`- 裁剪摘要: ${report.deadChainAudit.prunePlan.summary || "-"}`);
+      lines.push(`- 下一波建议: \`${report.deadChainAudit.prunePlan.nextWave?.waveId || "-"}\` / ${report.deadChainAudit.prunePlan.nextWave?.title || "-"} / \`${report.deadChainAudit.prunePlan.nextWave?.candidateCount ?? 0}\``);
+      lines.push(`- 手工收缩提案: \`${report.deadChainAudit.prunePlan.nextWaveProposal?.action || "-"}\` / ${(report.deadChainAudit.prunePlan.nextWaveProposal?.removeTaskIds || []).join("、") || "-"}`);
+      lines.push(`- 历史链桥接提案: \`${report.deadChainAudit.prunePlan.chainCollapseProposalCount ?? 0}\``);
+      lines.push(`- 叶子优先复核: \`${report.deadChainAudit.prunePlan.leafReviewCandidateCount ?? 0}\``);
+      lines.push(`- 仅历史链引用: \`${report.deadChainAudit.prunePlan.retiredChainOnlyCount ?? 0}\``);
+      lines.push(`- 被 active 依赖阻塞: \`${report.deadChainAudit.prunePlan.blockedByActiveCount ?? 0}\``);
+    }
+    if (report.deadChainAudit.prunePlan?.nextWaveProposal) {
+      lines.push("- 手工收缩提案:");
+      lines.push(`- Manifest: \`${report.deadChainAudit.prunePlan.nextWaveProposal.manifestPath || "-"}\``);
+      lines.push(`- 动作: \`${report.deadChainAudit.prunePlan.nextWaveProposal.action || "-"}\``);
+      lines.push(`- 建议移除: ${(report.deadChainAudit.prunePlan.nextWaveProposal.removeTaskIds || []).join("、") || "-"}`);
+      lines.push(`- 摘要: ${report.deadChainAudit.prunePlan.nextWaveProposal.summary || "-"}`);
+      lines.push(`- 复核命令: ${(report.deadChainAudit.prunePlan.nextWaveProposal.verificationCommands || []).join(" -> ") || "-"}`);
+    }
+    if (report.deadChainAudit.prunePlan && Array.isArray(report.deadChainAudit.prunePlan.chainCollapseProposals) && report.deadChainAudit.prunePlan.chainCollapseProposals.length > 0) {
+      lines.push("- 历史链桥接提案:");
+      report.deadChainAudit.prunePlan.chainCollapseProposals.forEach((proposal) => {
+        lines.push(`- ${proposal.proposalId || "chain-collapse"}: ${(proposal.removableTaskIds || []).join(" -> ") || "-"}`);
+        lines.push(`- 上游锚点: ${(proposal.upstreamAnchorTaskIds || []).join("、") || "-"}`);
+        lines.push(`- 下游边界: ${(proposal.downstreamBoundaryTaskIds || []).join("、") || "-"}`);
+        lines.push(`- 摘要: ${proposal.summary || "-"}`);
+      });
+    }
+    if (report.deadChainAudit.prunePlan && Array.isArray(report.deadChainAudit.prunePlan.leafReviewCandidates) && report.deadChainAudit.prunePlan.leafReviewCandidates.length > 0) {
+      lines.push("- 叶子优先裁剪候选:");
+      report.deadChainAudit.prunePlan.leafReviewCandidates.forEach((item) => {
+        lines.push(`- ${item.taskId || "-"}: ${item.recommendedAction || item.summary || "-"}`);
+      });
+    }
+    if (Array.isArray(report.deadChainAudit.items) && report.deadChainAudit.items.length > 0) {
+      lines.push("- 审计发现:");
+      report.deadChainAudit.items.forEach((item) => {
+        lines.push(`- [${item.kind || "unknown"}] ${item.summary || "-"}`);
+      });
+    }
   }
 
   lines.push("", "## Agent Context", "");

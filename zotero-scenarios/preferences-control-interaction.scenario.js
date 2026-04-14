@@ -166,8 +166,15 @@ registerZoteroScenario("preference pane control interaction", async ({ assert, a
   assert.equal(services.prefs.getStringPref(logLevelPref, ""), targetLogLevel);
   assert.equal(services.prefs.getStringPref(themeModePref, ""), targetThemeMode);
   const paneTarget = assertSingleSurfaceEvidenceTarget(openResult, "preference-pane", "surface-preference-");
+  const paneGeometryReady = Array.isArray(openResult.readiness?.checks)
+    ? openResult.readiness.checks.find((entry) => entry?.name === "pane-geometry-ready")
+    : null;
   assert.equal(paneTarget.details?.paneID, paneID);
-  assert.equal(paneTarget.details?.geometrySettled, true);
+  assert.equal(
+    paneGeometryReady?.ok,
+    true,
+    `expected pane-geometry-ready readiness check to pass, got ${JSON.stringify(openResult.readiness)}`,
+  );
   assert.ok(Number(paneTarget.details?.surfaceGeometry?.width || 0) > 0);
   assert.ok(Number(paneTarget.details?.surfaceGeometry?.height || 0) > 0);
   assert.equal(paneTarget.details?.windowResize?.requestedWidth, 800);
