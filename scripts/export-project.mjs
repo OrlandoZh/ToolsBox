@@ -38,6 +38,7 @@ const COPY_PATHS = [
   "scripts/build-react-ui.mjs",
   "scripts/build.mjs",
   "scripts/package.mjs",
+  "scripts/package-protection-lib.mjs",
   "scripts/optional-bundles-lib.mjs",
   "scripts/script-runtime-lib.mjs",
   "scripts/static-runtime-baseline-lib.mjs",
@@ -89,6 +90,7 @@ function buildExportPackageJSON(sourcePackage, optionalBundleRegistry = null) {
   const scripts = {
     build: "node scripts/build.mjs",
     package: "node scripts/package.mjs",
+    "package:encrypted": "node scripts/package.mjs --encrypt-bundle --skip-release-metadata",
     verify: "node scripts/verify.mjs",
     lint: "node scripts/lint.mjs",
     "format:check": "node scripts/format-check.mjs",
@@ -183,10 +185,13 @@ function buildExportReadme(config, exportLicense) {
 \`\`\`bash
 npm run build
 npm run package
+npm run package:encrypted
 npm run verify
 npm run check
 npm run build:react-ui
 \`\`\`
+
+补充说明：\`package:encrypted\` 只生成本地手动触发的受保护 XPI 分支，不参与默认 release metadata / release gate 主线，也不替代服务端保护。
 
 导出目标适合继续聚焦插件本体开发；如果需要 agent 闭环、真机 runner、Obsidian 介入包等能力，请回到主仓库。
 `;

@@ -26,6 +26,18 @@
 - 如果仓库存在自己的 `CLAUDE.md`、`AGENTS.md`、workflow scripts、validation / acceptance contract，先服从这些本地定义。
 - 这一节只补充通用执行纪律，不重写当前模板已经冻结的 truth、scope、validation、delegation 与 host contract 语义。
 
+### 通用性结论
+
+- `Codex 插件`、`opencode run`、`mco` 不能假设一定可用，只能在当前环境实际可调用时使用。
+- 在“Codex / opencode / mco 这些具体工具链”层面不是完全通用，必须降级为“如果当前环境可用则启用”。
+
+### 适合当前模板的部分
+
+- 保留 Claude Code 作为 controller overlay 的角色，不把它写成第二份 project truth。
+- 优先使用仓库已有编排入口，再决定是否调用 `Codex`、`opencode run` 或 `mco`。
+- 先运行 `npm run check`。
+- 再按当前任务需要运行 `npm run agent:monitor` 与 `npm run agent:gate`。
+
 ### Core Behavior
 
 - 编码前先思考，但思考深度要与任务规模和风险匹配。
@@ -152,8 +164,10 @@ small task mode 的目标是降低流程开销，不是降低质量要求。
   - 如当前环境已安装并允许调用 Claude Code 的 Codex 插件，优先通过显式 `/codex:*` 命令把它当成专项执行通道。
   - 默认承担技术蓝图、跨模块边界梳理、验证规则设计、复杂根因分析、代码审查、最终收口建议。
   - 中大型规划任务、拆阶段、`scopePaths` 切分、派工草案与验证蓝图，默认先交给 Codex 产出第一版，再由控制器结合 truth 与仓库约束做最终裁决。
+  - 该 lane 默认仍以分析、审查、建议为主；但如本轮明确把它指定为 strict write owner，也可以在已声明 `scopePaths`、验收要求和写域边界内直接实现或收口关键改动。
 - 实施与交付 lane：
   - 如当前环境已安装并允许调用 `opencode run`，可让其承担 routine implementation、schema/defaults wiring、文档和测试同步、shell-heavy work，以及已明确方案下的实现收口。
+  - 该 lane 只在 scope 明确时获得写权限，并且必须服从控制器给出的 `scopePaths`、验收要求和写域边界。
 - 多模型头脑风暴 lane：
   - `mco` 只用于困难问题会诊，不作为默认实现入口，也不默认作为 strict write owner。
 - 长上下文整合 lane：
@@ -164,7 +178,15 @@ small task mode 的目标是降低流程开销，不是降低质量要求。
 - 默认只允许一个 strict write owner。
 - 并发任务不能有重叠 `scopePaths`。
 - review / read-only lane 可以并发，但不得与写入 lane 争用同一写域。
-- worker 只在 `scopePaths` 内执行，不越权扩面，不代替控制器改策略。
+- 若架构与规划 lane 未被显式指定为 write owner，其输出默认是建议，不直接视为已落地。
+- worker 只在 `scopePaths` 内执行，不越权扩面，不代替控制器改策略，也不直接反问用户。
+- worker 回传至少包含：
+  - `status`
+  - `owner_role`
+  - `changed_files`
+  - `checks_run`
+  - `blockers`
+  - `next_action`
 - 若仓库已有更具体的委派入口，优先复用仓库入口，而不是临时拼第二套协议。
 
 ### 默认路由顺序
@@ -173,6 +195,21 @@ small task mode 的目标是降低流程开销，不是降低质量要求。
 2. 中大型规划、拆阶段、`scopePaths` 切分、派工方案、验证蓝图，默认先交给 Codex。
 3. 已明确方案下的 routine implementation / docs / tests / shell-heavy work，默认优先交给 `opencode run`。
 4. `mco` 只在一次主分析和一次定向推进后仍未收敛时启用。
+
+- 未满足架构与规划前置条件时，不要由 Claude 自己直接生成最终计划、拆分和派工结论；应先让 Codex 产出架构与规划草案，再由控制器收口。
+- 不要擅自假设外部 CLI 一定可写仓库。
+
+### 优先使用仓库已有编排入口
+
+- 仓库已经有 `agent:delegate`、`monitor`、`gate`、`sync` 等编排入口时，优先复用，不要绕开。
+- 只有仓库没有定义时，才采用你自己的通用控制器流程。
+- 对当前模板，默认优先复用：
+  - `npm run agent:delegate:list`
+  - `npm run agent:delegate:run`
+  - `npm run agent:delegate:review`
+  - `npm run agent:delegate:close`
+  - 运行 `npm run agent:monitor` 与 `npm run agent:gate`
+- 如果 `config/agent-delegation-tasks.json` 已覆盖当前任务，或当前委派 manifest 已明确当前阶段由 Codex 的架构规划角色或 `opencode run` 的实施交付角色负责，默认先复用 `npm run agent:delegate:list` / `run` / `review` / `close`。
 
 ### Fallback 降级规则
 
@@ -217,6 +254,29 @@ small task mode 的目标是降低流程开销，不是降低质量要求。
 - 只有在当前会话有人类值守、并且接受更高循环和额度成本时，才允许开启 `Stop` hook 形式的 review gate。
 - 不要在默认开发流里把 Codex review gate 常驻打开。
 
+### 默认工具顺序与降级说明
+
+- 若当前默认模型是 `qwen3.6-plus`，优先把它用于长上下文整合型任务，而不是把它当成默认架构主裁决者。
+- 默认把它当成“长上下文整合器 + 视觉/证据归并器”，不是默认的复杂逻辑主裁决者，也不是默认的复杂实现主写者。
+- 若任务主要是在整理大量文档、会话、日志、scenario 结果、`monitor / gate / e2e` 工件，且目标是形成证据对齐、状态摘要、验证清单、风险列表，可优先让 `qwen3.6-plus` 处理。
+- 先让 `qwen3.6-plus` 整理证据、上下文、候选约束。
+- 但这类输出默认只视为“整理结果”和“候选结论”，最终架构与策略判断仍由 Codex 或控制器确认。
+- 再让 Codex 负责架构分析、规划、拆分和关键裁决。
+- 架构与规划类任务默认先让 Codex 完成第一次蓝图 / review / root-cause 分析。
+- 中大型规划任务、拆阶段、`scopePaths` 切分、派工草案与验证蓝图，默认先交给 Codex 产出第一版，再由 Claude Code 控制器结合 truth 与仓库约束做最终裁决。
+- 若任务本身是在做规划、拆阶段、`scopePaths` 切分、派工方案或验证计划，中大型场景默认先交给 Codex 形成第一版方案；Claude Code 不应先自己长时间独立拆分，再把 Codex 降成事后 review。
+- routine implementation / docs / tests / shell-heavy work 默认优先通过 `Bash` 调用 `opencode run` 承担实现。
+- 不要因为 Claude Code 自带 `Read/Grep/Edit/Bash`，就在架构与规划类任务一开始跳过 Codex，或在实施与交付类任务一开始跳过 `opencode run`。
+- 不要在中大型规划任务、拆阶段或 `scopePaths` 切分任务里，先让 Claude 自己长时间独立产出完整拆分方案，再把 Codex 只当成补充 review。
+- 若当前默认模型是 `qwen3.6-plus`，不要因为它上下文窗口大，就把复杂逻辑裁决、复杂实现或高风险架构判断默认交给它。
+- 不要因为它支持长上下文，就把复杂逻辑裁决或复杂编程实现默认交给它。
+- `mco` 不是第一次分析入口。
+- 只有完成一次架构与规划分析后仍未收敛，或一次分析加一次定向修复后仍未收敛，才允许升级到 `mco`。
+- 不要在第一次架构与规划分析之前，直接把复杂问题升级到 `mco`。
+- 若本轮不走默认工具顺序，必须先在对用户的中间汇报里说明：
+  - 如果是规划 / 拆分 / 派工任务，为什么不先交给 Codex
+  - 如果是实现 / 文档 / 测试同步任务，为什么不先交给 `opencode run`
+
 ### Zotero 验收路由硬规则
 
 对当前仓库，`E2E` 在 Zotero 语境里默认专指 Zotero 宿主验收，而不是网页浏览器测试。
@@ -224,7 +284,9 @@ small task mode 的目标是降低流程开销，不是降低质量要求。
 - 若任务涉及 `Zotero`、`Reader`、`Annotation`、`preference pane`、`item pane`、`context pane`、`renderToolbar`、`menu item`、`host-visible surface`、`toolbar smoke`、`scenario` 等宿主语义：
   - 默认验收入口是 `npm run agent:zotero:e2e`，以及仓库既有的 `zotero:scenario` / host action / `agent:monitor` / `agent:gate` / host guard / semantic guard 链。
 - 不得把 Zotero 的 smoke、toolbar、Reader、Annotation、`preference pane`、`item pane`、`context pane` 或其他宿主 surface 验收，默认路由到 `ecc:e2e-runner`、Playwright、browser automation 或网页 E2E agent。
-- 只有当目标明确是 Web 页面而不是 Zotero 宿主 surface，或用户明确要求网页 E2E / Playwright / browser runner 时，才允许走网页 E2E 入口。
+- 只有当目标明确是 Web 页面而不是 Zotero 宿主 surface，或用户明确要求网页 E2E / Playwright / browser runner 时，才允许走 `ecc:e2e-runner` 或同类浏览器测试入口。
+- 如果语言同时出现 `E2E`、`toolbar smoke`、`scenario` 之类容易触发网页测试默认路由的词，必须先按宿主语义判定：
+  - 为什么 `agent:zotero:e2e` / `zotero:scenario` 不是正确入口
 - 若本轮选择了网页 E2E 而不是 Zotero 验收，必须先在中间汇报里说明为什么 `agent:zotero:e2e` / `zotero:scenario` 不是正确入口。
 
 ## 3. mco 使用规则
@@ -394,3 +456,13 @@ small task mode 的目标是降低流程开销，不是降低质量要求。
   6. 是否需要用户决策
 - 若仓库已有更具体的 manifest / delegate / gate 流程，则优先服从仓库流程。
 - 如果发现 `config/addon.config.json` 仍处于模板默认身份态，先回到 [AGENTS.md](AGENTS.md) 的 `Initialization Guard` 处理，不要直接继续功能开发。
+
+## 14. 初始化保护
+
+- 如果发现 `config/addon.config.json` 仍回退到模板默认值，先暂停功能开发。
+- 需要优先核对的模板身份字段包括：
+  - 模板 `addonId`
+  - 模板 `author`
+  - 模板 `homepage`
+  - 模板 `updateURL`
+- 先修正项目身份信息，再继续后续实现。

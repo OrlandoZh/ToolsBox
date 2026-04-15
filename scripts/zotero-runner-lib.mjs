@@ -770,6 +770,29 @@ export class RdpClient {
     this.greeting = null;
   }
 
+  #rejectInflight(error) {
+    const failure = error instanceof Error
+      ? error
+      : new Error(String(error || "RDP socket disconnected"));
+
+    if (this.greeting) {
+      this.greeting.reject(failure);
+      this.greeting = null;
+    }
+
+    for (const deferred of this.pending.values()) {
+      deferred.reject(failure);
+    }
+    this.pending.clear();
+
+    for (const waiter of this.eventWaiters) {
+      waiter.reject(failure);
+    }
+    this.eventWaiters = [];
+    this.eventQueue = [];
+    this.buffer = Buffer.alloc(0);
+  }
+
   async connect({
     port,
     host = "127.0.0.1",
@@ -803,35 +826,41 @@ export class RdpClient {
   async #open(port, host) {
     this.disconnect();
 
-    this.socket = net.createConnection({ port, host });
+    const socket = net.createConnection({ port, host });
+    this.socket = socket;
     this.buffer = Buffer.alloc(0);
     this.pending = new Map();
     this.eventQueue = [];
     this.eventWaiters = [];
 
-    this.socket.on("data", (chunk) => {
+    const handleSocketTermination = (error) => {
+      if (this.socket !== socket) {
+        return;
+      }
+      this.socket = null;
+      this.#rejectInflight(error);
+    };
+
+    socket.on("data", (chunk) => {
       this.buffer = Buffer.concat([this.buffer, chunk]);
       this.#parseMessages();
     });
 
-    this.socket.on("error", (error) => {
-      if (this.greeting) {
-        this.greeting.reject(error);
-        this.greeting = null;
-      }
-      for (const deferred of this.pending.values()) {
-        deferred.reject(error);
-      }
-      this.pending.clear();
-      for (const waiter of this.eventWaiters) {
-        waiter.reject(error);
-      }
-      this.eventWaiters = [];
+    socket.on("error", (error) => {
+      handleSocketTermination(error);
+    });
+
+    socket.on("end", () => {
+      handleSocketTermination(new Error("RDP socket ended"));
+    });
+
+    socket.on("close", () => {
+      handleSocketTermination(new Error("RDP socket closed"));
     });
 
     await new Promise((resolve, reject) => {
-      this.socket.once("connect", resolve);
-      this.socket.once("error", reject);
+      socket.once("connect", resolve);
+      socket.once("error", reject);
     });
 
     await new Promise((resolve, reject) => {
@@ -840,22 +869,14 @@ export class RdpClient {
   }
 
   disconnect() {
-    if (!this.socket) {
-      return;
+    if (this.socket) {
+      const socket = this.socket;
+      this.socket = null;
+      socket.removeAllListeners();
+      socket.end();
+      socket.destroy();
     }
-
-    this.socket.removeAllListeners();
-    this.socket.end();
-    this.socket.destroy();
-    this.socket = null;
-    this.greeting = null;
-    this.pending.clear();
-    this.eventQueue = [];
-    for (const waiter of this.eventWaiters) {
-      waiter.reject(new Error("RDP socket disconnected"));
-    }
-    this.eventWaiters = [];
-    this.buffer = Buffer.alloc(0);
+    this.#rejectInflight(new Error("RDP socket disconnected"));
   }
 
   #parseMessages() {

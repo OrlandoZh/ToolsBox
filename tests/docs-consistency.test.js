@@ -93,6 +93,7 @@ describe("Documentation Consistency", () => {
     assert.ok(readme.includes("只用于这个模板项目自身的远端发布验收与测试"));
     assert.ok(readme.includes("已被 `.gitignore` 忽略"));
     assert.ok(readme.includes("使用 `npm run export:project` 生成剔除运行时工件与 agent 附件的最小工程"));
+    assert.ok(readme.includes("npm run package:encrypted"));
     assert.ok(readme.includes("[Claude Code 入口](CLAUDE.md)"));
     assert.ok(readme.includes("release / toolchain 测试不要把现有 `build/` / `dist/` 当成稳定夹具"));
     assert.ok(readme.includes("先准备 fresh 工件，再断言 JSON/Markdown 输出"));
@@ -134,6 +135,7 @@ describe("Documentation Consistency", () => {
     assert.ok(readme.includes("`registerSubmenu({ target: MENU_TARGETS.LIBRARY_ITEM | LIBRARY_COLLECTION | READER_MENU_VIEW, ... })` 时，优先直接迁到对应的 scene submenu helper"));
     assert.ok(readme.includes("只有确实需要跨 target 做通用子菜单装配时，再继续保留 `registerSubmenu(...)`"));
     assert.ok(guide.includes("仅用于这个模板项目自身的远端发布验收与测试"));
+    assert.ok(guide.includes("npm run package:encrypted"));
     assert.ok(guide.includes("正常 `git push` 不会上传这些产物"));
     assert.ok(guide.includes("不要把仓库里已有的 `build/` / `dist/` 当稳定输入"));
     assert.ok(guide.includes("`dist/update.json`"));

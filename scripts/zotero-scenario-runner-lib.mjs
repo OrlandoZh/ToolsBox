@@ -22,6 +22,14 @@ function normalizePattern(pattern) {
   return normalized || null;
 }
 
+function normalizeNameList(values) {
+  return Array.from(new Set(
+    (Array.isArray(values) ? values : [])
+      .map((value) => normalizeMatchValue(value))
+      .filter(Boolean),
+  ));
+}
+
 function normalizeMatchValue(value) {
   return String(value || "")
     .trim()
@@ -111,14 +119,20 @@ export function filterScenarioFiles({
 export function filterRegisteredScenarios({
   registeredScenarios,
   scenarioPattern = null,
+  excludeScenarioNames = [],
 }) {
   const matcher = buildFlexibleMatcher(scenarioPattern);
   const entries = Array.isArray(registeredScenarios) ? registeredScenarios : [];
-  const selected = entries.filter((entry) => matcher(entry?.name));
+  const excludedNames = new Set(normalizeNameList(excludeScenarioNames));
+  const selected = entries.filter((entry) => (
+    matcher(entry?.name)
+    && !excludedNames.has(normalizeMatchValue(entry?.name))
+  ));
   return {
     pattern: normalizePattern(scenarioPattern),
     entries,
     selected,
+    excludedNames: Array.from(excludedNames),
   };
 }
 
@@ -260,6 +274,7 @@ export async function runIntegratedScenarios({
   config,
   scenarioPattern = null,
   scenarioFilePattern = null,
+  excludeScenarioNames = [],
   listOnly = false,
   modeLabel = "zotero:scenario",
   processLogs = [],
@@ -273,6 +288,7 @@ export async function runIntegratedScenarios({
   const scenarioSelection = filterRegisteredScenarios({
     registeredScenarios: registry.registeredScenarios,
     scenarioPattern,
+    excludeScenarioNames,
   });
 
   if (scenarioSelection.selected.length === 0) {
@@ -293,6 +309,7 @@ export async function runIntegratedScenarios({
     scenario: scenarioSelection.pattern,
     scenarioFile: registry.fileSelection.pattern,
     listOnly: listOnly === true,
+    excludeScenarioNames: scenarioSelection.excludedNames,
   };
   const completedScenarios = [];
   const results = [];

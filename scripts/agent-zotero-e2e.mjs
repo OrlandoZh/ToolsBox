@@ -70,6 +70,12 @@ import { inspectBaselineMainLocaleFiles } from "./agent-zotero-locale-lib.mjs";
 import { inspectStaticRuntimeBaselineFiles } from "./static-runtime-baseline-lib.mjs";
 import { summarizeE2EReport } from "./agent-zotero-validation-lib.mjs";
 import { runIntegratedScenarios as runIntegratedScenarioBatch } from "./zotero-scenario-runner-lib.mjs";
+import {
+  isRecoverableHotReloadTransportError,
+  mergeRecoveredScenarioBatch,
+  planScenarioBatchRecovery,
+  prepareCycleSession,
+} from "./agent-zotero-e2e-session-lib.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -129,6 +135,20 @@ const VISUAL_LIBRARY_STAGE_TIMEOUTS_MS = Object.freeze({
 });
 const VISUAL_SURFACE_CAPTURE_DELAY_MS = 520;
 const VISUAL_READER_PREPARE_TIMEOUT_MS = 8000;
+const HANG_PROBE_TIMEOUT_KINDS = new Set(["chrome-evaluation-timeout"]);
+const HANG_PROBE_SAMPLE = Object.freeze({
+  durationSeconds: 1,
+  intervalMs: 10,
+  psTimeoutMs: 3000,
+  sampleTimeoutMs: 15000,
+});
+const OOM_SIGNAL_PATTERNS = Object.freeze([
+  /\bns_error_out_of_memory\b/iu,
+  /\bout of memory\b/iu,
+  /\bmemory pressure\b/iu,
+  /\boom-kill\b/iu,
+  /\bkilled process\b/iu,
+]);
 const ADDITIVE_E2E_SUMMARY_FIELDS = Object.freeze([
   "status",
   "statusLabel",
@@ -196,6 +216,7 @@ const ADDITIVE_E2E_SUMMARY_FIELDS = Object.freeze([
   "lifecycleSlowThresholdMs",
   "lifecycleLastSlowStage",
   "lifecycleBoundaryEvents",
+  "hangProbe",
   "performanceBudget",
   "domContractReport",
   "readerEventReport",
@@ -270,6 +291,187 @@ async function readPerformanceBudgetConfig() {
   });
 }
 
+function normalizeScenarioName(value) {
+  return String(value || "").trim();
+}
+
+function inferScenarioFailureKind(error) {
+  const explicitKind = String(error?.details?.kind || error?.kind || "").trim();
+  if (explicitKind) {
+    return explicitKind;
+  }
+  const message = String(error?.message || error || "").toLowerCase();
+  if (message.includes("timed out")) {
+    return "chrome-evaluation-timeout";
+  }
+  return "scenario-execution-failed";
+}
+
+function buildAdvisoryScenarioFailureResult({ scenarioName, error }) {
+  const failureInfo = buildScriptFailureInfo(error);
+  return {
+    name: scenarioName,
+    status: "failed",
+    durationMs: 0,
+    synthetic: true,
+    advisory: true,
+    gateEffect: "non-blocking",
+    error: {
+      message: failureInfo.errorMessage,
+      stack: String(error?.stack || "").trim(),
+      kind: inferScenarioFailureKind(error),
+      phase: String(error?.details?.phase || "runner").trim() || "runner",
+      step: String(error?.details?.step || error?.failedStage || "evaluateInChrome").trim() || "evaluateInChrome",
+      scenarioName,
+    },
+  };
+}
+
+async function runAdvisoryScenarioBatch({
+  projectRoot,
+  rdp,
+  config,
+  scenarioName,
+  processLogs = [],
+}) {
+  const normalizedScenarioName = normalizeScenarioName(scenarioName);
+  if (!normalizedScenarioName) {
+    return null;
+  }
+
+  try {
+    const batch = await runIntegratedScenarioBatch({
+      projectRoot,
+      rdp,
+      config,
+      scenarioPattern: normalizedScenarioName,
+      modeLabel: "agent:zotero:e2e:advisory",
+      processLogs,
+    });
+    const results = Array.isArray(batch?.results)
+      ? batch.results.map((entry) => ({
+        ...entry,
+        advisory: true,
+        gateEffect: "non-blocking",
+      }))
+      : [];
+    return {
+      present: true,
+      scenarioName: normalizedScenarioName,
+      results,
+      failedResults: results.filter((entry) => entry?.status === "failed"),
+      failed: results.filter((entry) => entry?.status === "failed").length,
+      failure: batch?.failure || null,
+      execution: batch?.execution || null,
+    };
+  }
+  catch (error) {
+    const failureResult = buildAdvisoryScenarioFailureResult({
+      scenarioName: normalizedScenarioName,
+      error,
+    });
+    return {
+      present: true,
+      scenarioName: normalizedScenarioName,
+      results: [failureResult],
+      failedResults: [failureResult],
+      failed: 1,
+      failure: buildScriptFailureInfo(error),
+      execution: null,
+    };
+  }
+}
+
+function mergeAdvisoryScenarioBatch(mainBatch, advisoryBatch) {
+  const baseBatch = mainBatch && typeof mainBatch === "object"
+    ? mainBatch
+    : {
+      total: 0,
+      passed: 0,
+      failed: 0,
+      skipped: 0,
+      results: [],
+      failedResults: [],
+      listedOnly: false,
+      skippedExecution: false,
+      registeredScenarios: [],
+      selectedScenarios: [],
+      execution: null,
+      failure: null,
+      processLogSummary: null,
+    };
+  if (!advisoryBatch?.present) {
+    return baseBatch;
+  }
+
+  const advisoryScenarioName = normalizeScenarioName(advisoryBatch.scenarioName);
+  const results = [
+    ...(Array.isArray(baseBatch.results) ? baseBatch.results : []).filter((entry) => (
+      normalizeScenarioName(entry?.name) !== advisoryScenarioName
+    )),
+    ...(Array.isArray(advisoryBatch.results) ? advisoryBatch.results : []),
+  ];
+
+  return {
+    ...baseBatch,
+    results,
+    advisories: {
+      present: true,
+      scenarioName: advisoryScenarioName,
+      failed: Number(advisoryBatch.failed || 0),
+      results: Array.isArray(advisoryBatch.results) ? advisoryBatch.results : [],
+      failedResults: Array.isArray(advisoryBatch.failedResults) ? advisoryBatch.failedResults : [],
+      failure: advisoryBatch.failure || null,
+      execution: advisoryBatch.execution || null,
+      gateEffect: "non-blocking",
+    },
+  };
+}
+
+function annotateSupersededCyclesByRecovery(cycles) {
+  const entries = Array.isArray(cycles) ? cycles : [];
+  const lastRecoveryPosition = entries.reduce((foundIndex, cycle, cycleIndex) => {
+    return cycle?.checks?.hotReloadTransportRecovered === true
+      ? cycleIndex
+      : foundIndex;
+  }, -1);
+
+  entries.forEach((cycle, cycleIndex) => {
+    if (!cycle || typeof cycle !== "object") {
+      return;
+    }
+    cycle.supersededByRecovery = lastRecoveryPosition > 0 && cycleIndex < lastRecoveryPosition;
+    if (cycleIndex !== lastRecoveryPosition && Object.prototype.hasOwnProperty.call(cycle, "recoverySupersededCycleIndexes")) {
+      delete cycle.recoverySupersededCycleIndexes;
+    }
+  });
+
+  if (lastRecoveryPosition <= 0) {
+    return {
+      effectiveCycles: entries,
+      supersededCount: 0,
+      recoveryCycleIndex: null,
+    };
+  }
+
+  const supersededCycleIndexes = entries
+    .slice(0, lastRecoveryPosition)
+    .map((cycle) => Number(cycle?.index))
+    .filter((value) => Number.isFinite(value));
+  const recoveryCycle = entries[lastRecoveryPosition];
+  if (recoveryCycle && typeof recoveryCycle === "object") {
+    recoveryCycle.recoverySupersededCycleIndexes = supersededCycleIndexes;
+  }
+
+  return {
+    effectiveCycles: entries.filter((cycle) => cycle?.supersededByRecovery !== true),
+    supersededCount: supersededCycleIndexes.length,
+    recoveryCycleIndex: Number.isFinite(Number(recoveryCycle?.index))
+      ? Number(recoveryCycle.index)
+      : null,
+  };
+}
+
 async function readZoteroRuntimeContext(rdp) {
   const rawResult = await rdp.evaluateInChrome(`(() => {
     try {
@@ -304,6 +506,9 @@ async function step(name, fn) {
 }
 
 async function execFileText(command, args, options = {}) {
+  const timeoutMs = Number.isFinite(Number(options.timeoutMs)) && Number(options.timeoutMs) > 0
+    ? Number(options.timeoutMs)
+    : null;
   return await new Promise((resolve, reject) => {
     execFile(
       command,
@@ -313,6 +518,7 @@ async function execFileText(command, args, options = {}) {
         env: options.env || process.env,
         encoding: "utf8",
         maxBuffer: options.maxBuffer || 10 * 1024 * 1024,
+        timeout: timeoutMs || undefined,
       },
       (error, stdout, stderr) => {
         if (error) {
@@ -334,6 +540,338 @@ async function execFileText(command, args, options = {}) {
       },
     );
   });
+}
+
+function parseProcessSnapshotLine(line) {
+  const text = String(line || "").trim();
+  if (!text) {
+    return null;
+  }
+  const match = text.match(/^(\d+)\s+(\d+)\s+(\d+)\s+([\d.]+)\s+(\S+)\s+(\S+)\s+(.+)$/u);
+  if (!match) {
+    return null;
+  }
+  return {
+    pid: Number(match[1]),
+    ppid: Number(match[2]),
+    rssKb: Number(match[3]),
+    percentMem: Number(match[4]),
+    elapsed: match[5],
+    state: match[6],
+    command: match[7],
+  };
+}
+
+function collectOOMSignals(processLogs = []) {
+  return uniqueStrings((Array.isArray(processLogs) ? processLogs : [])
+    .map((entry) => String(entry?.message || "").trim())
+    .filter((message) => OOM_SIGNAL_PATTERNS.some((pattern) => pattern.test(message))))
+    .slice(0, 6);
+}
+
+function resolveHangProbeFailure(scenarios = null) {
+  const execution = scenarios?.execution && typeof scenarios.execution === "object"
+    ? scenarios.execution
+    : null;
+  const failure = scenarios?.failure && typeof scenarios.failure === "object"
+    ? scenarios.failure
+    : null;
+  const failedResult = (Array.isArray(scenarios?.results) ? scenarios.results : [])
+    .find((entry) => entry?.status === "failed" && entry?.error && typeof entry.error === "object") || null;
+  const reasonKind = String(
+    execution?.timeoutKind
+    || failure?.details?.kind
+    || failure?.kind
+    || failedResult?.error?.kind
+    || "",
+  ).trim() || null;
+  const reasonMessage = String(
+    failure?.errorMessage
+    || failure?.message
+    || failedResult?.error?.message
+    || "",
+  ).trim() || null;
+  const scenarioName = String(
+    execution?.lastStartedScenario
+    || failure?.details?.currentScenario
+    || failure?.scenarioName
+    || failedResult?.name
+    || "",
+  ).trim() || null;
+  return {
+    reasonKind,
+    reasonMessage,
+    scenarioName,
+  };
+}
+
+function shouldCollectHangProbe(scenarios = null) {
+  const failure = resolveHangProbeFailure(scenarios);
+  if (HANG_PROBE_TIMEOUT_KINDS.has(String(failure.reasonKind || "").trim())) {
+    return true;
+  }
+  if (failure.reasonMessage && isRecoverableHotReloadTransportError(new Error(failure.reasonMessage))) {
+    return true;
+  }
+  return false;
+}
+
+function pickHangProbeLikelyCause(probe) {
+  const reasonMessage = String(probe?.reasonMessage || "").trim();
+  if (reasonMessage && isRecoverableHotReloadTransportError(new Error(reasonMessage))) {
+    return "rdp-transport-disconnect";
+  }
+  if (Number(probe?.oomSignalCount || 0) > 0) {
+    return "memory-pressure-suspected";
+  }
+  if (probe?.reasonKind === "chrome-evaluation-timeout" && probe?.processAlive === false) {
+    return "process-exited";
+  }
+  if (probe?.reasonKind === "chrome-evaluation-timeout" && probe?.processAlive === true) {
+    return "event-loop-stall";
+  }
+  if (probe?.processAlive === true) {
+    return "process-alive-timeout";
+  }
+  return "unknown";
+}
+
+function pickHangProbeLikelyCauseLabel(cause) {
+  switch (String(cause || "").trim()) {
+    case "rdp-transport-disconnect":
+      return "更像 RDP transport 断链";
+    case "memory-pressure-suspected":
+      return "存在内存压力嫌疑";
+    case "process-exited":
+      return "超时期间进程已退出";
+    case "event-loop-stall":
+      return "更像 chrome evaluation / 事件循环阻塞";
+    case "process-alive-timeout":
+      return "超时期间进程仍存活";
+    default:
+      return "原因未明";
+  }
+}
+
+function buildHangProbeSummary(probe) {
+  if (!probe?.present) {
+    return "当前未采集 hang probe。";
+  }
+  const parts = [];
+  if (probe.scenarioName) {
+    parts.push(`触发场景 ${probe.scenarioName}`);
+  }
+  if (probe.reasonKind) {
+    parts.push(`原因 ${probe.reasonKind}`);
+  }
+  if (probe.processAlive === true) {
+    const processSummary = [
+      probe.pid ? `PID ${probe.pid}` : null,
+      Number.isFinite(probe.rssMb) ? `RSS ${probe.rssMb.toFixed(1)} MB` : null,
+      probe.processState ? `stat ${probe.processState}` : null,
+    ].filter(Boolean).join(" / ");
+    parts.push(processSummary ? `进程仍存活（${processSummary}）` : "进程仍存活");
+  }
+  else if (probe.processAlive === false) {
+    parts.push("探针时进程已退出");
+  }
+  if (Number(probe.oomSignalCount || 0) > 0) {
+    parts.push(`发现 ${probe.oomSignalCount} 条 OOM/内存压力信号`);
+  }
+  else {
+    parts.push("未见 OOM/内存压力信号");
+  }
+  if (probe.sampleCaptured === true) {
+    parts.push("已采集 sample");
+  }
+  else if (probe.sampleAttempted === true && probe.sampleError) {
+    parts.push(`sample 未完成：${probe.sampleError}`);
+  }
+  parts.push(`判断：${pickHangProbeLikelyCauseLabel(probe.likelyCause)}`);
+  return parts.join("；");
+}
+
+async function collectHangProbe({
+  session,
+  cycle,
+  scenarios,
+  processLogs = [],
+  distDir,
+}) {
+  const failure = resolveHangProbeFailure(scenarios);
+  const pid = Number.isFinite(Number(session?.child?.pid))
+    ? Number(session.child.pid)
+    : null;
+  const captureDir = path.join(distDir, "agent-zotero-e2e-assets");
+  const probe = {
+    present: true,
+    advisory: true,
+    cycleIndex: cycle,
+    pid,
+    scenarioName: failure.scenarioName,
+    reasonKind: failure.reasonKind,
+    reasonMessage: failure.reasonMessage,
+    processAlive: null,
+    processState: null,
+    rssKb: null,
+    rssMb: null,
+    percentMem: null,
+    elapsed: null,
+    command: null,
+    oomSignals: collectOOMSignals(processLogs),
+    oomSignalCount: 0,
+    sampleAttempted: false,
+    sampleCaptured: false,
+    samplePath: null,
+    sampleError: null,
+    likelyCause: "unknown",
+    likelyCauseLabel: null,
+    summary: null,
+  };
+  probe.oomSignalCount = probe.oomSignals.length;
+
+  if (pid !== null) {
+    try {
+      const { stdout } = await execFileText("ps", [
+        "-p",
+        String(pid),
+        "-o",
+        "pid=,ppid=,rss=,%mem=,etime=,stat=,command=",
+      ], {
+        timeoutMs: HANG_PROBE_SAMPLE.psTimeoutMs,
+      });
+      const snapshot = parseProcessSnapshotLine(stdout);
+      if (snapshot) {
+        probe.processAlive = true;
+        probe.processState = snapshot.state || null;
+        probe.rssKb = Number.isFinite(snapshot.rssKb) ? snapshot.rssKb : null;
+        probe.rssMb = Number.isFinite(snapshot.rssKb) ? Number((snapshot.rssKb / 1024).toFixed(1)) : null;
+        probe.percentMem = Number.isFinite(snapshot.percentMem) ? snapshot.percentMem : null;
+        probe.elapsed = snapshot.elapsed || null;
+        probe.command = snapshot.command || null;
+      }
+      else {
+        probe.processAlive = false;
+      }
+    }
+    catch (error) {
+      probe.processAlive = false;
+      probe.sampleError = String(error?.message || error).trim() || "ps failed";
+    }
+  }
+
+  if (process.platform === "darwin" && pid !== null && probe.processAlive === true) {
+    probe.sampleAttempted = true;
+    try {
+      await fs.mkdir(captureDir, { recursive: true });
+      const samplePath = path.join(captureDir, `cycle-${cycle}-hang-sample.txt`);
+      await execFileText("sample", [
+        String(pid),
+        String(HANG_PROBE_SAMPLE.durationSeconds),
+        String(HANG_PROBE_SAMPLE.intervalMs),
+        "-mayDie",
+        "-file",
+        samplePath,
+      ], {
+        timeoutMs: HANG_PROBE_SAMPLE.sampleTimeoutMs,
+      });
+      if (await pathExists(samplePath)) {
+        probe.sampleCaptured = true;
+        probe.samplePath = samplePath;
+      }
+      else {
+        probe.sampleError = "sample output missing";
+      }
+    }
+    catch (error) {
+      probe.sampleError = String(error?.message || error).trim() || "sample failed";
+    }
+  }
+
+  probe.likelyCause = pickHangProbeLikelyCause(probe);
+  probe.likelyCauseLabel = pickHangProbeLikelyCauseLabel(probe.likelyCause);
+  probe.summary = buildHangProbeSummary(probe);
+  return probe;
+}
+
+async function primeRecoveredScenarioSession({
+  session,
+  config,
+}) {
+  await step("wait-addon-recovery", async () => session.rdp.waitForAddonById(config.addonId));
+  await step("enable-addon-recovery", async () => session.rdp.enableAddonById(config.addonId));
+  await step("ensure-plugin-ready-recovery", async () => ensurePluginReady({
+    rdp: session.rdp,
+    config,
+  }));
+  await step("install-log-bridge-recovery", async () => installRuntimeLogBridge(session.rdp));
+  await step("clear-logs-recovery", async () => clearCapturedLogs(session.rdp));
+}
+
+async function recoverScenarioBatch({
+  session,
+  cycle,
+  scenarios,
+  config,
+  projectRoot,
+  runnerConfig,
+  rdpPort,
+  runtimeSanitization,
+  excludeScenarioNames,
+}) {
+  const recoveryPlan = planScenarioBatchRecovery({
+    scenarios,
+    excludeScenarioNames,
+  });
+  if (!recoveryPlan.eligible) {
+    return {
+      attempted: false,
+      session,
+      processLogStart: null,
+      scenarios,
+      recoveryPlan,
+    };
+  }
+
+  await teardownSession(session);
+  const nextSession = await createZoteroSession({
+    runnerConfig,
+    rdpPort,
+    runtimeSanitization,
+  });
+  await primeRecoveredScenarioSession({
+    session: nextSession,
+    config,
+  });
+
+  const processLogStart = Array.isArray(nextSession?.processLogs)
+    ? nextSession.processLogs.length
+    : 0;
+  const recoveredBatch = await step("run-scenarios-recovery", async () => runIntegratedScenarioBatch({
+    projectRoot,
+    rdp: nextSession.rdp,
+    config,
+    excludeScenarioNames: recoveryPlan.recoveryExcludeScenarioNames,
+    modeLabel: "agent:zotero:e2e:recovery",
+    processLogs: nextSession.processLogs.slice(processLogStart),
+  }));
+
+  return {
+    attempted: true,
+    session: nextSession,
+    processLogStart,
+    recoveryPlan,
+    scenarios: mergeRecoveredScenarioBatch({
+      scenarios,
+      recoveredBatch,
+      recovery: {
+        bootMode: "restart",
+        reasonKind: recoveryPlan.timeoutKind,
+        rerunStartScenario: recoveryPlan.rerunStartScenario,
+        excludeScenarioNames: recoveryPlan.recoveryExcludeScenarioNames,
+      },
+    }),
+  };
 }
 
 function sleep(ms) {
@@ -2100,13 +2638,33 @@ function parseZoteroWindowAppleScriptResult(stdout, contextLabel = "Zotero windo
 
 async function getZoteroWindowBoundsForTitle(targetTitle = null) {
   const lines = buildZoteroWindowAppleScriptLines({ targetTitle });
-  const { stdout } = await execFileText("osascript", lines.flatMap((line) => ["-e", line]));
+  const { stdout } = await execFileText("osascript", lines.flatMap((line) => ["-e", line]), {
+    timeoutMs: 8000,
+  });
   return parseZoteroWindowAppleScriptResult(stdout, "Zotero window bounds");
 }
 
 async function activateZoteroWindowForCapture(activationDelayMs = VISUAL_CAPTURE_POLICY.activationDelayMs) {
-  await execFileText("osascript", ["-e", 'tell application "Zotero" to activate']);
+  await execFileText("osascript", ["-e", 'tell application "Zotero" to activate'], {
+    timeoutMs: 8000,
+  });
   await sleep(Math.max(0, Number(activationDelayMs || 0)));
+}
+
+async function tryActivateZoteroWindowForCapture(activationDelayMs = VISUAL_CAPTURE_POLICY.activationDelayMs) {
+  try {
+    await activateZoteroWindowForCapture(activationDelayMs);
+    return {
+      ok: true,
+      warning: null,
+    };
+  }
+  catch (error) {
+    return {
+      ok: false,
+      warning: normalizeMaybeString(error?.message || error) || "Unable to activate Zotero window for capture",
+    };
+  }
 }
 
 async function getZoteroQuartzWindowBounds(title = null) {
@@ -2145,7 +2703,9 @@ JSON.stringify(chosen ? {
 } : null);
 `.trim();
 
-  const { stdout } = await execFileText("osascript", ["-l", "JavaScript", "-e", script]);
+  const { stdout } = await execFileText("osascript", ["-l", "JavaScript", "-e", script], {
+    timeoutMs: 8000,
+  });
   const payload = JSON.parse(stdout.trim() || "null");
   return normalizeCaptureWindowBounds(payload);
 }
@@ -2314,7 +2874,9 @@ async function setZoteroWindowGeometry(geometry = VISUAL_CAPTURE_WINDOW_GEOMETRY
     width,
     height,
   });
-  const { stdout } = await execFileText("osascript", lines.flatMap((line) => ["-e", line]));
+  const { stdout } = await execFileText("osascript", lines.flatMap((line) => ["-e", line]), {
+    timeoutMs: 8000,
+  });
   return parseZoteroWindowAppleScriptResult(stdout, "Zotero window bounds after geometry set");
 }
 
@@ -2329,22 +2891,17 @@ async function ensureZoteroWindowReadyForCapture(options = {}) {
   const explicitTargetTitle = normalizeMaybeString(options.targetTitle);
   const shouldUseChromeFocus = !explicitTargetTitle;
 
-  try {
-    await activateZoteroWindowForCapture(activationDelayMs);
-  }
-  catch (error) {
-    throw attachVisualCaptureFailure(error, {
-      failureKind: "window-activation-failed",
-      failureCategory: "capture-command-failed",
-      failureStage: "activate-window",
-    });
-  }
+  const activationAttempt = await tryActivateZoteroWindowForCapture(activationDelayMs);
   const initialChromeBounds = shouldUseChromeFocus
     ? await focusChromeCaptureWindow({
       rdp: options.rdp,
       geometry,
     }).catch(() => null)
     : null;
+  if (options.rdp && initialChromeBounds) {
+    await sleep(settleDelayMs);
+    return initialChromeBounds;
+  }
   const fallbackBounds = await setZoteroWindowGeometry(geometry, {
     targetTitle: explicitTargetTitle,
   }).catch(() => null);
@@ -2354,6 +2911,10 @@ async function ensureZoteroWindowReadyForCapture(options = {}) {
       geometry,
     }).catch(() => null)
     : null;
+  if (options.rdp && refreshedChromeBounds) {
+    await sleep(settleDelayMs);
+    return refreshedChromeBounds;
+  }
   const preferredTitle = explicitTargetTitle
     || normalizeMaybeString(refreshedChromeBounds?.title)
     || normalizeMaybeString(initialChromeBounds?.title)
@@ -2375,6 +2936,7 @@ async function ensureZoteroWindowReadyForCapture(options = {}) {
       failureCategory: "capture-command-failed",
       failureStage: "resolve-window",
       bounds: quartzBounds || genericQuartzBounds || refreshedChromeBounds || initialChromeBounds || fallbackBounds || null,
+      stderr: activationAttempt.ok ? null : activationAttempt.warning,
     });
   }
   await sleep(settleDelayMs);
@@ -2405,7 +2967,7 @@ async function captureZoteroWindow(filePath, options = {}) {
     try {
       if (options.rdp) {
         if (captureActivationDelayMs > 0) {
-          await activateZoteroWindowForCapture(captureActivationDelayMs);
+          await tryActivateZoteroWindowForCapture(captureActivationDelayMs);
         }
         const rdpBounds = await captureZoteroWindowViaRdp(filePath, {
           rdp: options.rdp,
@@ -2446,7 +3008,7 @@ async function captureZoteroWindow(filePath, options = {}) {
           };
         }
       }
-      await activateZoteroWindowForCapture(captureActivationDelayMs);
+      await tryActivateZoteroWindowForCapture(captureActivationDelayMs);
       const quartzBounds = await getZoteroQuartzWindowBounds(targetTitle).catch(() => null);
       const genericQuartzBounds = (quartzBounds || targetTitle)
         ? null
@@ -2463,10 +3025,14 @@ async function captureZoteroWindow(filePath, options = {}) {
       const rect = `${captureBounds.x},${captureBounds.y},${captureBounds.width},${captureBounds.height}`;
       try {
         if (Number.isFinite(captureBounds?.windowNumber) && captureBounds.windowNumber > 0) {
-          await execFileText("screencapture", ["-x", "-o", "-l", String(captureBounds.windowNumber), filePath]);
+          await execFileText("screencapture", ["-x", "-o", "-l", String(captureBounds.windowNumber), filePath], {
+            timeoutMs: 15000,
+          });
         }
         else {
-          await execFileText("screencapture", ["-x", "-R", rect, filePath]);
+          await execFileText("screencapture", ["-x", "-R", rect, filePath], {
+            timeoutMs: 15000,
+          });
         }
       }
       catch (error) {
@@ -2670,7 +3236,9 @@ async function captureSurfaceFromStageImage({
       stageCapture.path,
       "--out",
       filePath,
-    ]);
+    ], {
+      timeoutMs: 15000,
+    });
   }
 
   return {
@@ -2690,7 +3258,9 @@ async function captureScreenRect(filePath, bounds) {
     throw new Error("Surface capture bounds are unavailable");
   }
   const rect = `${captureBounds.x},${captureBounds.y},${captureBounds.width},${captureBounds.height}`;
-  await execFileText("screencapture", ["-x", "-R", rect, filePath]);
+  await execFileText("screencapture", ["-x", "-R", rect, filePath], {
+    timeoutMs: 15000,
+  });
   return captureBounds;
 }
 
@@ -3267,13 +3837,21 @@ async function captureStableVisualStage({
         },
       });
       state = preCaptureSettle?.state || await prepareVisualState({ rdp, config, stage });
-      const bounds = await ensureZoteroWindowReadyForCapture({
-        rdp,
-        geometry: policy.targetWindowGeometry,
-        activationDelayMs: policy.activationDelayMs,
-        settleDelayMs: attempt === 1 ? warmupMs : Number(policy.betweenAttemptsMs || 0),
-        targetTitle: resolveVisualStageTargetTitle(stage, state),
-      });
+      let bounds = null;
+      try {
+        bounds = await ensureZoteroWindowReadyForCapture({
+          rdp,
+          geometry: policy.targetWindowGeometry,
+          activationDelayMs: policy.activationDelayMs,
+          settleDelayMs: attempt === 1 ? warmupMs : Number(policy.betweenAttemptsMs || 0),
+          targetTitle: resolveVisualStageTargetTitle(stage, state),
+        });
+      }
+      catch (error) {
+        if (!rdp) {
+          throw error;
+        }
+      }
       const attemptPath = path.join(captureDir, `cycle-${cycle}-${stage}-attempt-${attempt}.png`);
       const capturedBounds = await captureZoteroWindow(attemptPath, {
         rdp,
@@ -3289,6 +3867,20 @@ async function captureStableVisualStage({
         analysis,
       });
       lastFailure = null;
+
+      const baselineBestAttempt = await pickBestAttemptAgainstVisualBaseline({
+        attempts,
+        kind: stage,
+        bootMode,
+        baselineDir: visualBaselineDir,
+      });
+      if (
+        attempts.length === 1
+        && baselineBestAttempt?.attempt?.index === attempt
+        && baselineBestAttempt?.comparison?.ok === true
+      ) {
+        break;
+      }
 
       if (attempts.length >= 2 && isStableVisualAttemptPair(attempts[attempts.length - 2], attempts[attempts.length - 1])) {
         break;
@@ -3740,23 +4332,20 @@ async function main() {
           });
         }
 
-        const needRestart = cycle === 1 || options.strategy === "restart";
-        if (needRestart) {
-          await teardownSession(session);
-          session = await createZoteroSession({
-            runnerConfig,
-            rdpPort,
-            runtimeSanitization,
-          });
-        } else {
-          await session.rdp.reloadAddonById(config.addonId);
-          await session.rdp.restartAddonRuntime({
-            addonId: config.addonId,
-            addonRef: config.addonRef,
-            instanceKey: config.instanceKey,
-          });
-        }
-        const processLogStart = needRestart ? 0 : session.processLogs.length;
+        const cycleSession = await step("prepare-cycle-session", async () => prepareCycleSession({
+          cycle,
+          strategy: options.strategy,
+          session,
+          createSession: createZoteroSession,
+          destroySession: teardownSession,
+          runnerConfig,
+          rdpPort,
+          runtimeSanitization,
+          config,
+        }));
+        session = cycleSession.session;
+        const bootMode = cycleSession.bootMode;
+        const processLogStart = cycleSession.processLogStart;
 
         await step("wait-addon", async () => session.rdp.waitForAddonById(config.addonId));
         await step("enable-addon", async () => session.rdp.enableAddonById(config.addonId));
@@ -3808,13 +4397,52 @@ async function main() {
             rdp: session.rdp,
             config,
           }));
-        const scenarios = await step("run-scenarios", async () => runIntegratedScenarioBatch({
+        const blockingScenarioExclusions = [];
+        if (normalizeScenarioName(performanceBudgetConfig?.scenarioName)) {
+          blockingScenarioExclusions.push(normalizeScenarioName(performanceBudgetConfig.scenarioName));
+        }
+        let scenarios = await step("run-scenarios", async () => runIntegratedScenarioBatch({
           projectRoot,
           rdp: session.rdp,
           config,
+          excludeScenarioNames: blockingScenarioExclusions,
           modeLabel: "agent:zotero:e2e",
           processLogs: session.processLogs.slice(processLogStart),
         }));
+        let recoveryProcessLogStart = processLogStart;
+        let preRecoveryNativeLogs = session.processLogs.slice(processLogStart);
+        let hangProbe = shouldCollectHangProbe(scenarios)
+          ? await collectHangProbe({
+            session,
+            cycle,
+            scenarios,
+            processLogs: preRecoveryNativeLogs,
+            distDir: zoteroArtifacts.artifactsDir,
+          })
+          : null;
+        if (planScenarioBatchRecovery({
+          scenarios,
+          excludeScenarioNames: blockingScenarioExclusions,
+        }).eligible) {
+          const recoveredBatch = await recoverScenarioBatch({
+            session,
+            cycle,
+            scenarios,
+            config,
+            projectRoot,
+            runnerConfig,
+            rdpPort,
+            runtimeSanitization,
+            excludeScenarioNames: blockingScenarioExclusions,
+          });
+          session = recoveredBatch.session;
+          recoveryProcessLogStart = recoveredBatch.processLogStart ?? 0;
+          scenarios = recoveredBatch.scenarios;
+          checks.scenarioBatchRecoveryAttempted = true;
+          checks.scenarioBatchRecoverySucceeded = scenarios?.execution?.filtersApplied?.recoverySucceeded === true;
+          checks.scenarioBatchRecoveryStartScenario = recoveredBatch.recoveryPlan?.rerunStartScenario || null;
+        }
+        const scenarioBatchIncomplete = scenarios?.execution?.incomplete === true;
         const scenarioResults = Array.isArray(scenarios?.results) ? scenarios.results : [];
         const readerHookScenario = scenarioResults.find((item) => item?.name === "reader event hook diagnostics") || null;
         const readerFineGrainedScenario = scenarioResults.find((item) => item?.name === "reader fine-grained hook diagnostics") || null;
@@ -3836,8 +4464,29 @@ async function main() {
         ]);
         checks.readerEventHostObservedTypes = readerEventHostObservedTypes;
         checks.readerEventHostObservedTypeCount = readerEventHostObservedTypes.length;
-        checks.readerEventToolbarHookObserved = readerEventHostObservedTypes.includes("renderToolbar");
-        const scenarioBatchIncomplete = scenarios?.execution?.incomplete === true;
+        if (readerFineGrainedScenario || readerEventHostObservedTypes.length > 0) {
+          checks.readerEventToolbarHookObserved = readerEventHostObservedTypes.includes("renderToolbar");
+        }
+        if (cycleSession.recoveredFromTransportDisconnect) {
+          checks.hotReloadTransportRecovered = true;
+          checks.hotReloadTransportRecoveryReason = cycleSession.recoveryReason;
+        }
+        const postRecoveryNativeLogs = session.processLogs.slice(recoveryProcessLogStart);
+        const nativeLogs = recoveryProcessLogStart === processLogStart
+          ? postRecoveryNativeLogs
+          : [
+            ...preRecoveryNativeLogs,
+            ...postRecoveryNativeLogs,
+          ];
+        if (!hangProbe && shouldCollectHangProbe(scenarios)) {
+          hangProbe = await collectHangProbe({
+            session,
+            cycle,
+            scenarios,
+            processLogs: nativeLogs,
+            distDir: zoteroArtifacts.artifactsDir,
+          });
+        }
         const runtimeLogSummary = scenarioBatchIncomplete
           ? {
             total: 0,
@@ -3855,7 +4504,7 @@ async function main() {
             rdp: session.rdp,
             config,
             cycle,
-            bootMode: needRestart ? "restart" : "hot-reload",
+            bootMode,
             distDir: zoteroArtifacts.artifactsDir,
             visualBaselineDir: options.visualBaselineDir,
             updateVisualBaseline: options.updateVisualBaseline,
@@ -3869,13 +4518,22 @@ async function main() {
                 : "UI capture skipped by --no-ui-capture",
             ],
           };
-        const nativeLogs = session.processLogs.slice(processLogStart);
+        if (!scenarioBatchIncomplete && normalizeScenarioName(performanceBudgetConfig?.scenarioName)) {
+          const advisoryScenarios = await runAdvisoryScenarioBatch({
+            projectRoot,
+            rdp: session.rdp,
+            config,
+            scenarioName: performanceBudgetConfig.scenarioName,
+            processLogs: session.processLogs.slice(recoveryProcessLogStart),
+          });
+          scenarios = mergeAdvisoryScenarioBatch(scenarios, advisoryScenarios);
+        }
         const nativeLogSummary = summarizeLogs(nativeLogs);
         const logSummary = mergeLogSummaries(nativeLogSummary, runtimeLogSummary);
 
         const cycleResult = {
           index: cycle,
-          bootMode: needRestart ? "restart" : "hot-reload",
+          bootMode,
           zoteroVersion: runtimeContext.zoteroVersion,
           readinessMode: readiness.mode,
           checks,
@@ -3883,6 +4541,7 @@ async function main() {
           scenarios,
           visuals,
           logs: logSummary,
+          hangProbe,
           rawLogs: {
             native: nativeLogs,
             runtime: runtimeLogSummary,
@@ -3895,7 +4554,11 @@ async function main() {
         cycleResult.diagnostics = evaluated.diagnoses;
         cycleResult.primaryDiagnosis = evaluated.primaryDiagnosis;
         cycleResult.summaryNote = evaluated.passed
-          ? "动作与校验通过"
+          ? (
+            checks.scenarioBatchRecoverySucceeded
+              ? "动作与校验通过（scenario recovery）"
+              : "动作与校验通过"
+          )
           : `发现 ${evaluated.issues.length} 项问题`;
         report.cycles.push(cycleResult);
       }
@@ -3903,14 +4566,21 @@ async function main() {
       await teardownSession(session);
     }
 
-    const allIssues = report.cycles.flatMap((cycle) => cycle.issues || []);
-    const allHints = report.cycles.flatMap((cycle) => cycle.hints || []);
-    const allDiagnoses = report.cycles.flatMap((cycle) => cycle.diagnostics || []);
+    const recoveryAggregation = annotateSupersededCyclesByRecovery(report.cycles);
+    const effectiveCycles = recoveryAggregation.effectiveCycles;
+    const allIssues = effectiveCycles.flatMap((cycle) => cycle.issues || []);
+    const allHints = effectiveCycles.flatMap((cycle) => cycle.hints || []);
+    const allDiagnoses = effectiveCycles.flatMap((cycle) => cycle.diagnostics || []);
     report.issues = Array.from(new Set(allIssues));
     report.hints = Array.from(new Set(allHints));
     report.diagnostics = mergeDiagnoses(allDiagnoses);
     report.primaryDiagnosis = pickPrimaryDiagnosis(report.diagnostics);
-    report.capabilitySummary = summarizeCapabilityCoverage(report, { config });
+    report.recoverySupersededCycleCount = recoveryAggregation.supersededCount;
+    report.recoveryEffectiveCycleStartIndex = recoveryAggregation.recoveryCycleIndex;
+    report.capabilitySummary = summarizeCapabilityCoverage({
+      ...report,
+      cycles: effectiveCycles,
+    }, { config });
     report.passed = report.issues.length === 0;
     report.durationMs = Math.max(0, Date.now() - scriptStartedAt);
     if (!report.passed) {

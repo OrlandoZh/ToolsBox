@@ -730,6 +730,12 @@ function summarizePatchDraftOperations(patchPlan) {
     .sort((a, b) => b.count - a.count || a.operation.localeCompare(b.operation));
 }
 
+function pickEffectiveE2ECycles(report) {
+  const cycles = Array.isArray(report?.cycles) ? report.cycles : [];
+  const effectiveCycles = cycles.filter((cycle) => cycle?.supersededByRecovery !== true);
+  return effectiveCycles.length > 0 ? effectiveCycles : cycles;
+}
+
 function getVerificationKindLabel(kind) {
   switch (String(kind || "").trim()) {
     case "all-cycle-check":
@@ -1092,6 +1098,107 @@ function pickDomContractStatusLabel(status) {
     default:
       return "未知";
   }
+}
+
+function pickHangProbeStatusLabel(status) {
+  switch (String(status || "").trim()) {
+    case "captured":
+      return "已采集";
+    case "partial":
+      return "部分采集";
+    case "missing":
+      return "缺失";
+    default:
+      return "未知";
+  }
+}
+
+function pickHangProbeLikelyCauseLabel(cause) {
+  switch (String(cause || "").trim()) {
+    case "rdp-transport-disconnect":
+      return "更像 RDP transport 断链";
+    case "memory-pressure-suspected":
+      return "存在内存压力嫌疑";
+    case "process-exited":
+      return "超时期间进程已退出";
+    case "event-loop-stall":
+      return "更像 chrome evaluation / 事件循环阻塞";
+    case "process-alive-timeout":
+      return "超时期间进程仍存活";
+    case "unknown":
+      return "原因未明";
+    default:
+      return "原因未明";
+  }
+}
+
+function summarizeHangProbe(latestCycle) {
+  const rawProbe = latestCycle?.hangProbe && typeof latestCycle.hangProbe === "object"
+    ? latestCycle.hangProbe
+    : null;
+  if (!rawProbe) {
+    return {
+      present: false,
+      status: "missing",
+      statusLabel: pickHangProbeStatusLabel("missing"),
+      advisory: true,
+      cycleIndex: null,
+      scenarioName: null,
+      reasonKind: null,
+      reasonMessage: null,
+      pid: null,
+      processAlive: null,
+      processState: null,
+      rssKb: null,
+      rssMb: null,
+      percentMem: null,
+      elapsed: null,
+      oomSignalCount: 0,
+      oomSignals: [],
+      sampleAttempted: false,
+      sampleCaptured: false,
+      samplePath: null,
+      sampleError: null,
+      likelyCause: "unknown",
+      likelyCauseLabel: pickHangProbeLikelyCauseLabel("unknown"),
+      summary: "当前未采集 hang probe。",
+    };
+  }
+
+  const sampleCaptured = rawProbe.sampleCaptured === true;
+  const processObserved = rawProbe.processAlive === true || rawProbe.processAlive === false;
+  const status = sampleCaptured && processObserved
+    ? "captured"
+    : processObserved || rawProbe.sampleAttempted === true
+      ? "partial"
+      : "missing";
+
+  return {
+    present: true,
+    status,
+    statusLabel: pickHangProbeStatusLabel(status),
+    advisory: rawProbe.advisory !== false,
+    cycleIndex: Number.isFinite(Number(rawProbe.cycleIndex)) ? Number(rawProbe.cycleIndex) : null,
+    scenarioName: String(rawProbe.scenarioName || "").trim() || null,
+    reasonKind: String(rawProbe.reasonKind || "").trim() || null,
+    reasonMessage: String(rawProbe.reasonMessage || "").trim() || null,
+    pid: Number.isFinite(Number(rawProbe.pid)) ? Number(rawProbe.pid) : null,
+    processAlive: rawProbe.processAlive === true ? true : rawProbe.processAlive === false ? false : null,
+    processState: String(rawProbe.processState || "").trim() || null,
+    rssKb: Number.isFinite(Number(rawProbe.rssKb)) ? Number(rawProbe.rssKb) : null,
+    rssMb: Number.isFinite(Number(rawProbe.rssMb)) ? Number(rawProbe.rssMb) : null,
+    percentMem: Number.isFinite(Number(rawProbe.percentMem)) ? Number(rawProbe.percentMem) : null,
+    elapsed: String(rawProbe.elapsed || "").trim() || null,
+    oomSignalCount: normalizeNonNegativeNumber(rawProbe.oomSignalCount, 0),
+    oomSignals: uniqueStrings(rawProbe.oomSignals).slice(0, 6),
+    sampleAttempted: rawProbe.sampleAttempted === true,
+    sampleCaptured,
+    samplePath: String(rawProbe.samplePath || "").trim() || null,
+    sampleError: String(rawProbe.sampleError || "").trim() || null,
+    likelyCause: String(rawProbe.likelyCause || "").trim() || "unknown",
+    likelyCauseLabel: pickHangProbeLikelyCauseLabel(rawProbe.likelyCause),
+    summary: String(rawProbe.summary || "").trim() || "当前未采集 hang probe。",
+  };
 }
 
 function formatDomContractFailedCheck(check, scenarioName) {
@@ -2740,6 +2847,32 @@ export function summarizeE2EReport(report, options = {}) {
       lifecycleSlowThresholdMs: 2000,
       lifecycleLastSlowStage: null,
       lifecycleBoundaryEvents: [],
+      hangProbe: {
+        present: false,
+        status: "missing",
+        statusLabel: pickHangProbeStatusLabel("missing"),
+        advisory: true,
+        cycleIndex: null,
+        scenarioName: null,
+        reasonKind: null,
+        reasonMessage: null,
+        pid: null,
+        processAlive: null,
+        processState: null,
+        rssKb: null,
+        rssMb: null,
+        percentMem: null,
+        elapsed: null,
+        oomSignalCount: 0,
+        oomSignals: [],
+        sampleAttempted: false,
+        sampleCaptured: false,
+        samplePath: null,
+        sampleError: null,
+        likelyCause: "unknown",
+        likelyCauseLabel: pickHangProbeLikelyCauseLabel("unknown"),
+        summary: "当前未采集 hang probe。",
+      },
       performanceBudget: {
         present: false,
         observed: false,
@@ -2891,7 +3024,7 @@ export function summarizeE2EReport(report, options = {}) {
     };
   }
 
-  const cycles = Array.isArray(report.cycles) ? report.cycles : [];
+  const cycles = pickEffectiveE2ECycles(report);
   const latestCycle = cycles[cycles.length - 1] || null;
   const passedCycles = cycles.filter((cycle) => cycle?.passed === true).length;
   const failedCycles = cycles.filter((cycle) => cycle?.passed !== true).length;
@@ -2995,6 +3128,7 @@ export function summarizeE2EReport(report, options = {}) {
     : summarizeCapabilityCoverage(report);
   const readerEventReport = summarizeReaderEventBridge(report, latestCycle);
   const domContractReport = summarizeDomContractReport(latestCycle);
+  const hangProbe = summarizeHangProbe(latestCycle);
   const readerHostState = summarizeReaderHostState(report, latestCycle);
   const toolbarEvidenceSummary = summarizeToolbarEvidence(readerEventReport);
   const visualEvidence = summarizeVisualEvidenceItems(cycles);
@@ -3149,6 +3283,7 @@ export function summarizeE2EReport(report, options = {}) {
     lifecycleSlowThresholdMs,
     lifecycleLastSlowStage,
     lifecycleBoundaryEvents,
+    hangProbe,
     performanceBudget,
     registrationObserved: registrationHealth.registrationObserved,
     officialMenuAPIAvailable: registrationHealth.officialMenuAPIAvailable,

@@ -11,6 +11,10 @@ import {
   readJSONFile,
   SCRIPT_ERROR_CATEGORY_LABELS,
 } from "./script-runtime-lib.mjs";
+import {
+  ENCRYPTED_PACKAGE_VARIANT,
+  protectBuildBundle,
+} from "./package-protection-lib.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,6 +41,85 @@ export async function readPackageConfig() {
     details: { configPath: filePath, field: "addonVersion" },
   });
   return config;
+}
+
+export function parsePackageArgs(argv = process.argv.slice(2)) {
+  const options = {
+    encryptBundle: false,
+    outputSuffix: "",
+    writeReleaseMetadata: true,
+  };
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = String(argv[index] || "").trim();
+    if (!token) {
+      continue;
+    }
+
+    switch (token) {
+      case "--encrypt-bundle":
+        options.encryptBundle = true;
+        break;
+      case "--skip-release-metadata":
+        options.writeReleaseMetadata = false;
+        break;
+      case "--write-release-metadata":
+        options.writeReleaseMetadata = true;
+        break;
+      case "--output-suffix": {
+        const rawSuffix = String(argv[index + 1] || "").trim();
+        if (!rawSuffix) {
+          throw createScriptError("args", "--output-suffix requires a non-empty value", {
+            failedStage: "parse-args",
+            details: { option: "--output-suffix" },
+          });
+        }
+        if (!/^[a-z0-9-]+$/u.test(rawSuffix)) {
+          throw createScriptError("args", "--output-suffix must match /^[a-z0-9-]+$/", {
+            failedStage: "parse-args",
+            details: {
+              option: "--output-suffix",
+              received: rawSuffix,
+            },
+          });
+        }
+        options.outputSuffix = rawSuffix;
+        index += 1;
+        break;
+      }
+      default:
+        throw createScriptError("args", `Unknown option: ${token}`, {
+          failedStage: "parse-args",
+          details: { option: token },
+        });
+    }
+  }
+
+  if (options.encryptBundle && !options.outputSuffix) {
+    options.outputSuffix = ENCRYPTED_PACKAGE_VARIANT;
+  }
+
+  if (options.outputSuffix && options.writeReleaseMetadata) {
+    throw createScriptError(
+      "args",
+      "custom package variants must use --skip-release-metadata because release metadata only tracks the standard XPI",
+      {
+        failedStage: "parse-args",
+        details: {
+          outputSuffix: options.outputSuffix,
+        },
+      },
+    );
+  }
+
+  return options;
+}
+
+function buildOutputName(config, options = {}) {
+  const suffix = String(options.outputSuffix || "").trim();
+  return suffix
+    ? `${config.addonRef}-${config.addonVersion}-${suffix}.xpi`
+    : `${config.addonRef}-${config.addonVersion}.xpi`;
 }
 
 export function runNodeScript(scriptPath, failedStage) {
@@ -91,17 +174,28 @@ export function runNodeScript(scriptPath, failedStage) {
   }
 }
 
-export async function main() {
+export async function main(argv = process.argv.slice(2)) {
   await withBuildLock("package.mjs", async () => {
+    const options = parsePackageArgs(argv);
     const config = await readPackageConfig();
     const buildRoot = path.join(projectRoot, "build", config.addonRef);
+    const bundlePath = path.join(buildRoot, "content", "scripts", `${config.addonRef}.js`);
     const distRoot = path.join(projectRoot, "dist");
 
     runNodeScript(path.join(projectRoot, "scripts", "build.mjs"), "run-build");
     const { promises: fs } = await import("node:fs");
     await fs.mkdir(distRoot, { recursive: true });
 
-    const outputName = `${config.addonRef}-${config.addonVersion}.xpi`;
+    let protectedBundleMeta = null;
+    if (options.encryptBundle) {
+      protectedBundleMeta = await protectBuildBundle({
+        bundlePath,
+        addonRef: config.addonRef,
+        addonVersion: config.addonVersion,
+      });
+    }
+
+    const outputName = buildOutputName(config, options);
     const outputPath = path.join(distRoot, outputName);
     await fs.rm(outputPath, { force: true });
 
@@ -131,9 +225,19 @@ export async function main() {
       });
     }
 
-    runNodeScript(path.join(projectRoot, "scripts", "release-metadata.mjs"), "run-release-metadata");
+    if (options.writeReleaseMetadata) {
+      runNodeScript(path.join(projectRoot, "scripts", "release-metadata.mjs"), "run-release-metadata");
+    }
 
     console.log(`Package complete: ${outputPath}`);
+    if (protectedBundleMeta) {
+      console.log(
+        `Protected bundle applied: variant=${protectedBundleMeta.variant} sourceSHA256=${protectedBundleMeta.sourceSHA256}`,
+      );
+    }
+    if (!options.writeReleaseMetadata) {
+      console.log("Release metadata skipped for this package variant.");
+    }
   });
 }
 

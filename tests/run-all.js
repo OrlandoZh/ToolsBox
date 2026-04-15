@@ -82,6 +82,7 @@ import './agent-zotero-loop-lib.test.js';
 import './agent-zotero-capture-window-lib.test.js';
 import './agent-zotero-e2e-lib.test.js';
 import './agent-zotero-e2e-script.test.js';
+import './agent-zotero-e2e-session-lib.test.js';
 import './agent-zotero-locale-lib.test.js';
 import './agent-zotero-static-runtime-lib.test.js';
 import './agent-zotero-validation-lib.test.js';

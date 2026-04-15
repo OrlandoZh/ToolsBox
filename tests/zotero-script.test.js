@@ -66,6 +66,25 @@ describe("Zotero Script", () => {
     ]);
   });
 
+  it("should exclude explicitly advisory scenarios from the selected scenario list", () => {
+    const scenarioSelection = filterRegisteredScenarios({
+      registeredScenarios: [
+        { name: "performance budget diagnostics" },
+        { name: "preference pane control interaction" },
+        { name: "reader surface smoke" },
+      ],
+      excludeScenarioNames: ["performance budget diagnostics"],
+    });
+
+    assert.deepEqual(scenarioSelection.selected.map((entry) => entry.name), [
+      "preference pane control interaction",
+      "reader surface smoke",
+    ]);
+    assert.deepEqual(scenarioSelection.excludedNames, [
+      "performance budget diagnostics",
+    ]);
+  });
+
   it("should fail fast when scenario file filters match nothing", async () => {
     const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cleanroom-zotero-script-"));
     const scenarioDir = path.join(projectRoot, "zotero-scenarios");

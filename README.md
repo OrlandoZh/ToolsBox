@@ -67,6 +67,7 @@
 2. 运行 `npm run verify` 验证配置
 3. 运行 `npm run build` 构建插件
 4. 运行 `npm run package` 生成 `.xpi` 发布包
+4.1. 如需手动触发受保护导出分支，运行 `npm run package:encrypted` 生成 `dist/<addonRef>-<addonVersion>-encrypted.xpi`
 5. 在 Zotero 中通过 “Install Add-on From File” 安装 `dist/<addonRef>-<addonVersion>.xpi`
 
 注意：
@@ -263,6 +264,7 @@ npm run docs:sync-current-truth # 同步正式文档中的当前 truth 摘要块
 npm run check    # lint + format + typecheck + verify + cleanroom:audit + test
 npm run build    # 构建：生成 manifest/prefs/bootstrap，打包源码
 npm run package  # 打包：创建 .xpi 发布包
+npm run package:encrypted # 手动导出受保护 XPI 分支（默认不写 release metadata）
 npm run release:metadata # 生成 dist/update.json 与 release-manifest.json
 npm run release:preflight # 校验发布产物一致性 + 发布态 clean-room 门禁，并生成 release-preflight.json
 npm run release:local # 本地完整发布门禁（package + release:preflight）

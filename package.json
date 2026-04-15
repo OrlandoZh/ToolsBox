@@ -8,6 +8,7 @@
     "build": "node scripts/build.mjs",
     "build:react-ui": "node scripts/build-react-ui.mjs",
     "package": "node scripts/package.mjs",
+    "package:encrypted": "node scripts/package.mjs --encrypt-bundle --skip-release-metadata",
     "export:project": "node scripts/export-project.mjs",
     "verify": "node scripts/verify.mjs",
     "cleanroom:sim": "node scripts/cleanroom-similarity.mjs",

@@ -51,12 +51,21 @@ cd my-plugin
 ```bash
 npm run build
 npm run package
+npm run package:encrypted
 ```
 
 在 Zotero 中：
 1. 打开 工具 → 开发者 → 管理附加组件
 2. 点击 "Install Add-on From File"
 3. 选择 `dist/myplugin-0.1.0.xpi`
+
+如果你需要一个手动触发的受保护导出分支，也可以额外执行：
+
+```bash
+npm run package:encrypted
+```
+
+它会生成 `dist/myplugin-0.1.0-encrypted.xpi`。这条分支只对主 bundle 做客户端侧加密包装，提高直接解包直读门槛；默认不写 release metadata，不进入 `release:plan` / `agent:gate:release` 主线，也不替代服务端保护。
 
 说明：`updateURL` 在 Zotero 7/8 的实际安装链路中应视为必填。留空时，构建虽然可能完成，但 Zotero 会把生成的包判为无效。
 说明：当前仓库 `config/addon.config.json` 中落地的 Gitee `updateURL` 仅用于这个模板项目自身的远端发布验收与测试；如果你是基于模板开发自己的插件，必须先替换 `addonId`、`homepage` 和 `updateURL`，不能继续沿用模板仓库的发布地址。
@@ -784,6 +793,21 @@ npm run package
 - `dist/release-manifest.json`
 
 `update.json` 会基于 `config/addon.config.json` 中的 `addonId`、`addonVersion`、`updateURL` 自动生成；不要再手写第二份更新清单。
+
+如果只想手动导出一个受保护包分支，而不触碰默认 release 主线，可执行：
+
+```bash
+npm run package:encrypted
+```
+
+它会额外生成：
+
+- `dist/myplugin-1.0.0-encrypted.xpi`
+
+补充说明：
+
+- `package:encrypted` 默认不写 `dist/update.json` 或 `dist/release-manifest.json`
+- 这条分支定位是“提高随手解包和直读源码门槛”，不是“客户端密钥不落地”的强安全方案
 
 ### 3. 先生成上传计划壳，再手动上传
 

@@ -2,6 +2,7 @@
  * Zotero runner helper tests
  */
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { EventEmitter } from "node:events";
@@ -616,6 +617,47 @@ ZOTERO_PLUGIN_RDP_PORT=64719
     assert.equal(error.details?.label, "scenario:menu surface smoke");
     assert.equal(error.details?.consoleActor, "server.conn.console");
     assert.equal(error.details?.resultID, "result-42");
+  });
+
+  it("should reject pending requests when the RDP socket closes cleanly", async () => {
+    const server = net.createServer((socket) => {
+      const greeting = JSON.stringify({ from: "root" });
+      socket.write(`${Buffer.byteLength(greeting)}:${greeting}`);
+      socket.once("data", () => {
+        socket.end();
+      });
+    });
+
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    const port = typeof address === "object" && address ? address.port : null;
+    const client = new RdpClient();
+    let error = null;
+
+    try {
+      await client.connect({
+        port,
+        retries: 1,
+        retryDelayMs: 1,
+      });
+
+      try {
+        await Promise.race([
+          client.request("getRoot"),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("request-timeout")), 200)),
+        ]);
+      }
+      catch (caught) {
+        error = caught;
+      }
+    } finally {
+      client.disconnect();
+      await new Promise((resolve) => server.close(resolve));
+    }
+
+    assert.ok(error);
+    assert.equal(error.message === "request-timeout", false);
+    assert.match(error.message, /RDP socket (ended|closed|disconnected)/u);
   });
 
   it("should unwrap RDP preview objects into plain values", () => {

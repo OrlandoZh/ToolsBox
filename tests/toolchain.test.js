@@ -306,6 +306,40 @@ describe("Toolchain Scripts", () => {
     assert.ok(releaseManifest.xpiName.endsWith(".xpi"));
   });
 
+  it("should build a manual encrypted package variant without writing release metadata", () => {
+    const config = readJSON(path.join(projectRoot, "config", "addon.config.json"));
+    const distRoot = path.join(projectRoot, "dist");
+    const buildRoot = path.join(projectRoot, "build", config.addonRef);
+    const encryptedXpiName = `${config.addonRef}-${config.addonVersion}-encrypted.xpi`;
+    const encryptedXpiPath = path.join(distRoot, encryptedXpiName);
+    const releaseManifestPath = path.join(distRoot, "release-manifest.json");
+    const updateManifestPath = path.join(distRoot, "update.json");
+    const protectedBundlePath = path.join(buildRoot, "content", "scripts", `${config.addonRef}.js`);
+
+    removeDirIfExists(buildRoot);
+    removeIfExists(encryptedXpiPath);
+    removeIfExists(releaseManifestPath);
+    removeIfExists(updateManifestPath);
+
+    execFileSync("node", ["scripts/package.mjs", "--encrypt-bundle", "--skip-release-metadata"], {
+      cwd: projectRoot,
+      stdio: "pipe",
+    });
+
+    assert.ok(fs.existsSync(encryptedXpiPath));
+    assert.equal(fs.existsSync(releaseManifestPath), false);
+    assert.equal(fs.existsSync(updateManifestPath), false);
+    assert.ok(fs.existsSync(protectedBundlePath));
+
+    const protectedBundleSource = fs.readFileSync(protectedBundlePath, "utf-8");
+    assert.ok(protectedBundleSource.includes("__CLEANROOM_ENCRYPTED_BUNDLE__"));
+    assert.ok(protectedBundleSource.includes("subtle.decrypt"));
+    assert.equal(protectedBundleSource.includes("__moduleDefs"), false);
+
+    removeDirIfExists(buildRoot);
+    removeIfExists(encryptedXpiPath);
+  });
+
   it("should pass release preflight and generate integrity report", () => {
     prepareLocalReleasePreflight();
 
@@ -623,6 +657,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(packageJSON.scripts["framework:governance:check"], "node scripts/framework-governance-check.mjs");
     assert.equal(packageJSON.scripts["framework:bundle:audit"], "node scripts/framework-bundle-audit.mjs");
     assert.equal(packageJSON.scripts["build:react-ui"], "node scripts/build-react-ui.mjs");
+    assert.equal(packageJSON.scripts["package:encrypted"], "node scripts/package.mjs --encrypt-bundle --skip-release-metadata");
     assert.equal(packageJSON.devDependencies.esbuild, "^0.21.5");
     assert.equal(packageJSON.devDependencies.react, "^18.3.1");
     assert.equal(packageJSON.devDependencies["react-dom"], "^18.3.1");
@@ -918,6 +953,7 @@ describe("Toolchain Scripts", () => {
     assert.ok(fs.existsSync(path.join(exportRoot, "src", "main.js")));
     assert.ok(fs.existsSync(path.join(exportRoot, "types", "index.d.ts")));
     assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "static-runtime-baseline-lib.mjs")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "package-protection-lib.mjs")));
     assert.ok(fs.existsSync(path.join(exportRoot, "LEGAL_RISK_CHECKLIST.md")));
     assert.ok(fs.existsSync(path.join(exportRoot, "CODE_PROVENANCE.md")));
     assert.ok(fs.existsSync(path.join(exportRoot, "THIRD_PARTY_NOTICES.md")));
@@ -931,6 +967,7 @@ describe("Toolchain Scripts", () => {
     assert.ok(exportManifest.includedPaths.includes("COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md"));
     assert.equal(exportPackage.scripts.build, "node scripts/build.mjs");
     assert.equal(exportPackage.scripts["build:react-ui"], "node scripts/build-react-ui.mjs");
+    assert.equal(exportPackage.scripts["package:encrypted"], "node scripts/package.mjs --encrypt-bundle --skip-release-metadata");
     assert.equal(exportPackage.devDependencies.esbuild, "^0.21.5");
     assert.equal(exportPackage.devDependencies.react, "^18.3.1");
     assert.equal(exportPackage.devDependencies["react-dom"], "^18.3.1");
@@ -940,6 +977,7 @@ describe("Toolchain Scripts", () => {
     assert.ok(exportReadme.includes("中国法商业交付骨架"));
     assert.ok(exportReadme.includes("UNLICENSED"));
     assert.ok(exportReadme.includes("build:react-ui"));
+    assert.ok(exportReadme.includes("package:encrypted"));
     assert.ok(exportReadme.includes("react-dom"));
     assert.ok(exportReadme.includes("addon-static/content/style/main.css"));
     assert.ok(exportReadme.includes("addon-static/locale/zh-CN/main.ftl"));

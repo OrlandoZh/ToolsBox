@@ -316,6 +316,61 @@ describe("Agent Zotero E2E Lib", () => {
     assert.ok(result.issues.some((item) => item.includes("chrome-evaluation-timeout")));
   });
 
+  it("should surface hang probe hints for transport-style stalls", () => {
+    const result = evaluateCycle({
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 3,
+        passed: 1,
+        failed: 1,
+        results: [{
+          name: "multi-window mount diagnostics",
+          status: "failed",
+          error: {
+            kind: "chrome-evaluation-timeout",
+            message: "Timed out waiting for RDP event (scenario:multi-window mount diagnostics)",
+          },
+        }],
+        execution: {
+          incomplete: true,
+          lastStartedScenario: "multi-window mount diagnostics",
+          timeoutKind: "chrome-evaluation-timeout",
+        },
+      },
+      hangProbe: {
+        present: true,
+        likelyCause: "event-loop-stall",
+        likelyCauseLabel: "更像 chrome evaluation / 事件循环阻塞",
+        summary: "触发场景 multi-window mount diagnostics；原因 chrome-evaluation-timeout；进程仍存活（PID 123 / RSS 842.1 MB / stat S）；未见 OOM/内存压力信号；已采集 sample；判断：更像 chrome evaluation / 事件循环阻塞",
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: false,
+      },
+    });
+
+    assert.ok(result.hints.some((item) => item.includes("Hang probe：")));
+    assert.ok(result.hints.some((item) => item.includes("不先把问题归因为内存泄漏")));
+  });
+
   it("should render markdown report with cycle summary", () => {
     const markdown = buildE2EMarkdown({
       generatedAt: "2026-03-19T00:00:00.000Z",
@@ -366,6 +421,22 @@ describe("Agent Zotero E2E Lib", () => {
               },
             },
           ],
+        },
+        hangProbe: {
+          present: true,
+          advisory: true,
+          cycleIndex: 1,
+          scenarioName: "multi-window mount diagnostics",
+          reasonKind: "chrome-evaluation-timeout",
+          processAlive: true,
+          rssMb: 842.1,
+          oomSignalCount: 0,
+          sampleAttempted: true,
+          sampleCaptured: true,
+          samplePath: "/tmp/cycle-1-hang-sample.txt",
+          likelyCause: "event-loop-stall",
+          likelyCauseLabel: "更像 chrome evaluation / 事件循环阻塞",
+          summary: "触发场景 multi-window mount diagnostics；原因 chrome-evaluation-timeout；进程仍存活（PID 123 / RSS 842.1 MB / stat S）；未见 OOM/内存压力信号；已采集 sample；判断：更像 chrome evaluation / 事件循环阻塞",
         },
         logs: {
           errorCount: 0,
@@ -486,6 +557,9 @@ describe("Agent Zotero E2E Lib", () => {
     assert.ok(markdown.includes("采集稳定性 library 稳定 2 次（哈希收敛）；reader 待稳 3 次（重试上限）"));
     assert.ok(markdown.includes("## Pre-capture Settle 诊断"));
     assert.ok(markdown.includes("reader 超时"));
+    assert.ok(markdown.includes("## Hang Probe"));
+    assert.ok(markdown.includes("更像 chrome evaluation / 事件循环阻塞"));
+    assert.ok(markdown.includes("cycle-1-hang-sample.txt"));
     assert.ok(markdown.includes("## 能力覆盖"));
     assert.ok(markdown.includes("基线注册"));
     assert.ok(markdown.includes("## 结构化诊断"));
@@ -1366,6 +1440,61 @@ describe("Agent Zotero E2E Lib", () => {
     assert.ok(result.issues.includes("Reader 官方事件监听注册异常。"));
     assert.equal(result.primaryDiagnosis?.fingerprint, "reader-event:toolbar-bridge-registration-drift");
     assert.ok(result.hints.some((item) => String(item).includes("registerEventListener()")));
+  });
+
+  it("should not report renderToolbar drift when reader hook scenarios were not observed", () => {
+    const result = evaluateCycle({
+      index: 1,
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        hasMainWindow: true,
+        primaryActionResult: true,
+        agentActionResult: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 1,
+        itemTreeColumns: 1,
+        notifierActiveCount: 1,
+        readerSummaryCommandRegistered: true,
+        readerSummaryMenuRegistered: true,
+        readerEventAPIAvailable: true,
+        readerEventKnownTypeCount: 0,
+        readerEventProbeTypeCount: 0,
+        readerEventSyntheticFallbackAvailable: true,
+        readerEventHookScenarioObserved: false,
+        readerEventFineGrainedScenarioObserved: false,
+        readerEventHookScenarioPassed: null,
+        readerEventFineGrainedScenarioPassed: null,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+        results: [],
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: true,
+        analysis: {
+          ok: true,
+          issues: [],
+        },
+      },
+    });
+
+    assert.equal(result.passed, true);
+    assert.equal(result.issues.includes("Reader renderToolbar 宿主点未观测。"), false);
+    assert.equal(result.issues.includes("Reader 官方事件监听注册异常。"), false);
   });
 
   it("should diagnose reader event synthetic fallback mapping gaps", () => {

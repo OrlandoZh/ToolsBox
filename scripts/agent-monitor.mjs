@@ -657,6 +657,19 @@ function buildMarkdown(summary) {
     });
     lines.push("");
   }
+  const hangProbe = summary.zoteroValidation?.e2e?.hangProbe || null;
+  if (hangProbe?.present) {
+    lines.push("### Hang Probe", "");
+    lines.push(`- 状态: \`${hangProbe.statusLabel || hangProbe.status || "缺失"}\``);
+    lines.push(`- 触发场景: \`${hangProbe.scenarioName || "-"}\``);
+    lines.push(`- 原因: \`${hangProbe.reasonKind || "-"}\``);
+    lines.push(`- 进程存活: \`${hangProbe.processAlive === null ? "-" : (hangProbe.processAlive ? "yes" : "no")}\``);
+    lines.push(`- RSS: \`${hangProbe.rssMb === null ? "-" : `${hangProbe.rssMb.toFixed(1)} MB`}\``);
+    lines.push(`- OOM 信号: \`${hangProbe.oomSignalCount ?? 0}\``);
+    lines.push(`- 判断: ${hangProbe.likelyCauseLabel || "-"}`);
+    lines.push(`- 摘要: ${hangProbe.summary || "-"}`);
+    lines.push("");
+  }
   const readerEvent = summary.zoteroValidation?.e2e?.readerEventReport || null;
   if (readerEvent) {
     const e2e = summary.zoteroValidation.e2e;

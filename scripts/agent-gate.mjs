@@ -1153,6 +1153,16 @@ function buildMarkdown(report) {
           });
         }
       }
+      if (e2e.hangProbe && typeof e2e.hangProbe === "object" && e2e.hangProbe.present) {
+        lines.push(`- Hang Probe: \`${e2e.hangProbe.statusLabel || e2e.hangProbe.status || "缺失"}\``);
+        lines.push(`- Hang 触发场景: \`${e2e.hangProbe.scenarioName || "-"}\``);
+        lines.push(`- Hang 原因: \`${e2e.hangProbe.reasonKind || "-"}\``);
+        lines.push(`- Hang 进程存活: \`${e2e.hangProbe.processAlive === null ? "-" : (e2e.hangProbe.processAlive ? "yes" : "no")}\``);
+        lines.push(`- Hang RSS: \`${e2e.hangProbe.rssMb === null ? "-" : `${e2e.hangProbe.rssMb.toFixed(1)} MB`}\``);
+        lines.push(`- Hang OOM 信号: \`${e2e.hangProbe.oomSignalCount ?? 0}\``);
+        lines.push(`- Hang 判断: ${e2e.hangProbe.likelyCauseLabel || "-"}`);
+        lines.push(`- Hang 摘要: ${e2e.hangProbe.summary || "-"}`);
+      }
       if (e2e.readerEventReport && typeof e2e.readerEventReport === "object") {
         lines.push(`- Reader 事件桥: \`${e2e.readerEventReport.status || "unknown"}\` (${e2e.readerEventReport.statusLabel || "未知"})`);
         lines.push(`- 事件 API: \`${e2e.readerEventReport.available === null ? "-" : (e2e.readerEventReport.available ? "可用" : "不可用")}\``);

@@ -3175,6 +3175,213 @@ describe("Agent Zotero Validation Lib", () => {
     assert.ok(String(summary.performanceBudget.violationSummary || "").includes("Reader 侧边栏切换"));
   });
 
+  it("should keep a failed performance budget advisory non-blocking in the E2E summary", () => {
+    const summary = summarizeE2EReport({
+      generatedAt: "2026-04-06T00:00:00.000Z",
+      passed: true,
+      issues: [],
+      hints: [],
+      cycles: [{
+        index: 1,
+        passed: true,
+        checks: {
+          hostReadyDurationMs: 2100,
+          startupDurationMs: 3200,
+          shutdownDurationMs: 900,
+          lifecycleSlowOperationCount: 1,
+          httpSlowOperationCount: 0,
+        },
+        tests: { failed: 0 },
+        scenarios: {
+          failed: 0,
+          results: [{
+            name: "performance budget diagnostics",
+            status: "failed",
+            advisory: true,
+            error: {
+              message: "Timed out waiting for RDP event (scenario:performance budget diagnostics)",
+              kind: "chrome-evaluation-timeout",
+            },
+          }],
+        },
+        logs: {
+          errorCount: 0,
+          warnCount: 0,
+          errorBoundaryHitCount: 0,
+          errorBoundaryEvents: [],
+        },
+      }],
+    }, {
+      now: "2026-04-06T00:30:00.000Z",
+    });
+
+    assert.equal(summary.status, "passed");
+    assert.equal(summary.scenarioFailed, 0);
+    assert.equal(summary.performanceBudget.status, "attention");
+    assert.ok(String(summary.performanceBudget.summary || "").includes("dev-only advisory"));
+    assert.ok(String(summary.performanceBudget.summary || "").includes("Timed out waiting for RDP event"));
+  });
+
+  it("should ignore superseded cycles once a recovered restart cycle takes over", () => {
+    const summary = summarizeE2EReport({
+      generatedAt: "2026-04-14T12:51:26.104Z",
+      passed: true,
+      issues: [],
+      hints: [],
+      cycles: [
+        {
+          index: 1,
+          bootMode: "restart",
+          passed: false,
+          supersededByRecovery: true,
+          checks: {
+            hostReadyDurationMs: 1800,
+            startupDurationMs: 3100,
+            shutdownDurationMs: 800,
+          },
+          tests: { failed: 0 },
+          scenarios: {
+            failed: 1,
+            execution: {
+              incomplete: true,
+              lastStartedScenario: "reader surface smoke",
+              timeoutKind: "runner-failure",
+            },
+            results: [{
+              name: "reader surface smoke",
+              status: "failed",
+            }],
+          },
+          logs: {
+            errorCount: 0,
+            warnCount: 0,
+            errorBoundaryHitCount: 0,
+            errorBoundaryEvents: [],
+          },
+        },
+        {
+          index: 2,
+          bootMode: "restart",
+          passed: true,
+          checks: {
+            hotReloadTransportRecovered: true,
+            hotReloadTransportRecoveryReason: "RDP socket is not connected",
+            hostReadyDurationMs: 1700,
+            startupDurationMs: 2900,
+            shutdownDurationMs: 820,
+          },
+          tests: { failed: 0 },
+          scenarios: {
+            failed: 0,
+            execution: {
+              incomplete: false,
+              lastStartedScenario: "reader surface smoke",
+              lastCompletedScenario: "reader surface smoke",
+              timeoutKind: null,
+            },
+            results: [{
+              name: "reader surface smoke",
+              status: "passed",
+            }],
+          },
+          logs: {
+            errorCount: 0,
+            warnCount: 0,
+            errorBoundaryHitCount: 0,
+            errorBoundaryEvents: [],
+          },
+        },
+      ],
+    }, {
+      now: "2026-04-14T13:00:00.000Z",
+    });
+
+    assert.equal(summary.status, "passed");
+    assert.equal(summary.cycles, 1);
+    assert.equal(summary.failedCycles, 0);
+    assert.equal(summary.scenarioFailed, 0);
+    assert.equal(summary.scenarioIncompleteCycleCount, 0);
+    assert.equal(summary.latestBootMode, "restart");
+  });
+
+  it("should summarize hang probe evidence for chrome evaluation timeouts", () => {
+    const summary = summarizeE2EReport({
+      generatedAt: "2026-04-14T13:18:54.020Z",
+      passed: false,
+      issues: ["Zotero 场景执行未完成：停止于 multi-window mount diagnostics（chrome-evaluation-timeout）。"],
+      hints: [],
+      cycles: [{
+        index: 2,
+        bootMode: "restart",
+        passed: false,
+        checks: {
+          hostReadyDurationMs: 1700,
+          startupDurationMs: 2900,
+          shutdownDurationMs: 820,
+        },
+        tests: { failed: 0 },
+        scenarios: {
+          failed: 1,
+          execution: {
+            incomplete: true,
+            lastStartedScenario: "multi-window mount diagnostics",
+            lastCompletedScenario: "live menu surface smoke",
+            timeoutKind: "chrome-evaluation-timeout",
+          },
+          results: [{
+            name: "multi-window mount diagnostics",
+            status: "failed",
+            error: {
+              kind: "chrome-evaluation-timeout",
+              message: "Timed out waiting for RDP event (scenario:multi-window mount diagnostics)",
+            },
+          }],
+        },
+        hangProbe: {
+          present: true,
+          advisory: true,
+          cycleIndex: 2,
+          scenarioName: "multi-window mount diagnostics",
+          reasonKind: "chrome-evaluation-timeout",
+          reasonMessage: "Timed out waiting for RDP event (scenario:multi-window mount diagnostics)",
+          pid: 55858,
+          processAlive: true,
+          processState: "S",
+          rssKb: 862412,
+          rssMb: 842.2,
+          percentMem: 3.4,
+          elapsed: "00:48",
+          oomSignalCount: 0,
+          oomSignals: [],
+          sampleAttempted: true,
+          sampleCaptured: true,
+          samplePath: "/tmp/cycle-2-hang-sample.txt",
+          likelyCause: "event-loop-stall",
+          likelyCauseLabel: "更像 chrome evaluation / 事件循环阻塞",
+          summary: "触发场景 multi-window mount diagnostics；原因 chrome-evaluation-timeout；进程仍存活（PID 55858 / RSS 842.2 MB / stat S）；未见 OOM/内存压力信号；已采集 sample；判断：更像 chrome evaluation / 事件循环阻塞",
+        },
+        logs: {
+          errorCount: 0,
+          warnCount: 0,
+          errorBoundaryHitCount: 0,
+          errorBoundaryEvents: [],
+        },
+      }],
+    }, {
+      now: "2026-04-14T14:00:00.000Z",
+    });
+
+    assert.equal(summary.hangProbe.present, true);
+    assert.equal(summary.hangProbe.status, "captured");
+    assert.equal(summary.hangProbe.scenarioName, "multi-window mount diagnostics");
+    assert.equal(summary.hangProbe.processAlive, true);
+    assert.equal(summary.hangProbe.rssMb, 842.2);
+    assert.equal(summary.hangProbe.oomSignalCount, 0);
+    assert.equal(summary.hangProbe.sampleCaptured, true);
+    assert.equal(summary.hangProbe.likelyCause, "event-loop-stall");
+    assert.ok(String(summary.hangProbe.summary || "").includes("未见 OOM/内存压力信号"));
+  });
+
   it("should summarize a passed dom contract report when all three routes are present", () => {
     const summary = summarizeE2EReport(buildDomContractE2EReport([
       buildDomContractScenarioResult({

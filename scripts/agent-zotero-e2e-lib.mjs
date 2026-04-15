@@ -50,6 +50,14 @@ function toMarkdownLink(filePath) {
   return `[${label}](${filePath})`;
 }
 
+function uniqueStrings(values) {
+  return Array.from(new Set(
+    (Array.isArray(values) ? values : [])
+      .map((item) => String(item || "").trim())
+      .filter(Boolean),
+  ));
+}
+
 function formatDateTime(dateLike) {
   if (!dateLike) {
     return "-";
@@ -1042,17 +1050,35 @@ export function evaluateCycle(cycle) {
     issues.push(`检测到 ${logSummary.errorCount} 条 error 级日志。`);
   }
 
+  const hints = deriveFixHints({ issues, logSummary });
+  const hangProbe = cycle?.hangProbe && typeof cycle.hangProbe === "object"
+    ? cycle.hangProbe
+    : null;
+  if (hangProbe?.present) {
+    const likelyCauseLabel = String(hangProbe.likelyCauseLabel || "").trim();
+    const summary = String(hangProbe.summary || "").trim();
+    if (likelyCauseLabel || summary) {
+      hints.push(`Hang probe：${summary || likelyCauseLabel}`);
+    }
+    if (hangProbe.likelyCause === "event-loop-stall" || hangProbe.likelyCause === "rdp-transport-disconnect") {
+      hints.push("当前更像 Zotero RDP / chrome evaluation 长批次失稳；优先收敛 session restart、scenario retry 或批次切分，不先把问题归因为内存泄漏。");
+    }
+    if (hangProbe.likelyCause === "memory-pressure-suspected") {
+      hints.push("当前已命中 OOM/内存压力信号；下一步应结合 sample 与 RSS 继续确认是否存在真正的内存型卡死。");
+    }
+  }
+
   const diagnoses = deriveCycleDiagnoses({
     cycle,
     issues,
-    hints: deriveFixHints({ issues, logSummary }),
+    hints,
     logSummary,
   });
 
   return {
     passed: issues.length === 0,
     issues,
-    hints: deriveFixHints({ issues, logSummary }),
+    hints: uniqueStrings(hints),
     diagnoses,
     primaryDiagnosis: pickPrimaryDiagnosis(diagnoses),
   };
@@ -1081,8 +1107,11 @@ export function buildE2EMarkdown(report) {
     const scenarioRemark = cycle.scenarios?.execution?.incomplete === true
       ? ` / incomplete@${cycle.scenarios.execution.lastStartedScenario || "-"}`
       : "";
+    const recoveryRemark = cycle.supersededByRecovery === true
+      ? " / superseded-by-recovery"
+      : "";
     lines.push(
-      `| ${cycle.index} | ${escapeMarkdown(cycle.bootMode)} | ${cycle.passed ? "通过" : "未通过"} | ${cycle.logs.errorCount} | ${cycle.logs.warnCount} | ${cycle.tests ? cycle.tests.failed : 0} | ${cycle.scenarios ? cycle.scenarios.failed : 0} | ${escapeMarkdown(`${cycle.summaryNote || "-"}${scenarioRemark}`)} |`,
+      `| ${cycle.index} | ${escapeMarkdown(cycle.bootMode)} | ${cycle.passed ? "通过" : "未通过"} | ${cycle.logs.errorCount} | ${cycle.logs.warnCount} | ${cycle.tests ? cycle.tests.failed : 0} | ${cycle.scenarios ? cycle.scenarios.failed : 0} | ${escapeMarkdown(`${cycle.summaryNote || "-"}${scenarioRemark}${recoveryRemark}`)} |`,
     );
   });
 
@@ -1113,6 +1142,23 @@ export function buildE2EMarkdown(report) {
       lines.push(`- Route 摘要: ${route.summary || "-"}`);
       lines.push(`- 失败检查: ${(route.failedChecks || []).join("；") || "-"}`);
     });
+  }
+
+  if (summary.hangProbe?.present) {
+    lines.push("", "## Hang Probe", "");
+    lines.push(`- 状态: \`${summary.hangProbe.statusLabel || summary.hangProbe.status || "-"}\``);
+    lines.push(`- Advisory: \`${summary.hangProbe.advisory ? "yes" : "no"}\``);
+    lines.push(`- 触发场景: \`${summary.hangProbe.scenarioName || "-"}\``);
+    lines.push(`- 原因: \`${summary.hangProbe.reasonKind || "-"}\``);
+    lines.push(`- 进程存活: \`${summary.hangProbe.processAlive === null ? "-" : (summary.hangProbe.processAlive ? "yes" : "no")}\``);
+    lines.push(`- RSS: \`${summary.hangProbe.rssMb === null ? "-" : `${summary.hangProbe.rssMb.toFixed(1)} MB`}\``);
+    lines.push(`- OOM 信号: \`${summary.hangProbe.oomSignalCount ?? 0}\``);
+    lines.push(`- sample: \`${summary.hangProbe.sampleCaptured ? "captured" : (summary.hangProbe.sampleAttempted ? "attempted" : "skipped")}\``);
+    lines.push(`- 判断: ${summary.hangProbe.likelyCauseLabel || "-"}`);
+    lines.push(`- 摘要: ${summary.hangProbe.summary || "-"}`);
+    if (summary.hangProbe.samplePath) {
+      lines.push(`- sample 文件: ${toMarkdownLink(summary.hangProbe.samplePath)}`);
+    }
   }
 
   if (
