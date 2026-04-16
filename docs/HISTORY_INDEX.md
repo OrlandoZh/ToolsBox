@@ -17,6 +17,7 @@
 | 2026-04-08 | capability | AIAssistant 踩坑经验模板化 | 把宿主 contract、Fluent、ItemPane 和 preference pane 的真实坑点转成模板护栏 | 保留“为什么要有这些 guardrail”的历史原因 | [CURRENT_BACKLOG.md](./CURRENT_BACKLOG.md), [PREFERENCE_PANE_GUIDE.md](./PREFERENCE_PANE_GUIDE.md), [API.md](./API.md) | [AIASSISTANT_PITFALLS.md](./AIASSISTANT_PITFALLS.md) |
 | 2026-04-08 | capability | React 面板创建与切换经验抽取 | 把 `AIAssistant` 的 host-mounted React surface 与 window mode 经验抽成 clean-room 模式 | 保留通用模式来源与不应直接模板化的产品边界 | [UI_CREATION_PATHS.md](./UI_CREATION_PATHS.md), [OPTIONAL_BUNDLES.md](./OPTIONAL_BUNDLES.md) | [REFERENCE_AIASSISTANT_REACT_PANEL_PATTERNS.md](./REFERENCE_AIASSISTANT_REACT_PANEL_PATTERNS.md) |
 | 2026-04-14 | capability | AIAssistant 经验吸收表达层收口 | 把下游项目里仍有价值的偏好页验证语言和 host-visible 成熟度标签，收口到模板 guide/router，而不是再造一套新产品能力 | 保留当前 authoritative guide、router 和文档 vocabulary 的来源说明 | [PREFERENCE_PANE_GUIDE.md](./PREFERENCE_PANE_GUIDE.md), [UI_VALIDATION_PATHS.md](./UI_VALIDATION_PATHS.md), [AGENT_INDEX.md](./AGENT_INDEX.md) | [PREFERENCE_PANE_GUIDE.md](./PREFERENCE_PANE_GUIDE.md) |
+| 2026-04-16 | capability | 手动受保护打包分支经验收口 | 把 `encrypted / shielded` 分支的真实性能、可解读性与威胁模型边界收成模板经验，避免后续再次回到重 loader 卡顿方案 | 保留“为什么 `encrypted` 更稳、为什么 `shielded` 必须 loader-lite、下一步性能该盯 decode”的历史依据 | [GUIDE.md](./GUIDE.md), [README.md](../README.md) | [PACKAGE_PROTECTION_EXPERIENCE.md](./PACKAGE_PROTECTION_EXPERIENCE.md) |
 
 ## Research / Archive Routes
 

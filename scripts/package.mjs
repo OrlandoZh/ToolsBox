@@ -2,6 +2,10 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import {
+  BUILD_MODULE_ID_MODE_ANONYMIZED,
+  BUILD_MODULE_ID_MODE_ENV,
+} from "./build.mjs";
 import { withBuildLock } from "./build-lock.mjs";
 import {
   assertNonEmptyString,
@@ -13,8 +17,14 @@ import {
 } from "./script-runtime-lib.mjs";
 import {
   ENCRYPTED_PACKAGE_VARIANT,
+  SHIELDED_PACKAGE_VARIANT,
   protectBuildBundle,
 } from "./package-protection-lib.mjs";
+import {
+  obfuscateBuildBundle,
+  SHIELDED_BUNDLE_OBFUSCATION_STAGE,
+  SHIELDED_LOADER_OBFUSCATION_STAGE,
+} from "./package-obfuscation-lib.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -46,6 +56,7 @@ export async function readPackageConfig() {
 export function parsePackageArgs(argv = process.argv.slice(2)) {
   const options = {
     encryptBundle: false,
+    shieldBundle: false,
     outputSuffix: "",
     writeReleaseMetadata: true,
   };
@@ -58,6 +69,10 @@ export function parsePackageArgs(argv = process.argv.slice(2)) {
 
     switch (token) {
       case "--encrypt-bundle":
+        options.encryptBundle = true;
+        break;
+      case "--shield-bundle":
+        options.shieldBundle = true;
         options.encryptBundle = true;
         break;
       case "--skip-release-metadata":
@@ -95,7 +110,11 @@ export function parsePackageArgs(argv = process.argv.slice(2)) {
     }
   }
 
-  if (options.encryptBundle && !options.outputSuffix) {
+  if (options.shieldBundle && !options.outputSuffix) {
+    options.outputSuffix = SHIELDED_PACKAGE_VARIANT;
+  }
+
+  if (!options.outputSuffix && options.encryptBundle) {
     options.outputSuffix = ENCRYPTED_PACKAGE_VARIANT;
   }
 
@@ -122,7 +141,34 @@ function buildOutputName(config, options = {}) {
     : `${config.addonRef}-${config.addonVersion}.xpi`;
 }
 
-export function runNodeScript(scriptPath, failedStage) {
+export function resolvePackageBuildEnv(options = {}) {
+  if (options.encryptBundle || options.shieldBundle || options.outputSuffix) {
+    return {
+      [BUILD_MODULE_ID_MODE_ENV]: BUILD_MODULE_ID_MODE_ANONYMIZED,
+    };
+  }
+
+  return {};
+}
+
+export function resolvePackageZipExcludePatterns(options = {}) {
+  if (options.encryptBundle || options.shieldBundle || options.outputSuffix) {
+    return ["build-report.json"];
+  }
+
+  return [];
+}
+
+export function buildPackageZipArgs(outputPath, options = {}) {
+  const args = ["-r", outputPath, "."];
+  const excludePatterns = resolvePackageZipExcludePatterns(options);
+  if (excludePatterns.length > 0) {
+    args.push("-x", ...excludePatterns);
+  }
+  return args;
+}
+
+export function runNodeScript(scriptPath, failedStage, options = {}) {
   const labelToCategory = Object.entries(SCRIPT_ERROR_CATEGORY_LABELS)
     .reduce((accumulator, [category, label]) => {
       accumulator[label] = category;
@@ -134,6 +180,7 @@ export function runNodeScript(scriptPath, failedStage) {
     encoding: "utf-8",
     env: {
       ...process.env,
+      ...(options.env && typeof options.env === "object" ? options.env : {}),
       CLEANROOM_BUILD_LOCK_HELD: "1",
     },
   });
@@ -182,16 +229,37 @@ export async function main(argv = process.argv.slice(2)) {
     const bundlePath = path.join(buildRoot, "content", "scripts", `${config.addonRef}.js`);
     const distRoot = path.join(projectRoot, "dist");
 
-    runNodeScript(path.join(projectRoot, "scripts", "build.mjs"), "run-build");
+    runNodeScript(
+      path.join(projectRoot, "scripts", "build.mjs"),
+      "run-build",
+      { env: resolvePackageBuildEnv(options) },
+    );
     const { promises: fs } = await import("node:fs");
     await fs.mkdir(distRoot, { recursive: true });
 
     let protectedBundleMeta = null;
+    let obfuscatedBundleMeta = null;
+    let obfuscatedLoaderMeta = null;
+    if (options.shieldBundle) {
+      obfuscatedBundleMeta = await obfuscateBuildBundle({
+        bundlePath,
+        stage: SHIELDED_BUNDLE_OBFUSCATION_STAGE,
+      });
+    }
+
     if (options.encryptBundle) {
       protectedBundleMeta = await protectBuildBundle({
         bundlePath,
         addonRef: config.addonRef,
         addonVersion: config.addonVersion,
+        variant: options.shieldBundle ? SHIELDED_PACKAGE_VARIANT : ENCRYPTED_PACKAGE_VARIANT,
+      });
+    }
+
+    if (options.shieldBundle) {
+      obfuscatedLoaderMeta = await obfuscateBuildBundle({
+        bundlePath,
+        stage: SHIELDED_LOADER_OBFUSCATION_STAGE,
       });
     }
 
@@ -199,7 +267,7 @@ export async function main(argv = process.argv.slice(2)) {
     const outputPath = path.join(distRoot, outputName);
     await fs.rm(outputPath, { force: true });
 
-    const zip = spawnSync("zip", ["-r", outputPath, "."], {
+    const zip = spawnSync("zip", buildPackageZipArgs(outputPath, options), {
       cwd: buildRoot,
       stdio: "inherit",
     });
@@ -230,9 +298,19 @@ export async function main(argv = process.argv.slice(2)) {
     }
 
     console.log(`Package complete: ${outputPath}`);
+    if (obfuscatedBundleMeta) {
+      console.log(
+        `Bundle obfuscation applied: variant=${obfuscatedBundleMeta.variant} stage=${obfuscatedBundleMeta.stage} sourceSHA256=${obfuscatedBundleMeta.sourceSHA256} obfuscatedSHA256=${obfuscatedBundleMeta.obfuscatedSHA256}`,
+      );
+    }
     if (protectedBundleMeta) {
       console.log(
         `Protected bundle applied: variant=${protectedBundleMeta.variant} sourceSHA256=${protectedBundleMeta.sourceSHA256}`,
+      );
+    }
+    if (obfuscatedLoaderMeta) {
+      console.log(
+        `Protected loader obfuscation applied: variant=${obfuscatedLoaderMeta.variant} stage=${obfuscatedLoaderMeta.stage} sourceSHA256=${obfuscatedLoaderMeta.sourceSHA256} obfuscatedSHA256=${obfuscatedLoaderMeta.obfuscatedSHA256}`,
       );
     }
     if (!options.writeReleaseMetadata) {

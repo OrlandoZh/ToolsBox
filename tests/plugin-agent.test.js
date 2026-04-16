@@ -244,6 +244,19 @@ describe("Plugin Agent", () => {
           ],
         };
       },
+      getPackageProtectionSummary() {
+        return {
+          active: true,
+          variant: "shielded",
+          loadSubScriptDurationMs: 420,
+          decodeDurationMs: 85,
+          decryptDurationMs: 17,
+          evalDurationMs: 193,
+          prepareDurationMs: 302,
+          bootstrapResolveDurationMs: 305,
+          bootstrapCallCount: 1,
+        };
+      },
     });
 
     const inspected = agent.inspectItemPresentation({
@@ -292,6 +305,16 @@ describe("Plugin Agent", () => {
     assert.equal(diagnostics.lifecycleSlowThresholdMs, 2000);
     assert.equal(diagnostics.lifecycleLastSlowStage, "startup");
     assert.equal(diagnostics.lifecycleBoundaryEvents[0]?.event, "plugin.start.failed");
+    assert.equal(diagnostics.packageProtectionActive, true);
+    assert.equal(diagnostics.packageProtectionVariant, "shielded");
+    assert.equal(diagnostics.packageProtectionLoadSubScriptDurationMs, 420);
+    assert.equal(diagnostics.packageProtectionDecodeDurationMs, 85);
+    assert.equal(diagnostics.packageProtectionDecryptDurationMs, 17);
+    assert.equal(diagnostics.packageProtectionEvalDurationMs, 193);
+    assert.equal(diagnostics.packageProtectionPrepareDurationMs, 302);
+    assert.equal(diagnostics.packageProtectionBootstrapResolveDurationMs, 305);
+    assert.equal(diagnostics.packageProtectionBootstrapCallCount, 1);
+    assert.equal(diagnostics.packageProtection.variant, "shielded");
 
     const capabilities = agent.listCapabilities();
     assert.ok(capabilities.length >= 12);

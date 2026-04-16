@@ -369,6 +369,15 @@ export async function runFunctionalActions({ rdp, config }) {
       lifecycleSlowThresholdMs: 2000,
       lifecycleLastSlowStage: null,
       lifecycleBoundaryEvents: [],
+      packageProtectionActive: false,
+      packageProtectionVariant: null,
+      packageProtectionLoadSubScriptDurationMs: 0,
+      packageProtectionDecodeDurationMs: 0,
+      packageProtectionDecryptDurationMs: 0,
+      packageProtectionEvalDurationMs: 0,
+      packageProtectionPrepareDurationMs: 0,
+      packageProtectionBootstrapResolveDurationMs: 0,
+      packageProtectionBootstrapCallCount: 0,
     };
 
     if (plugin && plugin.api) {
@@ -465,6 +474,18 @@ export async function runFunctionalActions({ rdp, config }) {
           }))
           .filter((entry) => entry.count > 0)
         : [];
+      checks.packageProtectionActive = Boolean(selfCheck?.packageProtectionActive);
+      checks.packageProtectionVariant = typeof selfCheck?.packageProtectionVariant === "string"
+        && selfCheck.packageProtectionVariant.trim()
+        ? selfCheck.packageProtectionVariant
+        : null;
+      checks.packageProtectionLoadSubScriptDurationMs = Number(selfCheck?.packageProtectionLoadSubScriptDurationMs || 0);
+      checks.packageProtectionDecodeDurationMs = Number(selfCheck?.packageProtectionDecodeDurationMs || 0);
+      checks.packageProtectionDecryptDurationMs = Number(selfCheck?.packageProtectionDecryptDurationMs || 0);
+      checks.packageProtectionEvalDurationMs = Number(selfCheck?.packageProtectionEvalDurationMs || 0);
+      checks.packageProtectionPrepareDurationMs = Number(selfCheck?.packageProtectionPrepareDurationMs || 0);
+      checks.packageProtectionBootstrapResolveDurationMs = Number(selfCheck?.packageProtectionBootstrapResolveDurationMs || 0);
+      checks.packageProtectionBootstrapCallCount = Number(selfCheck?.packageProtectionBootstrapCallCount || 0);
     }
 
     return JSON.stringify(checks);

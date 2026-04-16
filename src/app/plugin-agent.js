@@ -37,6 +37,7 @@ export function createPluginAgent({
   serviceRegistry,
   runtimeInfo,
   getLifecycleTelemetrySummary = null,
+  getPackageProtectionSummary = null,
 }) {
   const capabilityManifest = createCapabilityManifest({ config });
 
@@ -204,6 +205,19 @@ export function createPluginAgent({
         lifecycleLastSlowStage: null,
         lifecycleBoundaryEvents: [],
       };
+    const packageProtection = typeof getPackageProtectionSummary === "function"
+      ? getPackageProtectionSummary()
+      : {
+        active: false,
+        variant: null,
+        loadSubScriptDurationMs: 0,
+        decodeDurationMs: 0,
+        decryptDurationMs: 0,
+        evalDurationMs: 0,
+        prepareDurationMs: 0,
+        bootstrapResolveDurationMs: 0,
+        bootstrapCallCount: 0,
+      };
     return {
       enabled: Boolean(prefs.get("enabled")),
       hasMainWindow: Boolean(window),
@@ -268,6 +282,18 @@ export function createPluginAgent({
           }))
           .filter((entry) => entry.count > 0)
         : [],
+      packageProtectionActive: Boolean(packageProtection?.active),
+      packageProtectionVariant: typeof packageProtection?.variant === "string"
+        && packageProtection.variant.trim()
+        ? packageProtection.variant
+        : null,
+      packageProtectionLoadSubScriptDurationMs: Number(packageProtection?.loadSubScriptDurationMs || 0),
+      packageProtectionDecodeDurationMs: Number(packageProtection?.decodeDurationMs || 0),
+      packageProtectionDecryptDurationMs: Number(packageProtection?.decryptDurationMs || 0),
+      packageProtectionEvalDurationMs: Number(packageProtection?.evalDurationMs || 0),
+      packageProtectionPrepareDurationMs: Number(packageProtection?.prepareDurationMs || 0),
+      packageProtectionBootstrapResolveDurationMs: Number(packageProtection?.bootstrapResolveDurationMs || 0),
+      packageProtectionBootstrapCallCount: Number(packageProtection?.bootstrapCallCount || 0),
       services: Array.isArray(serviceSummary.services) ? serviceSummary.services : [],
       runtimeBridgeOK: Boolean(runtimeSummary.ok !== false),
       runtimeBridgeStatus: runtimeSummary.status || "unknown",
@@ -354,6 +380,9 @@ export function createPluginAgent({
       menuIDs: menuManager.getRegisteredMenuIds(),
       commandIDs: commandPalette.getAllCommands().map((item) => item.id),
       paneIDs: preferencePanes.getAllPanes(),
+      packageProtection: typeof getPackageProtectionSummary === "function"
+        ? getPackageProtectionSummary()
+        : null,
       hostActions: typeof listHostActions === "function"
         ? listHostActions()
         : [],

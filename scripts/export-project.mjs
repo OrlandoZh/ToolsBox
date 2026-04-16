@@ -38,6 +38,7 @@ const COPY_PATHS = [
   "scripts/build-react-ui.mjs",
   "scripts/build.mjs",
   "scripts/package.mjs",
+  "scripts/package-obfuscation-lib.mjs",
   "scripts/package-protection-lib.mjs",
   "scripts/optional-bundles-lib.mjs",
   "scripts/script-runtime-lib.mjs",
@@ -60,6 +61,10 @@ const STATIC_RUNTIME_BASELINE_PATHS = [
   "addon-static/locale/en-US/main.ftl",
   "addon-static/locale/zh-CN/main.ftl",
   "addon-static/locale/zh-TW/main.ftl",
+];
+
+const EXPORTED_TOOLCHAIN_DEV_DEPENDENCIES = [
+  "javascript-obfuscator",
 ];
 
 async function ensureDir(dirPath) {
@@ -91,6 +96,7 @@ function buildExportPackageJSON(sourcePackage, optionalBundleRegistry = null) {
     build: "node scripts/build.mjs",
     package: "node scripts/package.mjs",
     "package:encrypted": "node scripts/package.mjs --encrypt-bundle --skip-release-metadata",
+    "package:shielded": "node scripts/package.mjs --shield-bundle --skip-release-metadata",
     verify: "node scripts/verify.mjs",
     lint: "node scripts/lint.mjs",
     "format:check": "node scripts/format-check.mjs",
@@ -116,6 +122,12 @@ function buildExportPackageJSON(sourcePackage, optionalBundleRegistry = null) {
     : [];
   const devDependencies = {};
   const dependencies = {};
+
+  EXPORTED_TOOLCHAIN_DEV_DEPENDENCIES.forEach((packageName) => {
+    if (typeof sourcePackage?.devDependencies?.[packageName] === "string") {
+      devDependencies[packageName] = sourcePackage.devDependencies[packageName];
+    }
+  });
 
   requiredOptionalPackages.forEach((packageName) => {
     if (typeof sourcePackage?.devDependencies?.[packageName] === "string") {
@@ -186,12 +198,13 @@ function buildExportReadme(config, exportLicense) {
 npm run build
 npm run package
 npm run package:encrypted
+npm run package:shielded
 npm run verify
 npm run check
 npm run build:react-ui
 \`\`\`
 
-补充说明：\`package:encrypted\` 只生成本地手动触发的受保护 XPI 分支，不参与默认 release metadata / release gate 主线，也不替代服务端保护。
+补充说明：\`package:encrypted\` 与 \`package:shielded\` 只生成本地手动触发的受保护 XPI 分支，不参与默认 release metadata / release gate 主线，也不替代服务端保护；其中 \`package:shielded\` 会先对主 bundle 做混淆，再对 protected loader 做一层兼容性优先的混淆，最后做 AES 包装。
 
 导出目标适合继续聚焦插件本体开发；如果需要 agent 闭环、真机 runner、Obsidian 介入包等能力，请回到主仓库。
 `;

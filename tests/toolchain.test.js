@@ -4,6 +4,11 @@ import path from "node:path";
 import { execFile, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { describe, it, assert } from "./test-framework.js";
+import {
+  buildPackageZipArgs,
+  resolvePackageBuildEnv,
+  resolvePackageZipExcludePatterns,
+} from "../scripts/package.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -315,6 +320,7 @@ describe("Toolchain Scripts", () => {
     const releaseManifestPath = path.join(distRoot, "release-manifest.json");
     const updateManifestPath = path.join(distRoot, "update.json");
     const protectedBundlePath = path.join(buildRoot, "content", "scripts", `${config.addonRef}.js`);
+    const buildReportPath = path.join(buildRoot, "build-report.json");
 
     removeDirIfExists(buildRoot);
     removeIfExists(encryptedXpiPath);
@@ -330,14 +336,44 @@ describe("Toolchain Scripts", () => {
     assert.equal(fs.existsSync(releaseManifestPath), false);
     assert.equal(fs.existsSync(updateManifestPath), false);
     assert.ok(fs.existsSync(protectedBundlePath));
+    assert.ok(fs.existsSync(buildReportPath));
 
     const protectedBundleSource = fs.readFileSync(protectedBundlePath, "utf-8");
+    const buildReport = readJSON(buildReportPath);
     assert.ok(protectedBundleSource.includes("__CLEANROOM_ENCRYPTED_BUNDLE__"));
     assert.ok(protectedBundleSource.includes("subtle.decrypt"));
     assert.equal(protectedBundleSource.includes("__moduleDefs"), false);
+    assert.equal(buildReport.moduleIdMode, "anonymized");
+
+    const encryptedZipListing = execFileSync("unzip", ["-l", encryptedXpiPath], {
+      cwd: projectRoot,
+      encoding: "utf-8",
+      stdio: "pipe",
+    });
+    assert.equal(encryptedZipListing.includes("build-report.json"), false);
 
     removeDirIfExists(buildRoot);
     removeIfExists(encryptedXpiPath);
+  });
+
+  it("should keep protected package build env and zip exclusions scoped to custom variants", () => {
+    assert.deepEqual(resolvePackageBuildEnv({}), {});
+    assert.deepEqual(resolvePackageBuildEnv({ encryptBundle: true }), {
+      CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
+    });
+    assert.deepEqual(resolvePackageBuildEnv({ shieldBundle: true }), {
+      CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
+    });
+
+    assert.deepEqual(resolvePackageZipExcludePatterns({}), []);
+    assert.deepEqual(resolvePackageZipExcludePatterns({ encryptBundle: true }), ["build-report.json"]);
+    assert.deepEqual(resolvePackageZipExcludePatterns({ shieldBundle: true }), ["build-report.json"]);
+
+    assert.deepEqual(buildPackageZipArgs("/tmp/demo.xpi", {}), ["-r", "/tmp/demo.xpi", "."]);
+    assert.deepEqual(
+      buildPackageZipArgs("/tmp/demo.xpi", { shieldBundle: true }),
+      ["-r", "/tmp/demo.xpi", ".", "-x", "build-report.json"],
+    );
   });
 
   it("should pass release preflight and generate integrity report", () => {
@@ -658,7 +694,9 @@ describe("Toolchain Scripts", () => {
     assert.equal(packageJSON.scripts["framework:bundle:audit"], "node scripts/framework-bundle-audit.mjs");
     assert.equal(packageJSON.scripts["build:react-ui"], "node scripts/build-react-ui.mjs");
     assert.equal(packageJSON.scripts["package:encrypted"], "node scripts/package.mjs --encrypt-bundle --skip-release-metadata");
+    assert.equal(packageJSON.scripts["package:shielded"], "node scripts/package.mjs --shield-bundle --skip-release-metadata");
     assert.equal(packageJSON.devDependencies.esbuild, "^0.21.5");
+    assert.equal(packageJSON.devDependencies["javascript-obfuscator"], "^5.4.1");
     assert.equal(packageJSON.devDependencies.react, "^18.3.1");
     assert.equal(packageJSON.devDependencies["react-dom"], "^18.3.1");
     assert.equal(packageJSON.scripts["agent:workspace:guard"], "node scripts/agent-workspace-guard.mjs");
@@ -953,6 +991,7 @@ describe("Toolchain Scripts", () => {
     assert.ok(fs.existsSync(path.join(exportRoot, "src", "main.js")));
     assert.ok(fs.existsSync(path.join(exportRoot, "types", "index.d.ts")));
     assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "static-runtime-baseline-lib.mjs")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "package-obfuscation-lib.mjs")));
     assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "package-protection-lib.mjs")));
     assert.ok(fs.existsSync(path.join(exportRoot, "LEGAL_RISK_CHECKLIST.md")));
     assert.ok(fs.existsSync(path.join(exportRoot, "CODE_PROVENANCE.md")));
@@ -968,7 +1007,9 @@ describe("Toolchain Scripts", () => {
     assert.equal(exportPackage.scripts.build, "node scripts/build.mjs");
     assert.equal(exportPackage.scripts["build:react-ui"], "node scripts/build-react-ui.mjs");
     assert.equal(exportPackage.scripts["package:encrypted"], "node scripts/package.mjs --encrypt-bundle --skip-release-metadata");
+    assert.equal(exportPackage.scripts["package:shielded"], "node scripts/package.mjs --shield-bundle --skip-release-metadata");
     assert.equal(exportPackage.devDependencies.esbuild, "^0.21.5");
+    assert.equal(exportPackage.devDependencies["javascript-obfuscator"], "^5.4.1");
     assert.equal(exportPackage.devDependencies.react, "^18.3.1");
     assert.equal(exportPackage.devDependencies["react-dom"], "^18.3.1");
     assert.ok(!("agent:gate" in exportPackage.scripts));
@@ -978,6 +1019,7 @@ describe("Toolchain Scripts", () => {
     assert.ok(exportReadme.includes("UNLICENSED"));
     assert.ok(exportReadme.includes("build:react-ui"));
     assert.ok(exportReadme.includes("package:encrypted"));
+    assert.ok(exportReadme.includes("package:shielded"));
     assert.ok(exportReadme.includes("react-dom"));
     assert.ok(exportReadme.includes("addon-static/content/style/main.css"));
     assert.ok(exportReadme.includes("addon-static/locale/zh-CN/main.ftl"));

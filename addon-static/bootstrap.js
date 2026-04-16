@@ -420,10 +420,27 @@ async function startup({ rootURI }, reason) {
     chromeGlobal.__CLEANROOM_TEMPLATE_RUNTIME__ = pluginScope.__CLEANROOM_TEMPLATE_RUNTIME__;
     _emitCapabilityReport(capabilityReport);
 
+    const packageLoadStartedAt = Date.now();
     Services.scriptloader.loadSubScript(
       `${rootURI}content/scripts/${meta.addonRef}.js`,
       pluginScope,
     );
+    const packageLoadDurationMs = Math.max(0, Date.now() - packageLoadStartedAt);
+    const packageVariant = typeof pluginScope.__CLEANROOM_PACKAGE_VARIANT__ === "string"
+      && pluginScope.__CLEANROOM_PACKAGE_VARIANT__
+      ? pluginScope.__CLEANROOM_PACKAGE_VARIANT__
+      : null;
+    const runtimePackageProtection = pluginScope.__CLEANROOM_TEMPLATE_RUNTIME__?.packageProtection;
+
+    if (packageVariant || (runtimePackageProtection && typeof runtimePackageProtection === "object")) {
+      const packageProtection = runtimePackageProtection && typeof runtimePackageProtection === "object"
+        ? runtimePackageProtection
+        : {};
+      packageProtection.active = true;
+      packageProtection.variant = packageVariant || packageProtection.variant || null;
+      packageProtection.loadSubScriptDurationMs = packageLoadDurationMs;
+      pluginScope.__CLEANROOM_TEMPLATE_RUNTIME__.packageProtection = packageProtection;
+    }
 
     if (pluginScope.__CLEANROOM_TEMPLATE_CONFIG__) {
       chromeGlobal.__CLEANROOM_TEMPLATE_CONFIG__ = pluginScope.__CLEANROOM_TEMPLATE_CONFIG__;

@@ -82,6 +82,18 @@ function formatLogTail(chunks, limit = 8) {
   return chunks.slice(-limit);
 }
 
+async function readPackageProtectionSummary({ rdp, config }) {
+  const raw = await rdp.evaluateInChrome(`(() => {
+    const plugin = Zotero[${JSON.stringify(config.instanceKey)}];
+    const summary = plugin?.api?.runtime?.getPackageProtectionSummary?.()
+      || plugin?.api?.runAgentSelfCheck?.()?.packageProtection
+      || null;
+    return JSON.stringify(summary);
+  })()`);
+
+  return typeof raw === "string" ? JSON.parse(raw) : raw;
+}
+
 function pickChannelFromArgs(argv) {
   const index = argv.indexOf("--channel");
   const candidate = index >= 0 ? String(argv[index + 1] || "").trim() : "";
@@ -211,6 +223,25 @@ function renderMarkdown(report) {
     `- 插件错误数: \`${report.pluginRuntimeErrorCount ?? 0}\``,
     `- 资源错误数: \`${report.resourceRuntimeErrorCount ?? 0}\``,
     "",
+  );
+
+  if (report.packageProtection?.active) {
+    lines.push(
+      "## 包保护时序",
+      "",
+      `- 变体: \`${report.packageProtection.variant || "-"}\``,
+      `- loadSubScript: \`${report.packageProtection.loadSubScriptDurationMs ?? 0}ms\``,
+      `- payload decode: \`${report.packageProtection.decodeDurationMs ?? 0}ms\``,
+      `- decrypt: \`${report.packageProtection.decryptDurationMs ?? 0}ms\``,
+      `- eval: \`${report.packageProtection.evalDurationMs ?? 0}ms\``,
+      `- prepare total: \`${report.packageProtection.prepareDurationMs ?? 0}ms\``,
+      `- bootstrap resolve: \`${report.packageProtection.bootstrapResolveDurationMs ?? 0}ms\``,
+      `- bootstrap calls: \`${report.packageProtection.bootstrapCallCount ?? 0}\``,
+      "",
+    );
+  }
+
+  lines.push(
     "## 运行时错误画像",
     "",
     `- 阻断错误: ${report.blockingRuntimeErrorPortrait || "-"}`,
@@ -345,6 +376,9 @@ async function main() {
         return null;
       })
       : null;
+    const packageProtection = readiness
+      ? await readPackageProtectionSummary({ rdp, config }).catch(() => null)
+      : null;
     const apiReady = Boolean(
       readiness
       && (readiness.mode === "native" || readiness.mode === "plugins-init" || readiness.mode === "manual"),
@@ -406,6 +440,19 @@ async function main() {
         : null,
       readinessMode: readiness?.mode || null,
       apiReady,
+      packageProtection: packageProtection && typeof packageProtection === "object"
+        ? {
+          active: packageProtection.active === true,
+          variant: typeof packageProtection.variant === "string" ? packageProtection.variant : null,
+          loadSubScriptDurationMs: Number(packageProtection.loadSubScriptDurationMs || 0),
+          decodeDurationMs: Number(packageProtection.decodeDurationMs || 0),
+          decryptDurationMs: Number(packageProtection.decryptDurationMs || 0),
+          evalDurationMs: Number(packageProtection.evalDurationMs || 0),
+          prepareDurationMs: Number(packageProtection.prepareDurationMs || 0),
+          bootstrapResolveDurationMs: Number(packageProtection.bootstrapResolveDurationMs || 0),
+          bootstrapCallCount: Number(packageProtection.bootstrapCallCount || 0),
+        }
+        : null,
       runtimeLogs,
       runtimeErrorClasses: runtimeErrorSummary.runtimeErrorClasses,
       blockingRuntimeErrorCount: runtimeErrorSummary.blockingRuntimeErrorCount,

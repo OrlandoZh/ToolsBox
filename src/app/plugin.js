@@ -73,6 +73,36 @@ function cloneLifecycleTelemetrySummary(summary = null) {
   };
 }
 
+function clonePackageProtectionSummary(summary = null) {
+  if (!summary || typeof summary !== "object") {
+    return {
+      active: false,
+      variant: null,
+      loadSubScriptDurationMs: 0,
+      decodeDurationMs: 0,
+      decryptDurationMs: 0,
+      evalDurationMs: 0,
+      prepareDurationMs: 0,
+      bootstrapResolveDurationMs: 0,
+      bootstrapCallCount: 0,
+    };
+  }
+
+  return {
+    active: Boolean(summary.active),
+    variant: typeof summary.variant === "string" && summary.variant.trim()
+      ? summary.variant.trim()
+      : null,
+    loadSubScriptDurationMs: Number(summary.loadSubScriptDurationMs || 0),
+    decodeDurationMs: Number(summary.decodeDurationMs || 0),
+    decryptDurationMs: Number(summary.decryptDurationMs || 0),
+    evalDurationMs: Number(summary.evalDurationMs || 0),
+    prepareDurationMs: Number(summary.prepareDurationMs || 0),
+    bootstrapResolveDurationMs: Number(summary.bootstrapResolveDurationMs || 0),
+    bootstrapCallCount: Number(summary.bootstrapCallCount || 0),
+  };
+}
+
 export function createPlugin({ globalScope, config }) {
   const runtime = globalScope.__CLEANROOM_TEMPLATE_RUNTIME__ || {};
   const optionalBundleRegistry = globalScope.__CLEANROOM_TEMPLATE_OPTIONAL_BUNDLES__ || null;
@@ -611,6 +641,7 @@ export function createPlugin({ globalScope, config }) {
     serviceRegistry,
     runtimeInfo,
     getLifecycleTelemetrySummary: () => cloneLifecycleTelemetrySummary(lifecycleTelemetrySummary),
+    getPackageProtectionSummary: () => clonePackageProtectionSummary(runtime?.packageProtection),
   });
 
   const featureComposer = createFeatureComposer({
@@ -714,6 +745,7 @@ export function createPlugin({ globalScope, config }) {
     inspectItemPresentation: agent.inspectItemPresentation,
     listHostActions: hostActions.listHostActions,
     runHostAction: hostActions.runHostAction,
+    getPackageProtectionSummary: () => clonePackageProtectionSummary(runtime?.packageProtection),
   });
 
   return {

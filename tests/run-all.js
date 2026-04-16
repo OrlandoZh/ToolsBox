@@ -93,6 +93,8 @@ import './agent-delegation.test.js';
 import './preference-pane-governance-lib.test.js';
 import './preferences-theme-script.test.js';
 import './build-injection-lib.test.js';
+import './package-obfuscation-lib.test.js';
+import './package-protection-lib.test.js';
 import './cleanroom-audit.test.js';
 import './optional-bundles-lib.test.js';
 import './run-all-completeness.test.js';

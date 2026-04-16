@@ -33,6 +33,7 @@ export function createPluginAPI({
   inspectItemPresentation,
   listHostActions,
   runHostAction,
+  getPackageProtectionSummary,
 }) {
   function cloneValue(value) {
     if (value === null || value === undefined) {
@@ -76,6 +77,13 @@ export function createPluginAPI({
           typeof runtimeInfo?.cloneCapabilityReport === "function"
             ? runtimeInfo.cloneCapabilityReport()
             : runtimeInfo?.capabilityReport || null,
+        );
+      },
+      getPackageProtectionSummary() {
+        return cloneValue(
+          typeof getPackageProtectionSummary === "function"
+            ? getPackageProtectionSummary()
+            : null,
         );
       },
     }),

@@ -7,7 +7,22 @@ import {
 } from "./script-runtime-lib.mjs";
 
 export const ENCRYPTED_PACKAGE_VARIANT = "encrypted";
-export const PROTECTED_BUNDLE_MARKER = "__CLEANROOM_ENCRYPTED_BUNDLE__";
+export const SHIELDED_PACKAGE_VARIANT = "shielded";
+export const ENCRYPTED_BUNDLE_MARKER = "__CLEANROOM_ENCRYPTED_BUNDLE__";
+export const SHIELDED_BUNDLE_MARKER = "__CLEANROOM_SHIELDED_BUNDLE__";
+
+function resolveProtectedBundleVariant(variant) {
+  const normalizedVariant = String(variant || "").trim().toLowerCase();
+  return normalizedVariant === SHIELDED_PACKAGE_VARIANT
+    ? SHIELDED_PACKAGE_VARIANT
+    : ENCRYPTED_PACKAGE_VARIANT;
+}
+
+function resolveProtectedBundleMarker(variant) {
+  return resolveProtectedBundleVariant(variant) === SHIELDED_PACKAGE_VARIANT
+    ? SHIELDED_BUNDLE_MARKER
+    : ENCRYPTED_BUNDLE_MARKER;
+}
 
 function encodeBase64(buffer) {
   return Buffer.from(buffer).toString("base64");
@@ -23,33 +38,89 @@ function escapeForSingleQuotedTemplate(value) {
     .replaceAll("'", "\\'");
 }
 
+function buildSegmentedBase64Literal(value, options = {}) {
+  const normalizedValue = String(value || "");
+  const segmentLength = Math.max(8, Number(options.segmentLength) || 64);
+  const segments = [];
+
+  for (let index = 0; index < normalizedValue.length; index += segmentLength) {
+    segments.push([
+      segments.length,
+      normalizedValue.slice(index, index + segmentLength),
+    ]);
+  }
+
+  return `[${segments
+    .slice()
+    .reverse()
+    .map(([index, chunk]) => `[${index}, '${escapeForSingleQuotedTemplate(chunk)}']`)
+    .join(", ")}]`;
+}
+
 function buildProtectedBundleLoaderSource({
-  addonRef,
-  addonVersion,
-  generatedAt,
   keyBase64,
   ivBase64,
   encryptedPayloadBase64,
-  sourceSHA256,
+  variant,
 }) {
-  return `/* ${PROTECTED_BUNDLE_MARKER} variant=${ENCRYPTED_PACKAGE_VARIANT} addon=${escapeForSingleQuotedTemplate(addonRef)} version=${escapeForSingleQuotedTemplate(addonVersion)} sourceSHA256=${sourceSHA256} */
+  const protectedVariant = resolveProtectedBundleVariant(variant);
+  const marker = resolveProtectedBundleMarker(protectedVariant);
+  const payloadSegments = buildSegmentedBase64Literal(encryptedPayloadBase64, { segmentLength: 96 });
+  const keySegments = buildSegmentedBase64Literal(keyBase64, { segmentLength: 24 });
+  const ivSegments = buildSegmentedBase64Literal(ivBase64, { segmentLength: 12 });
+  return `/* ${marker} */
 (function (__global) {
   var __bundleMeta = {
-    marker: '${PROTECTED_BUNDLE_MARKER}',
-    variant: '${ENCRYPTED_PACKAGE_VARIANT}',
-    addonRef: '${escapeForSingleQuotedTemplate(addonRef)}',
-    addonVersion: '${escapeForSingleQuotedTemplate(addonVersion)}',
-    generatedAt: '${escapeForSingleQuotedTemplate(generatedAt)}',
-    sourceSHA256: '${sourceSHA256}'
+    marker: '${marker}',
+    variant: '${protectedVariant}'
   };
-  var __payloadBase64 = '${encryptedPayloadBase64}';
-  var __keyBase64 = '${keyBase64}';
-  var __ivBase64 = '${ivBase64}';
+  var __payloadSegments = ${payloadSegments};
+  var __keySegments = ${keySegments};
+  var __ivSegments = ${ivSegments};
   var __protectedBootstrapPromise = null;
   var __protectedBootstrap = null;
 
+  function __now() {
+    return Date.now();
+  }
+
   function __fail(message) {
-    throw new Error('[cleanroom.package:${ENCRYPTED_PACKAGE_VARIANT}] ' + message);
+    throw new Error('[cleanroom.package:${protectedVariant}] ' + message);
+  }
+
+  function __getPackageProtectionState() {
+    var runtime = __global.__CLEANROOM_TEMPLATE_RUNTIME__;
+    var summary = null;
+
+    if (!runtime || typeof runtime !== 'object') {
+      runtime = {};
+      __global.__CLEANROOM_TEMPLATE_RUNTIME__ = runtime;
+    }
+
+    summary = runtime.packageProtection;
+    if (!summary || typeof summary !== 'object') {
+      summary = {};
+      runtime.packageProtection = summary;
+    }
+
+    return summary;
+  }
+
+  function __recordPackageProtectionState(patch) {
+    var summary = __getPackageProtectionState();
+    var key = '';
+
+    if (!patch || typeof patch !== 'object') {
+      return summary;
+    }
+
+    for (key in patch) {
+      if (Object.prototype.hasOwnProperty.call(patch, key)) {
+        summary[key] = patch[key];
+      }
+    }
+
+    return summary;
   }
 
   function __getCrypto() {
@@ -66,6 +137,17 @@ function buildProtectedBundleLoaderSource({
       __fail('TextDecoder unavailable');
     }
     return candidate;
+  }
+
+  function __joinSegments(segments) {
+    var ordered = new Array(segments.length);
+    var index = 0;
+
+    for (index = 0; index < segments.length; index += 1) {
+      ordered[segments[index][0]] = segments[index][1];
+    }
+
+    return ordered.join('');
   }
 
   function __base64ToBytes(base64) {
@@ -116,8 +198,8 @@ function buildProtectedBundleLoaderSource({
   }
 
   function __evaluateBundle(sourceCode) {
-    var runtimeEval = (0, eval);
-    runtimeEval(sourceCode);
+    var runtimeFactory = new Function('__cleanroomScope', 'globalThis', 'window', 'self', sourceCode);
+    runtimeFactory.call(__global, __global, __global, __global, __global);
   }
 
   async function __loadProtectedBootstrap() {
@@ -127,15 +209,21 @@ function buildProtectedBundleLoaderSource({
 
     if (!__protectedBootstrapPromise) {
       __protectedBootstrapPromise = (async function () {
+        var prepareStartedAt = __now();
+        var decodeStartedAt = __now();
         var cryptoObject = __getCrypto();
-        var encryptedPayload = __base64ToBytes(__payloadBase64);
-        var keyBytes = __base64ToBytes(__keyBase64);
-        var ivBytes = __base64ToBytes(__ivBase64);
+        var encryptedPayload = __base64ToBytes(__joinSegments(__payloadSegments));
+        var keyBytes = __base64ToBytes(__joinSegments(__keySegments));
+        var ivBytes = __base64ToBytes(__joinSegments(__ivSegments));
+        var decodeDurationMs = __now() - decodeStartedAt;
+        var decryptStartedAt = __now();
         var key = await cryptoObject.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['decrypt']);
         var decryptedBuffer = await cryptoObject.subtle.decrypt({ name: 'AES-GCM', iv: ivBytes }, key, encryptedPayload);
+        var decryptDurationMs = __now() - decryptStartedAt;
         var decoder = new (__getTextDecoder())();
         var decryptedSource = decoder.decode(new Uint8Array(decryptedBuffer));
         var previousBootstrap = __global.bootstrapPlugin;
+        var evalStartedAt = __now();
 
         __global.bootstrapPlugin = undefined;
         try {
@@ -145,6 +233,16 @@ function buildProtectedBundleLoaderSource({
           throw error;
         }
 
+        var evalDurationMs = __now() - evalStartedAt;
+        __recordPackageProtectionState({
+          active: true,
+          variant: __bundleMeta.variant,
+          decodeDurationMs: Math.max(0, decodeDurationMs),
+          decryptDurationMs: Math.max(0, decryptDurationMs),
+          evalDurationMs: Math.max(0, evalDurationMs),
+          prepareDurationMs: Math.max(0, __now() - prepareStartedAt),
+        });
+
         if (typeof __global.bootstrapPlugin !== 'function') {
           __global.bootstrapPlugin = previousBootstrap;
           __fail('decrypted bundle did not expose bootstrapPlugin');
@@ -152,7 +250,7 @@ function buildProtectedBundleLoaderSource({
 
         __protectedBootstrap = __global.bootstrapPlugin;
         __global.__CLEANROOM_PACKAGE_VARIANT__ = __bundleMeta.variant;
-        __global.__CLEANROOM_ENCRYPTED_BUNDLE__ = __bundleMeta;
+        __global[__bundleMeta.marker] = 1;
         __global.bootstrapPlugin = __bootstrapPluginProxy;
         return __protectedBootstrap;
       })();
@@ -162,12 +260,30 @@ function buildProtectedBundleLoaderSource({
   }
 
   async function __bootstrapPluginProxy() {
+    var resolveStartedAt = __now();
     var actualBootstrap = await __loadProtectedBootstrap();
+    var summary = __recordPackageProtectionState({
+      active: true,
+      variant: __bundleMeta.variant,
+      bootstrapResolveDurationMs: Math.max(0, __now() - resolveStartedAt),
+    });
+    summary.bootstrapCallCount = Math.max(0, Number(summary.bootstrapCallCount || 0)) + 1;
     return actualBootstrap.apply(__global, arguments);
   }
 
+  __recordPackageProtectionState({
+    active: true,
+    variant: __bundleMeta.variant,
+    loadSubScriptDurationMs: 0,
+    decodeDurationMs: 0,
+    decryptDurationMs: 0,
+    evalDurationMs: 0,
+    prepareDurationMs: 0,
+    bootstrapResolveDurationMs: 0,
+    bootstrapCallCount: 0
+  });
   __global.__CLEANROOM_PACKAGE_VARIANT__ = __bundleMeta.variant;
-  __global.__CLEANROOM_ENCRYPTED_BUNDLE__ = __bundleMeta;
+  __global[__bundleMeta.marker] = 1;
   __global.bootstrapPlugin = __bootstrapPluginProxy;
 })(this);
 `;
@@ -195,6 +311,7 @@ export function protectBundleSource(sourceCode, options = {}) {
 
   const sourceBuffer = Buffer.from(normalizedSource, "utf-8");
   const generatedAt = String(options.generatedAt || new Date().toISOString());
+  const variant = resolveProtectedBundleVariant(options.variant);
   const key = crypto.randomBytes(32);
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
@@ -205,20 +322,17 @@ export function protectBundleSource(sourceCode, options = {}) {
   ]);
   const sourceSHA256 = computeSHA256(sourceBuffer);
   const loaderSource = buildProtectedBundleLoaderSource({
-    addonRef,
-    addonVersion,
-    generatedAt,
     keyBase64: encodeBase64(key),
     ivBase64: encodeBase64(iv),
     encryptedPayloadBase64: encodeBase64(ciphertext),
-    sourceSHA256,
+    variant,
   });
 
   return {
     loaderSource,
     metadata: {
-      marker: PROTECTED_BUNDLE_MARKER,
-      variant: ENCRYPTED_PACKAGE_VARIANT,
+      marker: resolveProtectedBundleMarker(variant),
+      variant,
       addonRef,
       addonVersion,
       generatedAt,
@@ -251,6 +365,7 @@ export async function protectBuildBundle(options = {}) {
       addonRef,
       addonVersion,
       generatedAt: options.generatedAt,
+      variant: options.variant,
     });
     await fs.writeFile(bundlePath, protectedBundle.loaderSource, "utf-8");
     return {

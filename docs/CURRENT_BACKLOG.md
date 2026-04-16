@@ -447,7 +447,9 @@
 - 本地 `.xpi` 打包
 - 手动受保护 `.xpi` 导出分支
   - 当前可执行 `npm run package:encrypted`
+  - 当前可执行 `npm run package:shielded`
   - 当前会生成 `dist/<addonRef>-<addonVersion>-encrypted.xpi`
+  - 当前会生成 `dist/<addonRef>-<addonVersion>-shielded.xpi`
   - 当前默认不写 release metadata，不进入 release-only 主线
 - 本地 release preflight
 - 本地 update / release manifest
