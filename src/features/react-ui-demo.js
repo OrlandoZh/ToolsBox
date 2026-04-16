@@ -9,12 +9,12 @@ import {
   resolveSurfaceWindowModeDecision,
 } from "../utils/surface-window-mode.js";
 
-function isOptionalBundleEnabled(optionalBundles, bundleID) {
-  if (optionalBundles && typeof optionalBundles.isEnabled === "function") {
-    return optionalBundles.isEnabled(bundleID);
+function isOptionalBundleEnabled(bundleRuntime, bundleID) {
+  if (bundleRuntime && typeof bundleRuntime.isEnabled === "function") {
+    return bundleRuntime.isEnabled(bundleID);
   }
-  if (optionalBundles && typeof optionalBundles.getBundle === "function") {
-    return Boolean(optionalBundles.getBundle(bundleID)?.enabled);
+  if (bundleRuntime && typeof bundleRuntime.getBundle === "function") {
+    return Boolean(bundleRuntime.getBundle(bundleID)?.enabled);
   }
   return false;
 }
@@ -24,7 +24,7 @@ export function createReactUIDemoLauncher({
   logger,
   host,
   themeManager,
-  optionalBundles,
+  bundleRuntime,
   services = null,
   rootURI = "",
 } = {}) {
@@ -33,7 +33,7 @@ export function createReactUIDemoLauncher({
   let lastPresentation = null;
 
   function isEnabled() {
-    return isOptionalBundleEnabled(optionalBundles, bundleID);
+    return isOptionalBundleEnabled(bundleRuntime, bundleID);
   }
 
   function debug(message, details = {}) {

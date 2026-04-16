@@ -690,7 +690,7 @@ function shouldExposeHostAction(entry, options = {}) {
   if (!requiredBundle) {
     return true;
   }
-  return isOptionalBundleEnabled(options.optionalBundles, requiredBundle);
+  return isOptionalBundleEnabled(options.bundleRuntime, requiredBundle);
 }
 
 export function listHostActionDescriptors(options = {}) {

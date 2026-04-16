@@ -838,20 +838,20 @@ describe("Host Actions", () => {
   });
 
   it("should expose the optional react-ui host action only when the bundle is enabled", () => {
-    const optionalBundles = {
+    const bundleRuntime = {
       isEnabled(bundleID) {
         return bundleID === "react-ui";
       },
     };
 
     const actions = listHostActionDescriptors({
-      optionalBundles,
+      bundleRuntime,
     });
 
     assert.ok(actions.some((entry) => entry.id === "window.openReactDemo"));
     assert.equal(
       getHostActionDescriptor("window.openReactDemo", {
-        optionalBundles,
+        bundleRuntime,
       })?.executable,
       true,
     );
@@ -1089,7 +1089,7 @@ describe("Host Actions", () => {
   });
 
   it("should run the optional react-ui window host action when the bundle is enabled", async () => {
-    const optionalBundles = {
+    const bundleRuntime = {
       isEnabled(bundleID) {
         return bundleID === "react-ui";
       },
@@ -1103,7 +1103,7 @@ describe("Host Actions", () => {
       reader: {},
       menuManager: {},
       itemPane: {},
-      optionalBundles,
+      bundleRuntime,
       async openReactDemoWindow() {
         return {
           window: {

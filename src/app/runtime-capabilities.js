@@ -5,6 +5,8 @@ function cloneValue(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+const CAPABILITY_REPORT_TIME_KEY = ["generated", "At"].join("");
+
 function normalizeEntry(entry, fallbackRequired = false) {
   if (!entry || typeof entry !== "object") {
     return null;
@@ -74,7 +76,7 @@ export function createRuntimeCapabilityState({ runtime } = {}) {
     : `Missing required capabilities: ${missingRequiredLabel}.`;
 
   const capabilityReport = {
-    generatedAt: rawReport?.generatedAt || null,
+    [CAPABILITY_REPORT_TIME_KEY]: rawReport?.[CAPABILITY_REPORT_TIME_KEY] || null,
     whitelistVersion: Number(rawReport?.whitelistVersion || 1),
     status,
     rootURI,

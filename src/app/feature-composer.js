@@ -28,14 +28,14 @@ export function createFeatureComposer({
   demoColumnKey,
   demoNotifierID,
   updateDemoNotifierState,
-  optionalBundles,
+  bundleRuntime,
   openReactDemoWindow,
   presentReactSurface,
   renderReactItemPaneSurface,
   unmountReactItemPaneSurface,
 }) {
   let baselineReady = false;
-  const reactUIBundleEnabled = isOptionalBundleEnabled(optionalBundles, "react-ui");
+  const reactUIBundleEnabled = isOptionalBundleEnabled(bundleRuntime, "react-ui");
   const reactSurfacePresenter = typeof presentReactSurface === "function"
     ? presentReactSurface
     : renderReactItemPaneSurface;

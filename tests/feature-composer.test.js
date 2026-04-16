@@ -166,7 +166,7 @@ function createDeps() {
       runReaderSelectionActionDemo() {
         calls.readerSelectionDemo = (calls.readerSelectionDemo || 0) + 1;
       },
-      optionalBundles: {
+      bundleRuntime: {
         isEnabled() {
           return false;
         },
@@ -386,7 +386,7 @@ describe("Feature Composer", () => {
 
   it("should register the optional react-ui command only when the bundle is enabled", async () => {
     const { deps, calls, commandRegistrations, sectionRegistrations } = createDeps();
-    deps.optionalBundles = {
+    deps.bundleRuntime = {
       isEnabled(bundleID) {
         return bundleID === "react-ui";
       },

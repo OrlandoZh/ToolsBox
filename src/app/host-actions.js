@@ -1469,7 +1469,7 @@ export function createHostActionRunner({
   reader,
   menuManager,
   itemPane,
-  optionalBundles,
+  bundleRuntime,
   openReactDemoWindow,
 }) {
   async function runPreferencesOpenPane(actionId, payload = {}) {
@@ -3190,14 +3190,14 @@ export function createHostActionRunner({
 
   async function runHostAction(actionId, payload = {}) {
     const descriptor = getHostActionDescriptor(actionId, {
-      optionalBundles,
+      bundleRuntime,
     });
     if (!descriptor) {
       return buildFailureResult(String(actionId || "unknown"), {
         failureKind: "unknown-action",
       });
     }
-    if (!isExecutableHostAction(actionId, { optionalBundles })) {
+    if (!isExecutableHostAction(actionId, { bundleRuntime })) {
       return buildFailureResult(actionId, {
         observedState: {
           status: descriptor.status,
@@ -3247,7 +3247,7 @@ export function createHostActionRunner({
   return {
     listHostActions() {
       return listHostActionDescriptors({
-        optionalBundles,
+        bundleRuntime,
       });
     },
     async runHostAction(actionId, payload = {}) {

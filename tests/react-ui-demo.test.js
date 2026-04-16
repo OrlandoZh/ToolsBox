@@ -138,7 +138,7 @@ describe("React UI Demo", () => {
         addonRef: "cleanroomtemplate",
         addonName: "Cleanroom Template",
       },
-      optionalBundles: {
+      bundleRuntime: {
         isEnabled(bundleID) {
           return bundleID === "react-ui";
         },
@@ -211,7 +211,7 @@ describe("React UI Demo", () => {
 
   it("should no-op item pane rendering when the optional bundle is disabled", () => {
     const launcher = createReactUIDemoLauncher({
-      optionalBundles: {
+      bundleRuntime: {
         isEnabled() {
           return false;
         },
@@ -257,7 +257,7 @@ describe("React UI Demo", () => {
         addonRef: "cleanroomtemplate",
         addonName: "Cleanroom Template",
       },
-      optionalBundles: {
+      bundleRuntime: {
         isEnabled(bundleID) {
           return bundleID === "react-ui";
         },
@@ -305,7 +305,7 @@ describe("React UI Demo", () => {
         addonRef: "cleanroomtemplate",
         addonName: "Cleanroom Template",
       },
-      optionalBundles: {
+      bundleRuntime: {
         isEnabled(bundleID) {
           return bundleID === "react-ui";
         },
@@ -365,7 +365,7 @@ describe("React UI Demo", () => {
         addonRef: "cleanroomtemplate",
         addonName: "Cleanroom Template",
       },
-      optionalBundles: {
+      bundleRuntime: {
         isEnabled(bundleID) {
           return bundleID === "react-ui";
         },

@@ -38,17 +38,17 @@ export function createOptionalBundleRuntime({ registry = null } = {}) {
   };
 }
 
-export function isOptionalBundleEnabled(optionalBundles, bundleID) {
-  if (optionalBundles && typeof optionalBundles.isEnabled === "function") {
-    return optionalBundles.isEnabled(bundleID);
+export function isOptionalBundleEnabled(bundleRuntime, bundleID) {
+  if (bundleRuntime && typeof bundleRuntime.isEnabled === "function") {
+    return bundleRuntime.isEnabled(bundleID);
   }
 
-  if (optionalBundles && typeof optionalBundles.getBundle === "function") {
-    return Boolean(optionalBundles.getBundle(bundleID)?.enabled);
+  if (bundleRuntime && typeof bundleRuntime.getBundle === "function") {
+    return Boolean(bundleRuntime.getBundle(bundleID)?.enabled);
   }
 
-  if (Array.isArray(optionalBundles?.bundles)) {
-    const matched = optionalBundles.bundles.find((entry) => String(entry?.id || "").trim() === String(bundleID || "").trim());
+  if (Array.isArray(bundleRuntime?.bundles)) {
+    const matched = bundleRuntime.bundles.find((entry) => String(entry?.id || "").trim() === String(bundleID || "").trim());
     return matched?.enabled === true;
   }
 

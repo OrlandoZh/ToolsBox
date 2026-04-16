@@ -110,7 +110,7 @@ function clonePackageProtectionSummary(summary = null) {
 export function createPlugin({ globalScope, config }) {
   const runtime = globalScope.__CLEANROOM_TEMPLATE_RUNTIME__ || {};
   const optionalBundleRegistry = globalScope.__CLEANROOM_TEMPLATE_OPTIONAL_BUNDLES__ || null;
-  const optionalBundles = createOptionalBundleRuntime({
+  const bundleRuntime = createOptionalBundleRuntime({
     registry: optionalBundleRegistry,
   });
   const runtimeInfo = createRuntimeCapabilityState({ runtime });
@@ -198,7 +198,7 @@ export function createPlugin({ globalScope, config }) {
     logger,
     host,
     themeManager,
-    optionalBundles,
+    bundleRuntime,
     services: globalScope.Services,
     rootURI: runtime.rootURI,
   });
@@ -207,7 +207,7 @@ export function createPlugin({ globalScope, config }) {
     id: `${config.addonRef}.react-ui-demo`,
     label: "Optional React UI Demo",
     enabledWhen() {
-      return optionalBundles.isEnabled("react-ui");
+      return bundleRuntime.isEnabled("react-ui");
     },
     async start() {},
     async stop() {
@@ -216,9 +216,9 @@ export function createPlugin({ globalScope, config }) {
     healthCheck() {
       return {
         ok: true,
-        status: optionalBundles.isEnabled("react-ui") ? "ready" : "disabled",
+        status: bundleRuntime.isEnabled("react-ui") ? "ready" : "disabled",
         details: {
-          enabled: optionalBundles.isEnabled("react-ui"),
+          enabled: bundleRuntime.isEnabled("react-ui"),
           open: reactUIDemo.isOpen(),
           hostSurfaceCount: reactUIDemo.getHostSurfaceCount(),
         },
@@ -613,7 +613,7 @@ export function createPlugin({ globalScope, config }) {
     reader,
     menuManager,
     itemPane,
-    optionalBundles,
+    bundleRuntime,
     openReactDemoWindow: reactUIDemo.openDemoWindow,
   });
 
@@ -676,7 +676,7 @@ export function createPlugin({ globalScope, config }) {
     demoColumnKey,
     demoNotifierID,
     updateDemoNotifierState,
-    optionalBundles,
+    bundleRuntime,
     openReactDemoWindow: reactUIDemo.openDemoWindow,
     presentReactSurface: reactUIDemo.presentSurface,
     renderReactItemPaneSurface: reactUIDemo.renderItemPaneSurface,
