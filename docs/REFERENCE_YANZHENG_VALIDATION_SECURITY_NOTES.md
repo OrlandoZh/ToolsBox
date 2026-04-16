@@ -1,0 +1,151 @@
+# yanzheng 验证与防盗版参考笔记
+
+> 用途：记录本地参考仓库 `yanzheng` 中“Zotero 插件验证 / 授权 / 混淆 / 防盗版”样本的可借鉴结论。
+> 范围：只沉淀防守侧设计判断，不把该仓库中的可直接利用绕过细节迁入当前模板。
+> 更新时间：2026-04-16
+
+## 结论先看
+
+- `yanzheng` 更像一个“多插件验证与安全机制样本库”，不是单一插件源码。
+- 从当前模板视角看，它最有价值的不是具体实现，而是方法分层：
+  - 本地 API 连通性验证
+  - 客户端激活/许可验证
+  - OAuth / 设备授权
+  - 本地混淆与加密存储
+  - 追踪/指纹/联盟跳转这类灰色控制面
+- 对当前模板最值得吸收的正向经验只有一条：
+  - **真正有强度的授权路径应尽量依赖服务器参与的认证或短时凭证，而不是客户端自持的激活秘密**
+- 反向经验也很明确：
+  - **硬编码密钥、客户端可推导 key、纯本地激活码、空 catch 吞错、动态执行** 都会显著降低保护有效性，并增加被分析、被绕过、被审计质疑的风险。
+
+## 参考仓库里已经整理出的机制类型
+
+### 1. 本地 API 验证函数
+
+`yanzheng` 对 `Zotero-One` 总结了一整组 provider-specific API 验证函数，并把验证结果写回偏好设置状态位。
+
+- 参考：[安全分析报告.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/安全分析报告.md#L34)
+- 参考：[安全分析最终报告.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/安全分析最终报告.md#L54)
+
+这类机制适合回答的问题是：
+
+- 当前 API key 是否有效
+- 当前 provider endpoint 是否可达
+- 当前模型配置是否可工作
+
+它不适合承担：
+
+- 付费授权主判断
+- 防盗版主判断
+- 高价值 secrets 保护
+
+对当前模板的启发：
+
+- 这类验证更适合归入 `ai-service` 或 provider health lane，语义上应接近“服务可用性验证”，不要与 release/gate 主阻断混写。
+
+### 2. 服务器参与的认证 / Device Flow
+
+`yanzheng` 对 `BibGenie` 的总结里，最值得借鉴的是 OAuth Device Authorization Flow。
+
+- 参考：[安全分析报告.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/安全分析报告.md#L80)
+- 参考：[安全分析最终报告.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/安全分析最终报告.md#L113)
+
+从防护强度看，这类路径优于“客户端激活码 + 本地对比”：
+
+- 授权根在服务端
+- 客户端只持有可过期 token
+- 可以做刷新、吊销、额度和设备态管理
+
+对当前模板路线 4 的启发：
+
+- 如果未来真要做授权或受控付费能力，这类“服务端主导、客户端只持短时状态”的路线才值得认真考虑。
+- 当前模板若进入这条线，更像 `ai-service` optional lane 的未来扩展，而不是 `shielded` 包本地再多包几层混淆。
+
+### 3. 客户端激活码 / 本地许可验证
+
+`yanzheng` 对多个插件的分析都指出了同一类问题：只要激活逻辑、密钥材料、校验规则和最终判断都在客户端，本质上就是“可还原的本地规则系统”。
+
+- 参考：[安全分析报告.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/安全分析报告.md#L38)
+- 参考：[mindmap插件安全分析.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/mindmap插件安全分析.md#L11)
+- 参考：[安全机制索引.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/安全机制索引.md#L12)
+
+对当前模板的结论很直接：
+
+- 不建议把客户端激活码机制作为未来防盗版主路线。
+- 即使叠加混淆、Base64、RC4、AES，只要秘密在客户端，最终都更接近“提高分析成本”，而不是“建立可信授权边界”。
+
+### 4. 本地加密存储
+
+`yanzheng` 的样本里既有“Token / API key 本地存储”，也有“加密后再存”的做法。
+
+- 参考：[安全分析报告.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/安全分析报告.md#L58)
+- 参考：[garden prefs.js](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/reference/garden_v0.0.14/prefs.js#L1)
+
+这类设计能解决的是：
+
+- 降低明文直读
+- 降低误操作暴露
+- 给普通静态检索增加一点门槛
+
+它解决不了的是：
+
+- 客户端长期 secrets 安全
+- 防止有心分析者恢复 token / key / 配置
+
+对当前模板路线 4 的启发：
+
+- 本地缓存或本地加密存储可以作为“延迟暴露层”，不能被当成真正安全边界。
+- 若未来要下发策略包，签名校验比“本地再 AES 一层”更有意义。
+
+### 5. 追踪、指纹与灰色控制面
+
+`yanzheng` 还把一些非纯授权机制单独拎了出来，例如：
+
+- 设备指纹
+- 联盟推荐链接
+- 用户行为追踪
+- 隐藏跳转和埋点
+
+- 参考：[安全机制索引.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/安全机制索引.md#L43)
+- 参考：[安全分析最终报告.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/安全分析最终报告.md#L14)
+
+从模板治理角度，这类机制不应被当成“安全能力”：
+
+- 它们更偏产品控制或数据采集
+- 容易带来隐私、披露和信任问题
+- 不应混入 clean-room 模板的默认能力判断
+
+## 对当前模板最有价值的 4 条判断
+
+### 1. “API 验证”与“授权验证”要分开
+
+- API 验证回答的是“服务可用吗”
+- 授权验证回答的是“用户有没有权限”
+- 这两类信号不应该共用一套布尔位或一套 gate 语义
+
+### 2. 若一定做付费/受控能力，优先服务端主导
+
+- 优先考虑 Device Flow、短时 token、签名策略包
+- 不优先考虑客户端激活码、客户端常量、客户端 hash 对比
+
+### 3. 本地混淆只能作为 delay layer
+
+- 受保护导出、bundle 语义减噪、轻量 loader 仍有价值
+- 但它们只能解决“别让人一眼看穿”，不能承担真正授权边界
+
+### 4. 不把追踪/指纹当成安全方案
+
+- 它们可能有控制面用途
+- 但不应被包装成 anti-piracy 主能力
+- 也不应默认进入模板基线
+
+## 对当前路线选择的影响
+
+- 对“受保护打包”主线：
+  - 继续优先做本地 bundle 语义减噪，而不是回到客户端激活码思路
+- 对“路线 4：轻服务能力”：
+  - 可以考虑小体量策略包、短时 token、签名配置
+  - 不建议把客户端 SQLite / prefs 加密缓存误当成主安全边界
+- 对“未来付费能力”：
+  - 若真的要做，优先参考 `BibGenie` 这一类服务端参与的认证路线
+  - 不优先参考硬编码 key 或本地激活码路线

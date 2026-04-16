@@ -31,13 +31,13 @@ export function createPluginAgent({
   getItemTitle,
   listHostActions,
   runHostAction,
-  runAgentAction,
+  executeAgentAction,
   updateDemoNotifierState,
   zotero,
-  serviceRegistry,
+  servicesHub,
   runtimeInfo,
-  getLifecycleTelemetrySummary = null,
-  getPackageProtectionSummary = null,
+  getLifecycleSummary = null,
+  getProtectionSummary = null,
 }) {
   const capabilityManifest = createCapabilityManifest({ config });
 
@@ -171,8 +171,8 @@ export function createPluginAgent({
       skippedCount: 0,
       missingRequired: [],
     };
-    const serviceSummary = serviceRegistry && typeof serviceRegistry.getSummary === "function"
-      ? serviceRegistry.getSummary()
+    const serviceSummary = servicesHub && typeof servicesHub.getSummary === "function"
+      ? servicesHub.getSummary()
       : {
         total: 0,
         healthy: 0,
@@ -194,8 +194,8 @@ export function createPluginAgent({
         lastRequest: null,
         lastError: null,
       };
-    const lifecycleTelemetry = typeof getLifecycleTelemetrySummary === "function"
-      ? getLifecycleTelemetrySummary()
+    const lifecycleTelemetry = typeof getLifecycleSummary === "function"
+      ? getLifecycleSummary()
       : {
         hostReadyDurationMs: 0,
         startupDurationMs: 0,
@@ -205,8 +205,8 @@ export function createPluginAgent({
         lifecycleLastSlowStage: null,
         lifecycleBoundaryEvents: [],
       };
-    const packageProtection = typeof getPackageProtectionSummary === "function"
-      ? getPackageProtectionSummary()
+    const packageProtection = typeof getProtectionSummary === "function"
+      ? getProtectionSummary()
       : {
         active: false,
         variant: null,
@@ -385,8 +385,8 @@ export function createPluginAgent({
       menuIDs: menuManager.getRegisteredMenuIds(),
       commandIDs: commandPalette.getAllCommands().map((item) => item.id),
       paneIDs: preferencePanes.getAllPanes(),
-      packageProtection: typeof getPackageProtectionSummary === "function"
-        ? getPackageProtectionSummary()
+      packageProtection: typeof getProtectionSummary === "function"
+        ? getProtectionSummary()
         : null,
       hostActions: typeof listHostActions === "function"
         ? listHostActions()
@@ -496,7 +496,7 @@ export function createPluginAgent({
       }
       case "command-no-ui":
         return {
-          ok: runAgentAction(),
+          ok: executeAgentAction(),
         };
       case "host-actions":
         return {

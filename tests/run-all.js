@@ -95,6 +95,7 @@ import './preferences-theme-script.test.js';
 import './build-injection-lib.test.js';
 import './package-obfuscation-lib.test.js';
 import './package-protection-lib.test.js';
+import './package-protection-anchor-audit.test.js';
 import './package-protection-smoke.test.js';
 import './package-protection-manual-score.test.js';
 import './package-protection-verdict.test.js';

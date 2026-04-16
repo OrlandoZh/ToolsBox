@@ -208,7 +208,7 @@ describe("Plugin Agent", () => {
           failureKind: null,
         };
       },
-      runAgentAction() {
+      executeAgentAction() {
         return true;
       },
       updateDemoNotifierState() {
@@ -230,7 +230,7 @@ describe("Plugin Agent", () => {
           missingRequired: [],
         },
       },
-      getLifecycleTelemetrySummary() {
+      getLifecycleSummary() {
         return {
           hostReadyDurationMs: 2150,
           startupDurationMs: 3180,
@@ -244,7 +244,7 @@ describe("Plugin Agent", () => {
           ],
         };
       },
-      getPackageProtectionSummary() {
+      getProtectionSummary() {
         return {
           active: true,
           variant: "shielded",
@@ -484,7 +484,7 @@ describe("Plugin Agent", () => {
       getItemTitle() {
         return "title";
       },
-      runAgentAction() {
+      executeAgentAction() {
         return false;
       },
       updateDemoNotifierState(event, type, ids) {
@@ -619,7 +619,7 @@ describe("Plugin Agent", () => {
       getItemTitle() {
         return "title";
       },
-      runAgentAction() {
+      executeAgentAction() {
         return true;
       },
       updateDemoNotifierState() {},
@@ -791,7 +791,7 @@ describe("Plugin Agent", () => {
       getItemTitle() {
         return "title";
       },
-      runAgentAction() {
+      executeAgentAction() {
         return true;
       },
       updateDemoNotifierState() {},

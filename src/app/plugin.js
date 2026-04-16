@@ -148,9 +148,9 @@ export function createPlugin({ globalScope, config }) {
     services: globalScope.Services,
   });
   const progress = createProgressNotifier({ logger, i18n, zotero });
-  const serviceRegistry = createServiceRegistry({ logger });
+  const servicesHub = createServiceRegistry({ logger });
 
-  serviceRegistry.register({
+  servicesHub.register({
     id: `${config.addonRef}.runtime-core`,
     label: "Runtime Core",
     enabledWhen() {
@@ -166,7 +166,7 @@ export function createPlugin({ globalScope, config }) {
     },
   });
 
-  serviceRegistry.register({
+  servicesHub.register({
     id: `${config.addonRef}.runtime-bridge`,
     label: "Runtime Bridge",
     enabledWhen() {
@@ -203,7 +203,7 @@ export function createPlugin({ globalScope, config }) {
     rootURI: runtime.rootURI,
   });
 
-  serviceRegistry.register({
+  servicesHub.register({
     id: `${config.addonRef}.react-ui-demo`,
     label: "Optional React UI Demo",
     enabledWhen() {
@@ -594,7 +594,7 @@ export function createPlugin({ globalScope, config }) {
     return true;
   }
 
-  function runAgentAction() {
+  function executeAgentAction() {
     const window = getPrimaryWindow();
     if (!prefs.get("enabled") || !window) {
       return false;
@@ -639,13 +639,13 @@ export function createPlugin({ globalScope, config }) {
     getItemTitle,
     listHostActions: hostActions.listHostActions,
     runHostAction: hostActions.runHostAction,
-    runAgentAction,
+    executeAgentAction,
     updateDemoNotifierState,
     zotero,
-    serviceRegistry,
+    servicesHub,
     runtimeInfo,
-    getLifecycleTelemetrySummary: () => cloneLifecycleTelemetrySummary(lifecycleTelemetrySummary),
-    getPackageProtectionSummary: () => clonePackageProtectionSummary(runtime?.packageProtection),
+    getLifecycleSummary: () => cloneLifecycleTelemetrySummary(lifecycleTelemetrySummary),
+    getProtectionSummary: () => clonePackageProtectionSummary(runtime?.packageProtection),
   });
 
   const featureComposer = createFeatureComposer({
@@ -695,14 +695,14 @@ export function createPlugin({ globalScope, config }) {
     onSettingsChange: handlePrefChange,
     addonName: config.addonName,
     startServices: async () => {
-      await serviceRegistry.startAll({
+      await servicesHub.startAll({
         host,
         prefs,
         settings,
       });
     },
     stopServices: async () => {
-      await serviceRegistry.stopAll({
+      await servicesHub.stopAll({
         host,
         prefs,
         settings,
@@ -736,20 +736,20 @@ export function createPlugin({ globalScope, config }) {
     preferencePanes,
     reader,
     readerSelectionActions,
-    serviceRegistry,
+    servicesHub,
     getMainWindow: getPrimaryWindow,
     runPrimaryAction,
-    runAgentAction,
+    executeAgentAction,
     runAgentSelfCheck: agent.runAgentSelfCheck,
     runAgentScenario: agent.runAgentScenario,
     collectAgentDiagnostics: agent.collectAgentDiagnostics,
     listAgentScenarios: agent.listAgentScenarios,
-    listAgentCapabilities: agent.listCapabilities,
-    getAgentCapability: agent.getCapability,
+    listCapabilitiesImpl: agent.listCapabilities,
+    getCapabilityImpl: agent.getCapability,
     inspectItemPresentation: agent.inspectItemPresentation,
     listHostActions: hostActions.listHostActions,
     runHostAction: hostActions.runHostAction,
-    getPackageProtectionSummary: () => clonePackageProtectionSummary(runtime?.packageProtection),
+    getProtectionSummary: () => clonePackageProtectionSummary(runtime?.packageProtection),
   });
 
   return {

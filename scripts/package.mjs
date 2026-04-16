@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import {
   BUILD_MODULE_ID_MODE_ANONYMIZED,
   BUILD_MODULE_ID_MODE_ENV,
+  BUILD_SEMANTIC_SCRUB_ENV,
+  BUILD_SEMANTIC_SCRUB_PROTECTED,
 } from "./build.mjs";
 import { withBuildLock } from "./build-lock.mjs";
 import {
@@ -145,6 +147,7 @@ export function resolvePackageBuildEnv(options = {}) {
   if (options.encryptBundle || options.shieldBundle || options.outputSuffix) {
     return {
       [BUILD_MODULE_ID_MODE_ENV]: BUILD_MODULE_ID_MODE_ANONYMIZED,
+      [BUILD_SEMANTIC_SCRUB_ENV]: BUILD_SEMANTIC_SCRUB_PROTECTED,
     };
   }
 

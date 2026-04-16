@@ -3,6 +3,8 @@
 > 历史经验页。这里只沉淀“手动受保护导出分支”在当前模板里已经验证过的经验，不定义 current truth。
 > 更新时间：2026-04-16
 
+当前若需要看“整体保护导出路线接下来该怎么推进、优先 trim 哪一层”，请配合阅读 [PACKAGE_PROTECTION_ROUTE_PLAN.md](./PACKAGE_PROTECTION_ROUTE_PLAN.md)。
+
 ## 适用范围
 
 本页只覆盖两条手动触发的受保护导出分支：
@@ -159,6 +161,54 @@
 
 这说明当前方案已经达到“阻碍普通开发者、自动化工具和一轮 AI 快速直读源码”的目标，但还达不到“连高层架构都不易理解”的更高目标。若未来目标升级到后一档，应新开 hardening wave，优先处理内层 bundle 的语义暴露，而不是先回到更重的 loader 或直接重开 `sidecar`。
 
+### 8. `package:protection:audit` 现在同时能给出 raw export 与 protected source proxy 两层结论
+
+这一轮新增并验证了一个更实用的经验：
+
+- 只看 `encrypted / shielded` 的 raw export，已经不足以判断 inner semantic scrub 是否真的生效
+- 因为 raw protected export 在当前模板里已经主要是 loader 视图，内层 bundle 的高层语义是否下降，需要额外看一个“protected source proxy”视图
+
+因此当前 `package:protection:audit` 的读法固定分成两层：
+
+- `comparison`
+  - 继续只回答 raw export 是否还泄露 loader / metadata 级锚点
+  - 当前结果仍是：
+    - `plainCandidateAnchorCount = 8`
+    - `encryptedRawAnchorCount = 0`
+    - `shieldedRawAnchorCount = 0`
+    - `nextAction = open-inner-semantic-scrub`
+- `sourceProxy`
+  - 用 plain build 对比 `anonymized + semantic scrub` 的 protected source proxy
+  - 直接量化 inner bundle 里的高层语义锚点有没有下降
+
+截至 `2026-04-16` 的首轮 prototype 结果已经验证：
+
+- `plain.totalAnchorCount = 11`
+- `plain.totalMatchCount = 98`
+- `protected.totalAnchorCount = 4`
+- `protected.totalMatchCount = 44`
+- `reducedAnchorCount = 7`
+- `reducedMatchCount = 54`
+
+这一轮被明确打掉的锚点包括：
+
+- `plugin.api.agent.*`
+- `runAgentAction`
+- `capabilityManifest.entrypoints`
+- `capabilityManifest.ownedBy`
+- `capabilityManifest.successSignals`
+- `agent-runtime`
+- `ai-service`
+
+这一轮仍保留的主要锚点是：
+
+- `addonRef`
+- `addonVersion`
+- `optionalBundles`
+- `generatedAt`
+
+这说明首轮 `protected-only inner semantic scrub` 已经有效，但还没有完全收口；下一步不该回头折腾 loader，而是继续集中处理剩余的少数高频高层锚点，尤其是 `optionalBundles` 一类仍能帮助 AI 快速理解模板分层的内部术语。
+
 ## Retained Recommendations
 
 ### 当前分支选择建议
@@ -172,6 +222,39 @@
 - 保持 `loader-lite`，不要再回到 60MB 级 loader
 - 不把 loader 当成主要反逆向战场，主要扰动应放在内层 bundle
 - 继续避免 hostile runtime 选项，优先兼容和可加载性
+
+### 当前后续策略基线
+
+- 下一轮若继续提高“抗一轮 AI 高层架构归纳”能力，优先开 `protected-only` 的内层 bundle 语义减噪波次，不先回到重 loader、`sidecar` 或更激进的运行时对抗。
+- 第一批优先处理模板自有的高层语义锚点：
+  - `plugin.api.agent.*` 能力面
+  - `capabilityManifest` 中的 `id / label / description / entrypoints / ownedBy / successSignals`
+  - `plugin-agent` 的结构化自检 / 遥测字段
+  - service label、optional bundle summary 这类不会影响 Zotero 宿主契约、但会帮助 AI 快速归纳框架分层的文本
+- 宿主 authoritative contract 继续视为禁改区：
+  - `bootstrapPlugin`
+  - Zotero / Services / ChromeUtils / TextDecoder / crypto
+  - Reader 官方事件类型，如 `renderToolbar`、`createViewContextMenu`
+  - PreferencePanes / ItemPane / MenuManager 对齐宿主的字段与 target/type 枚举
+- 若语义减噪后人工评级仍保持 `high-level-architecture`，才进入一次有止损线的 `lightweight-js-obfuscator` 内层 bundle 实验；它不是当前主推荐路线。
+- `路线4`（轻服务能力）与 `路线5`（Wasm 小内核）当前都只作为未来 hardening 备选，不替代本地受保护导出的主线。
+
+### 路线 4 的当前边界判断
+
+- 若未来要引入服务器能力，优先承接：
+  - 短时 token / ticket
+  - provider catalog / feature policy
+  - 许可 / 订阅判定
+  - 小体量签名配置或策略包
+- 不建议把启动主链绑定到远端；默认应保持：
+  - 插件先本地启动
+  - 远端策略后置拉取
+  - 拉取失败只降级，不阻断 `bootstrapPlugin`
+- 即使把远端响应写入 `zotero.sqlite`，它的保护语义也只能算“认知层延迟暴露”，不能算真正保密；若本地仍持有可推导密钥、解密函数和查询路径，分析者仍可在运行时或静态代码层恢复。
+- 当前项目侧已固定一条更细的 retained decision：
+  - 若未来路线 4 确实需要本地缓存小体量控制面数据，`zotero.sqlite` 可优先于 `prefs` 与普通明文文件
+  - 这只是“更隐蔽的本地缓存载体”判断，不是新的安全边界
+  - 具体适用范围见 [ROUTE4_LOCAL_STORAGE_DECISION.md](./ROUTE4_LOCAL_STORAGE_DECISION.md)
 
 ### 当前验证建议
 

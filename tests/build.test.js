@@ -10,8 +10,11 @@ import { describe, it, assert } from "./test-framework.js";
 import {
   BUILD_MODULE_ID_MODE_ANONYMIZED,
   BUILD_MODULE_ID_MODE_PATH,
+  BUILD_SEMANTIC_SCRUB_NONE,
+  BUILD_SEMANTIC_SCRUB_PROTECTED,
   createBundleModuleId,
   resolveBuildModuleIdMode,
+  resolveBuildSemanticScrubMode,
 } from "../scripts/build.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -32,6 +35,18 @@ describe("Build Artifacts", () => {
     assert.equal(
       resolveBuildModuleIdMode({ CLEANROOM_BUILD_MODULE_ID_MODE: "unexpected" }),
       BUILD_MODULE_ID_MODE_PATH,
+    );
+  });
+
+  it("should resolve build semantic scrub mode from environment safely", () => {
+    assert.equal(resolveBuildSemanticScrubMode({}), BUILD_SEMANTIC_SCRUB_NONE);
+    assert.equal(
+      resolveBuildSemanticScrubMode({ CLEANROOM_BUILD_SEMANTIC_SCRUB: "protected" }),
+      BUILD_SEMANTIC_SCRUB_PROTECTED,
+    );
+    assert.equal(
+      resolveBuildSemanticScrubMode({ CLEANROOM_BUILD_SEMANTIC_SCRUB: "unexpected" }),
+      BUILD_SEMANTIC_SCRUB_NONE,
     );
   });
 
@@ -91,5 +106,41 @@ describe("Build Artifacts", () => {
     assert.equal(reactUIBundle?.status, "skipped");
     assert.equal(reactUIBundle?.reason, "disabled");
     assert.equal(report.moduleIdMode, "path");
+    assert.equal(report.semanticScrubMode, "none");
+  });
+
+  it("should build a protected source proxy with semantic anchors reduced", () => {
+    execFileSync("node", ["scripts/build.mjs"], {
+      cwd: projectRoot,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
+        CLEANROOM_BUILD_SEMANTIC_SCRUB: "protected",
+      },
+    });
+
+    const config = readJSON(path.join(projectRoot, "config", "addon.config.json"));
+    const bundlePath = path.join(
+      projectRoot,
+      "build",
+      config.addonRef,
+      "content",
+      "scripts",
+      `${config.addonRef}.js`,
+    );
+    const bundleSource = fs.readFileSync(bundlePath, "utf-8");
+    const report = readJSON(
+      path.join(projectRoot, "build", config.addonRef, "build-report.json"),
+    );
+
+    assert.equal(report.moduleIdMode, "anonymized");
+    assert.equal(report.semanticScrubMode, "protected");
+    assert.equal(bundleSource.includes("plugin.api.agent."), false);
+    assert.equal(bundleSource.includes("entrypoints"), false);
+    assert.equal(bundleSource.includes("ownedBy"), false);
+    assert.equal(bundleSource.includes("successSignals"), false);
+    assert.equal(bundleSource.includes("agent-runtime"), false);
+    assert.equal(bundleSource.includes("ai-service"), false);
   });
 });

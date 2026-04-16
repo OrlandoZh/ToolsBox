@@ -14,6 +14,7 @@
     "package:protection:smoke:plain": "node scripts/package-protection-smoke.mjs --variant plain",
     "package:protection:smoke:encrypted": "node scripts/package-protection-smoke.mjs --variant encrypted",
     "package:protection:smoke:shielded": "node scripts/package-protection-smoke.mjs --variant shielded",
+    "package:protection:audit": "node scripts/package-protection-anchor-audit.mjs",
     "package:protection:score": "node scripts/package-protection-manual-score.mjs",
     "package:protection:verdict": "node scripts/package-protection-verdict.mjs",
     "export:project": "node scripts/export-project.mjs",

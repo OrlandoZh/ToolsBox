@@ -54,6 +54,7 @@ npm run package
 npm run package:encrypted
 npm run package:shielded
 npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable
+npm run package:protection:audit
 npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"
 npm run package:protection:verdict
 ```
@@ -81,6 +82,14 @@ npm run package:protection:smoke -- --variant shielded --repeats 3 --channel sta
 ```
 
 这条实验链会把报告写到 `dist/package-protection-smoke/<variant>-<channel>.json` 和 `dist/package-protection-smoke/<variant>-<channel>.md`，并额外生成 aggregate 报告。当前实验报告会固定回读 `readinessMode`、`blockingRuntimeErrorCount`、`packageProtection.*`、bundle/XPI 大小，以及运行时 `Uint8Array.fromBase64 / setFromBase64` 支持情况。
+
+如果要判断下一步应该继续 trim raw export，还是转向 inner bundle 的高层语义减噪，执行：
+
+```bash
+npm run package:protection:audit
+```
+
+它会生成 `dist/package-protection-anchor-audit.json` / `md`，对 `plain / encrypted / shielded` 的 raw 导出物做高层语义锚点盘点。当前这个实验入口是路线规划辅助，不替代 `smoke -> score -> verdict`。
 
 当前正式手动收口链路固定为：
 
@@ -831,6 +840,7 @@ npm run package
 npm run package:encrypted
 npm run package:shielded
 npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable
+npm run package:protection:audit
 npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"
 npm run package:protection:verdict
 ```
@@ -845,6 +855,7 @@ npm run package:protection:verdict
 - `package:encrypted` 默认不写 `dist/update.json` 或 `dist/release-manifest.json`
 - `package:shielded` 默认不写 `dist/update.json` 或 `dist/release-manifest.json`
 - `package:protection:smoke` 只生成 advisory 实验报告，不进入默认 release gate
+- `package:protection:audit` 只做 raw export 语义泄露审计，用于判断下一轮 hardening 应优先 trim 哪一层
 - `package:protection:score` 只回填 `shielded stable` 的手工评分，不触发重跑
 - `package:protection:verdict` 只生成 advisory 结论，不进入默认 release gate
 - 这些分支的定位都是“提高随手解包和直读源码门槛”，不是“客户端密钥不落地”的强安全方案

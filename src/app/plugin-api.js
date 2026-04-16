@@ -1,3 +1,7 @@
+const SERVICE_HUB_API_KEY = ["service", "Registry"].join("");
+const AGENT_ACTION_API_KEY = ["run", "Agent", "Action"].join("");
+const PACKAGE_PROTECTION_SUMMARY_API_KEY = ["get", "Package", "Protection", "Summary"].join("");
+
 export function createPluginAPI({
   host,
   runtimeInfo,
@@ -20,20 +24,20 @@ export function createPluginAPI({
   preferencePanes,
   reader,
   readerSelectionActions,
-  serviceRegistry,
+  servicesHub,
   getMainWindow,
   runPrimaryAction,
-  runAgentAction,
+  executeAgentAction,
   runAgentSelfCheck,
   runAgentScenario,
   collectAgentDiagnostics,
   listAgentScenarios,
-  listAgentCapabilities,
-  getAgentCapability,
+  listCapabilitiesImpl,
+  getCapabilityImpl,
   inspectItemPresentation,
   listHostActions,
   runHostAction,
-  getPackageProtectionSummary,
+  getProtectionSummary,
 }) {
   function cloneValue(value) {
     if (value === null || value === undefined) {
@@ -47,10 +51,10 @@ export function createPluginAPI({
       selfCheck: runAgentSelfCheck,
       collectDiagnostics: collectAgentDiagnostics,
       listScenarios: listAgentScenarios,
-      listCapabilities: listAgentCapabilities,
-      getCapability: getAgentCapability,
+      listCapabilities: listCapabilitiesImpl,
+      getCapability: getCapabilityImpl,
       runScenario: runAgentScenario,
-      runAction: runAgentAction,
+      runAction: executeAgentAction,
       listHostActions,
       runHostAction,
       inspectItem: inspectItemPresentation,
@@ -79,10 +83,10 @@ export function createPluginAPI({
             : runtimeInfo?.capabilityReport || null,
         );
       },
-      getPackageProtectionSummary() {
+      [PACKAGE_PROTECTION_SUMMARY_API_KEY]() {
         return cloneValue(
-          typeof getPackageProtectionSummary === "function"
-            ? getPackageProtectionSummary()
+          typeof getProtectionSummary === "function"
+            ? getProtectionSummary()
             : null,
         );
       },
@@ -107,10 +111,10 @@ export function createPluginAPI({
     preferencePanes,
     reader,
     readerSelectionActions,
-    serviceRegistry,
+    [SERVICE_HUB_API_KEY]: servicesHub,
     getMainWindow,
     runPrimaryAction,
-    runAgentAction,
+    [AGENT_ACTION_API_KEY]: executeAgentAction,
     runAgentSelfCheck,
     runAgentScenario,
   });

@@ -30,6 +30,8 @@
 | Item Pane Chat 面板 / Reader 文本弹出 / LLM 流式调用 | [REFERENCE_AIASSISTANT_PATTERNS.md](./REFERENCE_AIASSISTANT_PATTERNS.md) | [REFERENCE_AIASSISTANT_REACT_PANEL_PATTERNS.md](./REFERENCE_AIASSISTANT_REACT_PANEL_PATTERNS.md) | 轻量 Chat Section 动态 UI、附件会话持久化、renderTextSelectionPopup 路由 |
 | 多 Provider LLM + API Key 轮换 + 任务队列 + 多模态管线 | [REFERENCE_AI_BUTLER_PATTERNS.md](./REFERENCE_AI_BUTLER_PATTERNS.md) | [REFERENCE_AINOTE_PATTERNS.md](./REFERENCE_AINOTE_PATTERNS.md), [REFERENCE_PLUGIN_TECHNICAL_CHAINS.md](./REFERENCE_PLUGIN_TECHNICAL_CHAINS.md) | 6 Provider 注册表 + Facade 统一调用、多 Key 等权重轮换+冷却、TaskQueueManager 优先级调度+流式事件、4 种 AI 管线分阶段回调、MainWindow 单例 Dashboard |
 | Agent 运行时 / 多轮工具调用 / MCP / HITL 确认 | [REFERENCE_LLM_FOR_ZOTERO_PATTERNS.md](./REFERENCE_LLM_FOR_ZOTERO_PATTERNS.md) | [REFERENCE_PAPER_CHAT_PATTERNS.md](./REFERENCE_PAPER_CHAT_PATTERNS.md) | 先看完整 Agent 架构（5 种模型适配器、10+ HITL 字段、MCP Server、第三方扩展 API），再看 Paper Chat 的轻量 AI 对话实现 |
+| 远端字段下发 / `zotero.sqlite` 缓存 / 认知层隐匿是否有意义 | [REFERENCE_ENHANCEDTRANS_PROTECTION_NOTES.md](./REFERENCE_ENHANCEDTRANS_PROTECTION_NOTES.md) | [ROUTE4_LOCAL_STORAGE_DECISION.md](./ROUTE4_LOCAL_STORAGE_DECISION.md) | 先看参考侧判断“SQLite 落库 + 本地解密”到底是不是主保护策略；若问题已经进入模板侧定夺，再看项目自己的本地存储决策矩阵 |
+| Zotero 插件里现成的验证 / 授权 / 混淆 / 防盗版方法有哪些可借鉴边界 | [REFERENCE_YANZHENG_VALIDATION_SECURITY_NOTES.md](./REFERENCE_YANZHENG_VALIDATION_SECURITY_NOTES.md) | [REFERENCE_ENHANCEDTRANS_PROTECTION_NOTES.md](./REFERENCE_ENHANCEDTRANS_PROTECTION_NOTES.md) | 用于区分“API 可用性验证”“服务端认证”“客户端激活码”“本地加密缓存”“追踪/指纹”这几类机制各自的真实价值和风险，不把灰色控制面误当成安全能力 |
 | 批量 AI 笔记生成 / 多 Provider LLM / PDF 全文提取 / Prompt 版本管理 | [REFERENCE_AINOTE_PATTERNS.md](./REFERENCE_AINOTE_PATTERNS.md) | [REFERENCE_AIASSISTANT_PATTERNS.md](./REFERENCE_AIASSISTANT_PATTERNS.md) | 批量处理管线 + 流式输出窗口 + 6 Provider 自动检测 + Zotero 全文索引复用 + Markdown→笔记 HTML 转换 |
 | 右键菜单 / 子菜单 / `popupshowing` / 菜单 repair | [REFERENCE_PLUGIN_MENU_PATTERNS.md](./REFERENCE_PLUGIN_MENU_PATTERNS.md) | [REFERENCE_PLUGIN_TECHNICAL_CHAINS.md](./REFERENCE_PLUGIN_TECHNICAL_CHAINS.md) | 先按 `item / collection / field / reader` 场景选型，不混成一类菜单 |
 | 跨项目通用技术链 | [REFERENCE_PLUGIN_TECHNICAL_CHAINS.md](./REFERENCE_PLUGIN_TECHNICAL_CHAINS.md) | [REFERENCE_COMPARISON.md](./REFERENCE_COMPARISON.md) | 先看哪些模式已可 clean-room 泛化，再看对比快照 |
@@ -130,6 +132,9 @@
 ### 专项分析
 
 - BibGenie 架构分析：[REFERENCE_BIBGENIE_ANALYSIS.md](./REFERENCE_BIBGENIE_ANALYSIS.md)
+- EnhancedTrans 路线 4 参考笔记：[REFERENCE_ENHANCEDTRANS_PROTECTION_NOTES.md](./REFERENCE_ENHANCEDTRANS_PROTECTION_NOTES.md)
+- 路线 4 本地存储决策：[ROUTE4_LOCAL_STORAGE_DECISION.md](./ROUTE4_LOCAL_STORAGE_DECISION.md)
+- yanzheng 验证与防盗版参考笔记：[REFERENCE_YANZHENG_VALIDATION_SECURITY_NOTES.md](./REFERENCE_YANZHENG_VALIDATION_SECURITY_NOTES.md)
 - 跨项目比较：[REFERENCE_COMPARISON.md](./REFERENCE_COMPARISON.md)
 - 快照治理：[REFERENCE_SNAPSHOTS.md](./REFERENCE_SNAPSHOTS.md)
 - manifest：[`../config/reference-projects.json`](../config/reference-projects.json)

@@ -38,7 +38,10 @@ const COPY_PATHS = [
   "scripts/build-react-ui.mjs",
   "scripts/build.mjs",
   "scripts/package.mjs",
+  "scripts/package-protection-anchor-audit.mjs",
   "scripts/package-protection-smoke.mjs",
+  "scripts/package-protection-manual-score.mjs",
+  "scripts/package-protection-verdict.mjs",
   "scripts/package-obfuscation-lib.mjs",
   "scripts/package-protection-lib.mjs",
   "scripts/agent-artifacts.mjs",
@@ -107,6 +110,7 @@ function buildExportPackageJSON(sourcePackage, optionalBundleRegistry = null) {
     "package:protection:smoke:plain": "node scripts/package-protection-smoke.mjs --variant plain",
     "package:protection:smoke:encrypted": "node scripts/package-protection-smoke.mjs --variant encrypted",
     "package:protection:smoke:shielded": "node scripts/package-protection-smoke.mjs --variant shielded",
+    "package:protection:audit": "node scripts/package-protection-anchor-audit.mjs",
     "package:protection:score": "node scripts/package-protection-manual-score.mjs",
     "package:protection:verdict": "node scripts/package-protection-verdict.mjs",
     verify: "node scripts/verify.mjs",
@@ -212,6 +216,7 @@ npm run package
 npm run package:encrypted
 npm run package:shielded
 npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable
+npm run package:protection:audit
 npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"
 npm run package:protection:verdict
 npm run verify
@@ -219,7 +224,7 @@ npm run check
 npm run build:react-ui
 \`\`\`
 
-补充说明：\`package:encrypted\` 与 \`package:shielded\` 只生成本地手动触发的受保护 XPI 分支，不参与默认 release metadata / release gate 主线，也不替代服务端保护；其中 \`package:shielded\` 会先对主 bundle 做混淆，再对 protected loader 做一层兼容性优先的混淆，最后做 AES 包装。当前正式手动收口链路固定为 \`package:protection:smoke -> package:protection:score -> package:protection:verdict\`：\`package:protection:smoke\` 只用于手动实验 \`plain / encrypted / shielded\` 三个控制组的安装态、\`packageProtection\` 时序与 base64 fast path 支持情况；\`package:protection:score\` 用于回填 \`shielded stable\` 的手工评分；\`package:protection:verdict\` 只生成 advisory 结论，不进入默认 release 主线。
+补充说明：\`package:encrypted\` 与 \`package:shielded\` 只生成本地手动触发的受保护 XPI 分支，不参与默认 release metadata / release gate 主线，也不替代服务端保护；其中 \`package:shielded\` 会先对主 bundle 做混淆，再对 protected loader 做一层兼容性优先的混淆，最后做 AES 包装。当前正式手动收口链路固定为 \`package:protection:smoke -> package:protection:score -> package:protection:verdict\`：\`package:protection:smoke\` 只用于手动实验 \`plain / encrypted / shielded\` 三个控制组的安装态、\`packageProtection\` 时序与 base64 fast path 支持情况；\`package:protection:score\` 用于回填 \`shielded stable\` 的手工评分；\`package:protection:verdict\` 只生成 advisory 结论，不进入默认 release 主线。\`package:protection:audit\` 是额外的 raw export 语义泄露实验入口，用来判断下一步应该先 trim loader 还是进入 inner bundle semantic scrub。
 
 导出目标适合继续聚焦插件本体开发；如果需要完整 agent 闭环、Obsidian 介入包或默认 release gate 编排，请回到主仓库。
 `;
