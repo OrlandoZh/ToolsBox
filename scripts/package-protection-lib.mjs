@@ -79,6 +79,7 @@ function buildProtectedBundleLoaderSource({
   var __ivSegments = ${ivSegments};
   var __protectedBootstrapPromise = null;
   var __protectedBootstrap = null;
+  var __decodeMethod = null;
 
   function __now() {
     return Date.now();
@@ -123,6 +124,13 @@ function buildProtectedBundleLoaderSource({
     return summary;
   }
 
+  function __rememberDecodeMethod(method) {
+    if (!__decodeMethod && typeof method === 'string' && method) {
+      __decodeMethod = method;
+    }
+    return __decodeMethod;
+  }
+
   function __getCrypto() {
     var candidate = (typeof crypto !== 'undefined' && crypto) || __global.crypto;
     if (!candidate || !candidate.subtle || typeof candidate.subtle.importKey !== 'function') {
@@ -150,22 +158,92 @@ function buildProtectedBundleLoaderSource({
     return ordered.join('');
   }
 
+  function __getTypedUint8Array() {
+    var candidate = (typeof Uint8Array !== 'undefined' && Uint8Array) || __global.Uint8Array;
+    if (typeof candidate !== 'function') {
+      __fail('Uint8Array unavailable');
+    }
+    return candidate;
+  }
+
+  function __estimateDecodedByteLength(base64) {
+    var cleaned = String(base64 || '').replace(/\\s+/g, '');
+    var fullGroups = 0;
+    var remainder = 0;
+    var padding = 0;
+
+    if (!cleaned) {
+      return 0;
+    }
+
+    fullGroups = Math.floor(cleaned.length / 4);
+    remainder = cleaned.length % 4;
+
+    if (remainder === 1) {
+      __fail('invalid base64 payload');
+    }
+
+    if (remainder === 0) {
+      if (cleaned.charAt(cleaned.length - 1) === '=') {
+        padding = 1;
+        if (cleaned.charAt(cleaned.length - 2) === '=') {
+          padding = 2;
+        }
+      }
+      return Math.max(0, (fullGroups * 3) - padding);
+    }
+
+    if (remainder === 2) {
+      return (fullGroups * 3) + 1;
+    }
+
+    return (fullGroups * 3) + 2;
+  }
+
   function __base64ToBytes(base64) {
     var alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
     var cleaned = String(base64 || '').replace(/\\s+/g, '');
     var bytes = [];
     var index = 0;
+    var TypedUint8Array = __getTypedUint8Array();
+    var fromBase64 = typeof TypedUint8Array.fromBase64 === 'function'
+      ? TypedUint8Array.fromBase64
+      : null;
+    var setFromBase64 = TypedUint8Array.prototype && typeof TypedUint8Array.prototype.setFromBase64 === 'function'
+      ? TypedUint8Array.prototype.setFromBase64
+      : null;
 
     if (!cleaned) {
-      return new Uint8Array(0);
+      return new TypedUint8Array(0);
+    }
+
+    if (fromBase64) {
+      try {
+        var staticDecoded = fromBase64.call(TypedUint8Array, cleaned);
+        __rememberDecodeMethod('fromBase64');
+        return staticDecoded;
+      } catch {}
+    }
+
+    if (setFromBase64) {
+      try {
+        var target = new TypedUint8Array(__estimateDecodedByteLength(cleaned));
+        var setResult = setFromBase64.call(target, cleaned);
+        var written = setResult && typeof setResult === 'object' && typeof setResult.written === 'number'
+          ? setResult.written
+          : target.length;
+        __rememberDecodeMethod('setFromBase64');
+        return written === target.length ? target : target.slice(0, written);
+      } catch {}
     }
 
     if (typeof atob === 'function') {
       var binary = atob(cleaned);
-      var directBytes = new Uint8Array(binary.length);
+      var directBytes = new TypedUint8Array(binary.length);
       for (index = 0; index < binary.length; index += 1) {
         directBytes[index] = binary.charCodeAt(index);
       }
+      __rememberDecodeMethod('atob');
       return directBytes;
     }
 
@@ -194,7 +272,8 @@ function buildProtectedBundleLoaderSource({
       }
     }
 
-    return new Uint8Array(bytes);
+    __rememberDecodeMethod('manual');
+    return new TypedUint8Array(bytes);
   }
 
   function __evaluateBundle(sourceCode) {
@@ -237,6 +316,7 @@ function buildProtectedBundleLoaderSource({
         __recordPackageProtectionState({
           active: true,
           variant: __bundleMeta.variant,
+          decodeMethod: __decodeMethod || null,
           decodeDurationMs: Math.max(0, decodeDurationMs),
           decryptDurationMs: Math.max(0, decryptDurationMs),
           evalDurationMs: Math.max(0, evalDurationMs),
@@ -275,6 +355,7 @@ function buildProtectedBundleLoaderSource({
     active: true,
     variant: __bundleMeta.variant,
     loadSubScriptDurationMs: 0,
+    decodeMethod: null,
     decodeDurationMs: 0,
     decryptDurationMs: 0,
     evalDurationMs: 0,

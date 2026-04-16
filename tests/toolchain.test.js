@@ -695,6 +695,12 @@ describe("Toolchain Scripts", () => {
     assert.equal(packageJSON.scripts["build:react-ui"], "node scripts/build-react-ui.mjs");
     assert.equal(packageJSON.scripts["package:encrypted"], "node scripts/package.mjs --encrypt-bundle --skip-release-metadata");
     assert.equal(packageJSON.scripts["package:shielded"], "node scripts/package.mjs --shield-bundle --skip-release-metadata");
+    assert.equal(packageJSON.scripts["package:protection:smoke"], "node scripts/package-protection-smoke.mjs");
+    assert.equal(packageJSON.scripts["package:protection:smoke:plain"], "node scripts/package-protection-smoke.mjs --variant plain");
+    assert.equal(packageJSON.scripts["package:protection:smoke:encrypted"], "node scripts/package-protection-smoke.mjs --variant encrypted");
+    assert.equal(packageJSON.scripts["package:protection:smoke:shielded"], "node scripts/package-protection-smoke.mjs --variant shielded");
+    assert.equal(packageJSON.scripts["package:protection:score"], "node scripts/package-protection-manual-score.mjs");
+    assert.equal(packageJSON.scripts["package:protection:verdict"], "node scripts/package-protection-verdict.mjs");
     assert.equal(packageJSON.devDependencies.esbuild, "^0.21.5");
     assert.equal(packageJSON.devDependencies["javascript-obfuscator"], "^5.4.1");
     assert.equal(packageJSON.devDependencies.react, "^18.3.1");
@@ -993,6 +999,9 @@ describe("Toolchain Scripts", () => {
     assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "static-runtime-baseline-lib.mjs")));
     assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "package-obfuscation-lib.mjs")));
     assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "package-protection-lib.mjs")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "package-protection-smoke.mjs")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "zotero-runner-lib.mjs")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "zotero-agent-runtime-lib.mjs")));
     assert.ok(fs.existsSync(path.join(exportRoot, "LEGAL_RISK_CHECKLIST.md")));
     assert.ok(fs.existsSync(path.join(exportRoot, "CODE_PROVENANCE.md")));
     assert.ok(fs.existsSync(path.join(exportRoot, "THIRD_PARTY_NOTICES.md")));
@@ -1008,6 +1017,12 @@ describe("Toolchain Scripts", () => {
     assert.equal(exportPackage.scripts["build:react-ui"], "node scripts/build-react-ui.mjs");
     assert.equal(exportPackage.scripts["package:encrypted"], "node scripts/package.mjs --encrypt-bundle --skip-release-metadata");
     assert.equal(exportPackage.scripts["package:shielded"], "node scripts/package.mjs --shield-bundle --skip-release-metadata");
+    assert.equal(exportPackage.scripts["package:protection:smoke"], "node scripts/package-protection-smoke.mjs");
+    assert.equal(exportPackage.scripts["package:protection:smoke:plain"], "node scripts/package-protection-smoke.mjs --variant plain");
+    assert.equal(exportPackage.scripts["package:protection:smoke:encrypted"], "node scripts/package-protection-smoke.mjs --variant encrypted");
+    assert.equal(exportPackage.scripts["package:protection:smoke:shielded"], "node scripts/package-protection-smoke.mjs --variant shielded");
+    assert.equal(exportPackage.scripts["package:protection:score"], "node scripts/package-protection-manual-score.mjs");
+    assert.equal(exportPackage.scripts["package:protection:verdict"], "node scripts/package-protection-verdict.mjs");
     assert.equal(exportPackage.devDependencies.esbuild, "^0.21.5");
     assert.equal(exportPackage.devDependencies["javascript-obfuscator"], "^5.4.1");
     assert.equal(exportPackage.devDependencies.react, "^18.3.1");
@@ -1020,6 +1035,9 @@ describe("Toolchain Scripts", () => {
     assert.ok(exportReadme.includes("build:react-ui"));
     assert.ok(exportReadme.includes("package:encrypted"));
     assert.ok(exportReadme.includes("package:shielded"));
+    assert.ok(exportReadme.includes("package:protection:smoke"));
+    assert.ok(exportReadme.includes("package:protection:score"));
+    assert.ok(exportReadme.includes("package:protection:verdict"));
     assert.ok(exportReadme.includes("react-dom"));
     assert.ok(exportReadme.includes("addon-static/content/style/main.css"));
     assert.ok(exportReadme.includes("addon-static/locale/zh-CN/main.ftl"));

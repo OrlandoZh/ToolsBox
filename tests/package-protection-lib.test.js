@@ -5,6 +5,9 @@ import {
   SHIELDED_PACKAGE_VARIANT,
 } from "../scripts/package-protection-lib.mjs";
 
+const originalFromBase64Descriptor = Object.getOwnPropertyDescriptor(globalThis.Uint8Array, "fromBase64");
+const originalSetFromBase64Descriptor = Object.getOwnPropertyDescriptor(globalThis.Uint8Array.prototype, "setFromBase64");
+
 function createLoaderScope() {
   return {
     crypto: webcrypto,
@@ -18,6 +21,67 @@ function createLoaderScope() {
   };
 }
 
+function restoreBase64DecodeMethods() {
+  if (originalFromBase64Descriptor) {
+    Object.defineProperty(globalThis.Uint8Array, "fromBase64", originalFromBase64Descriptor);
+  } else {
+    delete globalThis.Uint8Array.fromBase64;
+  }
+
+  if (originalSetFromBase64Descriptor) {
+    Object.defineProperty(globalThis.Uint8Array.prototype, "setFromBase64", originalSetFromBase64Descriptor);
+  } else {
+    delete globalThis.Uint8Array.prototype.setFromBase64;
+  }
+}
+
+function configureBase64DecodeMethods({ fromBase64, setFromBase64 }) {
+  if (typeof fromBase64 === "function") {
+    Object.defineProperty(globalThis.Uint8Array, "fromBase64", {
+      value: fromBase64,
+      configurable: true,
+      writable: true,
+    });
+  } else {
+    delete globalThis.Uint8Array.fromBase64;
+  }
+
+  if (typeof setFromBase64 === "function") {
+    Object.defineProperty(globalThis.Uint8Array.prototype, "setFromBase64", {
+      value: setFromBase64,
+      configurable: true,
+      writable: true,
+    });
+  } else {
+    delete globalThis.Uint8Array.prototype.setFromBase64;
+  }
+}
+
+function createProtectedBootstrapScope() {
+  const sourceCode = `
+    (function (__global) {
+      "use strict";
+      async function bootstrapPlugin() {
+        return "ready";
+      }
+      __global.bootstrapPlugin = bootstrapPlugin;
+    })(this);
+  `;
+
+  const { loaderSource } = protectBundleSource(sourceCode, {
+    addonRef: "demo-addon",
+    addonVersion: "0.0.1",
+    variant: SHIELDED_PACKAGE_VARIANT,
+  });
+
+  const scope = createLoaderScope();
+  const loadProtectedBundle = new Function(`${loaderSource}\nreturn this.bootstrapPlugin;`);
+  return {
+    scope,
+    bootstrap: loadProtectedBundle.call(scope),
+  };
+}
+
 describe("Package Protection Lib", () => {
   afterEach(() => {
     delete globalThis.bootstrapPlugin;
@@ -26,6 +90,7 @@ describe("Package Protection Lib", () => {
     delete globalThis.__CLEANROOM_PACKAGE_VARIANT__;
     delete globalThis.__CLEANROOM_SHIELDED_BUNDLE__;
     delete globalThis.__CLEANROOM_ENCRYPTED_BUNDLE__;
+    restoreBase64DecodeMethods();
   });
 
   it("should keep protected bundle execution bound to the explicit loader scope", async () => {
@@ -82,6 +147,54 @@ describe("Package Protection Lib", () => {
     assert.equal(typeof globalThis.bootstrapPlugin, "undefined");
     assert.equal(typeof globalThis.__CLEANROOM_TEMPLATE_CONFIG__, "undefined");
     assert.equal(metadata.variant, SHIELDED_PACKAGE_VARIANT);
+  });
+
+  it("should record atob as the decode method when typed-array fast paths are unavailable", async () => {
+    configureBase64DecodeMethods({
+      fromBase64: null,
+      setFromBase64: null,
+    });
+
+    const { scope, bootstrap } = createProtectedBootstrapScope();
+    const result = await bootstrap.call(scope);
+
+    assert.equal(result, "ready");
+    assert.equal(scope.__CLEANROOM_TEMPLATE_RUNTIME__?.packageProtection?.decodeMethod, "atob");
+  });
+
+  it("should prefer Uint8Array.fromBase64 when it is available", async () => {
+    configureBase64DecodeMethods({
+      fromBase64(base64) {
+        return Uint8Array.from(Buffer.from(base64, "base64"));
+      },
+      setFromBase64: null,
+    });
+
+    const { scope, bootstrap } = createProtectedBootstrapScope();
+    const result = await bootstrap.call(scope);
+
+    assert.equal(result, "ready");
+    assert.equal(scope.__CLEANROOM_TEMPLATE_RUNTIME__?.packageProtection?.decodeMethod, "fromBase64");
+  });
+
+  it("should fall back to Uint8Array.prototype.setFromBase64 when the static helper is unavailable", async () => {
+    configureBase64DecodeMethods({
+      fromBase64: null,
+      setFromBase64(base64) {
+        const bytes = Uint8Array.from(Buffer.from(base64, "base64"));
+        this.set(bytes);
+        return {
+          read: base64.length,
+          written: bytes.length,
+        };
+      },
+    });
+
+    const { scope, bootstrap } = createProtectedBootstrapScope();
+    const result = await bootstrap.call(scope);
+
+    assert.equal(result, "ready");
+    assert.equal(scope.__CLEANROOM_TEMPLATE_RUNTIME__?.packageProtection?.decodeMethod, "setFromBase64");
   });
 
   it("should segment protected payload constants instead of embedding contiguous base64 blobs", () => {

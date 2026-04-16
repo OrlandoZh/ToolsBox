@@ -53,6 +53,9 @@ npm run build
 npm run package
 npm run package:encrypted
 npm run package:shielded
+npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable
+npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"
+npm run package:protection:verdict
 ```
 
 在 Zotero 中：
@@ -69,7 +72,31 @@ npm run package:shielded
 
 它会生成 `dist/myplugin-0.1.0-encrypted.xpi` 或 `dist/myplugin-0.1.0-shielded.xpi`。`package:encrypted` 只对主 bundle 做客户端侧加密包装，提高直接解包直读门槛，也是当前更稳的低开销受保护分支；`package:shielded` 会先对主 bundle 做混淆，再对 protected loader 做一层轻量硬化，最后做 AES 包装，更适合提高自动化工具与 AI 的快速解读成本。两条分支默认都不写 release metadata，不进入 `release:plan` / `agent:gate:release` 主线，也不替代服务端保护。
 
-如果需要定位受保护包的首次加载延迟，优先读取 `packageProtection` 时序，而不是只看插件内核 `startupDurationMs`。当前这组时序会拆出 `loadSubScript / decode / decrypt / eval / prepare total`，便于判断性能热点是在 loader、decode 还是插件本体启动。
+如果要正式比较 `plain / encrypted / shielded` 三个控制组，执行：
+
+```bash
+npm run package:protection:smoke -- --variant plain --repeats 3 --channel stable
+npm run package:protection:smoke -- --variant encrypted --repeats 3 --channel stable
+npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable
+```
+
+这条实验链会把报告写到 `dist/package-protection-smoke/<variant>-<channel>.json` 和 `dist/package-protection-smoke/<variant>-<channel>.md`，并额外生成 aggregate 报告。当前实验报告会固定回读 `readinessMode`、`blockingRuntimeErrorCount`、`packageProtection.*`、bundle/XPI 大小，以及运行时 `Uint8Array.fromBase64 / setFromBase64` 支持情况。
+
+当前正式手动收口链路固定为：
+
+```bash
+npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable
+npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"
+npm run package:protection:verdict
+```
+
+其中：
+
+- `package:protection:score` 只回填 `shielded stable` 的手工评分，不重新打包也不重跑 smoke
+- `package:protection:verdict` 只生成 `dist/package-protection-verdict.json` / `md` 的 advisory 结论，不进入默认 release gate
+- `plain` 继续只是 control group；它的自动评分不是最终 protection verdict 的降级依据
+
+如果需要定位受保护包的首次加载延迟，优先读取 `packageProtection` 时序与 `decodeMethod`，而不是只看插件内核 `startupDurationMs`。当前这组时序会拆出 `loadSubScript / decode / decrypt / eval / prepare total`，便于判断性能热点是在 loader、decode 还是插件本体启动。
 
 说明：`updateURL` 在 Zotero 7/8 的实际安装链路中应视为必填。留空时，构建虽然可能完成，但 Zotero 会把生成的包判为无效。
 说明：当前仓库 `config/addon.config.json` 中落地的 Gitee `updateURL` 仅用于这个模板项目自身的远端发布验收与测试；如果你是基于模板开发自己的插件，必须先替换 `addonId`、`homepage` 和 `updateURL`，不能继续沿用模板仓库的发布地址。
@@ -803,6 +830,9 @@ npm run package
 ```bash
 npm run package:encrypted
 npm run package:shielded
+npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable
+npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"
+npm run package:protection:verdict
 ```
 
 它会额外生成：
@@ -814,6 +844,9 @@ npm run package:shielded
 
 - `package:encrypted` 默认不写 `dist/update.json` 或 `dist/release-manifest.json`
 - `package:shielded` 默认不写 `dist/update.json` 或 `dist/release-manifest.json`
+- `package:protection:smoke` 只生成 advisory 实验报告，不进入默认 release gate
+- `package:protection:score` 只回填 `shielded stable` 的手工评分，不触发重跑
+- `package:protection:verdict` 只生成 advisory 结论，不进入默认 release gate
 - 这些分支的定位都是“提高随手解包和直读源码门槛”，不是“客户端密钥不落地”的强安全方案
 
 ### 3. 先生成上传计划壳，再手动上传

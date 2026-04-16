@@ -371,6 +371,7 @@ export async function runFunctionalActions({ rdp, config }) {
       lifecycleBoundaryEvents: [],
       packageProtectionActive: false,
       packageProtectionVariant: null,
+      packageProtectionDecodeMethod: null,
       packageProtectionLoadSubScriptDurationMs: 0,
       packageProtectionDecodeDurationMs: 0,
       packageProtectionDecryptDurationMs: 0,
@@ -478,6 +479,10 @@ export async function runFunctionalActions({ rdp, config }) {
       checks.packageProtectionVariant = typeof selfCheck?.packageProtectionVariant === "string"
         && selfCheck.packageProtectionVariant.trim()
         ? selfCheck.packageProtectionVariant
+        : null;
+      checks.packageProtectionDecodeMethod = typeof selfCheck?.packageProtectionDecodeMethod === "string"
+        && selfCheck.packageProtectionDecodeMethod.trim()
+        ? selfCheck.packageProtectionDecodeMethod
         : null;
       checks.packageProtectionLoadSubScriptDurationMs = Number(selfCheck?.packageProtectionLoadSubScriptDurationMs || 0);
       checks.packageProtectionDecodeDurationMs = Number(selfCheck?.packageProtectionDecodeDurationMs || 0);

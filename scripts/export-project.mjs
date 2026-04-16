@@ -38,13 +38,19 @@ const COPY_PATHS = [
   "scripts/build-react-ui.mjs",
   "scripts/build.mjs",
   "scripts/package.mjs",
+  "scripts/package-protection-smoke.mjs",
   "scripts/package-obfuscation-lib.mjs",
   "scripts/package-protection-lib.mjs",
+  "scripts/agent-artifacts.mjs",
   "scripts/optional-bundles-lib.mjs",
+  "scripts/release-matrix-lib.mjs",
+  "scripts/release-remote-verification-lib.mjs",
   "scripts/script-runtime-lib.mjs",
   "scripts/static-runtime-baseline-lib.mjs",
   "scripts/agent-zotero-locale-lib.mjs",
   "scripts/preference-pane-governance-lib.mjs",
+  "scripts/zotero-agent-runtime-lib.mjs",
+  "scripts/zotero-runner-lib.mjs",
   "scripts/verify.mjs",
   "scripts/lint.mjs",
   "scripts/format-check.mjs",
@@ -97,6 +103,12 @@ function buildExportPackageJSON(sourcePackage, optionalBundleRegistry = null) {
     package: "node scripts/package.mjs",
     "package:encrypted": "node scripts/package.mjs --encrypt-bundle --skip-release-metadata",
     "package:shielded": "node scripts/package.mjs --shield-bundle --skip-release-metadata",
+    "package:protection:smoke": "node scripts/package-protection-smoke.mjs",
+    "package:protection:smoke:plain": "node scripts/package-protection-smoke.mjs --variant plain",
+    "package:protection:smoke:encrypted": "node scripts/package-protection-smoke.mjs --variant encrypted",
+    "package:protection:smoke:shielded": "node scripts/package-protection-smoke.mjs --variant shielded",
+    "package:protection:score": "node scripts/package-protection-manual-score.mjs",
+    "package:protection:verdict": "node scripts/package-protection-verdict.mjs",
     verify: "node scripts/verify.mjs",
     lint: "node scripts/lint.mjs",
     "format:check": "node scripts/format-check.mjs",
@@ -181,8 +193,8 @@ function buildExportReadme(config, exportLicense) {
 
 ## 已剔除
 
-- agent 自动化链路脚本与真机编排
-- Zotero runner / watch / e2e / autofix / gate 工件
+- 默认 agent 自动化链路脚本与 gate 编排
+- Zotero \`watch / e2e / autofix / gate\` 工件
 - \`reference/\`、\`docs/\`、\`tests/\`、\`dist/\`、\`.zotero-runtime/\`
 - 当前仓库中的分析性与框架性辅助文档
 
@@ -199,14 +211,17 @@ npm run build
 npm run package
 npm run package:encrypted
 npm run package:shielded
+npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable
+npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"
+npm run package:protection:verdict
 npm run verify
 npm run check
 npm run build:react-ui
 \`\`\`
 
-补充说明：\`package:encrypted\` 与 \`package:shielded\` 只生成本地手动触发的受保护 XPI 分支，不参与默认 release metadata / release gate 主线，也不替代服务端保护；其中 \`package:shielded\` 会先对主 bundle 做混淆，再对 protected loader 做一层兼容性优先的混淆，最后做 AES 包装。
+补充说明：\`package:encrypted\` 与 \`package:shielded\` 只生成本地手动触发的受保护 XPI 分支，不参与默认 release metadata / release gate 主线，也不替代服务端保护；其中 \`package:shielded\` 会先对主 bundle 做混淆，再对 protected loader 做一层兼容性优先的混淆，最后做 AES 包装。当前正式手动收口链路固定为 \`package:protection:smoke -> package:protection:score -> package:protection:verdict\`：\`package:protection:smoke\` 只用于手动实验 \`plain / encrypted / shielded\` 三个控制组的安装态、\`packageProtection\` 时序与 base64 fast path 支持情况；\`package:protection:score\` 用于回填 \`shielded stable\` 的手工评分；\`package:protection:verdict\` 只生成 advisory 结论，不进入默认 release 主线。
 
-导出目标适合继续聚焦插件本体开发；如果需要 agent 闭环、真机 runner、Obsidian 介入包等能力，请回到主仓库。
+导出目标适合继续聚焦插件本体开发；如果需要完整 agent 闭环、Obsidian 介入包或默认 release gate 编排，请回到主仓库。
 `;
 }
 

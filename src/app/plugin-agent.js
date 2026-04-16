@@ -210,6 +210,7 @@ export function createPluginAgent({
       : {
         active: false,
         variant: null,
+        decodeMethod: null,
         loadSubScriptDurationMs: 0,
         decodeDurationMs: 0,
         decryptDurationMs: 0,
@@ -286,6 +287,10 @@ export function createPluginAgent({
       packageProtectionVariant: typeof packageProtection?.variant === "string"
         && packageProtection.variant.trim()
         ? packageProtection.variant
+        : null,
+      packageProtectionDecodeMethod: typeof packageProtection?.decodeMethod === "string"
+        && packageProtection.decodeMethod.trim()
+        ? packageProtection.decodeMethod
         : null,
       packageProtectionLoadSubScriptDurationMs: Number(packageProtection?.loadSubScriptDurationMs || 0),
       packageProtectionDecodeDurationMs: Number(packageProtection?.decodeDurationMs || 0),

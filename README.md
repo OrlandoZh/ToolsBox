@@ -69,6 +69,9 @@
 4. 运行 `npm run package` 生成 `.xpi` 发布包
 4.1. 如需手动触发受保护导出分支，运行 `npm run package:encrypted` 生成 `dist/<addonRef>-<addonVersion>-encrypted.xpi`
 4.2. 如需进一步提高自动化工具与 AI 的直读门槛，运行 `npm run package:shielded` 生成 `dist/<addonRef>-<addonVersion>-shielded.xpi`
+4.3. 如需正式对比 `plain / encrypted / shielded` 三个控制组的安装态、`packageProtection` 时序和 base64 fast path 支持，运行 `npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable`
+4.4. 如需回填 `shielded stable` 的手工评分，运行 `npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"`
+4.5. 如需生成当前手动实验链的 advisory 结论，运行 `npm run package:protection:verdict`
 5. 在 Zotero 中通过 “Install Add-on From File” 安装 `dist/<addonRef>-<addonVersion>.xpi`
 
 注意：
@@ -267,6 +270,9 @@ npm run build    # 构建：生成 manifest/prefs/bootstrap，打包源码
 npm run package  # 打包：创建 .xpi 发布包
 npm run package:encrypted # 手动导出受保护 XPI 分支（默认不写 release metadata）
 npm run package:shielded # 手动导出 shielded XPI 分支（主 bundle 混淆 + loader-lite 硬化 + AES 包装）
+npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable # 手动实验 plain/encrypted/shielded 控制组的安装态与 packageProtection 报告
+npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture" # 回填 shielded stable 的手工评分
+npm run package:protection:verdict # 生成当前受保护打包链的 advisory verdict
 npm run release:metadata # 生成 dist/update.json 与 release-manifest.json
 npm run release:preflight # 校验发布产物一致性 + 发布态 clean-room 门禁，并生成 release-preflight.json
 npm run release:local # 本地完整发布门禁（package + release:preflight）

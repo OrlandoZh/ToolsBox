@@ -248,6 +248,7 @@ describe("Plugin Agent", () => {
         return {
           active: true,
           variant: "shielded",
+          decodeMethod: "fromBase64",
           loadSubScriptDurationMs: 420,
           decodeDurationMs: 85,
           decryptDurationMs: 17,
@@ -307,6 +308,7 @@ describe("Plugin Agent", () => {
     assert.equal(diagnostics.lifecycleBoundaryEvents[0]?.event, "plugin.start.failed");
     assert.equal(diagnostics.packageProtectionActive, true);
     assert.equal(diagnostics.packageProtectionVariant, "shielded");
+    assert.equal(diagnostics.packageProtectionDecodeMethod, "fromBase64");
     assert.equal(diagnostics.packageProtectionLoadSubScriptDurationMs, 420);
     assert.equal(diagnostics.packageProtectionDecodeDurationMs, 85);
     assert.equal(diagnostics.packageProtectionDecryptDurationMs, 17);
@@ -315,6 +317,7 @@ describe("Plugin Agent", () => {
     assert.equal(diagnostics.packageProtectionBootstrapResolveDurationMs, 305);
     assert.equal(diagnostics.packageProtectionBootstrapCallCount, 1);
     assert.equal(diagnostics.packageProtection.variant, "shielded");
+    assert.equal(diagnostics.packageProtection.decodeMethod, "fromBase64");
 
     const capabilities = agent.listCapabilities();
     assert.ok(capabilities.length >= 12);

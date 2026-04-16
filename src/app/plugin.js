@@ -78,6 +78,7 @@ function clonePackageProtectionSummary(summary = null) {
     return {
       active: false,
       variant: null,
+      decodeMethod: null,
       loadSubScriptDurationMs: 0,
       decodeDurationMs: 0,
       decryptDurationMs: 0,
@@ -92,6 +93,9 @@ function clonePackageProtectionSummary(summary = null) {
     active: Boolean(summary.active),
     variant: typeof summary.variant === "string" && summary.variant.trim()
       ? summary.variant.trim()
+      : null,
+    decodeMethod: typeof summary.decodeMethod === "string" && summary.decodeMethod.trim()
+      ? summary.decodeMethod.trim()
       : null,
     loadSubScriptDurationMs: Number(summary.loadSubScriptDurationMs || 0),
     decodeDurationMs: Number(summary.decodeDurationMs || 0),
