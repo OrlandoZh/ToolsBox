@@ -202,6 +202,49 @@ function summarizePreflight(report) {
   };
 }
 
+function summarizeInnerAudit(report, expectedVariant = null) {
+  if (!report) {
+    return {
+      present: false,
+      status: "missing",
+      rating: null,
+      overlayEntryCount: 0,
+      architectureAnchorCount: 0,
+      moduleRecoveryAnchorCount: 0,
+      decodeMethod: null,
+      prepareDurationMs: 0,
+    };
+  }
+
+  const variants = Array.isArray(report.variants) ? report.variants : [];
+  const selected = variants.find((variant) => String(variant?.variant || "").trim() === String(expectedVariant || "").trim())
+    || variants[0]
+    || null;
+  if (!selected) {
+    return {
+      present: false,
+      status: "missing",
+      rating: null,
+      overlayEntryCount: 0,
+      architectureAnchorCount: 0,
+      moduleRecoveryAnchorCount: 0,
+      decodeMethod: null,
+      prepareDurationMs: 0,
+    };
+  }
+
+  return {
+    present: true,
+    status: String(selected.status || report.status || "missing"),
+    rating: String(selected.suggestedProxyLLMRating || "").trim() || null,
+    overlayEntryCount: Number(selected.overlay?.entryCount || 0),
+    architectureAnchorCount: Number(selected.innerSemanticScan?.architectureAnchorCount || 0),
+    moduleRecoveryAnchorCount: Number(selected.moduleRecoveryScan?.totalAnchorCount || 0),
+    decodeMethod: String(selected.packageProtection?.decodeMethod || "").trim() || null,
+    prepareDurationMs: Number(selected.packageProtection?.prepareDurationMs || 0),
+  };
+}
+
 function summarizeAuditComparison(variant, auditReport) {
   if (!auditReport) {
     return {
@@ -337,6 +380,8 @@ function evaluateJSConfuserString({
   candidateWebcrack,
   auditComparison,
   preflight,
+  baseInnerAudit,
+  candidateInnerAudit,
 }) {
   if (!baseSmoke.present || !candidateSmoke.present || !baseWebcrack.present || !candidateWebcrack.present) {
     return {
@@ -366,8 +411,11 @@ function evaluateJSConfuserString({
   const candidateLLM = candidateSmoke.llmSinglePassResult;
   const baseLLM = baseSmoke.llmSinglePassResult;
   if (!candidateLLM || !baseLLM) {
+    const proxyNote = baseInnerAudit.present && candidateInnerAudit.present
+      ? `inner audit proxy 当前为 shielded=${baseInnerAudit.rating || "-"} / jsconfuser-string=${candidateInnerAudit.rating || "-"}.`
+      : "当前还没有对称的 inner audit proxy。";
     const preflightNote = preflight.present === true && preflight.semanticDelta
-      ? `preflight 已显示 ${preflight.semanticDelta.inputAnchorCount || 0} -> ${preflight.semanticDelta.outputAnchorCount || 0} 的语义锚点压缩，但 stable 产物还缺对称的 LLM 单轮评分。`
+      ? `preflight 已显示 ${preflight.semanticDelta.inputAnchorCount || 0} -> ${preflight.semanticDelta.outputAnchorCount || 0} 的语义锚点压缩，但 stable 产物还缺对称的 LLM 单轮评分。${proxyNote}`
       : "当前仍缺对称的 LLM 单轮评分。";
     return {
       status: "attention",
@@ -419,6 +467,8 @@ export function summarizePackageProtectionExperimentCompare({
   candidateWebcrackReport = null,
   auditReport = null,
   preflightReport = null,
+  baseInnerAuditReport = null,
+  candidateInnerAuditReport = null,
 } = {}) {
   const normalizedVariant = normalizeVariant(variant);
   const normalizedChannel = normalizeChannel(channel) || "stable";
@@ -435,6 +485,8 @@ export function summarizePackageProtectionExperimentCompare({
   const preflight = normalizedVariant === "shielded-jsconfuser-string"
     ? summarizePreflight(preflightReport)
     : summarizePreflight(null);
+  const baseInnerAudit = summarizeInnerAudit(baseInnerAuditReport, "shielded");
+  const candidateInnerAudit = summarizeInnerAudit(candidateInnerAuditReport, normalizedVariant);
   const deltas = buildDeltas(baseSmoke, candidateSmoke, baseWebcrack, candidateWebcrack);
 
   const evaluation = normalizedVariant === "shielded-descriptor-bind"
@@ -452,6 +504,8 @@ export function summarizePackageProtectionExperimentCompare({
       candidateWebcrack,
       auditComparison,
       preflight,
+      baseInnerAudit,
+      candidateInnerAudit,
     });
 
   return {
@@ -472,14 +526,17 @@ export function summarizePackageProtectionExperimentCompare({
       auditPresent: auditComparison.present === true,
       preflightPresent: preflight.present === true,
       llmSymmetryComplete: Boolean(baseSmoke.llmSinglePassResult && candidateSmoke.llmSinglePassResult),
+      innerAuditComplete: baseInnerAudit.present && candidateInnerAudit.present,
     },
     base: {
       smoke: baseSmoke,
       webcrack: baseWebcrack,
+      innerAudit: baseInnerAudit,
     },
     candidate: {
       smoke: candidateSmoke,
       webcrack: candidateWebcrack,
+      innerAudit: candidateInnerAudit,
     },
     deltas,
     auditComparison,
@@ -507,6 +564,7 @@ export function renderPackageProtectionExperimentCompareMarkdown(report) {
     `- auditPresent: \`${report.evidence.auditPresent ? "yes" : "no"}\``,
     `- preflightPresent: \`${report.evidence.preflightPresent ? "yes" : "no"}\``,
     `- llmSymmetryComplete: \`${report.evidence.llmSymmetryComplete ? "yes" : "no"}\``,
+    `- innerAuditComplete: \`${report.evidence.innerAuditComplete ? "yes" : "no"}\``,
     "",
     "## Base",
     "",
@@ -515,6 +573,7 @@ export function renderPackageProtectionExperimentCompareMarkdown(report) {
     `- webcrackStatus: \`${report.base.webcrack.status}\``,
     `- webcrackRating: \`${report.base.webcrack.rating || "-"}\``,
     `- llmSinglePassResult: \`${report.base.smoke.llmSinglePassResult || "-"}\``,
+    `- proxyLLMRating: \`${report.base.innerAudit.rating || "-"}\``,
     `- xpiBytes: \`${report.base.smoke.xpiBytes}\``,
     `- bundleBytes: \`${report.base.smoke.bundleBytes}\``,
     `- medianDecodeDurationMs: \`${report.base.smoke.medianDecodeDurationMs}\``,
@@ -527,6 +586,7 @@ export function renderPackageProtectionExperimentCompareMarkdown(report) {
     `- webcrackStatus: \`${report.candidate.webcrack.status}\``,
     `- webcrackRating: \`${report.candidate.webcrack.rating || "-"}\``,
     `- llmSinglePassResult: \`${report.candidate.smoke.llmSinglePassResult || "-"}\``,
+    `- proxyLLMRating: \`${report.candidate.innerAudit.rating || "-"}\``,
     `- xpiBytes: \`${report.candidate.smoke.xpiBytes}\``,
     `- bundleBytes: \`${report.candidate.smoke.bundleBytes}\``,
     `- medianDecodeDurationMs: \`${report.candidate.smoke.medianDecodeDurationMs}\``,
@@ -617,6 +677,12 @@ async function loadPackageProtectionExperimentCompareInputs(projectRootPath, var
   const preflightReport = variant === "shielded-jsconfuser-string"
     ? await readOptionalJSON(resolveAgentArtifactPath(projectRootPath, "package-protection-jsconfuser-string-preflight.json"))
     : null;
+  const baseInnerAuditReport = await readOptionalJSON(
+    resolveAgentArtifactPath(projectRootPath, "package-protection-inner-audit", `shielded-${channel}.json`),
+  );
+  const candidateInnerAuditReport = await readOptionalJSON(
+    resolveAgentArtifactPath(projectRootPath, "package-protection-inner-audit", `${variant}-${channel}.json`),
+  );
 
   return {
     baseSmokeReport,
@@ -625,6 +691,8 @@ async function loadPackageProtectionExperimentCompareInputs(projectRootPath, var
     candidateWebcrackReport,
     auditReport,
     preflightReport,
+    baseInnerAuditReport,
+    candidateInnerAuditReport,
   };
 }
 

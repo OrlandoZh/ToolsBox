@@ -9,6 +9,7 @@ import {
   buildJSConfuserSemanticDelta,
   buildPackageProtectionJSConfuserAttemptStatus,
   discoverJSConfuserToolPath,
+  ensureJSConfuserToolReady,
   parsePackageProtectionJSConfuserPreflightArgs,
   resolveJSConfuserToolSelection,
   resolvePackageProtectionJSConfuserReportBasename,
@@ -19,6 +20,32 @@ import {
   summarizePackageProtectionJSConfuserPreflight,
 } from "../scripts/package-protection-jsconfuser-preflight.mjs";
 import { buildPackageProtectionAuditAnchors, scanBundleAnchors } from "../scripts/package-protection-anchor-audit.mjs";
+
+function writeRunnableJSConfuserCandidate(toolRoot, version = "0.0.0-test") {
+  fs.mkdirSync(path.join(toolRoot, "node_modules"), { recursive: true });
+  fs.mkdirSync(path.join(toolRoot, "dist"), { recursive: true });
+  fs.writeFileSync(path.join(toolRoot, "package.json"), `${JSON.stringify({
+    name: "js-confuser",
+    version,
+    main: "dist/index.js",
+  }, null, 2)}\n`, "utf-8");
+  fs.writeFileSync(
+    path.join(toolRoot, "dist", "index.js"),
+    "exports.obfuscate = async function obfuscate(source) { return { code: String(source || '') }; };\n",
+    "utf-8",
+  );
+}
+
+function writeStubJSConfuserCandidate(toolRoot, version = "0.0.0-test") {
+  fs.mkdirSync(path.join(toolRoot, "node_modules"), { recursive: true });
+  fs.mkdirSync(path.join(toolRoot, "dist"), { recursive: true });
+  fs.writeFileSync(path.join(toolRoot, "package.json"), `${JSON.stringify({
+    name: "js-confuser",
+    version,
+    main: "dist/index.js",
+  }, null, 2)}\n`, "utf-8");
+  fs.writeFileSync(path.join(toolRoot, "dist", "index.js"), "export default {};\n", "utf-8");
+}
 
 describe("Package Protection JS-Confuser Preflight", () => {
   it("should parse tool path, source proxy mode, bundle path and optional tool entry", () => {
@@ -69,10 +96,32 @@ describe("Package Protection JS-Confuser Preflight", () => {
       },
     });
 
+    assert.ok(roots.includes(path.resolve("/tmp/workspace/repo/dist/package-protection-tools/js-confuser")));
+    assert.ok(roots.includes(path.resolve("/tmp/workspace/repo/dist/package-protection-tools/js-confuser/node_modules/js-confuser")));
     assert.ok(roots.includes(path.resolve("/tmp/workspace/repo")));
     assert.ok(roots.includes(path.resolve("/tmp/home/Downloads")));
     assert.ok(roots.includes(path.resolve(os.tmpdir())));
     assert.ok(roots.includes(path.resolve("/tmp")));
+  });
+
+  it("should prioritize workspace and home discovery roots before temp fallbacks", () => {
+    const roots = buildJSConfuserDiscoveryRoots({
+      projectRootPath: "/tmp/workspace/repo",
+      env: {
+        HOME: "/tmp/home",
+        TMPDIR: "/tmp/custom-temp",
+      },
+    });
+
+    assert.ok(
+      roots.indexOf(path.resolve("/tmp/workspace")) < roots.indexOf(path.resolve("/tmp/home/.openclaw/workspace-coding")),
+    );
+    assert.ok(
+      roots.indexOf(path.resolve("/tmp/home/.openclaw/workspace-coding/projects/GitHub")) < roots.indexOf(path.resolve("/tmp/custom-temp")),
+    );
+    assert.ok(
+      roots.indexOf(path.resolve("/tmp/home/Downloads")) < roots.indexOf(path.resolve("/tmp")),
+    );
   });
 
   it("should resolve nearest reachable node_modules path", async () => {
@@ -87,12 +136,7 @@ describe("Package Protection JS-Confuser Preflight", () => {
   it("should discover a local js-confuser checkout from common roots", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "jsconfuser-discovery-"));
     const checkoutRoot = path.join(root, "projects", "GitHub", "js-confuser");
-    fs.mkdirSync(path.join(checkoutRoot, "node_modules"), { recursive: true });
-    fs.writeFileSync(path.join(checkoutRoot, "package.json"), `${JSON.stringify({
-      name: "js-confuser",
-      version: "0.0.0-test",
-      main: "dist/index.js",
-    }, null, 2)}\n`, "utf-8");
+    writeRunnableJSConfuserCandidate(checkoutRoot);
 
     const discovered = await discoverJSConfuserToolPath({
       projectRootPath: path.join(root, "workspace", "repo"),
@@ -102,18 +146,14 @@ describe("Package Protection JS-Confuser Preflight", () => {
     });
 
     assert.equal(discovered.toolPath, checkoutRoot);
+    assert.equal(discovered.toolEntry, "dist/index.js");
     assert.equal(discovered.discovered, true);
   });
 
   it("should fall back to auto-discovery when no explicit tool path is provided", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "jsconfuser-selection-"));
     const checkoutRoot = path.join(root, ".openclaw", "workspace-coding", "projects", "GitHub", "js-confuser");
-    fs.mkdirSync(path.join(checkoutRoot, "node_modules"), { recursive: true });
-    fs.writeFileSync(path.join(checkoutRoot, "package.json"), `${JSON.stringify({
-      name: "js-confuser",
-      version: "0.0.0-test",
-      main: "dist/index.js",
-    }, null, 2)}\n`, "utf-8");
+    writeRunnableJSConfuserCandidate(checkoutRoot);
 
     const selected = await resolveJSConfuserToolSelection({
       projectRootPath: path.join(root, "workspace", "repo"),
@@ -122,8 +162,67 @@ describe("Package Protection JS-Confuser Preflight", () => {
       },
     });
 
-    assert.equal(selected.toolPath, checkoutRoot);
     assert.equal(selected.discovered, true);
+    assert.equal(path.basename(selected.toolPath), "js-confuser");
+    assert.equal(selected.toolEntry, "dist/index.js");
+    assert.equal(fs.existsSync(path.join(selected.toolPath, "package.json")), true);
+  });
+
+  it("should skip discovered candidates without a runnable entry and continue to the next candidate", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "jsconfuser-discovery-ready-"));
+    const invalidRoot = path.join(root, "workspace", "js-confuser");
+    const validRoot = path.join(root, ".openclaw", "workspace-coding", "projects", "GitHub", "js-confuser");
+
+    writeStubJSConfuserCandidate(invalidRoot);
+    writeRunnableJSConfuserCandidate(validRoot);
+
+    const discovered = await discoverJSConfuserToolPath({
+      projectRootPath: path.join(root, "workspace", "repo"),
+      env: {
+        HOME: root,
+      },
+    });
+
+    assert.equal(discovered.toolPath, validRoot);
+    assert.equal(discovered.toolEntry, "dist/index.js");
+    assert.equal(discovered.discovered, true);
+  });
+
+  it("should discover the default bootstrap install root before falling back to temp candidates", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "jsconfuser-bootstrap-discovery-"));
+    const projectRoot = path.join(root, "workspace", "repo");
+    const bootstrapToolRoot = path.join(projectRoot, "dist", "package-protection-tools", "js-confuser", "node_modules", "js-confuser");
+    const tempStubRoot = path.join(root, "tmp-candidates", "js-confuser");
+
+    writeRunnableJSConfuserCandidate(bootstrapToolRoot, "2.0.1");
+    writeStubJSConfuserCandidate(tempStubRoot, "2.0.1");
+
+    const discovered = await discoverJSConfuserToolPath({
+      projectRootPath: projectRoot,
+      env: {
+        HOME: path.join(root, "home"),
+        TMPDIR: path.join(root, "tmp-candidates"),
+      },
+    });
+
+    assert.equal(discovered.toolPath, path.resolve(bootstrapToolRoot));
+    assert.equal(discovered.toolEntry, "dist/index.js");
+  });
+
+  it("should reject explicit tool paths whose entry is only a stub without obfuscate api", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "jsconfuser-explicit-stub-"));
+    const stubRoot = path.join(root, "js-confuser");
+    writeStubJSConfuserCandidate(stubRoot);
+
+    let error = null;
+    try {
+      await ensureJSConfuserToolReady(stubRoot);
+    } catch (caught) {
+      error = caught;
+    }
+
+    assert.ok(error, "expected ensureJSConfuserToolReady to reject stub entry");
+    assert.match(String(error?.message || error), /supported js-confuser obfuscate API/);
   });
 
   it("should build the non-hostile astScrambler profile", () => {

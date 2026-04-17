@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { withBuildLock } from "./build-lock.mjs";
 import {
   BUILD_MODULE_ID_MODE_ANONYMIZED,
@@ -297,18 +297,27 @@ function normalizeUniqueAbsolutePaths(values = []) {
 
 export function buildJSConfuserDiscoveryRoots({ projectRootPath = projectRoot, env = process.env } = {}) {
   const homePath = String(env?.HOME || os.homedir?.() || "").trim();
-  const tempPath = String(os.tmpdir?.() || "").trim();
-  return normalizeUniqueAbsolutePaths([
+  const tempPath = String(env?.TMPDIR || os.tmpdir?.() || "").trim();
+  const bootstrapInstallRoot = resolveAgentArtifactPath(projectRootPath, "package-protection-tools", "js-confuser");
+  const bootstrapToolPath = path.join(bootstrapInstallRoot, "node_modules", "js-confuser");
+  const tempFallbackRoots = normalizeUniqueAbsolutePaths([
+    tempPath || null,
+    "/tmp",
+  ]);
+  const projectNeighborRoots = normalizeUniqueAbsolutePaths([
     projectRootPath,
     path.join(projectRootPath, ".."),
     path.join(projectRootPath, "..", ".."),
-    path.join(projectRootPath, "..", "..", ".."),
+  ]).filter((candidate) => !tempFallbackRoots.includes(candidate));
+  return normalizeUniqueAbsolutePaths([
+    bootstrapToolPath,
+    bootstrapInstallRoot,
+    ...projectNeighborRoots,
     homePath ? path.join(homePath, ".openclaw", "workspace-coding") : null,
     homePath ? path.join(homePath, ".openclaw", "workspace-coding", "projects") : null,
     homePath ? path.join(homePath, ".openclaw", "workspace-coding", "projects", "GitHub") : null,
     homePath ? path.join(homePath, "Downloads") : null,
-    tempPath || null,
-    "/tmp",
+    ...tempFallbackRoots,
   ]);
 }
 
@@ -413,16 +422,14 @@ export async function discoverJSConfuserToolPath({ projectRootPath = projectRoot
     searchedRoots.push(rootPath);
     const candidates = await listJSConfuserCandidates(rootPath);
     for (const candidate of candidates) {
-      if (!await isJSConfuserPackageRoot(candidate)) {
-        continue;
-      }
-      const nodeModulesPath = await resolveNearestNodeModulesPath(candidate);
-      if (!nodeModulesPath) {
+      const readyCandidate = await resolveReadyJSConfuserDiscoveryCandidate(candidate);
+      if (!readyCandidate) {
         continue;
       }
       return {
-        toolPath: candidate,
-        nodeModulesPath,
+        toolPath: readyCandidate.toolPath,
+        toolEntry: readyCandidate.entryRelativePath,
+        nodeModulesPath: readyCandidate.nodeModulesPath,
         searchedRoots,
         discovered: true,
       };
@@ -431,6 +438,7 @@ export async function discoverJSConfuserToolPath({ projectRootPath = projectRoot
 
   return {
     toolPath: null,
+    toolEntry: null,
     nodeModulesPath: null,
     searchedRoots,
     discovered: false,
@@ -478,7 +486,7 @@ export async function resolveJSConfuserToolSelection({
 
   return {
     toolPath: discovery.toolPath,
-    toolEntry: explicitToolEntry,
+    toolEntry: explicitToolEntry || discovery.toolEntry || null,
     discovered: true,
     searchedRoots: discovery.searchedRoots,
   };
@@ -601,6 +609,74 @@ async function resolveExistingEntryPath(toolPath, packageJSON, overrideEntry = n
   });
 }
 
+function pickJSConfuserObfuscateCandidate(mod = {}) {
+  const candidates = [
+    ["named-obfuscate", mod?.obfuscate],
+    ["default-obfuscate", mod?.default?.obfuscate],
+    ["default-function", mod?.default],
+    ["module-function", mod],
+    ["named-jsconfuser-obfuscate", mod?.JsConfuser?.obfuscate],
+  ];
+  return candidates.find(([, value]) => typeof value === "function") || null;
+}
+
+async function inspectJSConfuserToolAPI(entryPath) {
+  try {
+    const mod = await import(pathToFileURL(entryPath).href);
+    const picked = pickJSConfuserObfuscateCandidate(mod);
+    return {
+      apiShape: picked ? String(picked[0] || "") : null,
+      causeMessage: picked ? null : "no supported obfuscate API found in tool entry",
+    };
+  } catch (error) {
+    return {
+      apiShape: null,
+      causeMessage: String(error?.message || error || "unable to import tool entry"),
+    };
+  }
+}
+
+async function resolveReadyJSConfuserDiscoveryCandidate(candidatePath) {
+  if (!await isJSConfuserPackageRoot(candidatePath)) {
+    return null;
+  }
+
+  const resolvedToolPath = path.resolve(candidatePath);
+  const nodeModulesPath = await resolveNearestNodeModulesPath(resolvedToolPath);
+  if (!nodeModulesPath) {
+    return null;
+  }
+
+  const packagePath = path.join(resolvedToolPath, "package.json");
+  const packageJSON = await readJSONFile(packagePath, {
+    missingCategory: "environment",
+    invalidCategory: "validation",
+    failedStage: "read-tool-package",
+    label: "js-confuser package.json",
+  }).catch(() => null);
+  if (!packageJSON) {
+    return null;
+  }
+
+  const entryInfo = await resolveExistingEntryPath(resolvedToolPath, packageJSON)
+    .catch(() => null);
+  if (!entryInfo) {
+    return null;
+  }
+  const apiInfo = await inspectJSConfuserToolAPI(entryInfo.entryPath);
+  if (!apiInfo.apiShape) {
+    return null;
+  }
+
+  return {
+    toolPath: resolvedToolPath,
+    nodeModulesPath,
+    packageJSON,
+    apiShape: apiInfo.apiShape,
+    ...entryInfo,
+  };
+}
+
 export async function ensureJSConfuserToolReady(toolPath, overrideEntry = null) {
   const resolvedToolPath = path.resolve(toolPath);
   const packagePath = path.join(resolvedToolPath, "package.json");
@@ -632,12 +708,23 @@ export async function ensureJSConfuserToolReady(toolPath, overrideEntry = null) 
     label: "js-confuser package.json",
   });
   const entryInfo = await resolveExistingEntryPath(resolvedToolPath, packageJSON, overrideEntry);
+  const apiInfo = await inspectJSConfuserToolAPI(entryInfo.entryPath);
+  assertScript(Boolean(apiInfo.apiShape), "toolPath entry does not expose supported js-confuser obfuscate API", {
+    category: "environment",
+    failedStage: "validate-tool-api",
+    details: {
+      toolPath: resolvedToolPath,
+      entryPath: entryInfo.entryPath,
+      causeMessage: apiInfo.causeMessage,
+    },
+  });
 
   return {
     toolPath: resolvedToolPath,
     packagePath,
     nodeModulesPath,
     packageJSON,
+    apiShape: apiInfo.apiShape,
     ...entryInfo,
   };
 }

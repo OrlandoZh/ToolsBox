@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { withBuildLock } from "./build-lock.mjs";
 import { resolveAgentArtifactsDir } from "./agent-artifacts.mjs";
 import {
   buildPackageProtectionAuditAnchors,
@@ -23,6 +24,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const scriptStartedAt = Date.now();
+const PACKAGE_PROTECTION_BUILD_LOCK_TIMEOUT_MS = 10 * 60 * 1000;
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const DEFAULT_WEBCRACK_BIN = "webcrack";
@@ -39,6 +41,24 @@ const STATUS_LABELS = Object.freeze({
   attention: "关注",
   failed: "失败",
 });
+
+async function withPackageProtectionWorkflowLock(owner, fn) {
+  const previousBuildLockHeld = process.env.CLEANROOM_BUILD_LOCK_HELD;
+  return withBuildLock(owner, async () => {
+    process.env.CLEANROOM_BUILD_LOCK_HELD = "1";
+    try {
+      return await fn();
+    } finally {
+      if (previousBuildLockHeld === undefined) {
+        delete process.env.CLEANROOM_BUILD_LOCK_HELD;
+      } else {
+        process.env.CLEANROOM_BUILD_LOCK_HELD = previousBuildLockHeld;
+      }
+    }
+  }, {
+    timeoutMs: PACKAGE_PROTECTION_BUILD_LOCK_TIMEOUT_MS,
+  });
+}
 
 const LOADER_ANCHORS = Object.freeze([
   {
@@ -766,10 +786,12 @@ async function createWebcrackAudit(options = {}) {
 
 async function main(argv = process.argv.slice(2)) {
   const options = parsePackageProtectionWebcrackAuditArgs(argv);
-  const { report, paths } = await createWebcrackAudit(options);
-  console.log(`Package protection webcrack audit generated: ${paths.reportPath}`);
-  console.log(`Package protection webcrack status: ${report.status}`);
-  console.log(`Suggested webcrack rating: ${report.suggestedWebcrackRating || "pending"}`);
+  await withPackageProtectionWorkflowLock("package-protection-webcrack-audit.mjs", async () => {
+    const { report, paths } = await createWebcrackAudit(options);
+    console.log(`Package protection webcrack audit generated: ${paths.reportPath}`);
+    console.log(`Package protection webcrack status: ${report.status}`);
+    console.log(`Suggested webcrack rating: ${report.suggestedWebcrackRating || "pending"}`);
+  });
 }
 
 if (isExecutedAsScript(import.meta.url)) {

@@ -7,6 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const lockDir = path.join(projectRoot, ".build-lock");
+const OWNER_FILE_GRACE_MS = 5000;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -44,6 +45,11 @@ async function readLockOwner() {
 async function cleanupStaleLockIfNeeded() {
   const ownerInfo = await readLockOwner();
   if (!ownerInfo) {
+    const lockStats = await fs.stat(lockDir).catch(() => null);
+    const lockAgeMs = lockStats ? Math.max(0, Date.now() - Number(lockStats.mtimeMs || 0)) : Number.POSITIVE_INFINITY;
+    if (lockAgeMs < OWNER_FILE_GRACE_MS) {
+      return false;
+    }
     await fs.rm(lockDir, { recursive: true, force: true });
     return true;
   }
@@ -100,8 +106,12 @@ export async function acquireBuildLock({
   throw new Error(`Timed out acquiring build lock: ${lockDir}`);
 }
 
-export async function withBuildLock(owner, fn) {
-  const lock = await acquireBuildLock({ owner });
+export async function withBuildLock(owner, fn, options = {}) {
+  const lock = await acquireBuildLock({
+    owner,
+    timeoutMs: options.timeoutMs,
+    retryDelayMs: options.retryDelayMs,
+  });
   try {
     return await fn();
   }

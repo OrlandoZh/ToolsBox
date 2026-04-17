@@ -11,11 +11,13 @@
 
 - `npm run package:encrypted`
 - `npm run package:shielded`
+- `npm run package:protection:jsconfuser:bootstrap`
 - `npm run package:protection:jsconfuser:preflight`
 - `npm run package:protection:lightweight:preflight -- --tool-path /absolute/path/to/lightweight-js-obfuscator`
 - `npm run package:protection:smoke -- --variant <plain|encrypted|shielded|shielded-descriptor-bind> --repeats 3 --channel <stable|beta>`
 - `npm run package:protection:webcrack -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta>`
 - `npm run package:protection:webcrack:score -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta>`
+- `npm run package:protection:inner:audit -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string|all> --channel <stable|beta>`
 - `npm run package:protection:score:llm -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta> --llm "<rating>"`
 - `npm run package:protection:compare -- --variant <shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta>`
 - `npm run package:protection:score -- --variant shielded --channel stable --webcrack "<rating>" --llm "<rating>"`
@@ -38,6 +40,10 @@
 - `dist/package-protection-smoke.json`
 - `dist/package-protection-smoke.md`
 - `dist/package-protection-webcrack/<variant>-<channel>.json`
+- `dist/package-protection-inner-audit/<variant>-<channel>.json`
+- `dist/package-protection-inner-audit/<variant>-<channel>.md`
+- `dist/package-protection-inner-audit.json`
+- `dist/package-protection-inner-audit.md`
 - `dist/package-protection-webcrack/<variant>-<channel>.md`
 - `dist/package-protection-compare/<variant>-vs-shielded-<channel>.json`
 - `dist/package-protection-compare/<variant>-vs-shielded-<channel>.md`
@@ -48,7 +54,10 @@
 
 - `package:protection:webcrack` 负责生成本地 `webcrack` 自动化工件
 - `package:protection:webcrack:score` 只把 `suggestedWebcrackRating` 回填到 smoke report 的 `manualScorecard.webcrackInitialResult`
+- `package:protection:inner:audit` 只补一份离线 `proxy LLM` 证据，不会写回 `manualScorecard`
+- `package:protection:compare` 在手工 `LLM single-pass` 尚未完成时，会把 `inner audit` 的 proxy 结果一起展示，帮助保持 A/B 结论可读；一旦手工 LLM 补齐，compare 才能正式落到 `runtime-only`、`hardening-win` 或 `leaning-same`
 - `package:protection:score` 仍负责补齐 `llmSinglePassResult`，不会被替代
+- `package:protection:jsconfuser:bootstrap` 负责把 `js-confuser` 安装到当前仓库默认可发现位置，解决实验链的本地工具可复跑性，不改默认 `shielded`
 
 ## 当前已验证结论
 
@@ -561,9 +570,33 @@ npm run package:protection:compare:jsconfuser:string -- --channel stable
 
 当前更稳的下一步不是直接并入主线，而是：
 
-- 先把它视为 `Stage 3` 的首选手动 A/B 候选
-- 再做一次真正的 XPI / Zotero 安装态与首次加载体验对比
-- 只有兼容和体感都过关，才讨论是否为受保护打包线加一个新的显式实验变体
+- 保留 `shielded` 作为当前默认手动受保护导出基线
+- 把 `shielded-jsconfuser-string` 保留为已完成一轮复验的实验记录，不再当作当前推荐候选
+- 后续只有在新的真实样本或新一轮跨环境复验里重新出现稳定收益，才重开它的推广讨论
+
+### 11. `shielded-jsconfuser-string` 已完成 stable / beta 复验，当前保守结论是 `leaning-same`
+
+截至 `2026-04-17`，这条实验线的证据已经补齐到可收口状态：
+
+- `stable compare` 曾给出 `status=passed`、`decision=hardening-win`
+- 但 `beta compare` 最新结果是 `status=attention`、`decision=leaning-same`、`nextAction=stop-current-candidate`
+- `beta` 侧 fresh `smoke`、`webcrack`、`inner audit` 与手工 `LLM single-pass` 都已补齐
+- `beta` 侧可读性结果与基线 `shielded` 相同：两边都停留在 `parse-fail / only-loader`
+- `beta` 侧性能与体积没有换来额外收益：
+  - `xpiBytes +1403664`
+  - `bundleBytes +2320674`
+  - `medianDecodeDurationMs +5`
+  - `medianPrepareDurationMs +18`
+
+当前更可信的 retained decision 应固定为：
+
+- `shielded-jsconfuser-string` 在当前威胁模型下没有形成可稳定复现的 A/B 优势
+- 它的 preflight 与单次 stable 结果说明 `targeted stringConcealing` 仍值得研究，但这不足以支撑当前就升级为推荐候选
+- 这条路线继续保留为实验记录即可，不替代当前正式收口链中的默认 `shielded stable`
+- 当前若继续推进“抗一轮 AI 高层架构归纳”，优先做 inner semantic scrub / protected-only 语义减噪，而不是继续给 `jsconfuser-string` 扩面
+- 这条实验线的工件顺序仍固定为：
+  `smoke -> webcrack:score / manual-score -> compare`
+  若中途重新跑了 `smoke`，对应 smoke report 的 `manualScorecard` 会被刷新回 `pending`，必须重新回填后再看 compare
 
 ## Retained Recommendations
 

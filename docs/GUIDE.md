@@ -67,9 +67,13 @@ npm run package:protection:audit:descriptor-bind
 npm run package:protection:audit:jsconfuser:string
 npm run package:protection:compare:descriptor-bind -- --channel stable
 npm run package:protection:compare:jsconfuser:string -- --channel stable
+npm run package:protection:jsconfuser:bootstrap
 npm run package:protection:jsconfuser:preflight
 npm run package:protection:jsconfuser:string:preflight
-npm run package:protection:score:llm -- --variant shielded-jsconfuser-string --channel stable --llm "high-level-architecture"
+npm run package:protection:inner:audit:shielded -- --channel stable
+npm run package:protection:inner:audit:descriptor-bind -- --channel stable
+npm run package:protection:inner:audit:jsconfuser:string -- --channel stable
+npm run package:protection:score:llm -- --variant shielded-jsconfuser-string --channel stable --llm "parse-fail / only-loader"
 npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"
 npm run package:protection:verdict
 ```
@@ -123,6 +127,14 @@ npm run package:protection:audit:jsconfuser:string
 这条扩展入口同样不会改变 `plain / encrypted / shielded` 这三条基线对比的 summary / nextAction 判据，只会附加 `jsconfuser-string` 的 raw export 结果与体积增量，方便判断它的收益究竟还停留在 inner semantic suppression，还是已经反映到了 raw surface。
 如果本地自动发现 `js-confuser` 失败，再补 `-- --jsconfuser-tool-path /absolute/path/to/js-confuser`。
 
+如果你想先把 `js-confuser` 工具安装到当前仓库的默认可发现位置，执行：
+
+```bash
+npm run package:protection:jsconfuser:bootstrap
+```
+
+默认会安装到 `dist/package-protection-tools/js-confuser`。这条命令只解决本地实验链的工具可复跑性，不改默认 `shielded`。
+
 如果你要预检 `JS-Confuser` 的 `astScrambler` 非 hostile 子集是否值得进入下一轮 Stage 3 PoC，执行：
 
 ```bash
@@ -136,7 +148,7 @@ npm run package:protection:jsconfuser:preflight
 - 对模板内高层语义锚点是否有实际压缩
 
 这条命令仍然是 advisory/manual lane，不接默认 release 主线，也不会改写当前 `package:shielded`。
-如果本地自动发现 `js-confuser` 失败，再补 `-- --tool-path /absolute/path/to/js-confuser`。
+如果本地自动发现 `js-confuser` 失败，优先先跑 `npm run package:protection:jsconfuser:bootstrap`，再考虑补 `-- --tool-path /absolute/path/to/js-confuser`。
 
 如果你要继续验证 `JS-Confuser` 的第二层候选，也就是“只针对高层语义锚点做小范围 `stringConcealing`”，执行：
 
@@ -157,7 +169,7 @@ npm run package:protection:jsconfuser:string:preflight
 - `agent-runtime / ai-service`
 
 它仍然只是一条 advisory/manual 预检入口，不会直接改写当前 `package:shielded`，但比 `astScrambler` 更接近“阻断一轮 AI 高层架构归纳”的实际目标。
-如果本地自动发现 `js-confuser` 失败，再补 `-- --tool-path /absolute/path/to/js-confuser`。
+如果本地自动发现 `js-confuser` 失败，优先先跑 `npm run package:protection:jsconfuser:bootstrap`，再考虑补 `-- --tool-path /absolute/path/to/js-confuser`。
 
 如果你要把这条 `targeted stringConcealing` 候选真正提升成一个可安装的手动 XPI 实验变体，而不是只停留在 preflight，执行：
 
@@ -166,7 +178,7 @@ npm run package:shielded:jsconfuser:string
 ```
 
 它会在当前 `shielded` 路线的 protected-only source proxy 上，额外跑一层显式目标字符串的 `JS-Confuser stringConcealing`，然后继续走原有的 bundle obfuscation + AES 包装 + loader-lite 硬化。这个入口仍然是手动实验分支，不会替换默认 `package:shielded`。
-如果本地自动发现 `js-confuser` 失败，再补 `-- --jsconfuser-tool-path /absolute/path/to/js-confuser`。
+如果本地自动发现 `js-confuser` 失败，优先先跑 `npm run package:protection:jsconfuser:bootstrap`，再考虑补 `-- --jsconfuser-tool-path /absolute/path/to/js-confuser`。
 
 如果你要对这个新变体直接做 Zotero 安装态 / 启动态 smoke A/B，执行：
 
@@ -175,7 +187,7 @@ npm run package:protection:smoke:shielded:jsconfuser:string -- --repeats 3 --cha
 ```
 
 它会复用现有 `packageProtection` 时序回读、runtime log bridge 与安装 smoke 探针，但不会被纳入正式 `smoke -> score -> verdict` 的 required target。
-如果本地自动发现 `js-confuser` 失败，再补 `--jsconfuser-tool-path /absolute/path/to/js-confuser`。
+如果本地自动发现 `js-confuser` 失败，优先先跑 `npm run package:protection:jsconfuser:bootstrap`，再考虑补 `--jsconfuser-tool-path /absolute/path/to/js-confuser`。
 
 如果你要把 `shielded` 基线和某个实验变体的当前证据收口成一份 A/B compare 报告，执行：
 
@@ -187,12 +199,12 @@ npm run package:protection:compare:jsconfuser:string -- --channel stable
 它会读取现有的 smoke / webcrack / audit 工件，生成 `dist/package-protection-compare/*.json` / `md`，专门回答两类问题：
 
 - `descriptor-bind` 当前是不是只该作为 `runtime-only` 实验分支保留
-- `jsconfuser-string` 当前到底已经是 `hardening win`，还是仍然只是 `leaning-same`
+- `jsconfuser-string` 当前是否已经形成可稳定复现的 hardening 收益；截至 `2026-04-17`，`stable` compare 曾给出 `hardening-win`，但 `beta` compare 已回落到 `leaning-same`
 
 如果你已经完成了一轮外部 AI / LLM 解读，只想把 `LLM single-pass` 评级补回现有 smoke report，而不重复填写已有的 `webcrack` 结果，执行：
 
 ```bash
-npm run package:protection:score:llm -- --variant shielded-jsconfuser-string --channel stable --llm "high-level-architecture"
+npm run package:protection:score:llm -- --variant shielded-jsconfuser-string --channel stable --llm "parse-fail / only-loader"
 ```
 
 这条命令会保留当前 `manualScorecard.webcrackInitialResult`，只更新 `llmSinglePassResult`。如果当前还没有 webcrack 评分，它也能先记下 LLM 结果，但 `manualScorecard.status` 会继续保持 `pending`。
@@ -211,6 +223,10 @@ npm run package:protection:verdict
 - `package:protection:verdict` 只生成 `dist/package-protection-verdict.json` / `md` 的 advisory 结论，不进入默认 release gate
 - `package:protection:webcrack` 会在 fresh 打包后提取 XPI 内主脚本，调用本地 `webcrack` CLI，并额外保留一个 `--no-deobfuscate --no-unpack` 的 fallback loader-only 工件，供 controller / subagent / 人工继续判读
 - `package:protection:webcrack:score` 只把 `webcrack` 自动建议评级回填到 `manualScorecard.webcrackInitialResult`，不会自动补 `llmSinglePassResult`
+- `package:protection:inner:audit` 会离线提取 protected loader、拦截解密后的 inner bundle，并给出保守的 `proxy LLM` 建议评级；它只补证据，不会自动回填 `manualScorecard`
+- `package:protection:compare` 现在会附带读取 `inner audit` 结果；当手工 `LLM single-pass` 还没补齐时，它会把这份 proxy 一并写进 compare 报告，但不会自动替代 manual score
+- 当前最新保守 compare 结论是：`shielded-descriptor-bind = runtime-only`；`shielded-jsconfuser-string` 保留实验记录，但因 `beta` 复验未复现 `stable` 优势，当前按 `leaning-same / stop-current-candidate` 处理
+- 若你对实验变体重新跑了 `smoke`，对应 smoke report 的 `manualScorecard` 会被重置回 `pending`；此时要先重新执行 `package:protection:webcrack:score` 或 `package:protection:score` / `package:protection:score:llm`，再跑 compare
 - `plain` 继续只是 control group；它的自动评分不是最终 protection verdict 的降级依据
 
 如果需要定位受保护包的首次加载延迟，优先读取 `packageProtection` 时序与 `decodeMethod`，而不是只看插件内核 `startupDurationMs`。当前这组时序会拆出 `loadSubScript / decode / decrypt / eval / prepare total`，便于判断性能热点是在 loader、decode 还是插件本体启动。

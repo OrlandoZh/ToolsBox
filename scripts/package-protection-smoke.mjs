@@ -3,6 +3,7 @@ import path from "node:path";
 import process from "node:process";
 import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { withBuildLock } from "./build-lock.mjs";
 import { resolveAgentArtifactPath, resolveAgentArtifactsDir } from "./agent-artifacts.mjs";
 import {
   RdpClient,
@@ -39,6 +40,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const scriptStartedAt = Date.now();
+const PACKAGE_PROTECTION_BUILD_LOCK_TIMEOUT_MS = 10 * 60 * 1000;
 
 export const PACKAGE_PROTECTION_SMOKE_VARIANTS = Object.freeze([
   "plain",
@@ -54,6 +56,24 @@ export const MANUAL_SCORECARD_LEVELS = Object.freeze([
   "readable-module-recovery",
 ]);
 const MANUAL_SCORECARD_LEVEL_SET = new Set(MANUAL_SCORECARD_LEVELS);
+
+async function withPackageProtectionWorkflowLock(owner, fn) {
+  const previousBuildLockHeld = process.env.CLEANROOM_BUILD_LOCK_HELD;
+  return withBuildLock(owner, async () => {
+    process.env.CLEANROOM_BUILD_LOCK_HELD = "1";
+    try {
+      return await fn();
+    } finally {
+      if (previousBuildLockHeld === undefined) {
+        delete process.env.CLEANROOM_BUILD_LOCK_HELD;
+      } else {
+        process.env.CLEANROOM_BUILD_LOCK_HELD = previousBuildLockHeld;
+      }
+    }
+  }, {
+    timeoutMs: PACKAGE_PROTECTION_BUILD_LOCK_TIMEOUT_MS,
+  });
+}
 
 function normalizeVariant(variant) {
   const normalized = String(variant || "").trim().toLowerCase();
@@ -959,57 +979,59 @@ export async function persistPackageProtectionSmokeReport(report, options = {}) 
 
 async function main(argv = process.argv.slice(2)) {
   const options = parsePackageProtectionSmokeArgs(argv);
-  const channelEnv = buildChannelEnv(options.channel, {
-    ...process.env,
-    ...(options.jsConfuserToolPath
-      ? { CLEANROOM_PACKAGE_JSCONFUSER_TOOL_PATH: options.jsConfuserToolPath }
-      : {}),
-    ...(options.jsConfuserToolEntry
-      ? { CLEANROOM_PACKAGE_JSCONFUSER_TOOL_ENTRY: options.jsConfuserToolEntry }
-      : {}),
-  });
+  await withPackageProtectionWorkflowLock("package-protection-smoke.mjs", async () => {
+    const channelEnv = buildChannelEnv(options.channel, {
+      ...process.env,
+      ...(options.jsConfuserToolPath
+        ? { CLEANROOM_PACKAGE_JSCONFUSER_TOOL_PATH: options.jsConfuserToolPath }
+        : {}),
+      ...(options.jsConfuserToolEntry
+        ? { CLEANROOM_PACKAGE_JSCONFUSER_TOOL_ENTRY: options.jsConfuserToolEntry }
+        : {}),
+    });
 
-  packageVariant(projectRoot, options.variant, channelEnv);
-  const artifacts = await readVariantArtifacts(projectRoot, options.variant);
-  const automatedScorecard = buildProtectionAutomationScorecard({
-    sourceCode: artifacts.bundle.source,
-    variant: options.variant,
-    config: artifacts.config,
-  });
-  const runnerConfig = await readRunnerConfig({
-    projectRoot,
-    mode: buildRunMode(options.variant, options.channel),
-    env: channelEnv,
-  });
-
-  const runs = [];
-  for (let runIndex = 1; runIndex <= options.repeats; runIndex += 1) {
-    runs.push(await runSingleSmokeIteration({
-      channel: options.channel,
-      config: artifacts.config,
-      runnerConfig,
+    packageVariant(projectRoot, options.variant, channelEnv);
+    const artifacts = await readVariantArtifacts(projectRoot, options.variant);
+    const automatedScorecard = buildProtectionAutomationScorecard({
+      sourceCode: artifacts.bundle.source,
       variant: options.variant,
-      runIndex,
+      config: artifacts.config,
+    });
+    const runnerConfig = await readRunnerConfig({
+      projectRoot,
+      mode: buildRunMode(options.variant, options.channel),
+      env: channelEnv,
+    });
+
+    const runs = [];
+    for (let runIndex = 1; runIndex <= options.repeats; runIndex += 1) {
+      runs.push(await runSingleSmokeIteration({
+        channel: options.channel,
+        config: artifacts.config,
+        runnerConfig,
+        variant: options.variant,
+        runIndex,
+        xpi: artifacts.xpi,
+        bundle: artifacts.bundle,
+      }));
+    }
+
+    const report = summarizePackageProtectionSmokeReport({
+      variant: options.variant,
+      channel: options.channel,
+      repeats: options.repeats,
       xpi: artifacts.xpi,
       bundle: artifacts.bundle,
-    }));
-  }
+      runs,
+      automatedScorecard,
+    });
+    const paths = await persistPackageProtectionSmokeReport(report);
 
-  const report = summarizePackageProtectionSmokeReport({
-    variant: options.variant,
-    channel: options.channel,
-    repeats: options.repeats,
-    xpi: artifacts.xpi,
-    bundle: artifacts.bundle,
-    runs,
-    automatedScorecard,
+    console.log(`Package protection smoke generated: ${paths.reportPath}`);
+    if (!report.passed) {
+      process.exitCode = 2;
+    }
   });
-  const paths = await persistPackageProtectionSmokeReport(report);
-
-  console.log(`Package protection smoke generated: ${paths.reportPath}`);
-  if (!report.passed) {
-    process.exitCode = 2;
-  }
 }
 
 if (isExecutedAsScript(import.meta.url)) {

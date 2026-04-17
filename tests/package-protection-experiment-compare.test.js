@@ -120,6 +120,43 @@ function buildWebcrackReport({
   };
 }
 
+function buildInnerAuditReport({
+  variant,
+  channel = "stable",
+  rating = "parse-fail / only-loader",
+  overlayEntryCount = 0,
+} = {}) {
+  return {
+    generatedAt: "2026-04-17T00:00:00.000Z",
+    advisory: true,
+    channel,
+    status: "passed",
+    variants: [
+      {
+        variant,
+        status: "passed",
+        statusLabel: "通过",
+        summary: "inner audit",
+        suggestedProxyLLMRating: rating,
+        overlay: {
+          present: overlayEntryCount > 0,
+          entryCount: overlayEntryCount,
+        },
+        innerSemanticScan: {
+          architectureAnchorCount: 0,
+        },
+        moduleRecoveryScan: {
+          totalAnchorCount: 0,
+        },
+        packageProtection: {
+          decodeMethod: "atob",
+          prepareDurationMs: 100,
+        },
+      },
+    ],
+  };
+}
+
 describe("Package Protection Experiment Compare", () => {
   it("should parse experimental variant aliases", () => {
     const options = parsePackageProtectionExperimentCompareArgs([
@@ -200,6 +237,14 @@ describe("Package Protection Experiment Compare", () => {
       candidateWebcrackReport: buildWebcrackReport({
         variant: "shielded-jsconfuser-string",
       }),
+      baseInnerAuditReport: buildInnerAuditReport({
+        variant: "shielded",
+        rating: "parse-fail / only-loader",
+      }),
+      candidateInnerAuditReport: buildInnerAuditReport({
+        variant: "shielded-jsconfuser-string",
+        rating: "parse-fail / only-loader",
+      }),
       auditReport: {
         jsConfuserStringComparison: {
           present: true,
@@ -228,6 +273,10 @@ describe("Package Protection Experiment Compare", () => {
     assert.equal(report.decision, "needs-manual-ab");
     assert.equal(report.nextAction, "collect-llm-score");
     assert.equal(report.preflight.present, true);
+    assert.equal(report.evidence.innerAuditComplete, true);
+    assert.equal(report.base.innerAudit.rating, "parse-fail / only-loader");
+    assert.equal(report.candidate.innerAudit.rating, "parse-fail / only-loader");
+    assert.equal(report.summary.includes("inner audit proxy"), true);
   });
 
   it("should promote jsconfuser-string when llm readability is better than base shielded", () => {
