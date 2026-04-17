@@ -26,11 +26,23 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const scriptStartedAt = Date.now();
+const PACKAGE_JSCONFUSER_TOOL_PATH_ENV = "CLEANROOM_PACKAGE_JSCONFUSER_TOOL_PATH";
+const PACKAGE_JSCONFUSER_TOOL_ENTRY_ENV = "CLEANROOM_PACKAGE_JSCONFUSER_TOOL_ENTRY";
 
-export const PACKAGE_PROTECTION_AUDIT_VARIANTS = Object.freeze([
+export const PACKAGE_PROTECTION_AUDIT_BASE_VARIANTS = Object.freeze([
   "plain",
   "encrypted",
   "shielded",
+]);
+
+export const PACKAGE_PROTECTION_AUDIT_EXPERIMENTAL_VARIANTS = Object.freeze([
+  "descriptor-bind",
+  "jsconfuser-string",
+]);
+
+export const PACKAGE_PROTECTION_AUDIT_VARIANTS = Object.freeze([
+  ...PACKAGE_PROTECTION_AUDIT_BASE_VARIANTS,
+  ...PACKAGE_PROTECTION_AUDIT_EXPERIMENTAL_VARIANTS,
 ]);
 
 export const PACKAGE_PROTECTION_SOURCE_PROXY_MODES = Object.freeze([
@@ -139,6 +151,14 @@ function normalizeVariant(value) {
   return PACKAGE_PROTECTION_AUDIT_VARIANTS.includes(normalized)
     ? normalized
     : null;
+}
+
+function dedupeVariants(variants = []) {
+  return Array.from(new Set(
+    (Array.isArray(variants) ? variants : [])
+      .map((variant) => String(variant || "").trim())
+      .filter(Boolean),
+  ));
 }
 
 function countOccurrences(source, needle) {
@@ -257,9 +277,33 @@ function buildVariantPackageArgs(variant) {
       return ["scripts/package.mjs", "--encrypt-bundle", "--skip-release-metadata"];
     case "shielded":
       return ["scripts/package.mjs", "--shield-bundle", "--skip-release-metadata"];
+    case "descriptor-bind":
+      return ["scripts/package.mjs", "--descriptor-bind", "--skip-release-metadata"];
+    case "jsconfuser-string":
+      return ["scripts/package.mjs", "--jsconfuser-string", "--skip-release-metadata"];
     default:
       throw createScriptError("args", `unsupported package protection audit variant: ${variant}`, {
         failedStage: "build-variant-args",
+        details: { variant },
+      });
+  }
+}
+
+export function resolvePackageProtectionAuditOutputSuffix(variant) {
+  switch (String(variant || "").trim()) {
+    case "plain":
+      return "";
+    case "encrypted":
+      return "encrypted";
+    case "shielded":
+      return "shielded";
+    case "descriptor-bind":
+      return "shielded-descriptor-bind";
+    case "jsconfuser-string":
+      return "shielded-jsconfuser-string";
+    default:
+      throw createScriptError("args", `unsupported package protection audit variant: ${variant}`, {
+        failedStage: "resolve-output-suffix",
         details: { variant },
       });
   }
@@ -341,7 +385,11 @@ function buildSourceProxyBuildEnv(mode) {
 
 export function parsePackageProtectionAnchorAuditArgs(argv = process.argv.slice(2)) {
   const options = {
-    variants: [...PACKAGE_PROTECTION_AUDIT_VARIANTS],
+    variants: [...PACKAGE_PROTECTION_AUDIT_BASE_VARIANTS],
+    includeDescriptorBind: false,
+    includeJSConfuserString: false,
+    jsConfuserToolEntry: null,
+    jsConfuserToolPath: null,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -353,16 +401,30 @@ export function parsePackageProtectionAnchorAuditArgs(argv = process.argv.slice(
     switch (token) {
       case "--variant": {
         const variant = normalizeVariant(argv[index + 1]);
-        assertScript(Boolean(variant), "--variant must be one of plain|encrypted|shielded|all", {
+        assertScript(Boolean(variant), "--variant must be one of plain|encrypted|shielded|descriptor-bind|jsconfuser-string|all", {
           category: "args",
           failedStage: "parse-args",
         });
         options.variants = variant === "all"
-          ? [...PACKAGE_PROTECTION_AUDIT_VARIANTS]
+          ? [...PACKAGE_PROTECTION_AUDIT_BASE_VARIANTS]
           : [variant];
         index += 1;
         break;
       }
+      case "--include-descriptor-bind":
+        options.includeDescriptorBind = true;
+        break;
+      case "--include-jsconfuser-string":
+        options.includeJSConfuserString = true;
+        break;
+      case "--jsconfuser-tool-path":
+        options.jsConfuserToolPath = String(argv[index + 1] || "").trim() || null;
+        index += 1;
+        break;
+      case "--jsconfuser-tool-entry":
+        options.jsConfuserToolEntry = String(argv[index + 1] || "").trim() || null;
+        index += 1;
+        break;
       default:
         throw createScriptError("args", `Unknown option: ${token}`, {
           failedStage: "parse-args",
@@ -371,22 +433,73 @@ export function parsePackageProtectionAnchorAuditArgs(argv = process.argv.slice(
     }
   }
 
+  if (options.includeDescriptorBind) {
+    options.variants = dedupeVariants([
+      ...options.variants,
+      "descriptor-bind",
+    ]);
+  }
+
+  if (options.includeJSConfuserString) {
+    options.variants = dedupeVariants([
+      ...options.variants,
+      "jsconfuser-string",
+    ]);
+  }
+
   return options;
 }
 
-async function buildVariantAudit({ projectRootPath, config, variant, anchors }) {
+function resolveAuditJSConfuserToolOptions(options = {}, env = process.env) {
+  const toolPath = String(
+    options.jsConfuserToolPath
+    || env[PACKAGE_JSCONFUSER_TOOL_PATH_ENV]
+    || "",
+  ).trim() || null;
+  const toolEntry = String(
+    options.jsConfuserToolEntry
+    || env[PACKAGE_JSCONFUSER_TOOL_ENTRY_ENV]
+    || "",
+  ).trim() || null;
+
+  return {
+    toolPath,
+    toolEntry,
+  };
+}
+
+async function buildVariantAudit({ projectRootPath, config, variant, anchors, options = {} }) {
   const args = buildVariantPackageArgs(variant);
   const bundlePath = path.join(projectRootPath, "build", config.addonRef, "content", "scripts", `${config.addonRef}.js`);
-  const xpiName = variant === "plain"
-    ? `${config.addonRef}-${config.addonVersion}.xpi`
-    : `${config.addonRef}-${config.addonVersion}-${variant}.xpi`;
+  const outputSuffix = resolvePackageProtectionAuditOutputSuffix(variant);
+  const xpiName = outputSuffix
+    ? `${config.addonRef}-${config.addonVersion}-${outputSuffix}.xpi`
+    : `${config.addonRef}-${config.addonVersion}.xpi`;
   const xpiPath = path.join(projectRootPath, "dist", xpiName);
 
   try {
+    const env = {
+      ...process.env,
+    };
+    if (variant === "jsconfuser-string") {
+      const jsConfuserTool = resolveAuditJSConfuserToolOptions(options);
+      assertScript(Boolean(jsConfuserTool.toolPath), "--jsconfuser-tool-path is required for jsconfuser-string audit variant", {
+        category: "args",
+        failedStage: "build-variant",
+        details: {
+          variant,
+          envVar: PACKAGE_JSCONFUSER_TOOL_PATH_ENV,
+        },
+      });
+      env[PACKAGE_JSCONFUSER_TOOL_PATH_ENV] = jsConfuserTool.toolPath;
+      if (jsConfuserTool.toolEntry) {
+        env[PACKAGE_JSCONFUSER_TOOL_ENTRY_ENV] = jsConfuserTool.toolEntry;
+      }
+    }
     execFileSync(process.execPath, args, {
       cwd: projectRootPath,
       stdio: "pipe",
-      env: process.env,
+      env,
     });
   } catch (error) {
     throw wrapScriptError(error, {
@@ -505,6 +618,100 @@ export function summarizePackageProtectionSourceProxy(sourceProxyReports = []) {
   };
 }
 
+export function summarizeDescriptorBindComparison(variantReports = []) {
+  const reportByVariant = new Map(
+    (Array.isArray(variantReports) ? variantReports : [])
+      .map((report) => [String(report?.variant || "").trim(), report]),
+  );
+  const shielded = reportByVariant.get("shielded") || null;
+  const descriptorBind = reportByVariant.get("descriptor-bind") || null;
+
+  if (!shielded || !descriptorBind) {
+    return {
+      present: false,
+      shieldedPresent: Boolean(shielded),
+      descriptorBindPresent: Boolean(descriptorBind),
+      sameRawSurface: false,
+      rawAnchorDeltaCount: null,
+      rawMatchDeltaCount: null,
+      xpiSizeDeltaBytes: null,
+      bundleSizeDeltaBytes: null,
+      interpretation: "descriptor-bind 对比样本不完整，暂不生成增量结论。",
+      recommendedReading: "collect-descriptor-bind-audit",
+    };
+  }
+
+  const rawAnchorDeltaCount = Number(descriptorBind.totalAnchorCount || 0) - Number(shielded.totalAnchorCount || 0);
+  const rawMatchDeltaCount = Number(descriptorBind.totalMatchCount || 0) - Number(shielded.totalMatchCount || 0);
+  const xpiSizeDeltaBytes = Number(descriptorBind.xpiSizeBytes || 0) - Number(shielded.xpiSizeBytes || 0);
+  const bundleSizeDeltaBytes = Number(descriptorBind.bundleSizeBytes || 0) - Number(shielded.bundleSizeBytes || 0);
+  const sameRawSurface = rawAnchorDeltaCount === 0 && rawMatchDeltaCount === 0;
+
+  return {
+    present: true,
+    shieldedPresent: true,
+    descriptorBindPresent: true,
+    sameRawSurface,
+    rawAnchorDeltaCount,
+    rawMatchDeltaCount,
+    xpiSizeDeltaBytes,
+    bundleSizeDeltaBytes,
+    interpretation: sameRawSurface
+      ? "descriptor-bind 没有改变 raw export 暴露面，增量更可能落在 runtime semantic recovery。"
+      : "descriptor-bind 改变了 raw export 暴露面，需要重新判断它是 hardening 还是 regression。",
+    recommendedReading: sameRawSurface
+      ? "runtime-semantic-recovery"
+      : "recheck-raw-export-surface",
+  };
+}
+
+export function summarizeJSConfuserStringComparison(variantReports = []) {
+  const reportByVariant = new Map(
+    (Array.isArray(variantReports) ? variantReports : [])
+      .map((report) => [String(report?.variant || "").trim(), report]),
+  );
+  const shielded = reportByVariant.get("shielded") || null;
+  const jsConfuserString = reportByVariant.get("jsconfuser-string") || null;
+
+  if (!shielded || !jsConfuserString) {
+    return {
+      present: false,
+      shieldedPresent: Boolean(shielded),
+      jsConfuserStringPresent: Boolean(jsConfuserString),
+      sameRawSurface: false,
+      rawAnchorDeltaCount: null,
+      rawMatchDeltaCount: null,
+      xpiSizeDeltaBytes: null,
+      bundleSizeDeltaBytes: null,
+      interpretation: "jsconfuser-string 对比样本不完整，暂不生成增量结论。",
+      recommendedReading: "collect-jsconfuser-string-audit",
+    };
+  }
+
+  const rawAnchorDeltaCount = Number(jsConfuserString.totalAnchorCount || 0) - Number(shielded.totalAnchorCount || 0);
+  const rawMatchDeltaCount = Number(jsConfuserString.totalMatchCount || 0) - Number(shielded.totalMatchCount || 0);
+  const xpiSizeDeltaBytes = Number(jsConfuserString.xpiSizeBytes || 0) - Number(shielded.xpiSizeBytes || 0);
+  const bundleSizeDeltaBytes = Number(jsConfuserString.bundleSizeBytes || 0) - Number(shielded.bundleSizeBytes || 0);
+  const sameRawSurface = rawAnchorDeltaCount === 0 && rawMatchDeltaCount === 0;
+
+  return {
+    present: true,
+    shieldedPresent: true,
+    jsConfuserStringPresent: true,
+    sameRawSurface,
+    rawAnchorDeltaCount,
+    rawMatchDeltaCount,
+    xpiSizeDeltaBytes,
+    bundleSizeDeltaBytes,
+    interpretation: sameRawSurface
+      ? "jsconfuser-string 没有改变 raw export 暴露面，增量更可能落在 inner semantic suppression 与手工解读阻力。"
+      : "jsconfuser-string 改变了 raw export 暴露面，需要重新判断它是 hardening 还是 regression。",
+    recommendedReading: sameRawSurface
+      ? "jsconfuser-targeted-string-smoke"
+      : "recheck-raw-export-surface",
+  };
+}
+
 export function summarizePackageProtectionAnchorAudit(variantReports = [], options = {}) {
   const reportByVariant = new Map(
     (Array.isArray(variantReports) ? variantReports : [])
@@ -512,6 +719,13 @@ export function summarizePackageProtectionAnchorAudit(variantReports = [], optio
   );
   const summary = buildAuditSummary(reportByVariant);
   const sourceProxy = summarizePackageProtectionSourceProxy(options.sourceProxyReports);
+  const descriptorBindComparison = summarizeDescriptorBindComparison(variantReports);
+  const jsConfuserStringComparison = summarizeJSConfuserStringComparison(variantReports);
+  const variantOrder = dedupeVariants(
+    Array.isArray(options.variantOrder) && options.variantOrder.length > 0
+      ? options.variantOrder
+      : PACKAGE_PROTECTION_AUDIT_BASE_VARIANTS,
+  );
 
   return {
     generatedAt: new Date().toISOString(),
@@ -522,7 +736,9 @@ export function summarizePackageProtectionAnchorAudit(variantReports = [], optio
     nextAction: summary.nextAction,
     comparison: summary.comparison,
     sourceProxy,
-    variants: PACKAGE_PROTECTION_AUDIT_VARIANTS.map((variant) => {
+    descriptorBindComparison,
+    jsConfuserStringComparison,
+    variants: variantOrder.map((variant) => {
       const report = reportByVariant.get(variant);
       if (!report) {
         return {
@@ -587,6 +803,48 @@ export function renderPackageProtectionAnchorAuditMarkdown(report) {
     `- nextPriority: \`${report.comparison?.nextPriority || "unknown"}\``,
     "",
   ];
+
+  const descriptorBindReport = Array.isArray(report.variants)
+    ? report.variants.find((variantReport) => variantReport?.variant === "descriptor-bind" && variantReport.present)
+    : null;
+  if (descriptorBindReport) {
+    lines.push(`- descriptorBindRawAnchorCount: \`${descriptorBindReport.totalAnchorCount}\``);
+    lines.push(`- descriptorBindRawMatchCount: \`${descriptorBindReport.totalMatchCount}\``);
+    lines.push("");
+  }
+
+  const jsConfuserStringReport = Array.isArray(report.variants)
+    ? report.variants.find((variantReport) => variantReport?.variant === "jsconfuser-string" && variantReport.present)
+    : null;
+  if (jsConfuserStringReport) {
+    lines.push(`- jsconfuserStringRawAnchorCount: \`${jsConfuserStringReport.totalAnchorCount}\``);
+    lines.push(`- jsconfuserStringRawMatchCount: \`${jsConfuserStringReport.totalMatchCount}\``);
+    lines.push("");
+  }
+
+  if (report.descriptorBindComparison?.present) {
+    lines.push("## Descriptor-Bind Comparison", "");
+    lines.push(`- sameRawSurface: \`${report.descriptorBindComparison.sameRawSurface ? "yes" : "no"}\``);
+    lines.push(`- rawAnchorDeltaCount: \`${report.descriptorBindComparison.rawAnchorDeltaCount}\``);
+    lines.push(`- rawMatchDeltaCount: \`${report.descriptorBindComparison.rawMatchDeltaCount}\``);
+    lines.push(`- xpiSizeDeltaBytes: \`${report.descriptorBindComparison.xpiSizeDeltaBytes}\``);
+    lines.push(`- bundleSizeDeltaBytes: \`${report.descriptorBindComparison.bundleSizeDeltaBytes}\``);
+    lines.push(`- interpretation: ${report.descriptorBindComparison.interpretation}`);
+    lines.push(`- recommendedReading: \`${report.descriptorBindComparison.recommendedReading}\``);
+    lines.push("");
+  }
+
+  if (report.jsConfuserStringComparison?.present) {
+    lines.push("## JSConfuser String Comparison", "");
+    lines.push(`- sameRawSurface: \`${report.jsConfuserStringComparison.sameRawSurface ? "yes" : "no"}\``);
+    lines.push(`- rawAnchorDeltaCount: \`${report.jsConfuserStringComparison.rawAnchorDeltaCount}\``);
+    lines.push(`- rawMatchDeltaCount: \`${report.jsConfuserStringComparison.rawMatchDeltaCount}\``);
+    lines.push(`- xpiSizeDeltaBytes: \`${report.jsConfuserStringComparison.xpiSizeDeltaBytes}\``);
+    lines.push(`- bundleSizeDeltaBytes: \`${report.jsConfuserStringComparison.bundleSizeDeltaBytes}\``);
+    lines.push(`- interpretation: ${report.jsConfuserStringComparison.interpretation}`);
+    lines.push(`- recommendedReading: \`${report.jsConfuserStringComparison.recommendedReading}\``);
+    lines.push("");
+  }
 
   if (report.sourceProxy?.present) {
     lines.push("## Source Proxy Reduction", "");
@@ -664,6 +922,7 @@ export async function runPackageProtectionAnchorAudit(options = {}) {
       config,
       variant,
       anchors,
+      options,
     }));
   }
 
@@ -680,6 +939,7 @@ export async function runPackageProtectionAnchorAudit(options = {}) {
   const report = summarizePackageProtectionAnchorAudit(variantReports, {
     anchors,
     sourceProxyReports,
+    variantOrder: variants,
   });
   const paths = await persistPackageProtectionAnchorAudit(report, {
     projectRootPath,

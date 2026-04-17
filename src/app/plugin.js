@@ -17,6 +17,8 @@ import { createReaderSelectionActions } from "../features/reader-selection-actio
 import { createWindowManager } from "../features/window-manager.js";
 import { createThemeManager } from "../features/theme-manager.js";
 import { createZoteroHost } from "../platform/zotero-host.js";
+import { createZoteroHostSignals } from "../platform/zotero-host-signals.js";
+import { createZoteroPluginNonceStore } from "../platform/zotero-plugin-nonce-store.js";
 import { createDialogBuilder } from "../utils/dialog.js";
 import { createProgressNotifier } from "../utils/progress-window.js";
 import { createServiceRegistry } from "../services/index.js";
@@ -74,6 +76,10 @@ function cloneLifecycleTelemetrySummary(summary = null) {
 }
 
 function clonePackageProtectionSummary(summary = null) {
+  const hostBinding = summary && typeof summary === "object"
+    ? summary.hostBinding
+    : null;
+
   if (!summary || typeof summary !== "object") {
     return {
       active: false,
@@ -86,6 +92,7 @@ function clonePackageProtectionSummary(summary = null) {
       prepareDurationMs: 0,
       bootstrapResolveDurationMs: 0,
       bootstrapCallCount: 0,
+      hostBinding: cloneHostBindingSummary(hostBinding),
     };
   }
 
@@ -104,7 +111,194 @@ function clonePackageProtectionSummary(summary = null) {
     prepareDurationMs: Number(summary.prepareDurationMs || 0),
     bootstrapResolveDurationMs: Number(summary.bootstrapResolveDurationMs || 0),
     bootstrapCallCount: Number(summary.bootstrapCallCount || 0),
+    hostBinding: cloneHostBindingSummary(hostBinding),
   };
+}
+
+function cloneCapabilityManifestOverlay(overlay = null) {
+  if (!Array.isArray(overlay)) {
+    return null;
+  }
+  return JSON.parse(JSON.stringify(overlay));
+}
+
+function isCapabilityManifestOverlayReady(hostBinding = null) {
+  return Boolean(
+    typeof hostBinding?.profileHash === "string"
+    && hostBinding.profileHash.trim()
+    && hostBinding?.dbAvailable
+    && hostBinding?.noncePresent,
+  );
+}
+
+function cloneHostBindingSummary(summary = null) {
+  const normalized = {
+    signalVersion: 1,
+    available: false,
+    profileHash: null,
+    schemaBucket: null,
+    zoteroVersionBucket: null,
+    profileBasenameBucket: null,
+    dataDirHash: null,
+    collectionError: null,
+    dbAvailable: false,
+    noncePresent: false,
+    nonceSource: "unavailable",
+    nonceHash: null,
+    storeError: null,
+  };
+
+  if (!summary || typeof summary !== "object") {
+    return normalized;
+  }
+
+  normalized.signalVersion = Number(summary.signalVersion || 1);
+  normalized.profileHash = typeof summary.profileHash === "string" && summary.profileHash.trim()
+    ? summary.profileHash.trim()
+    : null;
+  normalized.schemaBucket = typeof summary.schemaBucket === "string" && summary.schemaBucket.trim()
+    ? summary.schemaBucket.trim()
+    : null;
+  normalized.zoteroVersionBucket = typeof summary.zoteroVersionBucket === "string"
+    && summary.zoteroVersionBucket.trim()
+    ? summary.zoteroVersionBucket.trim()
+    : null;
+  normalized.profileBasenameBucket = typeof summary.profileBasenameBucket === "string"
+    && summary.profileBasenameBucket.trim()
+    ? summary.profileBasenameBucket.trim()
+    : null;
+  normalized.dataDirHash = typeof summary.dataDirHash === "string" && summary.dataDirHash.trim()
+    ? summary.dataDirHash.trim()
+    : null;
+  normalized.collectionError = typeof summary.collectionError === "string" && summary.collectionError.trim()
+    ? summary.collectionError.trim()
+    : null;
+  normalized.dbAvailable = Boolean(summary.dbAvailable);
+  normalized.noncePresent = Boolean(summary.noncePresent);
+  normalized.nonceSource = typeof summary.nonceSource === "string" && summary.nonceSource.trim()
+    ? summary.nonceSource.trim()
+    : "unavailable";
+  normalized.nonceHash = typeof summary.nonceHash === "string" && summary.nonceHash.trim()
+    ? summary.nonceHash.trim()
+    : null;
+  normalized.storeError = typeof summary.storeError === "string" && summary.storeError.trim()
+    ? summary.storeError.trim()
+    : null;
+  normalized.available = Boolean(
+    normalized.profileHash
+    || normalized.schemaBucket
+    || normalized.zoteroVersionBucket
+    || normalized.profileBasenameBucket
+    || normalized.dataDirHash
+    || normalized.dbAvailable
+    || normalized.noncePresent,
+  );
+  return normalized;
+}
+
+function mergeHostBindingSummary(base = null, patch = null) {
+  const merged = cloneHostBindingSummary(base);
+  if (!patch || typeof patch !== "object") {
+    return merged;
+  }
+
+  const own = Object.prototype.hasOwnProperty;
+  const apply = (key, value) => {
+    merged[key] = value;
+  };
+
+  if (own.call(patch, "signalVersion")) {
+    apply("signalVersion", Number(patch.signalVersion || 1));
+  }
+  if (own.call(patch, "profileHash")) {
+    apply(
+      "profileHash",
+      typeof patch.profileHash === "string" && patch.profileHash.trim()
+        ? patch.profileHash.trim()
+        : null,
+    );
+  }
+  if (own.call(patch, "schemaBucket")) {
+    apply(
+      "schemaBucket",
+      typeof patch.schemaBucket === "string" && patch.schemaBucket.trim()
+        ? patch.schemaBucket.trim()
+        : null,
+    );
+  }
+  if (own.call(patch, "zoteroVersionBucket")) {
+    apply(
+      "zoteroVersionBucket",
+      typeof patch.zoteroVersionBucket === "string" && patch.zoteroVersionBucket.trim()
+        ? patch.zoteroVersionBucket.trim()
+        : null,
+    );
+  }
+  if (own.call(patch, "profileBasenameBucket")) {
+    apply(
+      "profileBasenameBucket",
+      typeof patch.profileBasenameBucket === "string" && patch.profileBasenameBucket.trim()
+        ? patch.profileBasenameBucket.trim()
+        : null,
+    );
+  }
+  if (own.call(patch, "dataDirHash")) {
+    apply(
+      "dataDirHash",
+      typeof patch.dataDirHash === "string" && patch.dataDirHash.trim()
+        ? patch.dataDirHash.trim()
+        : null,
+    );
+  }
+  if (own.call(patch, "collectionError")) {
+    apply(
+      "collectionError",
+      typeof patch.collectionError === "string" && patch.collectionError.trim()
+        ? patch.collectionError.trim()
+        : null,
+    );
+  }
+  if (own.call(patch, "dbAvailable")) {
+    apply("dbAvailable", Boolean(patch.dbAvailable));
+  }
+  if (own.call(patch, "noncePresent")) {
+    apply("noncePresent", Boolean(patch.noncePresent));
+  }
+  if (own.call(patch, "nonceSource")) {
+    apply(
+      "nonceSource",
+      typeof patch.nonceSource === "string" && patch.nonceSource.trim()
+        ? patch.nonceSource.trim()
+        : "unavailable",
+    );
+  }
+  if (own.call(patch, "nonceHash")) {
+    apply(
+      "nonceHash",
+      typeof patch.nonceHash === "string" && patch.nonceHash.trim()
+        ? patch.nonceHash.trim()
+        : null,
+    );
+  }
+  if (own.call(patch, "storeError")) {
+    apply(
+      "storeError",
+      typeof patch.storeError === "string" && patch.storeError.trim()
+        ? patch.storeError.trim()
+        : null,
+    );
+  }
+
+  merged.available = Boolean(
+    merged.profileHash
+    || merged.schemaBucket
+    || merged.zoteroVersionBucket
+    || merged.profileBasenameBucket
+    || merged.dataDirHash
+    || merged.dbAvailable
+    || merged.noncePresent,
+  );
+  return merged;
 }
 
 export function createPlugin({ globalScope, config }) {
@@ -149,6 +343,69 @@ export function createPlugin({ globalScope, config }) {
   });
   const progress = createProgressNotifier({ logger, i18n, zotero });
   const servicesHub = createServiceRegistry({ logger });
+  const hostSignals = createZoteroHostSignals({
+    globalScope,
+    zotero,
+    logger,
+  });
+  const nonceStore = createZoteroPluginNonceStore({
+    globalScope,
+    zotero,
+    addonRef: config.addonRef,
+    logger,
+  });
+  runtime.hostBinding = cloneHostBindingSummary(runtime.hostBinding);
+
+  function syncRuntimeHostBinding(summary) {
+    runtime.hostBinding = mergeHostBindingSummary(runtime.hostBinding, summary);
+    return runtime.hostBinding;
+  }
+
+  function getProtectionSummary() {
+    const packageProtection = runtime?.packageProtection && typeof runtime.packageProtection === "object"
+      ? runtime.packageProtection
+      : {};
+    return clonePackageProtectionSummary({
+      ...packageProtection,
+      hostBinding: runtime?.hostBinding || hostSignals.getSummary(),
+    });
+  }
+
+  function getCapabilityManifestOverlay() {
+    const packageProtection = runtime?.packageProtection && typeof runtime.packageProtection === "object"
+      ? runtime.packageProtection
+      : null;
+    const currentOverlay = cloneCapabilityManifestOverlay(packageProtection?.capabilityManifestOverlay);
+    if (currentOverlay) {
+      return currentOverlay;
+    }
+
+    if (!packageProtection || !isCapabilityManifestOverlayReady(runtime?.hostBinding)) {
+      return null;
+    }
+
+    const resolver = typeof packageProtection.overlayResolver === "function"
+      ? packageProtection.overlayResolver
+      : null;
+    if (!resolver) {
+      return null;
+    }
+
+    try {
+      const resolvedOverlay = cloneCapabilityManifestOverlay(resolver());
+      if (!resolvedOverlay) {
+        return null;
+      }
+      packageProtection.capabilityManifestOverlay = resolvedOverlay;
+      packageProtection.overlayResolver = null;
+      return cloneCapabilityManifestOverlay(resolvedOverlay);
+    } catch (error) {
+      logger.warn("packageProtection.overlayResolver", {
+        message: error?.message || String(error),
+      });
+      return null;
+    }
+  }
 
   servicesHub.register({
     id: `${config.addonRef}.runtime-core`,
@@ -162,6 +419,58 @@ export function createPlugin({ globalScope, config }) {
       return {
         ok: true,
         status: "healthy",
+      };
+    },
+  });
+
+  servicesHub.register({
+    id: `${config.addonRef}.host-signals`,
+    label: "Host Signal Collector",
+    enabledWhen() {
+      return true;
+    },
+    async start() {
+      syncRuntimeHostBinding(await hostSignals.init());
+    },
+    async stop() {
+      syncRuntimeHostBinding(hostSignals.getSummary());
+    },
+    healthCheck() {
+      const summary = syncRuntimeHostBinding(hostSignals.getSummary());
+      return {
+        ok: true,
+        status: summary.available
+          ? "ready"
+          : summary.collectionError
+            ? "attention"
+            : "idle",
+        details: summary,
+      };
+    },
+  });
+
+  servicesHub.register({
+    id: `${config.addonRef}.host-nonce`,
+    label: "Host Nonce Store",
+    enabledWhen() {
+      return true;
+    },
+    async start() {
+      syncRuntimeHostBinding(await nonceStore.init());
+    },
+    async stop() {
+      syncRuntimeHostBinding(nonceStore.getSummary());
+    },
+    healthCheck() {
+      const summary = syncRuntimeHostBinding(nonceStore.getSummary());
+      return {
+        ok: true,
+        status: summary.dbAvailable && summary.noncePresent
+          ? "ready"
+          : summary.storeError
+            ? "attention"
+            : "idle",
+        details: summary,
       };
     },
   });
@@ -645,7 +954,8 @@ export function createPlugin({ globalScope, config }) {
     servicesHub,
     runtimeInfo,
     getLifecycleSummary: () => cloneLifecycleTelemetrySummary(lifecycleTelemetrySummary),
-    getProtectionSummary: () => clonePackageProtectionSummary(runtime?.packageProtection),
+    getProtectionSummary,
+    getCapabilityManifestOverlay,
   });
 
   const featureComposer = createFeatureComposer({
@@ -749,7 +1059,7 @@ export function createPlugin({ globalScope, config }) {
     inspectItemPresentation: agent.inspectItemPresentation,
     listHostActions: hostActions.listHostActions,
     runHostAction: hostActions.runHostAction,
-    getProtectionSummary: () => clonePackageProtectionSummary(runtime?.packageProtection),
+    getProtectionSummary,
   });
 
   return {

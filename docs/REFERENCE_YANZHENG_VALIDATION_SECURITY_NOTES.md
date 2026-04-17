@@ -24,8 +24,8 @@
 
 `yanzheng` 对 `Zotero-One` 总结了一整组 provider-specific API 验证函数，并把验证结果写回偏好设置状态位。
 
-- 参考：[安全分析报告.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/安全分析报告.md#L34)
-- 参考：[安全分析最终报告.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/安全分析最终报告.md#L54)
+- 参考：[安全分析报告.md](../reference/yanzheng/docs/安全分析报告.md#L34)
+- 参考：[安全分析最终报告.md](../reference/yanzheng/docs/安全分析最终报告.md#L54)
 
 这类机制适合回答的问题是：
 
@@ -47,8 +47,8 @@
 
 `yanzheng` 对 `BibGenie` 的总结里，最值得借鉴的是 OAuth Device Authorization Flow。
 
-- 参考：[安全分析报告.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/安全分析报告.md#L80)
-- 参考：[安全分析最终报告.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/安全分析最终报告.md#L113)
+- 参考：[安全分析报告.md](../reference/yanzheng/docs/安全分析报告.md#L80)
+- 参考：[安全分析最终报告.md](../reference/yanzheng/docs/安全分析最终报告.md#L113)
 
 从防护强度看，这类路径优于“客户端激活码 + 本地对比”：
 
@@ -65,9 +65,9 @@
 
 `yanzheng` 对多个插件的分析都指出了同一类问题：只要激活逻辑、密钥材料、校验规则和最终判断都在客户端，本质上就是“可还原的本地规则系统”。
 
-- 参考：[安全分析报告.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/安全分析报告.md#L38)
-- 参考：[mindmap插件安全分析.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/mindmap插件安全分析.md#L11)
-- 参考：[安全机制索引.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/安全机制索引.md#L12)
+- 参考：[安全分析报告.md](../reference/yanzheng/docs/安全分析报告.md#L38)
+- 参考：[mindmap插件安全分析.md](../reference/yanzheng/docs/mindmap插件安全分析.md#L11)
+- 参考：[安全机制索引.md](../reference/yanzheng/docs/安全机制索引.md#L12)
 
 对当前模板的结论很直接：
 
@@ -78,8 +78,8 @@
 
 `yanzheng` 的样本里既有“Token / API key 本地存储”，也有“加密后再存”的做法。
 
-- 参考：[安全分析报告.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/安全分析报告.md#L58)
-- 参考：[garden prefs.js](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/reference/garden_v0.0.14/prefs.js#L1)
+- 参考：[安全分析报告.md](../reference/yanzheng/docs/安全分析报告.md#L58)
+- 参考：[garden prefs.js](../reference/yanzheng/reference/garden_v0.0.14/prefs.js#L1)
 
 这类设计能解决的是：
 
@@ -106,8 +106,8 @@
 - 用户行为追踪
 - 隐藏跳转和埋点
 
-- 参考：[安全机制索引.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/安全机制索引.md#L43)
-- 参考：[安全分析最终报告.md](/Users/orlandozh/.openclaw/workspace-coding/projects/GitHub/yanzheng/docs/安全分析最终报告.md#L14)
+- 参考：[安全机制索引.md](../reference/yanzheng/docs/安全机制索引.md#L43)
+- 参考：[安全分析最终报告.md](../reference/yanzheng/docs/安全分析最终报告.md#L14)
 
 从模板治理角度，这类机制不应被当成“安全能力”：
 

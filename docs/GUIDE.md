@@ -53,8 +53,14 @@ npm run build
 npm run package
 npm run package:encrypted
 npm run package:shielded
+npm run package:shielded:descriptor-bind
 npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable
+npm run package:protection:webcrack:shielded -- --channel stable
+npm run package:protection:webcrack:shielded:descriptor-bind -- --channel stable
+npm run package:protection:webcrack:score -- --variant shielded --channel stable
 npm run package:protection:audit
+npm run package:protection:jsconfuser:preflight -- --tool-path /absolute/path/to/js-confuser
+npm run package:protection:jsconfuser:string:preflight -- --tool-path /absolute/path/to/js-confuser
 npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"
 npm run package:protection:verdict
 ```
@@ -91,6 +97,72 @@ npm run package:protection:audit
 
 它会生成 `dist/package-protection-anchor-audit.json` / `md`，对 `plain / encrypted / shielded` 的 raw 导出物做高层语义锚点盘点。当前这个实验入口是路线规划辅助，不替代 `smoke -> score -> verdict`。
 
+如果你要把 `shielded-descriptor-bind` 也作为额外实验变体并入同一份审计报告，执行：
+
+```bash
+npm run package:protection:audit:descriptor-bind
+```
+
+这条扩展入口不会改变 `plain / encrypted / shielded` 这三条基线对比的 summary / nextAction 判据，只会在同一份报告里附加 `descriptor-bind` 的 raw export 结果，方便判断它带来的到底是 raw hardening 还是 runtime semantic recovery。
+
+如果你要把 `shielded-jsconfuser-string` 也作为额外实验变体并入同一份审计报告，执行：
+
+```bash
+npm run package:protection:audit:jsconfuser:string -- --jsconfuser-tool-path /absolute/path/to/js-confuser
+```
+
+这条扩展入口同样不会改变 `plain / encrypted / shielded` 这三条基线对比的 summary / nextAction 判据，只会附加 `jsconfuser-string` 的 raw export 结果与体积增量，方便判断它的收益究竟还停留在 inner semantic suppression，还是已经反映到了 raw surface。
+
+如果你要预检 `JS-Confuser` 的 `astScrambler` 非 hostile 子集是否值得进入下一轮 Stage 3 PoC，执行：
+
+```bash
+npm run package:protection:jsconfuser:preflight -- --tool-path /absolute/path/to/js-confuser
+```
+
+它会生成 `dist/package-protection-jsconfuser-preflight.json` / `md`，默认基于 `plain` source proxy 回答三件事：
+
+- 这个外部 checkout 能否成功产出可解析输出
+- 体积是否仍落在当前 `loader-lite` 路线可接受范围内
+- 对模板内高层语义锚点是否有实际压缩
+
+这条命令仍然是 advisory/manual lane，不接默认 release 主线，也不会改写当前 `package:shielded`。
+
+如果你要继续验证 `JS-Confuser` 的第二层候选，也就是“只针对高层语义锚点做小范围 `stringConcealing`”，执行：
+
+```bash
+npm run package:protection:jsconfuser:string:preflight -- --tool-path /absolute/path/to/js-confuser
+```
+
+它会生成 `dist/package-protection-jsconfuser-string-preflight.json` / `md`，默认目标集固定对齐当前模板高层语义锚点：
+
+- `plugin.api.agent.*`
+- `runAgentAction`
+- `listAgentCapabilities`
+- `getPackageProtectionSummary`
+- `getLifecycleTelemetrySummary`
+- `entrypoints / ownedBy / successSignals`
+- `serviceRegistry`
+- `optionalBundles`
+- `agent-runtime / ai-service`
+
+它仍然只是一条 advisory/manual 预检入口，不会直接改写当前 `package:shielded`，但比 `astScrambler` 更接近“阻断一轮 AI 高层架构归纳”的实际目标。
+
+如果你要把这条 `targeted stringConcealing` 候选真正提升成一个可安装的手动 XPI 实验变体，而不是只停留在 preflight，执行：
+
+```bash
+npm run package:shielded:jsconfuser:string -- --jsconfuser-tool-path /absolute/path/to/js-confuser
+```
+
+它会在当前 `shielded` 路线的 protected-only source proxy 上，额外跑一层显式目标字符串的 `JS-Confuser stringConcealing`，然后继续走原有的 bundle obfuscation + AES 包装 + loader-lite 硬化。这个入口仍然是手动实验分支，不会替换默认 `package:shielded`。
+
+如果你要对这个新变体直接做 Zotero 安装态 / 启动态 smoke A/B，执行：
+
+```bash
+npm run package:protection:smoke:shielded:jsconfuser:string -- --repeats 3 --channel stable --jsconfuser-tool-path /absolute/path/to/js-confuser
+```
+
+它会复用现有 `packageProtection` 时序回读、runtime log bridge 与安装 smoke 探针，但不会被纳入正式 `smoke -> score -> verdict` 的 required target。
+
 当前正式手动收口链路固定为：
 
 ```bash
@@ -103,6 +175,8 @@ npm run package:protection:verdict
 
 - `package:protection:score` 只回填 `shielded stable` 的手工评分，不重新打包也不重跑 smoke
 - `package:protection:verdict` 只生成 `dist/package-protection-verdict.json` / `md` 的 advisory 结论，不进入默认 release gate
+- `package:protection:webcrack` 会在 fresh 打包后提取 XPI 内主脚本，调用本地 `webcrack` CLI，并额外保留一个 `--no-deobfuscate --no-unpack` 的 fallback loader-only 工件，供 controller / subagent / 人工继续判读
+- `package:protection:webcrack:score` 只把 `webcrack` 自动建议评级回填到 `manualScorecard.webcrackInitialResult`，不会自动补 `llmSinglePassResult`
 - `plain` 继续只是 control group；它的自动评分不是最终 protection verdict 的降级依据
 
 如果需要定位受保护包的首次加载延迟，优先读取 `packageProtection` 时序与 `decodeMethod`，而不是只看插件内核 `startupDurationMs`。当前这组时序会拆出 `loadSubScript / decode / decrypt / eval / prepare total`，便于判断性能热点是在 loader、decode 还是插件本体启动。

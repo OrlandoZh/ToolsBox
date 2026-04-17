@@ -10,6 +10,7 @@
 | 2026-03-20 | milestone | clean-room 分层重构计划 | 首次把 settings / service / kernel / feature / agent contract 分层明确写成系统方案 | 保留重构动机、阶段边界与早期分层依据 | [CURRENT_BACKLOG.md](./CURRENT_BACKLOG.md), [ARCHITECTURE.md](./ARCHITECTURE.md) | [CLEANROOM_REFACTOR_PLAN.md](./CLEANROOM_REFACTOR_PLAN.md) |
 | 2026-04-08 | decision-record | 参考快照不入主仓 | 固化本地 `reference/` 快照只作为研究输入，不进入主仓源码历史 | 保留 clean-room 研究输入边界与导出约束 | [REFERENCE_INDEX.md](./REFERENCE_INDEX.md) | [REFERENCE_SNAPSHOTS.md](./REFERENCE_SNAPSHOTS.md) |
 | 2026-04-16 | decision-record | 路线 4 本地存储优先级 | 明确未来若进入轻服务能力，本地缓存应把 `zotero.sqlite` 视为优于 `prefs` / 明文文件的隐蔽载体，但不得误判成安全边界 | 保留“何时优先 sqlite、何时继续用 prefs、何时不应本地保存”的决策矩阵 | [PACKAGE_PROTECTION_EXPERIENCE.md](./PACKAGE_PROTECTION_EXPERIENCE.md), [OPTIONAL_BUNDLES.md](./OPTIONAL_BUNDLES.md) | [ROUTE4_LOCAL_STORAGE_DECISION.md](./ROUTE4_LOCAL_STORAGE_DECISION.md) |
+| 2026-04-16 | decision-record | 受保护打包宿主弱绑定候选 | 明确 `shielded` 若继续加固，宿主信号应只进入二阶段 unlock，且 `Profile.dir` 优先于 `DataDirectory.dir`，`sqlite nonce` 高于继续挤压路径文本 | 保留“哪些宿主信号值得用、怎么接入 package protection、什么收益和代价可以接受”的模板侧判断 | [PACKAGE_PROTECTION_ROUTE_PLAN.md](./PACKAGE_PROTECTION_ROUTE_PLAN.md), [REFERENCE_ZOTERO_HOST_SIGNAL_BINDING_NOTES.md](./REFERENCE_ZOTERO_HOST_SIGNAL_BINDING_NOTES.md) | [PACKAGE_PROTECTION_HOST_WEAK_BINDING_V1.md](./PACKAGE_PROTECTION_HOST_WEAK_BINDING_V1.md) |
 
 ## Capability / Pitfall History
 

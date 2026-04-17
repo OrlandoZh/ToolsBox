@@ -1,5 +1,195 @@
 import { describe, it, assert } from "./test-framework.js";
 import { createPluginAgent } from "../src/app/plugin-agent.js";
+import {
+  createCapabilityManifest as createProtectedCapabilityManifest,
+  findCapabilityById as findProtectedCapabilityById,
+  getCapabilityManifestView as getProtectedCapabilityManifestView,
+} from "../src/app/capability-manifest-protected.js";
+
+function createMinimalPluginAgent(overrides = {}) {
+  return createPluginAgent({
+    host: {
+      getMainWindow() {
+        return null;
+      },
+      listMainWindows() {
+        return [];
+      },
+      ...(overrides.host || {}),
+    },
+    config: {
+      addonRef: "cleanroomtemplate",
+      ...(overrides.config || {}),
+    },
+    settings: {
+      listDefinitions() {
+        return [];
+      },
+      getMigrationSummary() {
+        return null;
+      },
+      ...(overrides.settings || {}),
+    },
+    prefs: {
+      get() {
+        return true;
+      },
+      ...(overrides.prefs || {}),
+    },
+    itemPane: {
+      getSectionCount() {
+        return 0;
+      },
+      getInfoRowCount() {
+        return 0;
+      },
+      getRegistrationSnapshot() {
+        return {
+          sections: [],
+          infoRows: [],
+        };
+      },
+      ...(overrides.itemPane || {}),
+    },
+    itemTree: {
+      getColumnCount() {
+        return 0;
+      },
+      ...(overrides.itemTree || {}),
+    },
+    notifier: {
+      getActiveCount() {
+        return 0;
+      },
+      ...(overrides.notifier || {}),
+    },
+    reader: {
+      getActiveReader() {
+        return null;
+      },
+      getReaderSummary() {
+        return null;
+      },
+      getReaderInteractionSnapshot() {
+        return null;
+      },
+      getWindowStates() {
+        return [];
+      },
+      ...(overrides.reader || {}),
+    },
+    commandPalette: {
+      getCommandCount() {
+        return 0;
+      },
+      getAllCommands() {
+        return [];
+      },
+      ...(overrides.commandPalette || {}),
+    },
+    menuManager: {
+      getMenuCount() {
+        return 0;
+      },
+      getRegisteredMenuIds() {
+        return [];
+      },
+      ...(overrides.menuManager || {}),
+    },
+    preferencePanes: {
+      getPaneCount() {
+        return 0;
+      },
+      getAllPanes() {
+        return [];
+      },
+      ...(overrides.preferencePanes || {}),
+    },
+    demoState: {
+      lastNotifierEvent: "idle",
+      ...(overrides.demoState || {}),
+    },
+    demoInfoRowID: "cleanroomtemplate-selection-summary",
+    demoSectionID: "cleanroomtemplate-details",
+    getItemTypeLabel(item) {
+      return item?.itemType || "journalArticle";
+    },
+    getItemSummary(item) {
+      return item?.title || item?.getField?.("title") || "Unknown";
+    },
+    getColumnValue(item) {
+      return item?.id || 0;
+    },
+    getItemTitle(item) {
+      return item?.title || item?.getField?.("title") || "Untitled";
+    },
+    listHostActions() {
+      return [];
+    },
+    async runHostAction(actionId) {
+      return { ok: true, actionId };
+    },
+    executeAgentAction() {
+      return true;
+    },
+    updateDemoNotifierState() {},
+    zotero: {
+      Items: {
+        get() {
+          return null;
+        },
+      },
+      ...(overrides.zotero || {}),
+    },
+    servicesHub: {
+      getSummary() {
+        return {
+          total: 0,
+          healthy: 0,
+          unhealthy: 0,
+          healthOK: true,
+          status: "idle",
+          services: [],
+        };
+      },
+      ...(overrides.servicesHub || {}),
+    },
+    runtimeInfo: {
+      capabilitySummary: {
+        ok: true,
+        status: "healthy",
+        injectedCount: 0,
+        skippedCount: 0,
+        missingRequired: [],
+      },
+      ...(overrides.runtimeInfo || {}),
+    },
+    getLifecycleSummary() {
+      return {
+        hostReadyDurationMs: 0,
+        startupDurationMs: 0,
+        shutdownDurationMs: 0,
+        lifecycleSlowOperationCount: 0,
+        lifecycleSlowThresholdMs: 2000,
+        lifecycleLastSlowStage: null,
+        lifecycleBoundaryEvents: [],
+      };
+    },
+    getProtectionSummary() {
+      return {
+        active: false,
+        variant: null,
+        hostBinding: {
+          available: false,
+          profileHash: null,
+          dbAvailable: false,
+          noncePresent: false,
+        },
+      };
+    },
+    ...(overrides || {}),
+  });
+}
 
 describe("Plugin Agent", () => {
   it("should inspect sample item and expose diagnostics", () => {
@@ -256,6 +446,21 @@ describe("Plugin Agent", () => {
           prepareDurationMs: 302,
           bootstrapResolveDurationMs: 305,
           bootstrapCallCount: 1,
+          hostBinding: {
+            signalVersion: 1,
+            available: true,
+            profileHash: "sha256:profilehash012345678901",
+            schemaBucket: "120-129",
+            zoteroVersionBucket: "9.x",
+            profileBasenameBucket: "sha256:basename012345678901",
+            dataDirHash: "sha256:datadir0123456789012",
+            collectionError: null,
+            dbAvailable: true,
+            noncePresent: true,
+            nonceSource: "existing",
+            nonceHash: "sha256:noncehash01234567890",
+            storeError: null,
+          },
         };
       },
     });
@@ -316,8 +521,35 @@ describe("Plugin Agent", () => {
     assert.equal(diagnostics.packageProtectionPrepareDurationMs, 302);
     assert.equal(diagnostics.packageProtectionBootstrapResolveDurationMs, 305);
     assert.equal(diagnostics.packageProtectionBootstrapCallCount, 1);
+    assert.equal(diagnostics.hostBindingAvailable, true);
+    assert.equal(diagnostics.hostBindingProfileHashPresent, true);
+    assert.equal(diagnostics.hostBindingSchemaBucket, "120-129");
+    assert.equal(diagnostics.hostBindingZoteroVersionBucket, "9.x");
+    assert.equal(
+      diagnostics.hostBindingProfileBasenameBucket,
+      "sha256:basename012345678901",
+    );
+    assert.equal(diagnostics.hostBindingDataDirHashPresent, true);
+    assert.equal(diagnostics.hostBindingDBAvailable, true);
+    assert.equal(diagnostics.hostBindingNoncePresent, true);
+    assert.equal(diagnostics.hostBindingNonceSource, "existing");
+    assert.equal(diagnostics.hostBindingNonceHashPresent, true);
+    assert.equal(diagnostics.hostBindingCollectionError, null);
+    assert.equal(diagnostics.hostBindingStoreError, null);
+    assert.equal(diagnostics.capabilityManifestVariant, "source");
+    assert.equal(diagnostics.capabilityManifestProtectedView, false);
+    assert.equal(diagnostics.capabilityManifestDetailLevel, "full");
+    assert.equal(diagnostics.capabilityManifestLimitedMode, false);
+    assert.equal(diagnostics.capabilityManifestOverlayAvailable, false);
+    assert.equal(diagnostics.capabilityManifestOverlayApplied, false);
+    assert.equal(diagnostics.capabilityManifestActivationSatisfied, true);
+    assert.deepEqual(diagnostics.capabilityManifestActivationMissing, []);
     assert.equal(diagnostics.packageProtection.variant, "shielded");
     assert.equal(diagnostics.packageProtection.decodeMethod, "fromBase64");
+    assert.equal(diagnostics.packageProtection.hostBinding.available, true);
+    assert.equal(diagnostics.packageProtection.hostBinding.schemaBucket, "120-129");
+    assert.equal(diagnostics.packageProtection.hostBinding.noncePresent, true);
+    assert.equal(diagnostics.packageProtection.hostBinding.nonceSource, "existing");
 
     const capabilities = agent.listCapabilities();
     assert.ok(capabilities.length >= 12);
@@ -366,6 +598,77 @@ describe("Plugin Agent", () => {
 
     const hostActionScenario = agent.runAgentScenario("host-actions");
     assert.equal(hostActionScenario.total, 2);
+  });
+
+  it("should resolve capability manifest dynamically from current overlay context", () => {
+    let overlayEnabled = false;
+    const descriptorOverlay = [{
+      id: "host-actions",
+      description: "验证 host action overlay 已按宿主弱绑定解锁。",
+      entrypoints: ["plugin.api.agent.runHostAction(actionId, payload)"],
+      ownedBy: ["src/app/host-actions.js"],
+      successSignals: ["Host actions return readiness details"],
+    }];
+
+    const agent = createMinimalPluginAgent({
+      createCapabilityManifest: createProtectedCapabilityManifest,
+      findCapabilityById: findProtectedCapabilityById,
+      getCapabilityManifestView: getProtectedCapabilityManifestView,
+      getProtectionSummary() {
+        return {
+          active: true,
+          variant: "shielded",
+          hostBinding: {
+            available: overlayEnabled,
+            profileHash: overlayEnabled ? "sha256:profile" : null,
+            dbAvailable: overlayEnabled,
+            noncePresent: overlayEnabled,
+          },
+        };
+      },
+      getCapabilityManifestOverlay() {
+        return overlayEnabled ? descriptorOverlay : null;
+      },
+    });
+
+    const limitedDiagnostics = agent.collectAgentDiagnostics();
+    const limitedCapability = agent.getCapability("host-actions");
+    assert.equal(limitedDiagnostics.capabilityManifestVariant, "protected");
+    assert.equal(limitedDiagnostics.capabilityManifestProtectedView, true);
+    assert.equal(limitedDiagnostics.capabilityManifestDetailLevel, "limited");
+    assert.equal(limitedDiagnostics.capabilityManifestOverlayAvailable, false);
+    assert.equal(limitedDiagnostics.capabilityManifestOverlayApplied, false);
+    assert.equal(limitedDiagnostics.capabilityManifestActivationSatisfied, false);
+    assert.includes(limitedDiagnostics.capabilityManifestActivationMissing, "profileHash");
+    assert.equal(
+      limitedCapability.description,
+      "受保护导出不附带该能力的详细说明。",
+    );
+    assert.equal(Object.prototype.hasOwnProperty.call(limitedCapability, "entrypoints"), false);
+
+    overlayEnabled = true;
+
+    const fullDiagnostics = agent.collectAgentDiagnostics();
+    const fullCapability = agent.getCapability("host-actions");
+    const manifestScenario = agent.runAgentScenario("capability-manifest");
+
+    assert.equal(fullDiagnostics.capabilityManifestVariant, "protected");
+    assert.equal(fullDiagnostics.capabilityManifestDetailLevel, "full");
+    assert.equal(fullDiagnostics.capabilityManifestLimitedMode, false);
+    assert.equal(fullDiagnostics.capabilityManifestOverlayAvailable, true);
+    assert.equal(fullDiagnostics.capabilityManifestOverlayApplied, true);
+    assert.equal(fullDiagnostics.capabilityManifestActivationSatisfied, true);
+    assert.deepEqual(fullDiagnostics.capabilityManifestActivationMissing, []);
+    assert.equal(
+      fullCapability.description,
+      "验证 host action overlay 已按宿主弱绑定解锁。",
+    );
+    assert.deepEqual(
+      fullCapability.entrypoints,
+      ["plugin.api.agent.runHostAction(actionId, payload)"],
+    );
+    assert.equal(manifestScenario.view.detailLevel, "full");
+    assert.equal(manifestScenario.total >= 1, true);
   });
 
   it("should execute built-in notifier scenario", () => {

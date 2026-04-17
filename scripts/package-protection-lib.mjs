@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { createCapabilityManifest as createSourceCapabilityManifest } from "../src/app/capability-manifest.js";
 import {
   createScriptError,
   wrapScriptError,
@@ -8,18 +9,33 @@ import {
 
 export const ENCRYPTED_PACKAGE_VARIANT = "encrypted";
 export const SHIELDED_PACKAGE_VARIANT = "shielded";
+export const SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT = "shielded-descriptor-bind";
+export const SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT = "shielded-jsconfuser-string";
 export const ENCRYPTED_BUNDLE_MARKER = "__CLEANROOM_ENCRYPTED_BUNDLE__";
 export const SHIELDED_BUNDLE_MARKER = "__CLEANROOM_SHIELDED_BUNDLE__";
 
-function resolveProtectedBundleVariant(variant) {
+function isShieldedProtectedVariant(variant) {
   const normalizedVariant = String(variant || "").trim().toLowerCase();
   return normalizedVariant === SHIELDED_PACKAGE_VARIANT
+    || normalizedVariant === SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT
+    || normalizedVariant === SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT;
+}
+
+function resolveProtectedBundleVariant(variant) {
+  const normalizedVariant = String(variant || "").trim().toLowerCase();
+  if (normalizedVariant === SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT) {
+    return SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT;
+  }
+  if (normalizedVariant === SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT) {
+    return SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT;
+  }
+  return isShieldedProtectedVariant(normalizedVariant)
     ? SHIELDED_PACKAGE_VARIANT
     : ENCRYPTED_PACKAGE_VARIANT;
 }
 
 function resolveProtectedBundleMarker(variant) {
-  return resolveProtectedBundleVariant(variant) === SHIELDED_PACKAGE_VARIANT
+  return isShieldedProtectedVariant(resolveProtectedBundleVariant(variant))
     ? SHIELDED_BUNDLE_MARKER
     : ENCRYPTED_BUNDLE_MARKER;
 }
@@ -57,17 +73,85 @@ function buildSegmentedBase64Literal(value, options = {}) {
     .join(", ")}]`;
 }
 
+function encryptBuffer(buffer) {
+  const payloadBuffer = Buffer.isBuffer(buffer)
+    ? buffer
+    : Buffer.from(buffer || "");
+  const key = crypto.randomBytes(32);
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const ciphertext = Buffer.concat([
+    cipher.update(payloadBuffer),
+    cipher.final(),
+    cipher.getAuthTag(),
+  ]);
+
+  return {
+    key,
+    iv,
+    ciphertext,
+    sourceSHA256: computeSHA256(payloadBuffer),
+    sourceBytes: payloadBuffer.byteLength,
+  };
+}
+
+function normalizeStringArray(values) {
+  return (Array.isArray(values) ? values : [])
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+}
+
+function normalizeDescriptorOverlay(descriptorOverlay = null) {
+  return (Array.isArray(descriptorOverlay) ? descriptorOverlay : [])
+    .map((item) => {
+      const id = String(item?.id || "").trim();
+      if (!id) {
+        return null;
+      }
+
+      const normalized = { id };
+      if (typeof item?.description === "string" && item.description.trim()) {
+        normalized.description = item.description.trim();
+      }
+
+      for (const key of ["entrypoints", "ownedBy", "successSignals"]) {
+        const normalizedValues = normalizeStringArray(item?.[key]);
+        if (normalizedValues.length > 0) {
+          normalized[key] = normalizedValues;
+        }
+      }
+
+      return Object.keys(normalized).length > 1 ? normalized : null;
+    })
+    .filter(Boolean);
+}
+
+export function createCapabilityManifestDescriptorOverlay({ config } = {}) {
+  const manifest = createSourceCapabilityManifest({ config });
+  return normalizeDescriptorOverlay(manifest);
+}
+
 function buildProtectedBundleLoaderSource({
   keyBase64,
   ivBase64,
   encryptedPayloadBase64,
   variant,
+  descriptorOverlay = null,
 }) {
   const protectedVariant = resolveProtectedBundleVariant(variant);
   const marker = resolveProtectedBundleMarker(protectedVariant);
   const payloadSegments = buildSegmentedBase64Literal(encryptedPayloadBase64, { segmentLength: 96 });
   const keySegments = buildSegmentedBase64Literal(keyBase64, { segmentLength: 24 });
   const ivSegments = buildSegmentedBase64Literal(ivBase64, { segmentLength: 12 });
+  const overlayPayloadSegments = descriptorOverlay?.encryptedPayloadBase64
+    ? buildSegmentedBase64Literal(descriptorOverlay.encryptedPayloadBase64, { segmentLength: 96 })
+    : "null";
+  const overlayKeySegments = descriptorOverlay?.keyBase64
+    ? buildSegmentedBase64Literal(descriptorOverlay.keyBase64, { segmentLength: 24 })
+    : "null";
+  const overlayIVSegments = descriptorOverlay?.ivBase64
+    ? buildSegmentedBase64Literal(descriptorOverlay.ivBase64, { segmentLength: 12 })
+    : "null";
   return `/* ${marker} */
 (function (__global) {
   var __bundleMeta = {
@@ -77,8 +161,12 @@ function buildProtectedBundleLoaderSource({
   var __payloadSegments = ${payloadSegments};
   var __keySegments = ${keySegments};
   var __ivSegments = ${ivSegments};
+  var __overlayPayloadSegments = ${overlayPayloadSegments};
+  var __overlayKeySegments = ${overlayKeySegments};
+  var __overlayIVSegments = ${overlayIVSegments};
   var __protectedBootstrapPromise = null;
   var __protectedBootstrap = null;
+  var __overlayValue = null;
   var __decodeMethod = null;
 
   function __now() {
@@ -122,6 +210,10 @@ function buildProtectedBundleLoaderSource({
     }
 
     return summary;
+  }
+
+  function __cloneJSON(value) {
+    return value == null ? null : JSON.parse(JSON.stringify(value));
   }
 
   function __rememberDecodeMethod(method) {
@@ -281,6 +373,35 @@ function buildProtectedBundleLoaderSource({
     runtimeFactory.call(__global, __global, __global, __global, __global);
   }
 
+  async function __loadDescriptorOverlay(cryptoObject, decoder) {
+    if (__overlayValue) {
+      return __cloneJSON(__overlayValue);
+    }
+
+    if (!__overlayPayloadSegments || !__overlayKeySegments || !__overlayIVSegments) {
+      return null;
+    }
+
+    try {
+      var overlayPayload = __base64ToBytes(__joinSegments(__overlayPayloadSegments));
+      var overlayKeyBytes = __base64ToBytes(__joinSegments(__overlayKeySegments));
+      var overlayIVBytes = __base64ToBytes(__joinSegments(__overlayIVSegments));
+      var overlayKey = await cryptoObject.subtle.importKey('raw', overlayKeyBytes, { name: 'AES-GCM' }, false, ['decrypt']);
+      var overlayBuffer = await cryptoObject.subtle.decrypt({ name: 'AES-GCM', iv: overlayIVBytes }, overlayKey, overlayPayload);
+      var overlaySource = decoder.decode(new Uint8Array(overlayBuffer));
+      var overlay = JSON.parse(overlaySource);
+
+      if (!Array.isArray(overlay)) {
+        return null;
+      }
+
+      __overlayValue = overlay;
+      return __cloneJSON(__overlayValue);
+    } catch (error) {
+      return null;
+    }
+  }
+
   async function __loadProtectedBootstrap() {
     if (__protectedBootstrap) {
       return __protectedBootstrap;
@@ -302,6 +423,7 @@ function buildProtectedBundleLoaderSource({
         var decoder = new (__getTextDecoder())();
         var decryptedSource = decoder.decode(new Uint8Array(decryptedBuffer));
         var previousBootstrap = __global.bootstrapPlugin;
+        var overlayResolver = null;
         var evalStartedAt = __now();
 
         __global.bootstrapPlugin = undefined;
@@ -313,6 +435,14 @@ function buildProtectedBundleLoaderSource({
         }
 
         var evalDurationMs = __now() - evalStartedAt;
+        var overlay = await __loadDescriptorOverlay(cryptoObject, decoder);
+
+        if (overlay) {
+          overlayResolver = function () {
+            return __cloneJSON(__overlayValue);
+          };
+        }
+
         __recordPackageProtectionState({
           active: true,
           variant: __bundleMeta.variant,
@@ -322,6 +452,9 @@ function buildProtectedBundleLoaderSource({
           evalDurationMs: Math.max(0, evalDurationMs),
           prepareDurationMs: Math.max(0, __now() - prepareStartedAt),
         });
+        if (overlayResolver) {
+          __getPackageProtectionState().overlayResolver = overlayResolver;
+        }
 
         if (typeof __global.bootstrapPlugin !== 'function') {
           __global.bootstrapPlugin = previousBootstrap;
@@ -393,20 +526,23 @@ export function protectBundleSource(sourceCode, options = {}) {
   const sourceBuffer = Buffer.from(normalizedSource, "utf-8");
   const generatedAt = String(options.generatedAt || new Date().toISOString());
   const variant = resolveProtectedBundleVariant(options.variant);
-  const key = crypto.randomBytes(32);
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
-  const ciphertext = Buffer.concat([
-    cipher.update(sourceBuffer),
-    cipher.final(),
-    cipher.getAuthTag(),
-  ]);
-  const sourceSHA256 = computeSHA256(sourceBuffer);
+  const encryptedBundle = encryptBuffer(sourceBuffer);
+  const descriptorOverlay = normalizeDescriptorOverlay(options.descriptorOverlay);
+  const encryptedDescriptorOverlay = descriptorOverlay.length > 0
+    ? encryptBuffer(Buffer.from(JSON.stringify(descriptorOverlay), "utf-8"))
+    : null;
   const loaderSource = buildProtectedBundleLoaderSource({
-    keyBase64: encodeBase64(key),
-    ivBase64: encodeBase64(iv),
-    encryptedPayloadBase64: encodeBase64(ciphertext),
+    keyBase64: encodeBase64(encryptedBundle.key),
+    ivBase64: encodeBase64(encryptedBundle.iv),
+    encryptedPayloadBase64: encodeBase64(encryptedBundle.ciphertext),
     variant,
+    descriptorOverlay: encryptedDescriptorOverlay
+      ? {
+        keyBase64: encodeBase64(encryptedDescriptorOverlay.key),
+        ivBase64: encodeBase64(encryptedDescriptorOverlay.iv),
+        encryptedPayloadBase64: encodeBase64(encryptedDescriptorOverlay.ciphertext),
+      }
+      : null,
   });
 
   return {
@@ -417,9 +553,11 @@ export function protectBundleSource(sourceCode, options = {}) {
       addonRef,
       addonVersion,
       generatedAt,
-      sourceSHA256,
-      sourceBytes: sourceBuffer.byteLength,
+      sourceSHA256: encryptedBundle.sourceSHA256,
+      sourceBytes: encryptedBundle.sourceBytes,
       protectedBytes: Buffer.byteLength(loaderSource, "utf-8"),
+      descriptorOverlayPresent: Boolean(encryptedDescriptorOverlay),
+      descriptorOverlayEntryCount: descriptorOverlay.length,
     },
   };
 }
@@ -447,6 +585,7 @@ export async function protectBuildBundle(options = {}) {
       addonVersion,
       generatedAt: options.generatedAt,
       variant: options.variant,
+      descriptorOverlay: options.descriptorOverlay,
     });
     await fs.writeFile(bundlePath, protectedBundle.loaderSource, "utf-8");
     return {

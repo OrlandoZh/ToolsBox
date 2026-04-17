@@ -18,6 +18,7 @@
 
 - 当前最稳的人工导出基线仍是 `package:encrypted`
 - 当前更高阻力分支仍是 `package:shielded`
+- 当前 `smoke -> score -> verdict` 手动收口链已经 fresh 通过，最新 advisory verdict 为 `passed`
 - 下一步不该回到重 loader、`sidecar` 或 hostile runtime
 - 下一步也不该直接跳到服务端主导或 Wasm
 - **下一步最值得优先验证的是：inner bundle 在解密后暴露给 AI 的高层语义锚点，能否在 protected-only 路线下继续减噪**
@@ -122,6 +123,16 @@
 - 把 `sqlite + 本地解密` 当成主要防盗版能力
 - 在没有语义减噪证据前直接引入更重的 obfuscator 组合
 
+当前同时保留一个**不应被误归类进路线 4**的本地候选：
+
+- `shielded host weak binding`
+  - 只作用于二阶段 unlock
+  - 不进入 `bootstrapPlugin` 主启动链
+  - 主锚点优先 `hash(realpath(Zotero.Profile.dir)) + plugin-owned sqlite nonce`
+  - `Zotero.DataDirectory.dir` 只做辅助盐 / fallback
+
+这条路线当前仍属于未来 hardening 候选，不代表已经实现；具体边界见 [PACKAGE_PROTECTION_HOST_WEAK_BINDING_V1.md](./PACKAGE_PROTECTION_HOST_WEAK_BINDING_V1.md)。
+
 ## 分阶段推进方案
 
 ### Stage 0：当前稳定基线
@@ -132,6 +143,9 @@
 - `decodeMethod=fromBase64` 的 fast path 收口
 - `loader-lite` 兼容性基线
 - `smoke -> score -> verdict` 手动收口链
+- 最新 fresh verdict 已重新确认：
+  - `status = passed`
+  - `nextAction = keep-current-shielded`
 
 ### Stage 1：raw export 语义泄露盘点
 
@@ -162,6 +176,14 @@
 - 不改宿主 authoritative contract
 - 不把产品功能删空，只做高层语义减噪
 
+当前最新状态补充：
+
+- 最新 `package:protection:audit` 已确认：
+  - `encrypted/shielded` raw export 仍保持 `0` 个 raw leakage
+  - protected source proxy 只剩 `addonRef / addonVersion`
+- 这意味着 Stage 2 已经达到“继续压缩收益明显下降”的节点
+- 当前更合理的阶段决策不是继续追剩余两个锚点，而是把 Stage 2 先视为当前版本的可接受收口点，再决定是否启动更重的 Stage 3
+
 ### Stage 3：inner bundle obfuscator A/B
 
 只有在 Stage 2 完成后，人工评分仍然稳定停留在 `high-level-architecture`，才考虑一次有止损线的 A/B。
@@ -176,6 +198,82 @@
 - 不重开 loader 级重混淆
 - 必须先过安装态与首次加载体感门槛
 - 一旦带来明显卡顿或调试/兼容性回退，直接废弃
+
+当前真实 preflight 结论补充如下：
+
+- `lightweight-js-obfuscator` 当前不是 npm registry 包，`npm view lightweight-js-obfuscator ...` 会返回 `404`
+- 当前只能按 GitHub 仓库形态使用它，而不能直接按稳定 npm devDependency 接线
+- 直接对当前 `protected-only` inner bundle 运行上游 `obfuscator.js` 时，会先因为 `ObjectProperty` 字符串 key 被替换为 `CallExpression` 而报 Babel AST 兼容错误
+- 在 `/tmp` 中对上游实验副本仅补“跳过非 computed 对象字面量 key”这一刀后，它才首次成功产出输出
+- patched upstream 对当前 inner bundle 的一次真实样本结果是：
+  - 输入约 `652KB`
+  - 输出大致落在 `4MB ~ 5MB`
+  - 体积膨胀大致落在 `6x ~ 8x`
+- 更关键的是，上游默认 final pass 仍会启用：
+  - `selfDefending`
+  - `debugProtection`
+  - `debugProtectionInterval`
+  - `disableConsoleOutput`
+- 这些默认值与当前模板已经验证过的 `loader-lite / hostile-runtime-disabled / 首次加载不卡顿` 路线冲突
+
+因此当前 Stage 3 的 retained decision 需要更精确地写成：
+
+- 允许继续做 `lightweight-js-obfuscator` 思路验证
+- 但不允许把上游 CLI 原样接入模板主实验链
+- 如果后续继续推进，正确方向应是：
+  - 在模板内做本地适配 wrapper 或受控 fork
+  - 先关掉 hostile runtime 选项
+  - 先修复当前 AST 兼容性问题
+  - 再做真正的安装态 / 首次加载体感 / XPI 级 smoke A/B
+
+### Stage 3 补充候选：`JS-Confuser` 非 hostile 子集
+
+这条路线当前只允许按“官方可确认能力 + 社区线索分层”进入 PoC，不允许把社区经验直接写成模板既定结论。
+
+当前基于官方文档可直接确认的事实只有：
+
+- `astScrambler`
+  - 官方描述是：`Semantically changes the AST to bypass automated tools`
+- `stringConcealing`
+  - 官方描述是：`encoding strings to conceal plain-text values`
+- `tamperProtection`
+  - 官方描述是：`safeguards the runtime behavior from being altered`
+- `antiDebug`
+  - 官方描述是：`Adds debugger statements throughout the code`
+- `pack`
+  - 官方描述是：`Packs the output code into a single Function() call`
+- `RGF`
+  - 官方描述是：`creates executable code from strings`
+
+当前同样需要明确：
+
+- 官方文档没有给出 Zotero / Firefox 兼容性结论
+- 官方文档没有给出 `dispatcher` / `opaquePredicates` 的可信性能量化
+- 关于 `stringConcealing` 对 `class constructor` 的破坏、或 `dispatcher` / `opaquePredicates` 的细粒度风险，目前都只能算 GitHub Issue / 社区线索，不是当前模板 contract
+
+因此当前模板的 retained decision 固定为：
+
+- 值得进入最小 PoC 的只有：
+  - `astScrambler`
+- 允许做“小范围、带谓词”的次级实验，但不允许默认全开：
+  - `stringConcealing`
+- 当前不进入模板实验主链的选项包括：
+  - `antiDebug`
+  - `tamperProtection`
+  - `pack`
+  - `RGF`
+
+原因固定为：
+
+- 这几项要么直接引入 `debugger` 注入，要么显式走 `Function()` / runtime-generated code 路线
+- 它们与当前模板已经收口的 `loader-lite / hostile-runtime-disabled / 首次加载不卡顿` 方向不一致
+- 在没有 Zotero 宿主 PoC 之前，不允许把这类选项写成“只是混淆更强”
+
+`dispatcher` 与 `opaquePredicates` 当前也不进入 retained decision：
+
+- 可以保留为后续候选词条
+- 但在没有独立 Zotero PoC 前，不写进模板默认建议
+- 也不把社区风险描述写成当前仓库的既定兼容性结论
 
 ### Stage 4：路线 4 轻服务能力
 
@@ -214,8 +312,40 @@
 
 - `protected-only semantic scrub prototype`
   - 只针对受保护分支的内层 bundle 语义减噪
+- `shielded host weak binding v1`
+  - 只做宿主感知的二阶段 unlock
+  - 不改 `bootstrapPlugin` 主启动链
+  - 只在需要进一步压缩离机静态分析 / 跨环境复制复用时考虑
+- `JS-Confuser` non-hostile subset PoC
+  - 第一优先只试 `astScrambler`
+  - 第二优先才是带谓词的小范围 `stringConcealing`
+  - 明确不把 `antiDebug / tamperProtection / pack / RGF` 带进当前模板实验链
+  - 当前仓库内已提供显式预检入口：
+    `npm run package:protection:jsconfuser:preflight -- --tool-path /absolute/path/to/js-confuser`
+  - 以及次级预检入口：
+    `npm run package:protection:jsconfuser:string:preflight -- --tool-path /absolute/path/to/js-confuser`
+  - 当前也已提供对应的显式手动 XPI / smoke 入口：
+    `npm run package:shielded:jsconfuser:string -- --jsconfuser-tool-path /absolute/path/to/js-confuser`
+  - 以及：
+    `npm run package:protection:smoke:shielded:jsconfuser:string -- --repeats 3 --channel stable --jsconfuser-tool-path /absolute/path/to/js-confuser`
+  - 以及 raw export 对比入口：
+    `npm run package:protection:audit:jsconfuser:string -- --jsconfuser-tool-path /absolute/path/to/js-confuser`
+  - 截至 `2026-04-16` 的真实预检结果是：
+    - `js-confuser@2.0.1` 可跑通 `astScrambler`
+    - 输出可过语法检查，且体积未失控
+    - 但对当前模板的高层语义锚点压缩为 `0`
+    - 当前 advisory 结论固定为 `attention`
+    - 当前不建议直接升级到 XPI / Zotero A/B
+    - `targeted stringConcealing` 也已跑通真实预检
+    - 输出可过语法检查，且体积仍保持可控
+    - 对当前模板的高层语义锚点压缩达到 `7 -> 0`
+    - 当前 advisory 结论可记为 `passed`
+    - 当前更值得进入下一步手动 XPI / Zotero A/B 的是这条路线，而不是 `astScrambler`
 - `lightweight-js-obfuscator` inner bundle A/B
   - 只在语义减噪后仍不足时再做
+  - 当前已经完成 preflight，但 direct upstream 路线已被判定为“不应直接接入”
+  - 当前仓库内已提供显式预检入口：
+    `npm run package:protection:lightweight:preflight -- --tool-path /absolute/path/to/lightweight-js-obfuscator`
 
 ## 决策门槛
 
@@ -254,11 +384,14 @@
 1. `encrypted` 继续是最稳的低开销保护导出分支。
 2. `shielded` 继续是更高阻力的手动导出分支，但必须坚持 `loader-lite`。
 3. raw export 之外的下一轮 hardening，应优先指向 inner bundle semantics，而不是重 loader。
-4. `路线 4` 与 `Wasm` 继续保留为后续增强层，不抢当前主路线。
-5. 整条保护导出线继续保持 `advisory + manual lane`，不回写默认 `release` / `agent:gate`。
+4. 若未来要继续加固本地分支，允许把“宿主弱绑定二阶段 unlock”保留为独立候选，但它不替代 inner semantic scrub，也不等同于路线 4。
+5. `路线 4` 与 `Wasm` 继续保留为后续增强层，不抢当前主路线。
+6. 整条保护导出线继续保持 `advisory + manual lane`，不回写默认 `release` / `agent:gate`。
 
 ## 相关文档
 
 - [PACKAGE_PROTECTION_EXPERIENCE.md](./PACKAGE_PROTECTION_EXPERIENCE.md)
+- [PACKAGE_PROTECTION_HOST_SIGNAL_IMPLEMENTATION_PLAN.md](./PACKAGE_PROTECTION_HOST_SIGNAL_IMPLEMENTATION_PLAN.md)
+- [PACKAGE_PROTECTION_HOST_WEAK_BINDING_V1.md](./PACKAGE_PROTECTION_HOST_WEAK_BINDING_V1.md)
 - [ROUTE4_LOCAL_STORAGE_DECISION.md](./ROUTE4_LOCAL_STORAGE_DECISION.md)
 - [OPTIONAL_BUNDLES.md](./OPTIONAL_BUNDLES.md)

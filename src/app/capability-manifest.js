@@ -2,6 +2,19 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function createSourceManifestView() {
+  return {
+    manifestVariant: "source",
+    protectedView: false,
+    detailLevel: "full",
+    limitedMode: false,
+    overlayAvailable: false,
+    overlayApplied: false,
+    activationSatisfied: true,
+    activationMissing: [],
+  };
+}
+
 export function createCapabilityManifest({ config } = {}) {
   const addonRef = String(config?.addonRef || "cleanroomtemplate").trim() || "cleanroomtemplate";
 
@@ -287,6 +300,10 @@ export function createCapabilityManifest({ config } = {}) {
   ];
 
   return capabilities.map((item) => clone(item));
+}
+
+export function getCapabilityManifestView() {
+  return clone(createSourceManifestView());
 }
 
 export function listCapabilityIds(manifest = []) {

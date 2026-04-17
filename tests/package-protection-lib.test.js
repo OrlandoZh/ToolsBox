@@ -1,8 +1,15 @@
 import { webcrypto } from "node:crypto";
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, assert, describe, it } from "./test-framework.js";
 import {
+  createCapabilityManifestDescriptorOverlay,
+  protectBuildBundle,
   protectBundleSource,
   SHIELDED_PACKAGE_VARIANT,
+  SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT,
+  SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT,
 } from "../scripts/package-protection-lib.mjs";
 
 const originalFromBase64Descriptor = Object.getOwnPropertyDescriptor(globalThis.Uint8Array, "fromBase64");
@@ -147,6 +154,151 @@ describe("Package Protection Lib", () => {
     assert.equal(typeof globalThis.bootstrapPlugin, "undefined");
     assert.equal(typeof globalThis.__CLEANROOM_TEMPLATE_CONFIG__, "undefined");
     assert.equal(metadata.variant, SHIELDED_PACKAGE_VARIANT);
+  });
+
+  it("should expose a descriptor overlay resolver only for the descriptor-bind experiment variant", async () => {
+    const sourceCode = `
+      (function (__global) {
+        "use strict";
+        async function bootstrapPlugin() {
+          return "ready";
+        }
+        __global.bootstrapPlugin = bootstrapPlugin;
+      })(this);
+    `;
+
+    const descriptorOverlay = [{
+      id: "host-actions",
+      description: "overlay description",
+      entrypoints: ["plugin.api.agent.runHostAction(actionId, payload)"],
+      ownedBy: ["src/app/host-actions.js"],
+      successSignals: ["Host actions return readiness details"],
+    }];
+    const { loaderSource, metadata } = protectBundleSource(sourceCode, {
+      addonRef: "demo-addon",
+      addonVersion: "0.0.1",
+      variant: SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT,
+      descriptorOverlay,
+    });
+
+    const scope = createLoaderScope();
+    const loadProtectedBundle = new Function(`${loaderSource}\nreturn this.bootstrapPlugin;`);
+    const bootstrap = loadProtectedBundle.call(scope);
+    const result = await bootstrap.call(scope);
+    const runtime = scope.__CLEANROOM_TEMPLATE_RUNTIME__;
+
+    assert.equal(result, "ready");
+    assert.equal(metadata.variant, SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT);
+    assert.equal(metadata.descriptorOverlayPresent, true);
+    assert.equal(metadata.descriptorOverlayEntryCount, 1);
+    assert.equal(runtime?.packageProtection?.variant, SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT);
+    assert.equal(typeof runtime?.packageProtection?.overlayResolver, "function");
+    assert.deepEqual(runtime.packageProtection.overlayResolver(), descriptorOverlay);
+    assert.equal(loaderSource.includes("overlay description"), false);
+    assert.equal(loaderSource.includes("runHostAction"), false);
+    assert.equal(loaderSource.includes("src/app/host-actions.js"), false);
+  });
+
+  it("should keep the js-confuser string experiment variant on the runtime marker without enabling overlay recovery", async () => {
+    const sourceCode = `
+      (function (__global) {
+        "use strict";
+        async function bootstrapPlugin() {
+          return "ready";
+        }
+        __global.bootstrapPlugin = bootstrapPlugin;
+      })(this);
+    `;
+
+    const { loaderSource, metadata } = protectBundleSource(sourceCode, {
+      addonRef: "demo-addon",
+      addonVersion: "0.0.1",
+      variant: SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT,
+    });
+
+    const scope = createLoaderScope();
+    const loadProtectedBundle = new Function(`${loaderSource}\nreturn this.bootstrapPlugin;`);
+    const bootstrap = loadProtectedBundle.call(scope);
+    const result = await bootstrap.call(scope);
+
+    assert.equal(result, "ready");
+    assert.equal(metadata.variant, SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT);
+    assert.equal(scope.__CLEANROOM_PACKAGE_VARIANT__, SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT);
+    assert.equal(scope.__CLEANROOM_SHIELDED_BUNDLE__, 1);
+    assert.equal(
+      scope.__CLEANROOM_TEMPLATE_RUNTIME__?.packageProtection?.variant,
+      SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT,
+    );
+    assert.equal(typeof scope.__CLEANROOM_TEMPLATE_RUNTIME__?.packageProtection?.overlayResolver, "undefined");
+  });
+
+  it("should derive a minimal descriptor overlay from the source capability manifest", () => {
+    const overlay = createCapabilityManifestDescriptorOverlay({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+    });
+    const hostActions = overlay.find((item) => item.id === "host-actions");
+
+    assert.ok(Array.isArray(overlay));
+    assert.ok(overlay.length >= 12);
+    assert.equal(typeof hostActions?.description, "string");
+    assert.ok(Array.isArray(hostActions?.entrypoints));
+    assert.ok(Array.isArray(hostActions?.ownedBy));
+    assert.ok(Array.isArray(hostActions?.successSignals));
+    assert.equal(Object.prototype.hasOwnProperty.call(hostActions || {}, "label"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(hostActions || {}, "agentScenario"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(hostActions || {}, "zoteroScenarios"), false);
+  });
+
+  it("should preserve descriptor overlay data when protecting a build bundle on disk", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cleanroom-protect-build-"));
+    const bundlePath = path.join(tempRoot, "bundle.js");
+    const sourceCode = `
+      (function (__global) {
+        "use strict";
+        async function bootstrapPlugin() {
+          return "ready";
+        }
+        __global.bootstrapPlugin = bootstrapPlugin;
+      })(this);
+    `;
+    const descriptorOverlay = [{
+      id: "host-actions",
+      description: "overlay description",
+      entrypoints: ["plugin.api.agent.runHostAction(actionId, payload)"],
+      ownedBy: ["src/app/host-actions.js"],
+      successSignals: ["Host actions return readiness details"],
+    }];
+
+    try {
+      await fs.writeFile(bundlePath, sourceCode, "utf-8");
+
+      const metadata = await protectBuildBundle({
+        bundlePath,
+        addonRef: "demo-addon",
+        addonVersion: "0.0.1",
+        variant: SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT,
+        descriptorOverlay,
+      });
+      const loaderSource = await fs.readFile(bundlePath, "utf-8");
+      const scope = createLoaderScope();
+      const loadProtectedBundle = new Function(`${loaderSource}\nreturn this.bootstrapPlugin;`);
+      const bootstrap = loadProtectedBundle.call(scope);
+      const result = await bootstrap.call(scope);
+
+      assert.equal(result, "ready");
+      assert.equal(metadata.variant, SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT);
+      assert.equal(metadata.descriptorOverlayPresent, true);
+      assert.equal(metadata.descriptorOverlayEntryCount, 1);
+      assert.equal(typeof scope.__CLEANROOM_TEMPLATE_RUNTIME__?.packageProtection?.overlayResolver, "function");
+      assert.deepEqual(scope.__CLEANROOM_TEMPLATE_RUNTIME__.packageProtection.overlayResolver(), descriptorOverlay);
+      assert.equal(loaderSource.includes("overlay description"), false);
+      assert.equal(loaderSource.includes("runHostAction"), false);
+      assert.equal(loaderSource.includes("src/app/host-actions.js"), false);
+    } finally {
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    }
   });
 
   it("should record atob as the decode method when typed-array fast paths are unavailable", async () => {

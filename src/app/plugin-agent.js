@@ -1,6 +1,7 @@
 import {
-  createCapabilityManifest,
-  findCapabilityById,
+  createCapabilityManifest as createCapabilityManifestFactory,
+  findCapabilityById as findCapabilityByIdFromManifest,
+  getCapabilityManifestView as getCapabilityManifestViewFactory,
 } from "./capability-manifest.js";
 
 const BASELINE_ITEM_PANE_L10N = Object.freeze({
@@ -38,8 +39,52 @@ export function createPluginAgent({
   runtimeInfo,
   getLifecycleSummary = null,
   getProtectionSummary = null,
+  getCapabilityManifestOverlay = null,
+  createCapabilityManifest = createCapabilityManifestFactory,
+  findCapabilityById = findCapabilityByIdFromManifest,
+  getCapabilityManifestView = getCapabilityManifestViewFactory,
 }) {
-  const capabilityManifest = createCapabilityManifest({ config });
+  function createDefaultHostBindingSummary() {
+    return {
+      signalVersion: 1,
+      available: false,
+      profileHash: null,
+      schemaBucket: null,
+      zoteroVersionBucket: null,
+      profileBasenameBucket: null,
+      dataDirHash: null,
+      collectionError: null,
+      dbAvailable: false,
+      noncePresent: false,
+      nonceSource: "unavailable",
+      nonceHash: null,
+      storeError: null,
+    };
+  }
+
+  function getCurrentProtectionSummary() {
+    return typeof getProtectionSummary === "function"
+      ? getProtectionSummary()
+      : null;
+  }
+
+  function getCurrentCapabilityManifestOptions() {
+    return {
+      config,
+      protectionSummary: getCurrentProtectionSummary(),
+      descriptorOverlay: typeof getCapabilityManifestOverlay === "function"
+        ? getCapabilityManifestOverlay()
+        : null,
+    };
+  }
+
+  function getCurrentCapabilityManifest() {
+    return createCapabilityManifest(getCurrentCapabilityManifestOptions());
+  }
+
+  function getCurrentCapabilityManifestView() {
+    return getCapabilityManifestView(getCurrentCapabilityManifestOptions());
+  }
 
   function buildReaderEventReport() {
     if (reader && typeof reader.getEventAPIReport === "function") {
@@ -218,7 +263,12 @@ export function createPluginAgent({
         prepareDurationMs: 0,
         bootstrapResolveDurationMs: 0,
         bootstrapCallCount: 0,
+        hostBinding: createDefaultHostBindingSummary(),
       };
+    const hostBinding = packageProtection?.hostBinding && typeof packageProtection.hostBinding === "object"
+      ? packageProtection.hostBinding
+      : createDefaultHostBindingSummary();
+    const capabilityManifestView = getCurrentCapabilityManifestView();
     return {
       enabled: Boolean(prefs.get("enabled")),
       hasMainWindow: Boolean(window),
@@ -299,6 +349,57 @@ export function createPluginAgent({
       packageProtectionPrepareDurationMs: Number(packageProtection?.prepareDurationMs || 0),
       packageProtectionBootstrapResolveDurationMs: Number(packageProtection?.bootstrapResolveDurationMs || 0),
       packageProtectionBootstrapCallCount: Number(packageProtection?.bootstrapCallCount || 0),
+      hostBindingAvailable: Boolean(hostBinding.available),
+      hostBindingProfileHashPresent: typeof hostBinding.profileHash === "string"
+        && hostBinding.profileHash.trim().length > 0,
+      hostBindingSchemaBucket: typeof hostBinding.schemaBucket === "string"
+        && hostBinding.schemaBucket.trim()
+        ? hostBinding.schemaBucket.trim()
+        : null,
+      hostBindingZoteroVersionBucket: typeof hostBinding.zoteroVersionBucket === "string"
+        && hostBinding.zoteroVersionBucket.trim()
+        ? hostBinding.zoteroVersionBucket.trim()
+        : null,
+      hostBindingProfileBasenameBucket: typeof hostBinding.profileBasenameBucket === "string"
+        && hostBinding.profileBasenameBucket.trim()
+        ? hostBinding.profileBasenameBucket.trim()
+        : null,
+      hostBindingDataDirHashPresent: typeof hostBinding.dataDirHash === "string"
+        && hostBinding.dataDirHash.trim().length > 0,
+      hostBindingDBAvailable: Boolean(hostBinding.dbAvailable),
+      hostBindingNoncePresent: Boolean(hostBinding.noncePresent),
+      hostBindingNonceSource: typeof hostBinding.nonceSource === "string"
+        && hostBinding.nonceSource.trim()
+        ? hostBinding.nonceSource.trim()
+        : "unavailable",
+      hostBindingNonceHashPresent: typeof hostBinding.nonceHash === "string"
+        && hostBinding.nonceHash.trim().length > 0,
+      hostBindingCollectionError: typeof hostBinding.collectionError === "string"
+        && hostBinding.collectionError.trim()
+        ? hostBinding.collectionError.trim()
+        : null,
+      hostBindingStoreError: typeof hostBinding.storeError === "string"
+        && hostBinding.storeError.trim()
+        ? hostBinding.storeError.trim()
+        : null,
+      capabilityManifestVariant: typeof capabilityManifestView?.manifestVariant === "string"
+        && capabilityManifestView.manifestVariant.trim()
+        ? capabilityManifestView.manifestVariant.trim()
+        : "source",
+      capabilityManifestProtectedView: Boolean(capabilityManifestView?.protectedView),
+      capabilityManifestDetailLevel: typeof capabilityManifestView?.detailLevel === "string"
+        && capabilityManifestView.detailLevel.trim()
+        ? capabilityManifestView.detailLevel.trim()
+        : "full",
+      capabilityManifestLimitedMode: Boolean(capabilityManifestView?.limitedMode),
+      capabilityManifestOverlayAvailable: Boolean(capabilityManifestView?.overlayAvailable),
+      capabilityManifestOverlayApplied: Boolean(capabilityManifestView?.overlayApplied),
+      capabilityManifestActivationSatisfied: Boolean(capabilityManifestView?.activationSatisfied),
+      capabilityManifestActivationMissing: Array.isArray(capabilityManifestView?.activationMissing)
+        ? capabilityManifestView.activationMissing
+          .map((item) => String(item || "").trim())
+          .filter(Boolean)
+        : [],
       services: Array.isArray(serviceSummary.services) ? serviceSummary.services : [],
       runtimeBridgeOK: Boolean(runtimeSummary.ok !== false),
       runtimeBridgeStatus: runtimeSummary.status || "unknown",
@@ -375,9 +476,11 @@ export function createPluginAgent({
   }
 
   function collectAgentDiagnostics() {
+    const capabilityManifest = getCurrentCapabilityManifest();
     return {
       ...runAgentSelfCheck(),
       capabilityCount: capabilityManifest.length,
+      capabilityManifestView: getCurrentCapabilityManifestView(),
       lastNotifierEvent: demoState.lastNotifierEvent,
       readerEventListeners: buildReaderEventReport().registeredListeners,
       readerEventReport: buildReaderEventReport(),
@@ -412,10 +515,11 @@ export function createPluginAgent({
   }
 
   function listCapabilities() {
-    return capabilityManifest.map((item) => JSON.parse(JSON.stringify(item)));
+    return getCurrentCapabilityManifest().map((item) => JSON.parse(JSON.stringify(item)));
   }
 
   function getCapability(capabilityId) {
+    const capabilityManifest = getCurrentCapabilityManifest();
     return findCapabilityById(capabilityManifest, capabilityId);
   }
 
@@ -424,11 +528,15 @@ export function createPluginAgent({
       case "baseline-registration":
         return collectAgentDiagnostics();
       case "capability-manifest":
+        {
+          const capabilityManifest = getCurrentCapabilityManifest();
         return {
           total: capabilityManifest.length,
           ids: capabilityManifest.map((item) => item.id),
+          view: getCurrentCapabilityManifestView(),
           capabilities: listCapabilities(),
         };
+        }
       case "sample-item-pane": {
         return inspectItemPresentation(payload.itemID ?? payload.item ?? payload);
       }

@@ -18,8 +18,19 @@ import {
   SCRIPT_ERROR_CATEGORY_LABELS,
 } from "./script-runtime-lib.mjs";
 import {
+  buildPackageProtectionAuditAnchors,
+} from "./package-protection-anchor-audit.mjs";
+import {
+  applyPackageProtectionJSConfuserTransform,
+  ensureJSConfuserToolReady,
+  resolveJSConfuserPreflightProfile,
+} from "./package-protection-jsconfuser-preflight.mjs";
+import {
+  createCapabilityManifestDescriptorOverlay,
   ENCRYPTED_PACKAGE_VARIANT,
   SHIELDED_PACKAGE_VARIANT,
+  SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT,
+  SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT,
   protectBuildBundle,
 } from "./package-protection-lib.mjs";
 import {
@@ -32,6 +43,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const scriptStartedAt = Date.now();
+const PACKAGE_JSCONFUSER_TOOL_PATH_ENV = "CLEANROOM_PACKAGE_JSCONFUSER_TOOL_PATH";
+const PACKAGE_JSCONFUSER_TOOL_ENTRY_ENV = "CLEANROOM_PACKAGE_JSCONFUSER_TOOL_ENTRY";
 
 export async function readPackageConfig() {
   const filePath = path.join(projectRoot, "config", "addon.config.json");
@@ -58,6 +71,10 @@ export async function readPackageConfig() {
 export function parsePackageArgs(argv = process.argv.slice(2)) {
   const options = {
     encryptBundle: false,
+    descriptorBind: false,
+    jsConfuserString: false,
+    jsConfuserToolEntry: null,
+    jsConfuserToolPath: null,
     shieldBundle: false,
     outputSuffix: "",
     writeReleaseMetadata: true,
@@ -76,6 +93,24 @@ export function parsePackageArgs(argv = process.argv.slice(2)) {
       case "--shield-bundle":
         options.shieldBundle = true;
         options.encryptBundle = true;
+        break;
+      case "--descriptor-bind":
+        options.descriptorBind = true;
+        options.shieldBundle = true;
+        options.encryptBundle = true;
+        break;
+      case "--jsconfuser-string":
+        options.jsConfuserString = true;
+        options.shieldBundle = true;
+        options.encryptBundle = true;
+        break;
+      case "--jsconfuser-tool-path":
+        options.jsConfuserToolPath = String(argv[index + 1] || "").trim() || null;
+        index += 1;
+        break;
+      case "--jsconfuser-tool-entry":
+        options.jsConfuserToolEntry = String(argv[index + 1] || "").trim() || null;
+        index += 1;
         break;
       case "--skip-release-metadata":
         options.writeReleaseMetadata = false;
@@ -112,8 +147,32 @@ export function parsePackageArgs(argv = process.argv.slice(2)) {
     }
   }
 
+  if (options.descriptorBind && options.jsConfuserString) {
+    throw createScriptError("args", "--descriptor-bind cannot be combined with --jsconfuser-string", {
+      failedStage: "parse-args",
+      details: {
+        descriptorBind: true,
+        jsConfuserString: true,
+      },
+    });
+  }
+
+  if (!options.jsConfuserString && (options.jsConfuserToolPath || options.jsConfuserToolEntry)) {
+    throw createScriptError("args", "--jsconfuser-tool-path/--jsconfuser-tool-entry require --jsconfuser-string", {
+      failedStage: "parse-args",
+      details: {
+        jsConfuserToolPath: options.jsConfuserToolPath,
+        jsConfuserToolEntry: options.jsConfuserToolEntry,
+      },
+    });
+  }
+
   if (options.shieldBundle && !options.outputSuffix) {
-    options.outputSuffix = SHIELDED_PACKAGE_VARIANT;
+    options.outputSuffix = options.descriptorBind
+      ? SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT
+      : options.jsConfuserString
+        ? SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT
+        : SHIELDED_PACKAGE_VARIANT;
   }
 
   if (!options.outputSuffix && options.encryptBundle) {
@@ -134,6 +193,19 @@ export function parsePackageArgs(argv = process.argv.slice(2)) {
   }
 
   return options;
+}
+
+export function resolvePackageProtectedVariant(options = {}) {
+  if (options.descriptorBind) {
+    return SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT;
+  }
+  if (options.jsConfuserString) {
+    return SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT;
+  }
+  if (options.shieldBundle) {
+    return SHIELDED_PACKAGE_VARIANT;
+  }
+  return ENCRYPTED_PACKAGE_VARIANT;
 }
 
 function buildOutputName(config, options = {}) {
@@ -224,6 +296,24 @@ export function runNodeScript(scriptPath, failedStage, options = {}) {
   }
 }
 
+export function resolvePackageJSConfuserToolOptions(options = {}, env = process.env) {
+  const toolPath = String(
+    options.jsConfuserToolPath
+    || env[PACKAGE_JSCONFUSER_TOOL_PATH_ENV]
+    || "",
+  ).trim() || null;
+  const toolEntry = String(
+    options.jsConfuserToolEntry
+    || env[PACKAGE_JSCONFUSER_TOOL_ENTRY_ENV]
+    || "",
+  ).trim() || null;
+
+  return {
+    toolPath,
+    toolEntry,
+  };
+}
+
 export async function main(argv = process.argv.slice(2)) {
   await withBuildLock("package.mjs", async () => {
     const options = parsePackageArgs(argv);
@@ -243,6 +333,45 @@ export async function main(argv = process.argv.slice(2)) {
     let protectedBundleMeta = null;
     let obfuscatedBundleMeta = null;
     let obfuscatedLoaderMeta = null;
+    let jsConfuserTransformMeta = null;
+    const descriptorOverlay = options.descriptorBind
+      ? createCapabilityManifestDescriptorOverlay({ config })
+      : null;
+    if (options.jsConfuserString) {
+      const jsConfuserTool = resolvePackageJSConfuserToolOptions(options);
+      assertNonEmptyString(jsConfuserTool.toolPath, PACKAGE_JSCONFUSER_TOOL_PATH_ENV, {
+        category: "environment",
+        failedStage: "resolve-jsconfuser-tool",
+        details: {
+          envVar: PACKAGE_JSCONFUSER_TOOL_PATH_ENV,
+        },
+      });
+      const toolInfo = await ensureJSConfuserToolReady(jsConfuserTool.toolPath, jsConfuserTool.toolEntry);
+      const anchors = buildPackageProtectionAuditAnchors({
+        addonRef: config.addonRef,
+        addonVersion: config.addonVersion,
+      });
+      const profile = resolveJSConfuserPreflightProfile({
+        profile: "targeted-string-concealing",
+      }, anchors);
+      jsConfuserTransformMeta = await applyPackageProtectionJSConfuserTransform({
+        toolInfo,
+        bundlePath,
+        profile,
+      });
+      if (!jsConfuserTransformMeta.succeeded || !jsConfuserTransformMeta.syntaxCheckPassed) {
+        throw createScriptError("execution", "js-confuser targeted string transform failed", {
+          failedStage: "apply-jsconfuser-transform",
+          details: {
+            toolPath: toolInfo.toolPath,
+            toolEntry: toolInfo.entryRelativePath,
+            exitCode: jsConfuserTransformMeta.exitCode,
+            stderr: jsConfuserTransformMeta.stderr,
+            syntaxCheckStderr: jsConfuserTransformMeta.syntaxCheckStderr,
+          },
+        });
+      }
+    }
     if (options.shieldBundle) {
       obfuscatedBundleMeta = await obfuscateBuildBundle({
         bundlePath,
@@ -255,7 +384,8 @@ export async function main(argv = process.argv.slice(2)) {
         bundlePath,
         addonRef: config.addonRef,
         addonVersion: config.addonVersion,
-        variant: options.shieldBundle ? SHIELDED_PACKAGE_VARIANT : ENCRYPTED_PACKAGE_VARIANT,
+        variant: resolvePackageProtectedVariant(options),
+        descriptorOverlay,
       });
     }
 
@@ -309,6 +439,11 @@ export async function main(argv = process.argv.slice(2)) {
     if (protectedBundleMeta) {
       console.log(
         `Protected bundle applied: variant=${protectedBundleMeta.variant} sourceSHA256=${protectedBundleMeta.sourceSHA256}`,
+      );
+    }
+    if (jsConfuserTransformMeta) {
+      console.log(
+        `JS-Confuser transform applied: variant=${resolvePackageProtectedVariant(options)} apiShape=${jsConfuserTransformMeta.apiShape} growthRatio=${jsConfuserTransformMeta.growthRatio ?? "-"} outputBytes=${jsConfuserTransformMeta.outputBytes}`,
       );
     }
     if (obfuscatedLoaderMeta) {

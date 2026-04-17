@@ -30,8 +30,15 @@ function collectReferenceLinks(docPath) {
   return [...source.matchAll(/\((\.\.\/reference\/[^)]+)\)/g)].map((match) => match[1]);
 }
 
+function stripLinkFragment(referenceLink) {
+  return String(referenceLink || "").split("#")[0].split("?")[0];
+}
+
 function toProjectRelativeReferencePath(docPath, referenceLink) {
-  const absoluteTarget = path.resolve(path.dirname(path.resolve(docPath)), referenceLink);
+  const absoluteTarget = path.resolve(
+    path.dirname(path.resolve(docPath)),
+    stripLinkFragment(referenceLink),
+  );
   return normalizeSlashes(path.relative(path.resolve("."), absoluteTarget));
 }
 
@@ -169,7 +176,12 @@ describe("Docs Governance", () => {
         }
         if (hasLocalReferenceSnapshots) {
           assert.ok(
-            fs.existsSync(path.resolve(path.dirname(path.resolve(docPath)), referenceLink)),
+            fs.existsSync(
+              path.resolve(
+                path.dirname(path.resolve(docPath)),
+                stripLinkFragment(referenceLink),
+              ),
+            ),
             `${docPath} references missing local snapshot: ${referenceLink}`,
           );
         }

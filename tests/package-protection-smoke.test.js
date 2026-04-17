@@ -16,6 +16,21 @@ describe("Package Protection Smoke", () => {
     assert.equal(options.repeats, 3);
   });
 
+  it("should parse optional js-confuser tool args for the string experiment variant", () => {
+    const options = parsePackageProtectionSmokeArgs([
+      "--variant",
+      "shielded-jsconfuser-string",
+      "--jsconfuser-tool-path",
+      "/tmp/js-confuser",
+      "--jsconfuser-tool-entry",
+      "dist/index.js",
+    ]);
+
+    assert.equal(options.variant, "shielded-jsconfuser-string");
+    assert.equal(options.jsConfuserToolPath, "/tmp/js-confuser");
+    assert.equal(options.jsConfuserToolEntry, "dist/index.js");
+  });
+
   it("should reject missing variants and invalid repeat counts", () => {
     assert.throws(() => parsePackageProtectionSmokeArgs([]));
     assert.throws(() => parsePackageProtectionSmokeArgs(["--variant", "plain", "--repeats", "0"]));
@@ -31,6 +46,17 @@ describe("Package Protection Smoke", () => {
     assert.deepEqual(resolvePackageProtectionSmokePackageArgs("shielded"), [
       "--shield-bundle",
       "--skip-release-metadata",
+    ]);
+    assert.deepEqual(resolvePackageProtectionSmokePackageArgs("shielded-jsconfuser-string", {
+      jsConfuserToolPath: "/tmp/js-confuser",
+      jsConfuserToolEntry: "dist/index.js",
+    }), [
+      "--jsconfuser-string",
+      "--skip-release-metadata",
+      "--jsconfuser-tool-path",
+      "/tmp/js-confuser",
+      "--jsconfuser-tool-entry",
+      "dist/index.js",
     ]);
   });
 

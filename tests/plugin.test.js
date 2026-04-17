@@ -130,6 +130,8 @@ describe("Plugin", () => {
   let startupReady;
   let serviceState;
   let mainWindow;
+  let nonceTableCreated;
+  let nonceTableRows;
 
   beforeEach(() => {
     promptRegistrations = [];
@@ -149,6 +151,8 @@ describe("Plugin", () => {
     readerEventRegistrations = [];
     readerEventUnregistrations = [];
     debugLogs = [];
+    nonceTableCreated = false;
+    nonceTableRows = new Map();
     startupReady = {
       initialization: createDeferred(),
       unlock: createDeferred(),
@@ -193,6 +197,7 @@ describe("Plugin", () => {
     };
 
     globalThis.Zotero = {
+      version: "9.0.0",
       initializationPromise: startupReady.initialization.promise,
       unlockPromise: startupReady.unlock.promise,
       uiReadyPromise: startupReady.uiReady.promise,
@@ -220,6 +225,58 @@ describe("Plugin", () => {
         },
         unregisterEventListener(type, handler) {
           readerEventUnregistrations.push({ type, handler });
+        },
+      },
+      Profile: {
+        dir: "/Users/test/Library/Application Support/Zotero/Profiles/abcd1234.default-release",
+      },
+      DataDirectory: {
+        dir: "/Users/test/Zotero",
+      },
+      Schema: {
+        async getDBVersion(schema) {
+          return schema === "userdata" ? 126 : null;
+        },
+      },
+      DB: {
+        async tableExists() {
+          return nonceTableCreated;
+        },
+        async executeTransaction(fn) {
+          return fn();
+        },
+        async queryAsync(sql, params = []) {
+          const normalizedSQL = String(sql || "").trim();
+          if (normalizedSQL.startsWith("CREATE TABLE IF NOT EXISTS")) {
+            nonceTableCreated = true;
+            return [];
+          }
+          if (normalizedSQL.startsWith("INSERT INTO")) {
+            nonceTableCreated = true;
+            nonceTableRows.set(String(params[0]), {
+              nonce: String(params[1]),
+              createdAt: String(params[2]),
+              updatedAt: String(params[3]),
+            });
+            return [];
+          }
+          if (normalizedSQL.startsWith("UPDATE")) {
+            const current = nonceTableRows.get(String(params[2])) || {};
+            nonceTableRows.set(String(params[2]), {
+              ...current,
+              nonce: String(params[0]),
+              updatedAt: String(params[1]),
+            });
+            return [];
+          }
+          throw new Error(`Unexpected DB query: ${normalizedSQL}`);
+        },
+        async valueQueryAsync(sql, params = []) {
+          const normalizedSQL = String(sql || "").trim();
+          if (normalizedSQL.startsWith("SELECT nonce FROM")) {
+            return nonceTableRows.get(String(params[0]))?.nonce || null;
+          }
+          return null;
         },
       },
       Items: {
@@ -498,16 +555,48 @@ describe("Plugin", () => {
     assert.includes(notifierScenario.lastNotifierEvent, "item:refresh #88");
     const diagnostics = plugin.api.agent.collectDiagnostics();
     assert.includes(diagnostics.lastNotifierEvent, "#88");
-    assert.equal(diagnostics.serviceTotal, 3);
-    assert.equal(diagnostics.serviceHealthyCount, 2);
+    assert.equal(diagnostics.serviceTotal, 5);
+    assert.equal(diagnostics.serviceHealthyCount, 4);
     assert.equal(diagnostics.serviceUnhealthyCount, 0);
     assert.equal(diagnostics.serviceHealthOK, true);
+    assert.equal(diagnostics.hostBindingAvailable, true);
+    assert.equal(diagnostics.hostBindingProfileHashPresent, true);
+    assert.equal(diagnostics.hostBindingSchemaBucket, "120-129");
+    assert.equal(diagnostics.hostBindingZoteroVersionBucket, "9.x");
+    assert.equal(diagnostics.hostBindingDataDirHashPresent, true);
+    assert.equal(diagnostics.hostBindingDBAvailable, true);
+    assert.equal(diagnostics.hostBindingNoncePresent, true);
+    assert.equal(diagnostics.hostBindingNonceSource, "created");
+    assert.equal(diagnostics.hostBindingNonceHashPresent, true);
+    assert.equal(diagnostics.hostBindingStoreError, null);
+    assert.equal(diagnostics.capabilityManifestVariant, "source");
+    assert.equal(diagnostics.capabilityManifestProtectedView, false);
+    assert.equal(diagnostics.capabilityManifestDetailLevel, "full");
+    assert.equal(diagnostics.capabilityManifestLimitedMode, false);
+    assert.equal(diagnostics.capabilityManifestOverlayAvailable, false);
+    assert.equal(diagnostics.capabilityManifestOverlayApplied, false);
+    assert.equal(diagnostics.capabilityManifestActivationSatisfied, true);
+    assert.deepEqual(diagnostics.capabilityManifestActivationMissing, []);
     assert.ok(
       diagnostics.services.some((entry) => {
         return entry.id === "cleanroomtemplate.react-ui-demo"
           && entry.enabled === false
           && entry.status === "disabled"
           && entry.health?.status === "disabled";
+      }),
+    );
+    assert.ok(
+      diagnostics.services.some((entry) => {
+        return entry.id === "cleanroomtemplate.host-signals"
+          && entry.enabled === true
+          && entry.health?.status === "ready";
+      }),
+    );
+    assert.ok(
+      diagnostics.services.some((entry) => {
+        return entry.id === "cleanroomtemplate.host-nonce"
+          && entry.enabled === true
+          && entry.health?.status === "ready";
       }),
     );
     assert.equal(diagnostics.runtimeBridgeStatus, "healthy");
@@ -532,6 +621,15 @@ describe("Plugin", () => {
     const hostActionSnapshot = plugin.api.agent.runScenario("host-actions");
     assert.ok(hostActionSnapshot.total >= 9);
     assert.ok(hostActionSnapshot.actions.some((entry) => entry.id === "preferences.openPane"));
+    const protectionSummary = plugin.api.runtime.getPackageProtectionSummary();
+    assert.equal(protectionSummary.hostBinding.available, true);
+    assert.equal(protectionSummary.hostBinding.schemaBucket, "120-129");
+    assert.equal(protectionSummary.hostBinding.zoteroVersionBucket, "9.x");
+    assert.typeOf(protectionSummary.hostBinding.profileHash, "string");
+    assert.equal(protectionSummary.hostBinding.dbAvailable, true);
+    assert.equal(protectionSummary.hostBinding.noncePresent, true);
+    assert.equal(protectionSummary.hostBinding.nonceSource, "created");
+    assert.typeOf(protectionSummary.hostBinding.nonceHash, "string");
 
     await plugin.shutdown();
 

@@ -44,6 +44,7 @@ export const PACKAGE_PROTECTION_SMOKE_VARIANTS = Object.freeze([
   "plain",
   "encrypted",
   "shielded",
+  "shielded-jsconfuser-string",
 ]);
 
 export const MANUAL_SCORECARD_LEVELS = Object.freeze([
@@ -60,6 +61,12 @@ function normalizeVariant(variant) {
     : null;
 }
 
+function isShieldedLikeVariant(variant) {
+  const normalizedVariant = String(variant || "").trim().toLowerCase();
+  return normalizedVariant === "shielded"
+    || normalizedVariant === "shielded-jsconfuser-string";
+}
+
 function normalizePositiveInteger(value, fallback = 0) {
   const numeric = Number.parseInt(String(value || ""), 10);
   return Number.isInteger(numeric) && numeric > 0 ? numeric : fallback;
@@ -69,6 +76,8 @@ export function parsePackageProtectionSmokeArgs(argv = process.argv.slice(2)) {
   const options = {
     variant: null,
     channel: "stable",
+    jsConfuserToolEntry: null,
+    jsConfuserToolPath: null,
     repeats: 3,
   };
 
@@ -87,6 +96,14 @@ export function parsePackageProtectionSmokeArgs(argv = process.argv.slice(2)) {
         options.channel = String(argv[index + 1] || "").trim().toLowerCase() || "stable";
         index += 1;
         break;
+      case "--jsconfuser-tool-path":
+        options.jsConfuserToolPath = String(argv[index + 1] || "").trim() || null;
+        index += 1;
+        break;
+      case "--jsconfuser-tool-entry":
+        options.jsConfuserToolEntry = String(argv[index + 1] || "").trim() || null;
+        index += 1;
+        break;
       case "--repeats":
         options.repeats = normalizePositiveInteger(argv[index + 1], 0);
         index += 1;
@@ -101,7 +118,7 @@ export function parsePackageProtectionSmokeArgs(argv = process.argv.slice(2)) {
     }
   }
 
-  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded", {
+  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded|shielded-jsconfuser-string", {
     category: "args",
     failedStage: "parse-args",
   });
@@ -133,9 +150,9 @@ function buildChannelEnv(channel, env = process.env) {
   return nextEnv;
 }
 
-export function resolvePackageProtectionSmokePackageArgs(variant) {
+export function resolvePackageProtectionSmokePackageArgs(variant, options = {}) {
   const normalizedVariant = normalizeVariant(variant);
-  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded", {
+  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-jsconfuser-string", {
     category: "args",
     failedStage: "resolve-variant",
   });
@@ -146,12 +163,22 @@ export function resolvePackageProtectionSmokePackageArgs(variant) {
   if (normalizedVariant === "encrypted") {
     return ["--encrypt-bundle", "--skip-release-metadata"];
   }
+  if (normalizedVariant === "shielded-jsconfuser-string") {
+    const args = ["--jsconfuser-string", "--skip-release-metadata"];
+    if (options.jsConfuserToolPath) {
+      args.push("--jsconfuser-tool-path", String(options.jsConfuserToolPath));
+    }
+    if (options.jsConfuserToolEntry) {
+      args.push("--jsconfuser-tool-entry", String(options.jsConfuserToolEntry));
+    }
+    return args;
+  }
   return ["--shield-bundle", "--skip-release-metadata"];
 }
 
 function resolvePackageVariantOutputName(config, variant) {
   const normalizedVariant = normalizeVariant(variant);
-  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded", {
+  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-jsconfuser-string", {
     category: "args",
     failedStage: "resolve-variant",
   });
@@ -237,7 +264,7 @@ export function buildProtectionAutomationScorecard({ sourceCode, variant, config
     .filter(Boolean)
     .filter((value) => source.includes(value));
   const maxBase64LiteralLength = computeLongestBase64LiteralLength(source);
-  const loaderOptions = normalizedVariant === "shielded"
+  const loaderOptions = isShieldedLikeVariant(normalizedVariant)
     ? buildShieldedObfuscationOptions({ stage: SHIELDED_LOADER_OBFUSCATION_STAGE })
     : null;
   const hostileRuntimeDisabled = !loaderOptions || (
@@ -331,7 +358,10 @@ async function readBase64SupportProbe({ rdp }) {
 function packageVariant(projectRootPath, variant, env = process.env) {
   execFileSync(process.execPath, [
     "scripts/package.mjs",
-    ...resolvePackageProtectionSmokePackageArgs(variant),
+    ...resolvePackageProtectionSmokePackageArgs(variant, {
+      jsConfuserToolPath: env.CLEANROOM_PACKAGE_JSCONFUSER_TOOL_PATH,
+      jsConfuserToolEntry: env.CLEANROOM_PACKAGE_JSCONFUSER_TOOL_ENTRY,
+    }),
   ], {
     cwd: projectRootPath,
     stdio: "inherit",
@@ -755,7 +785,15 @@ export async function persistPackageProtectionSmokeReport(report, options = {}) 
 
 async function main(argv = process.argv.slice(2)) {
   const options = parsePackageProtectionSmokeArgs(argv);
-  const channelEnv = buildChannelEnv(options.channel);
+  const channelEnv = buildChannelEnv(options.channel, {
+    ...process.env,
+    ...(options.jsConfuserToolPath
+      ? { CLEANROOM_PACKAGE_JSCONFUSER_TOOL_PATH: options.jsConfuserToolPath }
+      : {}),
+    ...(options.jsConfuserToolEntry
+      ? { CLEANROOM_PACKAGE_JSCONFUSER_TOOL_ENTRY: options.jsConfuserToolEntry }
+      : {}),
+  });
 
   packageVariant(projectRoot, options.variant, channelEnv);
   const artifacts = await readVariantArtifacts(projectRoot, options.variant);

@@ -2,6 +2,7 @@ import { describe, it, assert } from "./test-framework.js";
 import {
   createCapabilityManifest,
   findCapabilityById,
+  getCapabilityManifestView,
   listCapabilityIds,
 } from "../src/app/capability-manifest.js";
 
@@ -47,5 +48,11 @@ describe("Capability Manifest", () => {
     assert.equal(hostActionsCapability.agentScenario, "host-actions");
     assert.includes(hostActionsCapability.zoteroScenarios, "preference pane surface smoke");
     assert.includes(hostActionsCapability.zoteroScenarios, "preference pane control interaction");
+
+    const view = getCapabilityManifestView();
+    assert.equal(view.manifestVariant, "source");
+    assert.equal(view.protectedView, false);
+    assert.equal(view.detailLevel, "full");
+    assert.equal(view.limitedMode, false);
   });
 });
