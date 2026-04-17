@@ -4,6 +4,7 @@
 > 更新时间：2026-04-17
 
 当前若需要看“整体保护导出路线接下来该怎么推进、优先 trim 哪一层”，请配合阅读 [PACKAGE_PROTECTION_ROUTE_PLAN.md](./PACKAGE_PROTECTION_ROUTE_PLAN.md)。
+如果需要统一“攻击者 + AI 组合能力”的评测标准，配合阅读 [PACKAGE_PROTECTION_ATTACK_GRADING.md](./PACKAGE_PROTECTION_ATTACK_GRADING.md)。
 
 ## 适用范围
 
@@ -19,6 +20,7 @@
 - `npm run package:protection:webcrack:score -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta>`
 - `npm run package:protection:inner:audit -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string|all> --channel <stable|beta>`
 - `npm run package:protection:score:llm -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta> --llm "<rating>"`
+- `npm run package:protection:score:guided -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta> --rating "<rating>" --result-tier <R0|R1|R2|R3|R4> --attacker-tier <A0|A1|A2|A3|A4> --ai-tier <M0|M1|M2|M3|M4> --attack-method <static-only|static+webcrack|static+reference|dynamic-hooked|runtime-rehosted> --time-bucket <<10m|10-30m|30-120m|>120m> --round-mode <single-pass|multi-round> --summary "<summary>"`
 - `npm run package:protection:compare -- --variant <shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta>`
 - `npm run package:protection:score -- --variant shielded --channel stable --webcrack "<rating>" --llm "<rating>"`
 - `npm run package:protection:verdict`
@@ -47,6 +49,10 @@
 - `dist/package-protection-webcrack/<variant>-<channel>.md`
 - `dist/package-protection-compare/<variant>-vs-shielded-<channel>.json`
 - `dist/package-protection-compare/<variant>-vs-shielded-<channel>.md`
+- `dist/package-protection-guided-attack/<variant>-<channel>.json`
+- `dist/package-protection-guided-attack/<variant>-<channel>.md`
+- `dist/package-protection-guided-attack.json`
+- `dist/package-protection-guided-attack.md`
 - `dist/package-protection-verdict.json`
 - `dist/package-protection-verdict.md`
 
@@ -57,6 +63,7 @@
 - `package:protection:inner:audit` 只补一份离线 `proxy LLM` 证据，不会写回 `manualScorecard`
 - `package:protection:compare` 在手工 `LLM single-pass` 尚未完成时，会把 `inner audit` 的 proxy 结果一起展示，帮助保持 A/B 结论可读；一旦手工 LLM 补齐，compare 才能正式落到 `runtime-only`、`hardening-win` 或 `leaning-same`
 - `package:protection:score` 仍负责补齐 `llmSinglePassResult`，不会被替代
+- `package:protection:score:guided` 只记录更强攻击画像，不写回 `manualScorecard`
 - `package:protection:jsconfuser:bootstrap` 负责把 `js-confuser` 安装到当前仓库默认可发现位置，解决实验链的本地工具可复跑性，不改默认 `shielded`
 
 ## 评分分层
@@ -69,25 +76,7 @@
   - `readable-module-recovery`
 - 内部实验层继续走 `package:protection:score:guided`，额外记录攻击画像，不拿来替代 verdict
 
-`guided attack` 当前固定记录 5 个维度：
-
-- `attackerTier`
-  - `A0 | A1 | A2 | A3 | A4`
-- `aiTier`
-  - `M0 | M1 | M2 | M3 | M4`
-- `attackMethod`
-  - `static-only | static+webcrack | static+reference | dynamic-hooked | runtime-rehosted`
-- `cost`
-  - `timeBucket = <10m | 10-30m | 30-120m | >120m`
-  - `roundMode = single-pass | multi-round`
-- `resultTier`
-  - `R0 | R1 | R2 | R3 | R4`
-
-其中：
-
-- `rating` 继续只负责对外三档结论
-- `resultTier` 只在内部实验层里表达“恢复到什么程度”，不直接改 verdict
-- 旧字段 `attackPath` / `costBucket` 当前只保留为兼容镜像；新记录优先读 `attackMethod` / `timeBucket` / `roundMode`
+字段、等级定义与“什么结果才足以支撑二次开发”的统一标准，固定以 [PACKAGE_PROTECTION_ATTACK_GRADING.md](./PACKAGE_PROTECTION_ATTACK_GRADING.md) 为准。
 
 ## 当前已验证结论
 

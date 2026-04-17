@@ -76,6 +76,7 @@ npm run package:protection:inner:audit:descriptor-bind -- --channel stable
 npm run package:protection:inner:audit:jsconfuser:string -- --channel stable
 npm run package:protection:score:llm -- --variant shielded-jsconfuser-string --channel stable --llm "parse-fail / only-loader"
 npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"
+npm run package:protection:score:guided -- --variant shielded --channel stable --rating "high-level-architecture" --result-tier R1 --attacker-tier A2 --ai-tier M3 --attack-method static+reference --time-bucket 30-120m --round-mode multi-round --summary "guided attack recovered lifecycle facade"
 npm run package:protection:verdict
 ```
 
@@ -235,6 +236,7 @@ npm run package:protection:verdict
 其中：
 
 - `package:protection:score` 只回填 `shielded stable` 的手工评分，不重新打包也不重跑 smoke
+- `package:protection:score:guided` 只记录更强的“攻击者 + AI 组合能力”证据，不会覆盖 `single-pass` 手工评分；等级定义见 [PACKAGE_PROTECTION_ATTACK_GRADING.md](./PACKAGE_PROTECTION_ATTACK_GRADING.md)
 - `package:protection:verdict` 只生成 `dist/package-protection-verdict.json` / `md` 的 advisory 结论，不进入默认 release gate
 - `package:protection:webcrack` 会在 fresh 打包后提取 XPI 内主脚本，调用本地 `webcrack` CLI，并额外保留一个 `--no-deobfuscate --no-unpack` 的 fallback loader-only 工件，供 controller / subagent / 人工继续判读
 - `package:protection:webcrack:score` 只把 `webcrack` 自动建议评级回填到 `manualScorecard.webcrackInitialResult`，不会自动补 `llmSinglePassResult`
