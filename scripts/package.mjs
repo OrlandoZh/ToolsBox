@@ -23,6 +23,7 @@ import {
 import {
   applyPackageProtectionJSConfuserTransform,
   ensureJSConfuserToolReady,
+  resolveJSConfuserToolSelection,
   resolveJSConfuserPreflightProfile,
 } from "./package-protection-jsconfuser-preflight.mjs";
 import {
@@ -339,14 +340,12 @@ export async function main(argv = process.argv.slice(2)) {
       : null;
     if (options.jsConfuserString) {
       const jsConfuserTool = resolvePackageJSConfuserToolOptions(options);
-      assertNonEmptyString(jsConfuserTool.toolPath, PACKAGE_JSCONFUSER_TOOL_PATH_ENV, {
-        category: "environment",
-        failedStage: "resolve-jsconfuser-tool",
-        details: {
-          envVar: PACKAGE_JSCONFUSER_TOOL_PATH_ENV,
-        },
+      const toolSelection = await resolveJSConfuserToolSelection({
+        toolPath: jsConfuserTool.toolPath,
+        toolEntry: jsConfuserTool.toolEntry,
+        projectRootPath: projectRoot,
       });
-      const toolInfo = await ensureJSConfuserToolReady(jsConfuserTool.toolPath, jsConfuserTool.toolEntry);
+      const toolInfo = await ensureJSConfuserToolReady(toolSelection.toolPath, toolSelection.toolEntry);
       const anchors = buildPackageProtectionAuditAnchors({
         addonRef: config.addonRef,
         addonVersion: config.addonVersion,

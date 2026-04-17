@@ -78,7 +78,7 @@ export function parsePackageProtectionManualScoreArgs(argv = process.argv.slice(
     }
   }
 
-  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded", {
+  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string", {
     category: "args",
     failedStage: "parse-args",
   });
@@ -105,7 +105,7 @@ export async function recordPackageProtectionManualScore(options = {}) {
   const webcrack = normalizeManualScorecardRating(options.webcrack);
   const llm = normalizeManualScorecardRating(options.llm);
 
-  assertScript(Boolean(variant), "variant must be one of plain|encrypted|shielded", {
+  assertScript(Boolean(variant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string", {
     category: "args",
     failedStage: "validate-options",
   });

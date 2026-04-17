@@ -840,6 +840,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(packageJSON.scripts["package:protection:smoke:plain"], "node scripts/package-protection-smoke.mjs --variant plain");
     assert.equal(packageJSON.scripts["package:protection:smoke:encrypted"], "node scripts/package-protection-smoke.mjs --variant encrypted");
     assert.equal(packageJSON.scripts["package:protection:smoke:shielded"], "node scripts/package-protection-smoke.mjs --variant shielded");
+    assert.equal(packageJSON.scripts["package:protection:smoke:shielded:descriptor-bind"], "node scripts/package-protection-smoke.mjs --variant shielded-descriptor-bind");
     assert.equal(packageJSON.scripts["package:protection:smoke:shielded:jsconfuser:string"], "node scripts/package-protection-smoke.mjs --variant shielded-jsconfuser-string");
     assert.equal(packageJSON.scripts["package:protection:webcrack"], "node scripts/package-protection-webcrack-audit.mjs");
     assert.equal(packageJSON.scripts["package:protection:webcrack:shielded"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded");
@@ -849,6 +850,9 @@ describe("Toolchain Scripts", () => {
     assert.equal(packageJSON.scripts["package:protection:audit"], "node scripts/package-protection-anchor-audit.mjs");
     assert.equal(packageJSON.scripts["package:protection:audit:descriptor-bind"], "node scripts/package-protection-anchor-audit.mjs --include-descriptor-bind");
     assert.equal(packageJSON.scripts["package:protection:audit:jsconfuser:string"], "node scripts/package-protection-anchor-audit.mjs --include-jsconfuser-string");
+    assert.equal(packageJSON.scripts["package:protection:compare"], "node scripts/package-protection-experiment-compare.mjs");
+    assert.equal(packageJSON.scripts["package:protection:compare:descriptor-bind"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-descriptor-bind");
+    assert.equal(packageJSON.scripts["package:protection:compare:jsconfuser:string"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-jsconfuser-string");
     assert.equal(packageJSON.scripts["package:protection:jsconfuser:preflight"], "node scripts/package-protection-jsconfuser-preflight.mjs");
     assert.equal(packageJSON.scripts["package:protection:jsconfuser:string:preflight"], "node scripts/package-protection-jsconfuser-preflight.mjs --profile targeted-string-concealing");
     assert.equal(packageJSON.scripts["package:protection:lightweight:preflight"], "node scripts/package-protection-lightweight-preflight.mjs");
@@ -1183,6 +1187,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(exportPackage.scripts["package:protection:smoke:plain"], "node scripts/package-protection-smoke.mjs --variant plain");
     assert.equal(exportPackage.scripts["package:protection:smoke:encrypted"], "node scripts/package-protection-smoke.mjs --variant encrypted");
     assert.equal(exportPackage.scripts["package:protection:smoke:shielded"], "node scripts/package-protection-smoke.mjs --variant shielded");
+    assert.equal(exportPackage.scripts["package:protection:smoke:shielded:descriptor-bind"], "node scripts/package-protection-smoke.mjs --variant shielded-descriptor-bind");
     assert.equal(exportPackage.scripts["package:protection:smoke:shielded:jsconfuser:string"], "node scripts/package-protection-smoke.mjs --variant shielded-jsconfuser-string");
     assert.equal(exportPackage.scripts["package:protection:webcrack"], "node scripts/package-protection-webcrack-audit.mjs");
     assert.equal(exportPackage.scripts["package:protection:webcrack:shielded"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded");
@@ -1192,6 +1197,9 @@ describe("Toolchain Scripts", () => {
     assert.equal(exportPackage.scripts["package:protection:audit"], "node scripts/package-protection-anchor-audit.mjs");
     assert.equal(exportPackage.scripts["package:protection:audit:descriptor-bind"], "node scripts/package-protection-anchor-audit.mjs --include-descriptor-bind");
     assert.equal(exportPackage.scripts["package:protection:audit:jsconfuser:string"], "node scripts/package-protection-anchor-audit.mjs --include-jsconfuser-string");
+    assert.equal(exportPackage.scripts["package:protection:compare"], "node scripts/package-protection-experiment-compare.mjs");
+    assert.equal(exportPackage.scripts["package:protection:compare:descriptor-bind"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-descriptor-bind");
+    assert.equal(exportPackage.scripts["package:protection:compare:jsconfuser:string"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-jsconfuser-string");
     assert.equal(exportPackage.scripts["package:protection:jsconfuser:preflight"], "node scripts/package-protection-jsconfuser-preflight.mjs");
     assert.equal(exportPackage.scripts["package:protection:jsconfuser:string:preflight"], "node scripts/package-protection-jsconfuser-preflight.mjs --profile targeted-string-concealing");
     assert.equal(exportPackage.scripts["package:protection:lightweight:preflight"], "node scripts/package-protection-lightweight-preflight.mjs");
@@ -1211,6 +1219,7 @@ describe("Toolchain Scripts", () => {
     assert.ok(exportReadme.includes("package:shielded"));
     assert.ok(exportReadme.includes("package:shielded:jsconfuser:string"));
     assert.ok(exportReadme.includes("package:protection:smoke"));
+    assert.ok(exportReadme.includes("package:protection:smoke:shielded:descriptor-bind"));
     assert.ok(exportReadme.includes("package:protection:smoke:shielded:jsconfuser:string"));
     assert.ok(exportReadme.includes("package:protection:webcrack:shielded"));
     assert.ok(exportReadme.includes("package:protection:webcrack:shielded:descriptor-bind"));
@@ -1219,6 +1228,8 @@ describe("Toolchain Scripts", () => {
     assert.ok(exportReadme.includes("package:protection:audit"));
     assert.ok(exportReadme.includes("package:protection:audit:descriptor-bind"));
     assert.ok(exportReadme.includes("package:protection:audit:jsconfuser:string"));
+    assert.ok(exportReadme.includes("package:protection:compare:descriptor-bind"));
+    assert.ok(exportReadme.includes("package:protection:compare:jsconfuser:string"));
     assert.ok(exportReadme.includes("package:protection:jsconfuser:preflight"));
     assert.ok(exportReadme.includes("package:protection:jsconfuser:string:preflight"));
     assert.ok(exportReadme.includes("package:protection:lightweight:preflight"));

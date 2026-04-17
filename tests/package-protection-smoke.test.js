@@ -16,6 +16,13 @@ describe("Package Protection Smoke", () => {
     assert.equal(options.repeats, 3);
   });
 
+  it("should accept descriptor-bind as an experimental smoke variant alias", () => {
+    const options = parsePackageProtectionSmokeArgs(["--variant", "descriptor-bind"]);
+
+    assert.equal(options.variant, "shielded-descriptor-bind");
+    assert.equal(options.channel, "stable");
+  });
+
   it("should parse optional js-confuser tool args for the string experiment variant", () => {
     const options = parsePackageProtectionSmokeArgs([
       "--variant",
@@ -45,6 +52,10 @@ describe("Package Protection Smoke", () => {
     ]);
     assert.deepEqual(resolvePackageProtectionSmokePackageArgs("shielded"), [
       "--shield-bundle",
+      "--skip-release-metadata",
+    ]);
+    assert.deepEqual(resolvePackageProtectionSmokePackageArgs("shielded-descriptor-bind"), [
+      "--descriptor-bind",
       "--skip-release-metadata",
     ]);
     assert.deepEqual(resolvePackageProtectionSmokePackageArgs("shielded-jsconfuser-string", {
@@ -91,6 +102,18 @@ describe("Package Protection Smoke", () => {
         {
           passed: true,
           readinessMode: "native",
+          hostBinding: {
+            available: true,
+            dbAvailable: true,
+            noncePresent: true,
+            nonceSource: "sqlite",
+          },
+          capabilityManifest: {
+            detailLevel: "limited",
+            overlayAvailable: false,
+            overlayApplied: false,
+            activationSatisfied: false,
+          },
           packageProtection: {
             decodeMethod: "fromBase64",
             decodeDurationMs: 120,
@@ -101,6 +124,18 @@ describe("Package Protection Smoke", () => {
         {
           passed: true,
           readinessMode: "native",
+          hostBinding: {
+            available: true,
+            dbAvailable: true,
+            noncePresent: true,
+            nonceSource: "sqlite",
+          },
+          capabilityManifest: {
+            detailLevel: "limited",
+            overlayAvailable: false,
+            overlayApplied: false,
+            activationSatisfied: false,
+          },
           packageProtection: {
             decodeMethod: "fromBase64",
             decodeDurationMs: 100,
@@ -118,6 +153,12 @@ describe("Package Protection Smoke", () => {
     assert.equal(report.medianDecodeDurationMs, 110);
     assert.equal(report.decodeMethods.fromBase64, 2);
     assert.equal(report.readinessModes.native, 2);
+    assert.equal(report.hostBindingAvailableCount, 2);
+    assert.equal(report.hostBindingDBAvailableCount, 2);
+    assert.equal(report.hostBindingNoncePresentCount, 2);
+    assert.equal(report.hostBindingNonceSources.sqlite, 2);
+    assert.equal(report.capabilityManifestDetailLevels.limited, 2);
+    assert.equal(report.capabilityManifestOverlayAvailableCount, 0);
     assert.equal(report.automatedScorecard.passed, true);
     assert.deepEqual(report.manualScorecard.allowedRatings, MANUAL_SCORECARD_LEVELS);
   });

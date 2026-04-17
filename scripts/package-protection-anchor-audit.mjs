@@ -21,6 +21,9 @@ import {
   readJSONFile,
   wrapScriptError,
 } from "./script-runtime-lib.mjs";
+import {
+  resolveJSConfuserToolSelection,
+} from "./package-protection-jsconfuser-preflight.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -483,17 +486,15 @@ async function buildVariantAudit({ projectRootPath, config, variant, anchors, op
     };
     if (variant === "jsconfuser-string") {
       const jsConfuserTool = resolveAuditJSConfuserToolOptions(options);
-      assertScript(Boolean(jsConfuserTool.toolPath), "--jsconfuser-tool-path is required for jsconfuser-string audit variant", {
-        category: "args",
-        failedStage: "build-variant",
-        details: {
-          variant,
-          envVar: PACKAGE_JSCONFUSER_TOOL_PATH_ENV,
-        },
+      const toolSelection = await resolveJSConfuserToolSelection({
+        toolPath: jsConfuserTool.toolPath,
+        toolEntry: jsConfuserTool.toolEntry,
+        projectRootPath,
+        env,
       });
-      env[PACKAGE_JSCONFUSER_TOOL_PATH_ENV] = jsConfuserTool.toolPath;
-      if (jsConfuserTool.toolEntry) {
-        env[PACKAGE_JSCONFUSER_TOOL_ENTRY_ENV] = jsConfuserTool.toolEntry;
+      env[PACKAGE_JSCONFUSER_TOOL_PATH_ENV] = toolSelection.toolPath;
+      if (toolSelection.toolEntry) {
+        env[PACKAGE_JSCONFUSER_TOOL_ENTRY_ENV] = toolSelection.toolEntry;
       }
     }
     execFileSync(process.execPath, args, {

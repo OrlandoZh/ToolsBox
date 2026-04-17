@@ -1,12 +1,19 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, it, assert } from "./test-framework.js";
 import {
+  buildJSConfuserDiscoveryRoots,
   buildJSConfuserAstScramblerProfile,
   buildJSConfuserTargetedStringConcealingProfile,
   buildJSConfuserSemanticDelta,
   buildPackageProtectionJSConfuserAttemptStatus,
+  discoverJSConfuserToolPath,
   parsePackageProtectionJSConfuserPreflightArgs,
+  resolveJSConfuserToolSelection,
   resolvePackageProtectionJSConfuserReportBasename,
   resolveJSConfuserPreflightProfile,
+  resolveNearestNodeModulesPath,
   resolveJSConfuserTargetAnchorNeedles,
   resolveJSConfuserEntryRelativePath,
   summarizePackageProtectionJSConfuserPreflight,
@@ -49,8 +56,74 @@ describe("Package Protection JS-Confuser Preflight", () => {
     assert.deepEqual(options.targetStrings, ["custom-token"]);
   });
 
-  it("should require a tool path", () => {
-    assert.throws(() => parsePackageProtectionJSConfuserPreflightArgs([]));
+  it("should allow omitted tool path so auto-discovery can run later", () => {
+    const options = parsePackageProtectionJSConfuserPreflightArgs([]);
+    assert.equal(options.toolPath, null);
+  });
+
+  it("should build stable discovery roots near the workspace and home", () => {
+    const roots = buildJSConfuserDiscoveryRoots({
+      projectRootPath: "/tmp/workspace/repo",
+      env: {
+        HOME: "/tmp/home",
+      },
+    });
+
+    assert.ok(roots.includes(path.resolve("/tmp/workspace/repo")));
+    assert.ok(roots.includes(path.resolve("/tmp/home/Downloads")));
+    assert.ok(roots.includes(path.resolve(os.tmpdir())));
+    assert.ok(roots.includes(path.resolve("/tmp")));
+  });
+
+  it("should resolve nearest reachable node_modules path", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "jsconfuser-node-modules-"));
+    const toolRoot = path.join(root, "node_modules", "js-confuser");
+    fs.mkdirSync(toolRoot, { recursive: true });
+
+    const resolved = await resolveNearestNodeModulesPath(toolRoot);
+    assert.equal(resolved, path.join(root, "node_modules"));
+  });
+
+  it("should discover a local js-confuser checkout from common roots", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "jsconfuser-discovery-"));
+    const checkoutRoot = path.join(root, "projects", "GitHub", "js-confuser");
+    fs.mkdirSync(path.join(checkoutRoot, "node_modules"), { recursive: true });
+    fs.writeFileSync(path.join(checkoutRoot, "package.json"), `${JSON.stringify({
+      name: "js-confuser",
+      version: "0.0.0-test",
+      main: "dist/index.js",
+    }, null, 2)}\n`, "utf-8");
+
+    const discovered = await discoverJSConfuserToolPath({
+      projectRootPath: path.join(root, "workspace", "repo"),
+      env: {
+        HOME: root,
+      },
+    });
+
+    assert.equal(discovered.toolPath, checkoutRoot);
+    assert.equal(discovered.discovered, true);
+  });
+
+  it("should fall back to auto-discovery when no explicit tool path is provided", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "jsconfuser-selection-"));
+    const checkoutRoot = path.join(root, ".openclaw", "workspace-coding", "projects", "GitHub", "js-confuser");
+    fs.mkdirSync(path.join(checkoutRoot, "node_modules"), { recursive: true });
+    fs.writeFileSync(path.join(checkoutRoot, "package.json"), `${JSON.stringify({
+      name: "js-confuser",
+      version: "0.0.0-test",
+      main: "dist/index.js",
+    }, null, 2)}\n`, "utf-8");
+
+    const selected = await resolveJSConfuserToolSelection({
+      projectRootPath: path.join(root, "workspace", "repo"),
+      env: {
+        HOME: root,
+      },
+    });
+
+    assert.equal(selected.toolPath, checkoutRoot);
+    assert.equal(selected.discovered, true);
   });
 
   it("should build the non-hostile astScrambler profile", () => {

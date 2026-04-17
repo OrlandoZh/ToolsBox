@@ -32,9 +32,26 @@ const scriptStartedAt = Date.now();
 const DEFAULT_REPORT_BASENAME = "package-protection-jsconfuser-preflight";
 const TARGETED_STRING_REPORT_BASENAME = "package-protection-jsconfuser-string-preflight";
 const SOURCE_PROXY_MODES = Object.freeze(["plain", "protected"]);
+const PACKAGE_JSCONFUSER_TOOL_PATH_ENV = "CLEANROOM_PACKAGE_JSCONFUSER_TOOL_PATH";
+const PACKAGE_JSCONFUSER_TOOL_ENTRY_ENV = "CLEANROOM_PACKAGE_JSCONFUSER_TOOL_ENTRY";
 const PREFLIGHT_PROFILES = Object.freeze([
   "ast-scrambler",
   "targeted-string-concealing",
+]);
+const DISCOVERY_SKIP_DIRS = new Set([
+  ".git",
+  ".idea",
+  ".next",
+  ".openclaw",
+  ".turbo",
+  ".yarn",
+  "build",
+  "coverage",
+  "dist",
+  "node_modules/.cache",
+  "obsidian",
+  "reference",
+  "tmp",
 ]);
 const DEFAULT_TARGETED_STRING_CONCEALING_ANCHOR_IDS = Object.freeze([
   "plugin-api-agent-surface",
@@ -257,12 +274,214 @@ export function parsePackageProtectionJSConfuserPreflightArgs(argv = process.arg
     }
   }
 
-  assertScript(Boolean(options.toolPath), "--tool-path is required", {
-    category: "args",
-    failedStage: "parse-args",
+  return options;
+}
+
+function normalizeUniqueAbsolutePaths(values = []) {
+  const seen = new Set();
+  const result = [];
+  for (const value of values) {
+    const normalized = String(value || "").trim();
+    if (!normalized) {
+      continue;
+    }
+    const absolutePath = path.resolve(normalized);
+    if (seen.has(absolutePath)) {
+      continue;
+    }
+    seen.add(absolutePath);
+    result.push(absolutePath);
+  }
+  return result;
+}
+
+export function buildJSConfuserDiscoveryRoots({ projectRootPath = projectRoot, env = process.env } = {}) {
+  const homePath = String(env?.HOME || os.homedir?.() || "").trim();
+  const tempPath = String(os.tmpdir?.() || "").trim();
+  return normalizeUniqueAbsolutePaths([
+    projectRootPath,
+    path.join(projectRootPath, ".."),
+    path.join(projectRootPath, "..", ".."),
+    path.join(projectRootPath, "..", "..", ".."),
+    homePath ? path.join(homePath, ".openclaw", "workspace-coding") : null,
+    homePath ? path.join(homePath, ".openclaw", "workspace-coding", "projects") : null,
+    homePath ? path.join(homePath, ".openclaw", "workspace-coding", "projects", "GitHub") : null,
+    homePath ? path.join(homePath, "Downloads") : null,
+    tempPath || null,
+    "/tmp",
+  ]);
+}
+
+async function isJSConfuserPackageRoot(targetPath) {
+  const packagePath = path.join(targetPath, "package.json");
+  const stats = await fs.stat(packagePath).catch(() => null);
+  if (!stats?.isFile()) {
+    return false;
+  }
+  try {
+    const packageJSON = await readJSONFile(packagePath, {
+      missingCategory: "environment",
+      invalidCategory: "validation",
+      failedStage: "read-tool-package",
+      label: "js-confuser package.json",
+    });
+    return String(packageJSON?.name || "").trim() === "js-confuser";
+  } catch {
+    return false;
+  }
+}
+
+export async function resolveNearestNodeModulesPath(toolPath) {
+  let current = path.resolve(toolPath);
+  while (true) {
+    if (path.basename(current) === "node_modules") {
+      return current;
+    }
+    const nestedNodeModulesPath = path.join(current, "node_modules");
+    const stats = await fs.stat(nestedNodeModulesPath).catch(() => null);
+    if (stats?.isDirectory()) {
+      return nestedNodeModulesPath;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) {
+      return null;
+    }
+    current = parent;
+  }
+}
+
+async function listJSConfuserCandidates(rootPath, maxDepth = 4) {
+  const stats = await fs.stat(rootPath).catch(() => null);
+  if (!stats?.isDirectory()) {
+    return [];
+  }
+
+  const queue = [{ dirPath: rootPath, depth: 0 }];
+  const seenDirs = new Set();
+  const seenCandidates = new Set();
+  const candidates = [];
+
+  while (queue.length > 0) {
+    const { dirPath, depth } = queue.shift();
+    const normalizedDirPath = path.resolve(dirPath);
+    if (seenDirs.has(normalizedDirPath)) {
+      continue;
+    }
+    seenDirs.add(normalizedDirPath);
+
+    const directCandidates = normalizeUniqueAbsolutePaths([
+      path.basename(normalizedDirPath) === "js-confuser" ? normalizedDirPath : null,
+      path.join(normalizedDirPath, "js-confuser"),
+      path.join(normalizedDirPath, "node_modules", "js-confuser"),
+    ]);
+    for (const candidate of directCandidates) {
+      if (seenCandidates.has(candidate)) {
+        continue;
+      }
+      seenCandidates.add(candidate);
+      candidates.push(candidate);
+    }
+
+    if (depth >= maxDepth) {
+      continue;
+    }
+
+    const entries = await fs.readdir(normalizedDirPath, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      if (!entry?.isDirectory?.()) {
+        continue;
+      }
+      if (entry.name === "." || entry.name === "..") {
+        continue;
+      }
+      if (DISCOVERY_SKIP_DIRS.has(entry.name)) {
+        continue;
+      }
+      queue.push({
+        dirPath: path.join(normalizedDirPath, entry.name),
+        depth: depth + 1,
+      });
+    }
+  }
+
+  return candidates;
+}
+
+export async function discoverJSConfuserToolPath({ projectRootPath = projectRoot, env = process.env } = {}) {
+  const searchedRoots = [];
+  for (const rootPath of buildJSConfuserDiscoveryRoots({ projectRootPath, env })) {
+    searchedRoots.push(rootPath);
+    const candidates = await listJSConfuserCandidates(rootPath);
+    for (const candidate of candidates) {
+      if (!await isJSConfuserPackageRoot(candidate)) {
+        continue;
+      }
+      const nodeModulesPath = await resolveNearestNodeModulesPath(candidate);
+      if (!nodeModulesPath) {
+        continue;
+      }
+      return {
+        toolPath: candidate,
+        nodeModulesPath,
+        searchedRoots,
+        discovered: true,
+      };
+    }
+  }
+
+  return {
+    toolPath: null,
+    nodeModulesPath: null,
+    searchedRoots,
+    discovered: false,
+  };
+}
+
+export async function resolveJSConfuserToolSelection({
+  toolPath = null,
+  toolEntry = null,
+  projectRootPath = projectRoot,
+  env = process.env,
+} = {}) {
+  const explicitToolPath = String(
+    toolPath
+    || env?.[PACKAGE_JSCONFUSER_TOOL_PATH_ENV]
+    || "",
+  ).trim() || null;
+  const explicitToolEntry = String(
+    toolEntry
+    || env?.[PACKAGE_JSCONFUSER_TOOL_ENTRY_ENV]
+    || "",
+  ).trim() || null;
+
+  if (explicitToolPath) {
+    return {
+      toolPath: explicitToolPath,
+      toolEntry: explicitToolEntry,
+      discovered: false,
+      searchedRoots: [],
+    };
+  }
+
+  const discovery = await discoverJSConfuserToolPath({
+    projectRootPath,
+    env,
+  });
+  assertScript(Boolean(discovery.toolPath), "unable to discover local js-confuser checkout; pass --tool-path or set CLEANROOM_PACKAGE_JSCONFUSER_TOOL_PATH", {
+    category: "environment",
+    failedStage: "resolve-jsconfuser-tool",
+    details: {
+      envVar: PACKAGE_JSCONFUSER_TOOL_PATH_ENV,
+      searchedRoots: discovery.searchedRoots,
+    },
   });
 
-  return options;
+  return {
+    toolPath: discovery.toolPath,
+    toolEntry: explicitToolEntry,
+    discovered: true,
+    searchedRoots: discovery.searchedRoots,
+  };
 }
 
 export function resolveJSConfuserTargetAnchorNeedles(anchorIds = [], anchors = []) {
@@ -385,11 +604,10 @@ async function resolveExistingEntryPath(toolPath, packageJSON, overrideEntry = n
 export async function ensureJSConfuserToolReady(toolPath, overrideEntry = null) {
   const resolvedToolPath = path.resolve(toolPath);
   const packagePath = path.join(resolvedToolPath, "package.json");
-  const nodeModulesPath = path.join(resolvedToolPath, "node_modules");
+  const nodeModulesPath = await resolveNearestNodeModulesPath(resolvedToolPath);
 
-  const [packageStats, nodeModulesStats] = await Promise.all([
+  const [packageStats] = await Promise.all([
     fs.stat(packagePath).catch(() => null),
-    fs.stat(nodeModulesPath).catch(() => null),
   ]);
 
   assertScript(Boolean(packageStats?.isFile()), "toolPath must contain package.json", {
@@ -399,7 +617,7 @@ export async function ensureJSConfuserToolReady(toolPath, overrideEntry = null) 
       packagePath,
     },
   });
-  assertScript(Boolean(nodeModulesStats?.isDirectory()), "toolPath must have installed dependencies in node_modules", {
+  assertScript(Boolean(nodeModulesPath), "toolPath must have reachable dependencies in node_modules", {
     category: "environment",
     failedStage: "validate-tool-path",
     details: {
@@ -906,7 +1124,12 @@ async function main(argv = process.argv.slice(2)) {
       },
     });
 
-    const toolInfo = await ensureJSConfuserToolReady(options.toolPath, options.toolEntry);
+    const toolSelection = await resolveJSConfuserToolSelection({
+      toolPath: options.toolPath,
+      toolEntry: options.toolEntry,
+      projectRootPath: projectRoot,
+    });
+    const toolInfo = await ensureJSConfuserToolReady(toolSelection.toolPath, toolSelection.toolEntry);
     const anchors = buildPackageProtectionAuditAnchors(config);
     const bundlePath = await ensureSourceProxyBundle({
       sourceProxyMode: options.sourceProxyMode,

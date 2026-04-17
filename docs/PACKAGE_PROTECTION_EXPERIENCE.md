@@ -1,7 +1,7 @@
 # Package Protection Experience
 
 > 历史经验页。这里只沉淀“手动受保护导出分支”在当前模板里已经验证过的经验，不定义 current truth。
-> 更新时间：2026-04-16
+> 更新时间：2026-04-17
 
 当前若需要看“整体保护导出路线接下来该怎么推进、优先 trim 哪一层”，请配合阅读 [PACKAGE_PROTECTION_ROUTE_PLAN.md](./PACKAGE_PROTECTION_ROUTE_PLAN.md)。
 
@@ -11,11 +11,12 @@
 
 - `npm run package:encrypted`
 - `npm run package:shielded`
-- `npm run package:protection:jsconfuser:preflight -- --tool-path /absolute/path/to/js-confuser`
+- `npm run package:protection:jsconfuser:preflight`
 - `npm run package:protection:lightweight:preflight -- --tool-path /absolute/path/to/lightweight-js-obfuscator`
-- `npm run package:protection:smoke -- --variant <plain|encrypted|shielded> --repeats 3 --channel <stable|beta>`
+- `npm run package:protection:smoke -- --variant <plain|encrypted|shielded|shielded-descriptor-bind> --repeats 3 --channel <stable|beta>`
 - `npm run package:protection:webcrack -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta>`
-- `npm run package:protection:webcrack:score -- --variant <shielded|shielded-jsconfuser-string> --channel <stable|beta>`
+- `npm run package:protection:webcrack:score -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta>`
+- `npm run package:protection:compare -- --variant <shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta>`
 - `npm run package:protection:score -- --variant shielded --channel stable --webcrack "<rating>" --llm "<rating>"`
 - `npm run package:protection:verdict`
 
@@ -36,6 +37,8 @@
 - `dist/package-protection-smoke.md`
 - `dist/package-protection-webcrack/<variant>-<channel>.json`
 - `dist/package-protection-webcrack/<variant>-<channel>.md`
+- `dist/package-protection-compare/<variant>-vs-shielded-<channel>.json`
+- `dist/package-protection-compare/<variant>-vs-shielded-<channel>.md`
 - `dist/package-protection-verdict.json`
 - `dist/package-protection-verdict.md`
 
@@ -283,6 +286,33 @@
 - 这说明即使 overlay 已真实存在，`webcrack` 首轮自动化输出也没有直接把 richer descriptor 语义翻成可复核的 inner semantic anchors
 - 因此 `descriptor-bind` 当前更像 runtime-aware 恢复路径，而不是一条能额外改善或恶化 raw/webcrack 静态表面的 hardening 变体
 
+截至 `2026-04-17`，当前这条线也已经补上真实的 Zotero runtime smoke，而不再只停留在打包与静态分析：
+
+- `package:protection:smoke:shielded:descriptor-bind -- --repeats 3 --channel stable` 已可直接生成本地工件
+- 当前真实结果是：
+  - `status = passed`
+  - `readinessModes = {"native":3}`
+  - `decodeMethod = fromBase64`
+  - `medianDecodeDurationMs = 22`
+  - `medianPrepareDurationMs = 86`
+  - `hostBindingAvailableCount = 3/3`
+  - `hostBindingDBAvailableCount = 3/3`
+  - `hostBindingNoncePresentCount = 3/3`
+  - `hostBindingNonceSources = {"created":3}`
+  - `capabilityManifestDetailLevels = {"full":3}`
+  - `capabilityManifestOverlayAvailableCount = 3/3`
+  - `capabilityManifestOverlayAppliedCount = 3/3`
+  - `capabilityManifestActivationSatisfiedCount = 3/3`
+- 这说明 `descriptor-bind` 当前已经不只是“overlay 密文存在”或“host binding 逻辑在单元测试中通过”，而是：
+  - 在真实 Zotero runtime 中已能回读 `profileHash / dbAvailable / noncePresent`
+  - 能把 capability manifest 从 protected limited 视图推进到 `detailLevel = full`
+  - 能在不引入启动阻断的前提下，让 overlay 真正进入运行态
+
+因此这条线当前更精确的 retained decision 可以再补一条：
+
+- `shielded-descriptor-bind` 已经证明 runtime semantic recovery 链路可用
+- 但它的价值仍主要落在“运行时按需恢复 richer descriptor”，而不是“进一步压低 raw/webcrack 首轮静态可读性”
+
 修复后的外部 `webcrack + GPT-5.4` 复核也进一步确认了这一点：
 
 - AI 现在已经能稳定识别：
@@ -511,17 +541,21 @@ npm run package:protection:jsconfuser:string:preflight -- --tool-path /absolute/
 当前仓库内现已补齐对应的显式手动实验入口：
 
 ```bash
-npm run package:shielded:jsconfuser:string -- --jsconfuser-tool-path /absolute/path/to/js-confuser
-npm run package:protection:smoke:shielded:jsconfuser:string -- --repeats 3 --channel stable --jsconfuser-tool-path /absolute/path/to/js-confuser
-npm run package:protection:audit:jsconfuser:string -- --jsconfuser-tool-path /absolute/path/to/js-confuser
+npm run package:shielded:jsconfuser:string
+npm run package:protection:smoke:shielded:jsconfuser:string -- --repeats 3 --channel stable
+npm run package:protection:audit:jsconfuser:string
+npm run package:protection:compare:jsconfuser:string -- --channel stable
 ```
+
+如果本地自动发现 `js-confuser` 失败，再对前三条命令补 `--jsconfuser-tool-path`，或对 preflight 补 `--tool-path`。
 
 这两条命令的语义固定为：
 
 - 第一条只生成新的 `shielded-jsconfuser-string` 本地实验 XPI
 - 第二条只对这个实验变体做 Zotero 安装态 / 启动态 smoke A/B
 - 第三条只把它作为额外实验变体并入同一份 raw export 审计报告
-- 三者都不替代当前正式收口链里的 `shielded stable`
+- 第四条只把 `shielded` 基线和 `jsconfuser-string` 当前证据收口成一份 A/B compare 报告
+- 四者都不替代当前正式收口链里的 `shielded stable`
 
 当前更稳的下一步不是直接并入主线，而是：
 

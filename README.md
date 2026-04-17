@@ -70,15 +70,17 @@
 4.1. 如需手动触发受保护导出分支，运行 `npm run package:encrypted` 生成 `dist/<addonRef>-<addonVersion>-encrypted.xpi`
 4.2. 如需进一步提高自动化工具与 AI 的直读门槛，运行 `npm run package:shielded` 生成 `dist/<addonRef>-<addonVersion>-shielded.xpi`
 4.3. 如需正式对比 `plain / encrypted / shielded` 三个控制组的安装态、`packageProtection` 时序和 base64 fast path 支持，运行 `npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable`
+4.3.1. 如需对 `shielded-descriptor-bind` 做真实 Zotero runtime smoke，并回读 host binding / capability manifest overlay 状态，运行 `npm run package:protection:smoke:shielded:descriptor-bind -- --repeats 3 --channel stable`
 4.4. 如需审计当前导出物 raw 表面还泄露了多少高层语义锚点，运行 `npm run package:protection:audit`
 4.4.1. 如需把 `shielded-descriptor-bind` 作为额外实验变体并入同一份 raw export 审计报告，运行 `npm run package:protection:audit:descriptor-bind`
-4.4.2. 如需把 `shielded-jsconfuser-string` 作为额外实验变体并入同一份 raw export 审计报告，运行 `npm run package:protection:audit:jsconfuser:string -- --jsconfuser-tool-path /absolute/path/to/js-confuser`
-4.5. 如需预检 `JS-Confuser` 的 `astScrambler` 非 hostile 子集，运行 `npm run package:protection:jsconfuser:preflight -- --tool-path /absolute/path/to/js-confuser`
-4.6. 如需预检 `JS-Confuser` 的小范围 `stringConcealing` 候选，运行 `npm run package:protection:jsconfuser:string:preflight -- --tool-path /absolute/path/to/js-confuser`
-4.7. 如需在现有 `shielded` 基础上额外叠一层 `JS-Confuser` 的 targeted `stringConcealing`，运行 `npm run package:shielded:jsconfuser:string -- --jsconfuser-tool-path /absolute/path/to/js-confuser`
-4.7.1. 如需对这个实验变体直接做 Zotero smoke A/B，运行 `npm run package:protection:smoke:shielded:jsconfuser:string -- --repeats 3 --channel stable --jsconfuser-tool-path /absolute/path/to/js-confuser`
-4.7.2. 如需 fresh 打包后直接调用本地 `webcrack` 生成自动化工件，运行 `npm run package:protection:webcrack:shielded -- --channel stable`，或对实验变体运行 `npm run package:protection:webcrack:shielded:descriptor-bind -- --channel stable`、`npm run package:protection:webcrack:shielded:jsconfuser:string -- --channel stable --jsconfuser-tool-path /absolute/path/to/js-confuser`
+4.4.2. 如需把 `shielded-jsconfuser-string` 作为额外实验变体并入同一份 raw export 审计报告，运行 `npm run package:protection:audit:jsconfuser:string`；若本地自动发现 `js-confuser` 失败，再补 `-- --jsconfuser-tool-path /absolute/path/to/js-confuser`
+4.5. 如需预检 `JS-Confuser` 的 `astScrambler` 非 hostile 子集，运行 `npm run package:protection:jsconfuser:preflight`；若自动发现失败，再补 `-- --tool-path /absolute/path/to/js-confuser`
+4.6. 如需预检 `JS-Confuser` 的小范围 `stringConcealing` 候选，运行 `npm run package:protection:jsconfuser:string:preflight`；若自动发现失败，再补 `-- --tool-path /absolute/path/to/js-confuser`
+4.7. 如需在现有 `shielded` 基础上额外叠一层 `JS-Confuser` 的 targeted `stringConcealing`，运行 `npm run package:shielded:jsconfuser:string`；若自动发现失败，再补 `-- --jsconfuser-tool-path /absolute/path/to/js-confuser`
+4.7.1. 如需对这个实验变体直接做 Zotero smoke A/B，运行 `npm run package:protection:smoke:shielded:jsconfuser:string -- --repeats 3 --channel stable`；若自动发现失败，再补 `--jsconfuser-tool-path`
+4.7.2. 如需 fresh 打包后直接调用本地 `webcrack` 生成自动化工件，运行 `npm run package:protection:webcrack:shielded -- --channel stable`，或对实验变体运行 `npm run package:protection:webcrack:shielded:descriptor-bind -- --channel stable`、`npm run package:protection:webcrack:shielded:jsconfuser:string -- --channel stable`
 4.7.3. 如需把 `webcrack` 自动建议评级回填到 smoke report 的 `manualScorecard.webcrackInitialResult`，运行 `npm run package:protection:webcrack:score -- --variant shielded --channel stable`
+4.7.4. 如需把 `shielded` 基线和某个实验变体的 smoke / webcrack / audit / 手工 LLM 状态收口成一份 A/B 报告，运行 `npm run package:protection:compare:descriptor-bind -- --channel stable` 或 `npm run package:protection:compare:jsconfuser:string -- --channel stable`
 4.8. 如需回填 `shielded stable` 的手工评分，运行 `npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"`
 4.9. 如需生成当前手动实验链的 advisory 结论，运行 `npm run package:protection:verdict`
 5. 在 Zotero 中通过 “Install Add-on From File” 安装 `dist/<addonRef>-<addonVersion>.xpi`
@@ -279,18 +281,21 @@ npm run build    # 构建：生成 manifest/prefs/bootstrap，打包源码
 npm run package  # 打包：创建 .xpi 发布包
 npm run package:encrypted # 手动导出受保护 XPI 分支（默认不写 release metadata）
 npm run package:shielded # 手动导出 shielded XPI 分支（主 bundle 混淆 + loader-lite 硬化 + AES 包装）
-npm run package:shielded:jsconfuser:string -- --jsconfuser-tool-path /absolute/path/to/js-confuser # 在 shielded 基础上额外跑 targeted stringConcealing
+npm run package:shielded:jsconfuser:string # 在 shielded 基础上额外跑 targeted stringConcealing；如自动发现失败，再补 -- --jsconfuser-tool-path /absolute/path/to/js-confuser
 npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable # 手动实验 plain/encrypted/shielded 控制组的安装态与 packageProtection 报告
-npm run package:protection:smoke:shielded:jsconfuser:string -- --repeats 3 --channel stable --jsconfuser-tool-path /absolute/path/to/js-confuser # 对 stringConcealing 实验变体做 Zotero smoke A/B
+npm run package:protection:smoke:shielded:descriptor-bind -- --repeats 3 --channel stable # 对 descriptor-bind 实验变体做 Zotero runtime smoke，并回读 host binding / overlay 状态
+npm run package:protection:smoke:shielded:jsconfuser:string -- --repeats 3 --channel stable # 对 stringConcealing 实验变体做 Zotero smoke A/B；如自动发现失败，再补 --jsconfuser-tool-path
 npm run package:protection:webcrack:shielded -- --channel stable # fresh 打包 shielded 后调用本地 webcrack，生成默认首轮 + fallback loader-only 工件
 npm run package:protection:webcrack:shielded:descriptor-bind -- --channel stable # 对 descriptor-bind 实验变体生成同类 webcrack 工件
-npm run package:protection:webcrack:shielded:jsconfuser:string -- --channel stable --jsconfuser-tool-path /absolute/path/to/js-confuser # 对 stringConcealing 实验变体生成同类 webcrack 工件
+npm run package:protection:webcrack:shielded:jsconfuser:string -- --channel stable # 对 stringConcealing 实验变体生成同类 webcrack 工件；如自动发现失败，再补 --jsconfuser-tool-path
 npm run package:protection:webcrack:score -- --variant shielded --channel stable # 只回填 webcrack 半边评分，LLM 半边仍待人工或 controller 补齐
 npm run package:protection:audit # 审计 plain / encrypted / shielded 三个基线变体的 raw 导出物高层语义锚点
 npm run package:protection:audit:descriptor-bind # 在同一份审计报告里额外挂入 shielded-descriptor-bind 实验变体
-npm run package:protection:audit:jsconfuser:string -- --jsconfuser-tool-path /absolute/path/to/js-confuser # 在同一份审计报告里额外挂入 shielded-jsconfuser-string 实验变体
-npm run package:protection:jsconfuser:preflight -- --tool-path /absolute/path/to/js-confuser # 预检 JS-Confuser astScrambler 非 hostile 子集的兼容性/体积/语义压缩
-npm run package:protection:jsconfuser:string:preflight -- --tool-path /absolute/path/to/js-confuser # 预检 JS-Confuser 小范围 stringConcealing 的兼容性/体积/语义压缩
+npm run package:protection:audit:jsconfuser:string # 在同一份审计报告里额外挂入 shielded-jsconfuser-string 实验变体；如自动发现失败，再补 -- --jsconfuser-tool-path /absolute/path/to/js-confuser
+npm run package:protection:compare:descriptor-bind -- --channel stable # 把 shielded vs descriptor-bind 的 smoke/webcrack/audit 收成一份 A/B compare
+npm run package:protection:compare:jsconfuser:string -- --channel stable # 把 shielded vs jsconfuser-string 的 smoke/webcrack/audit/LLM 状态收成一份 A/B compare
+npm run package:protection:jsconfuser:preflight # 预检 JS-Confuser astScrambler 非 hostile 子集的兼容性/体积/语义压缩；如自动发现失败，再补 -- --tool-path /absolute/path/to/js-confuser
+npm run package:protection:jsconfuser:string:preflight # 预检 JS-Confuser 小范围 stringConcealing 的兼容性/体积/语义压缩；如自动发现失败，再补 -- --tool-path /absolute/path/to/js-confuser
 npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture" # 回填 shielded stable 的手工评分
 npm run package:protection:verdict # 生成当前受保护打包链的 advisory verdict
 npm run release:metadata # 生成 dist/update.json 与 release-manifest.json

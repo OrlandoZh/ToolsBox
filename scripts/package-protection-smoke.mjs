@@ -44,6 +44,7 @@ export const PACKAGE_PROTECTION_SMOKE_VARIANTS = Object.freeze([
   "plain",
   "encrypted",
   "shielded",
+  "shielded-descriptor-bind",
   "shielded-jsconfuser-string",
 ]);
 
@@ -56,6 +57,9 @@ const MANUAL_SCORECARD_LEVEL_SET = new Set(MANUAL_SCORECARD_LEVELS);
 
 function normalizeVariant(variant) {
   const normalized = String(variant || "").trim().toLowerCase();
+  if (normalized === "descriptor-bind") {
+    return "shielded-descriptor-bind";
+  }
   return PACKAGE_PROTECTION_SMOKE_VARIANTS.includes(normalized)
     ? normalized
     : null;
@@ -64,6 +68,7 @@ function normalizeVariant(variant) {
 function isShieldedLikeVariant(variant) {
   const normalizedVariant = String(variant || "").trim().toLowerCase();
   return normalizedVariant === "shielded"
+    || normalizedVariant === "shielded-descriptor-bind"
     || normalizedVariant === "shielded-jsconfuser-string";
 }
 
@@ -118,7 +123,7 @@ export function parsePackageProtectionSmokeArgs(argv = process.argv.slice(2)) {
     }
   }
 
-  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded|shielded-jsconfuser-string", {
+  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string", {
     category: "args",
     failedStage: "parse-args",
   });
@@ -152,7 +157,7 @@ function buildChannelEnv(channel, env = process.env) {
 
 export function resolvePackageProtectionSmokePackageArgs(variant, options = {}) {
   const normalizedVariant = normalizeVariant(variant);
-  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-jsconfuser-string", {
+  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string", {
     category: "args",
     failedStage: "resolve-variant",
   });
@@ -162,6 +167,9 @@ export function resolvePackageProtectionSmokePackageArgs(variant, options = {}) 
   }
   if (normalizedVariant === "encrypted") {
     return ["--encrypt-bundle", "--skip-release-metadata"];
+  }
+  if (normalizedVariant === "shielded-descriptor-bind") {
+    return ["--descriptor-bind", "--skip-release-metadata"];
   }
   if (normalizedVariant === "shielded-jsconfuser-string") {
     const args = ["--jsconfuser-string", "--skip-release-metadata"];
@@ -178,7 +186,7 @@ export function resolvePackageProtectionSmokePackageArgs(variant, options = {}) 
 
 function resolvePackageVariantOutputName(config, variant) {
   const normalizedVariant = normalizeVariant(variant);
-  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-jsconfuser-string", {
+  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string", {
     category: "args",
     failedStage: "resolve-variant",
   });
@@ -339,6 +347,16 @@ async function readPackageProtectionSummary({ rdp, config }) {
   return typeof raw === "string" ? JSON.parse(raw) : raw;
 }
 
+async function readAgentSelfCheck({ rdp, config }) {
+  const raw = await rdp.evaluateInChrome(`(() => {
+    const plugin = Zotero[${JSON.stringify(config.instanceKey)}];
+    const summary = plugin?.api?.runAgentSelfCheck?.() || null;
+    return JSON.stringify(summary);
+  })()`);
+
+  return typeof raw === "string" ? JSON.parse(raw) : raw;
+}
+
 async function readBase64SupportProbe({ rdp }) {
   const raw = await rdp.evaluateInChrome(`(() => JSON.stringify((() => {
     const typedArray = typeof Uint8Array === "function" ? Uint8Array : null;
@@ -367,6 +385,87 @@ function packageVariant(projectRootPath, variant, env = process.env) {
     stdio: "inherit",
     env,
   });
+}
+
+function normalizeHostBindingProbe({ packageProtection = null, selfCheck = null } = {}) {
+  const hostBinding = packageProtection?.hostBinding && typeof packageProtection.hostBinding === "object"
+    ? packageProtection.hostBinding
+    : null;
+  return {
+    available: Boolean(
+      hostBinding?.available === true
+      || selfCheck?.hostBindingAvailable === true
+    ),
+    profileHashPresent: Boolean(
+      (typeof hostBinding?.profileHash === "string" && hostBinding.profileHash.trim())
+      || selfCheck?.hostBindingProfileHashPresent === true
+    ),
+    schemaBucket: typeof hostBinding?.schemaBucket === "string" && hostBinding.schemaBucket.trim()
+      ? hostBinding.schemaBucket.trim()
+      : (typeof selfCheck?.hostBindingSchemaBucket === "string" && selfCheck.hostBindingSchemaBucket.trim()
+          ? selfCheck.hostBindingSchemaBucket.trim()
+          : null),
+    zoteroVersionBucket: typeof hostBinding?.zoteroVersionBucket === "string" && hostBinding.zoteroVersionBucket.trim()
+      ? hostBinding.zoteroVersionBucket.trim()
+      : (typeof selfCheck?.hostBindingZoteroVersionBucket === "string" && selfCheck.hostBindingZoteroVersionBucket.trim()
+          ? selfCheck.hostBindingZoteroVersionBucket.trim()
+          : null),
+    profileBasenameBucket: typeof hostBinding?.profileBasenameBucket === "string" && hostBinding.profileBasenameBucket.trim()
+      ? hostBinding.profileBasenameBucket.trim()
+      : (typeof selfCheck?.hostBindingProfileBasenameBucket === "string" && selfCheck.hostBindingProfileBasenameBucket.trim()
+          ? selfCheck.hostBindingProfileBasenameBucket.trim()
+          : null),
+    dataDirHashPresent: Boolean(
+      (typeof hostBinding?.dataDirHash === "string" && hostBinding.dataDirHash.trim())
+      || selfCheck?.hostBindingDataDirHashPresent === true
+    ),
+    dbAvailable: Boolean(
+      hostBinding?.dbAvailable === true
+      || selfCheck?.hostBindingDBAvailable === true
+    ),
+    noncePresent: Boolean(
+      hostBinding?.noncePresent === true
+      || selfCheck?.hostBindingNoncePresent === true
+    ),
+    nonceSource: typeof hostBinding?.nonceSource === "string" && hostBinding.nonceSource.trim()
+      ? hostBinding.nonceSource.trim()
+      : (typeof selfCheck?.hostBindingNonceSource === "string" && selfCheck.hostBindingNonceSource.trim()
+          ? selfCheck.hostBindingNonceSource.trim()
+          : "unavailable"),
+    nonceHashPresent: Boolean(
+      (typeof hostBinding?.nonceHash === "string" && hostBinding.nonceHash.trim())
+      || selfCheck?.hostBindingNonceHashPresent === true
+    ),
+    collectionError: typeof hostBinding?.collectionError === "string" && hostBinding.collectionError.trim()
+      ? hostBinding.collectionError.trim()
+      : (typeof selfCheck?.hostBindingCollectionError === "string" && selfCheck.hostBindingCollectionError.trim()
+          ? selfCheck.hostBindingCollectionError.trim()
+          : null),
+    storeError: typeof hostBinding?.storeError === "string" && hostBinding.storeError.trim()
+      ? hostBinding.storeError.trim()
+      : (typeof selfCheck?.hostBindingStoreError === "string" && selfCheck.hostBindingStoreError.trim()
+          ? selfCheck.hostBindingStoreError.trim()
+          : null),
+  };
+}
+
+function normalizeCapabilityManifestProbe(selfCheck = null) {
+  return {
+    variant: typeof selfCheck?.capabilityManifestVariant === "string" && selfCheck.capabilityManifestVariant.trim()
+      ? selfCheck.capabilityManifestVariant.trim()
+      : "source",
+    protectedView: Boolean(selfCheck?.capabilityManifestProtectedView),
+    detailLevel: typeof selfCheck?.capabilityManifestDetailLevel === "string" && selfCheck.capabilityManifestDetailLevel.trim()
+      ? selfCheck.capabilityManifestDetailLevel.trim()
+      : "full",
+    limitedMode: Boolean(selfCheck?.capabilityManifestLimitedMode),
+    overlayAvailable: Boolean(selfCheck?.capabilityManifestOverlayAvailable),
+    overlayApplied: Boolean(selfCheck?.capabilityManifestOverlayApplied),
+    activationSatisfied: Boolean(selfCheck?.capabilityManifestActivationSatisfied),
+    activationMissing: Array.isArray(selfCheck?.capabilityManifestActivationMissing)
+      ? selfCheck.capabilityManifestActivationMissing.map((item) => String(item || "").trim()).filter(Boolean)
+      : [],
+  };
 }
 
 async function readVariantArtifacts(projectRootPath, variant) {
@@ -485,9 +584,14 @@ async function runSingleSmokeIteration({
       fromBase64Available: false,
       setFromBase64Available: false,
     }));
+    const selfCheck = readiness
+      ? await readAgentSelfCheck({ rdp, config }).catch(() => null)
+      : null;
     const packageProtection = readiness
       ? await readPackageProtectionSummary({ rdp, config }).catch(() => null)
       : null;
+    const hostBinding = normalizeHostBindingProbe({ packageProtection, selfCheck });
+    const capabilityManifest = normalizeCapabilityManifestProbe(selfCheck);
     const runtimeLogs = await readCapturedLogs(rdp).catch(() => null);
     const runtimeErrorSummary = classifyReleaseInstallSmokeRuntimeErrors(runtimeLogs, processLogs);
     const expectedProtectionActive = variant !== "plain";
@@ -510,6 +614,32 @@ async function runSingleSmokeIteration({
     }
     if (expectedProtectionActive && protectionVariant !== variant) {
       issues.push(`受保护包回读 variant 不匹配：expected=${variant} actual=${protectionVariant || "-"}`);
+    }
+    if (expectedProtectionActive && capabilityManifest.protectedView !== true) {
+      issues.push(`受保护包未回读到 protected capability manifest：${variant}`);
+    }
+    if (variant === "shielded-descriptor-bind") {
+      if (!hostBinding.profileHashPresent) {
+        issues.push("descriptor-bind 未回读到 hostBinding.profileHash。");
+      }
+      if (!hostBinding.dbAvailable) {
+        issues.push("descriptor-bind 未回读到 hostBinding.dbAvailable=true。");
+      }
+      if (!hostBinding.noncePresent) {
+        issues.push("descriptor-bind 未回读到 hostBinding.noncePresent=true。");
+      }
+      if (!capabilityManifest.overlayAvailable) {
+        issues.push("descriptor-bind 未回读到 capabilityManifest.overlayAvailable=true。");
+      }
+      if (!capabilityManifest.overlayApplied) {
+        issues.push("descriptor-bind 未回读到 capabilityManifest.overlayApplied=true。");
+      }
+      if (!capabilityManifest.activationSatisfied) {
+        issues.push(`descriptor-bind activation 未满足：${capabilityManifest.activationMissing.join(",") || "-"}`);
+      }
+      if (capabilityManifest.detailLevel !== "full") {
+        issues.push(`descriptor-bind capability manifest detailLevel 异常：${capabilityManifest.detailLevel}`);
+      }
     }
 
     const passed = issues.length === 0;
@@ -553,6 +683,8 @@ async function runSingleSmokeIteration({
           bootstrapCallCount: Number(packageProtection.bootstrapCallCount || 0),
         }
         : null,
+      hostBinding,
+      capabilityManifest,
       runtimeLogs,
       blockingRuntimeErrorCount: runtimeErrorSummary.blockingRuntimeErrorCount,
       hostNoiseErrorCount: runtimeErrorSummary.hostNoiseErrorCount,
@@ -581,6 +713,18 @@ function buildInvocationSummary({ variant, channel, repeats, xpi, bundle, runs, 
   const resolveDurations = runList.map((run) => Number(run?.packageProtection?.bootstrapResolveDurationMs || 0));
   const decodeMethods = countByString(runList.map((run) => run?.packageProtection?.decodeMethod || ""));
   const readinessModes = countByString(runList.map((run) => run?.readinessMode || ""));
+  const capabilityManifestDetailLevels = countByString(
+    runList.map((run) => run?.capabilityManifest?.detailLevel || ""),
+  );
+  const hostBindingNonceSources = countByString(
+    runList.map((run) => run?.hostBinding?.nonceSource || ""),
+  );
+  const hostBindingAvailableCount = runList.filter((run) => run?.hostBinding?.available === true).length;
+  const hostBindingDBAvailableCount = runList.filter((run) => run?.hostBinding?.dbAvailable === true).length;
+  const hostBindingNoncePresentCount = runList.filter((run) => run?.hostBinding?.noncePresent === true).length;
+  const capabilityManifestOverlayAvailableCount = runList.filter((run) => run?.capabilityManifest?.overlayAvailable === true).length;
+  const capabilityManifestOverlayAppliedCount = runList.filter((run) => run?.capabilityManifest?.overlayApplied === true).length;
+  const capabilityManifestActivationSatisfiedCount = runList.filter((run) => run?.capabilityManifest?.activationSatisfied === true).length;
   const status = failedRunCount === 0 ? "passed" : "failed";
   const automatedPassed = (
     automatedScorecard.metadataLeakFree
@@ -617,6 +761,14 @@ function buildInvocationSummary({ variant, channel, repeats, xpi, bundle, runs, 
     medianBootstrapResolveDurationMs: computeMedian(resolveDurations),
     decodeMethods,
     readinessModes,
+    hostBindingAvailableCount,
+    hostBindingDBAvailableCount,
+    hostBindingNoncePresentCount,
+    hostBindingNonceSources,
+    capabilityManifestDetailLevels,
+    capabilityManifestOverlayAvailableCount,
+    capabilityManifestOverlayAppliedCount,
+    capabilityManifestActivationSatisfiedCount,
     runs: runList,
     summary: failedRunCount === 0
       ? `共 ${runList.length} 次 run，全部满足 readiness=native 且无阻断型 runtime error。`
@@ -663,6 +815,14 @@ export function renderPackageProtectionSmokeMarkdown(report) {
     `- 中位 bootstrap resolve: \`${normalizedReport.medianBootstrapResolveDurationMs}ms\``,
     `- Decode 方法分布: \`${JSON.stringify(normalizedReport.decodeMethods)}\``,
     `- Readiness 分布: \`${JSON.stringify(normalizedReport.readinessModes)}\``,
+    `- Host binding available: \`${normalizedReport.hostBindingAvailableCount}/${normalizedReport.repeats}\``,
+    `- Host binding DB available: \`${normalizedReport.hostBindingDBAvailableCount}/${normalizedReport.repeats}\``,
+    `- Host binding nonce present: \`${normalizedReport.hostBindingNoncePresentCount}/${normalizedReport.repeats}\``,
+    `- Host binding nonce source 分布: \`${JSON.stringify(normalizedReport.hostBindingNonceSources)}\``,
+    `- Capability manifest detailLevel 分布: \`${JSON.stringify(normalizedReport.capabilityManifestDetailLevels)}\``,
+    `- Capability manifest overlay available: \`${normalizedReport.capabilityManifestOverlayAvailableCount}/${normalizedReport.repeats}\``,
+    `- Capability manifest overlay applied: \`${normalizedReport.capabilityManifestOverlayAppliedCount}/${normalizedReport.repeats}\``,
+    `- Capability manifest activation satisfied: \`${normalizedReport.capabilityManifestActivationSatisfiedCount}/${normalizedReport.repeats}\``,
     `- 摘要: ${normalizedReport.summary}`,
     "",
     "## 自动评分卡",
@@ -699,6 +859,20 @@ export function renderPackageProtectionSmokeMarkdown(report) {
     lines.push(`- packageProtection decodeMethod: \`${run.packageProtection?.decodeMethod || "-"}\``);
     lines.push(`- packageProtection decode: \`${run.packageProtection?.decodeDurationMs ?? 0}ms\``);
     lines.push(`- packageProtection prepare: \`${run.packageProtection?.prepareDurationMs ?? 0}ms\``);
+    lines.push(`- hostBinding available: \`${run.hostBinding?.available ? "yes" : "no"}\``);
+    lines.push(`- hostBinding profileHash: \`${run.hostBinding?.profileHashPresent ? "yes" : "no"}\``);
+    lines.push(`- hostBinding dbAvailable: \`${run.hostBinding?.dbAvailable ? "yes" : "no"}\``);
+    lines.push(`- hostBinding noncePresent: \`${run.hostBinding?.noncePresent ? "yes" : "no"}\``);
+    lines.push(`- hostBinding nonceSource: \`${run.hostBinding?.nonceSource || "-"}\``);
+    lines.push(`- capabilityManifest variant: \`${run.capabilityManifest?.variant || "-"}\``);
+    lines.push(`- capabilityManifest detailLevel: \`${run.capabilityManifest?.detailLevel || "-"}\``);
+    lines.push(`- capabilityManifest overlayAvailable: \`${run.capabilityManifest?.overlayAvailable ? "yes" : "no"}\``);
+    lines.push(`- capabilityManifest overlayApplied: \`${run.capabilityManifest?.overlayApplied ? "yes" : "no"}\``);
+    lines.push(`- capabilityManifest activationSatisfied: \`${run.capabilityManifest?.activationSatisfied ? "yes" : "no"}\``);
+    const activationMissing = Array.isArray(run.capabilityManifest?.activationMissing)
+      ? run.capabilityManifest.activationMissing.join(",")
+      : "";
+    lines.push(`- capabilityManifest activationMissing: \`${activationMissing || "-"}\``);
     lines.push(`- issues: ${run.issues.length > 0 ? run.issues.join("；") : "-"}`);
     lines.push("");
   });
