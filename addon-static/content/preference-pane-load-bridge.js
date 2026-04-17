@@ -1,4 +1,4 @@
-(function bootstrapCleanroomPreferencePaneLoadBridge() {
+(function () {
   const LOAD_API_KEY = "__CLEANROOM_PREFERENCE_PANE_LOAD_API__";
   const DEBUG_STATE_KEY = "__CLEANROOM_PREFERENCE_PANE_LOAD_BRIDGE_STATE__";
 

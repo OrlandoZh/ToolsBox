@@ -3,6 +3,10 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import {
+  obfuscateBundleSource,
+  SHIELDED_LOADER_OBFUSCATION_STAGE,
+} from "./package-obfuscation-lib.mjs";
 import { buildReactUI } from "./build-react-ui.mjs";
 import { withBuildLock } from "./build-lock.mjs";
 import { applyBuildInjection } from "./build-injection-lib.mjs";
@@ -68,8 +72,20 @@ function resolveBuildModuleAliases(srcRootPath, semanticScrubMode = BUILD_SEMANT
   }
 
   aliases.set(
+    path.resolve(srcRootPath, "core", "i18n.js"),
+    path.resolve(srcRootPath, "core", "i18n-protected.js"),
+  );
+  aliases.set(
     path.resolve(srcRootPath, "app", "capability-manifest.js"),
     path.resolve(srcRootPath, "app", "capability-manifest-protected.js"),
+  );
+  aliases.set(
+    path.resolve(srcRootPath, "app", "copy-fallbacks.js"),
+    path.resolve(srcRootPath, "app", "copy-fallbacks-protected.js"),
+  );
+  aliases.set(
+    path.resolve(srcRootPath, "app", "surface-descriptors.js"),
+    path.resolve(srcRootPath, "app", "surface-descriptors-protected.js"),
   );
   return aliases;
 }
@@ -443,6 +459,71 @@ function patchReactUIDemoShell(templateContent, config) {
     .replaceAll("__ADDON_NAME__", escapeXHTML(config.addonName));
 }
 
+const PROTECTED_STATIC_REPLACEMENTS = Object.freeze({
+  "locale/en-US/main.ftl": Object.freeze([
+    ["Open Cleanroom Action", "Open Tool"],
+    ["Show Reader Demo Summary", "Open Current View"],
+    ["Cleanroom Template Preferences", "Tool Preferences"],
+    ["Enable plugin", "Enable tool"],
+    ["Cleanroom Summary", "Current Summary"],
+    ["Cleanroom Demo", "Current Panel"],
+    ["Cleanroom Template", "Tool"],
+    ["Plugin command executed successfully.", "Action completed."],
+  ]),
+  "locale/zh-CN/main.ftl": Object.freeze([
+    ["打开模板动作", "打开工具"],
+    ["显示 Reader 示例摘要", "打开当前视图"],
+    ["Cleanroom 模板首选项", "工具首选项"],
+    ["启用插件", "启用工具"],
+    ["模板摘要", "当前摘要"],
+    ["模板示例", "当前面板"],
+    ["模板插件", "工具"],
+    ["插件命令执行成功。", "操作已完成。"],
+  ]),
+  "locale/zh-TW/main.ftl": Object.freeze([
+    ["開啟範本動作", "開啟工具"],
+    ["顯示 Reader 示例摘要", "開啟目前視圖"],
+    ["Cleanroom 範本偏好設定", "工具偏好設定"],
+    ["啟用外掛", "啟用工具"],
+    ["範本摘要", "目前摘要"],
+    ["範本示例", "目前面板"],
+    ["範本外掛", "工具"],
+    ["外掛命令已成功執行。", "操作已完成。"],
+  ]),
+  "content/react-ui/demo.xhtml": Object.freeze([
+    ["React UI Demo", "Panel"],
+    ["React UI demo requires JavaScript.", "This panel requires JavaScript."],
+  ]),
+});
+
+async function applyProtectedStaticScrub(buildRoot) {
+  for (const [relativePath, replacements] of Object.entries(PROTECTED_STATIC_REPLACEMENTS)) {
+    const targetPath = path.join(buildRoot, relativePath);
+    let source = await fs.readFile(targetPath, "utf-8");
+    for (const [from, to] of replacements) {
+      source = source.replaceAll(from, to);
+    }
+    await fs.writeFile(targetPath, source, "utf-8");
+  }
+}
+
+const PROTECTED_STATIC_SCRIPT_PATHS = Object.freeze([
+  "content/preferences.js",
+  "content/preference-pane-load-bridge.js",
+  "content/theme.js",
+]);
+
+async function obfuscateProtectedStaticScripts(buildRoot) {
+  for (const relativePath of PROTECTED_STATIC_SCRIPT_PATHS) {
+    const targetPath = path.join(buildRoot, relativePath);
+    const source = await fs.readFile(targetPath, "utf-8");
+    const obfuscated = obfuscateBundleSource(source, {
+      stage: SHIELDED_LOADER_OBFUSCATION_STAGE,
+    });
+    await fs.writeFile(targetPath, `${obfuscated.obfuscatedSource}\n`, "utf-8");
+  }
+}
+
 async function writeBuildReport({
   buildRoot,
   bundlePath,
@@ -569,6 +650,26 @@ export async function main() {
         throw wrapScriptError(error, {
           failedStage: "patch-react-ui-shell",
           details: { reactUIDemoShellPath },
+        });
+      }
+    }
+
+    if (semanticScrubMode === BUILD_SEMANTIC_SCRUB_PROTECTED) {
+      try {
+        await applyProtectedStaticScrub(buildRoot);
+      } catch (error) {
+        throw wrapScriptError(error, {
+          failedStage: "apply-protected-static-scrub",
+          details: { buildRoot },
+        });
+      }
+
+      try {
+        await obfuscateProtectedStaticScripts(buildRoot);
+      } catch (error) {
+        throw wrapScriptError(error, {
+          failedStage: "obfuscate-protected-static-scripts",
+          details: { buildRoot },
         });
       }
     }

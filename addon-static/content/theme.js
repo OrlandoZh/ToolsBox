@@ -1,4 +1,4 @@
-(function bootstrapCleanroomThemeContract() {
+(function () {
   const CONTRACT_KEY = "__CLEANROOM_THEME_CONTRACT__";
   if (globalThis[CONTRACT_KEY]) {
     return;

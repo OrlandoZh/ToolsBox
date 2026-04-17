@@ -1,7 +1,8 @@
-(function bootstrapCleanroomPreferencesController() {
+(function () {
   const COMPACT_LAYOUT_MAX_WIDTH = 620;
   const THEME_HELPER_KEY = "__CLEANROOM_THEME_CONTRACT__";
   const WINDOW_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
+  const INIT_API_KEY = "initCleanroomPreferences";
   const STORAGE_KEY = "__cleanroomPreferenceThemeState__";
   const PREF_ELEMENT_ID = "pref-themeMode";
   const ROOT_SELECTOR = ".cleanroom-pref-root";
@@ -537,5 +538,5 @@
     };
   }
 
-  window.initCleanroomPreferences = initCleanroomPreferences;
+  window[INIT_API_KEY] = initCleanroomPreferences;
 })();

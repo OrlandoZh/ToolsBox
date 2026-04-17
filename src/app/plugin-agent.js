@@ -3,6 +3,7 @@ import {
   findCapabilityById as findCapabilityByIdFromManifest,
   getCapabilityManifestView as getCapabilityManifestViewFactory,
 } from "./capability-manifest.js";
+import { createSurfaceDescriptors } from "./surface-descriptors.js";
 
 const BASELINE_ITEM_PANE_L10N = Object.freeze({
   infoRowLabel: "cleanroom-item-pane-info-row-label",
@@ -43,7 +44,12 @@ export function createPluginAgent({
   createCapabilityManifest = createCapabilityManifestFactory,
   findCapabilityById = findCapabilityByIdFromManifest,
   getCapabilityManifestView = getCapabilityManifestViewFactory,
+  surfaceDescriptors = null,
 }) {
+  const descriptors = surfaceDescriptors && typeof surfaceDescriptors === "object"
+    ? surfaceDescriptors
+    : createSurfaceDescriptors(config);
+
   function createDefaultHostBindingSummary() {
     return {
       signalVersion: 1,
@@ -186,10 +192,10 @@ export function createPluginAgent({
   function runAgentSelfCheck() {
     const window = getPrimaryWindow();
     const itemPaneL10n = collectBaselineItemPaneL10nHealth();
-    const primaryActionEntryID = `${config.addonRef}-primary-action`;
-    const readerSummaryEntryID = `${config.addonRef}-reader-summary`;
-    const contextActionEntryID = `${config.addonRef}-context-action`;
-    const preferencePaneID = `${config.addonRef}-preferences`;
+    const primaryActionEntryID = descriptors.primaryActionCommandID;
+    const readerSummaryEntryID = descriptors.readerSummaryCommandID;
+    const contextActionEntryID = descriptors.contextMenuItemID;
+    const preferencePaneID = descriptors.preferencePaneID;
     const commandIDs = typeof commandPalette?.getAllCommands === "function"
       ? commandPalette.getAllCommands()
         .map((item) => String(item?.id || "").trim())
@@ -593,8 +599,8 @@ export function createPluginAgent({
         const details = windows.map((window, index) => ({
           index,
           href: window?.location?.href || window?.document?.location?.href || "",
-          hasMenuItem: Boolean(window?.document?.getElementById?.("cleanroom-template-menuitem")),
-          hasStyle: Boolean(window?.document?.getElementById?.("cleanroom-template-style")),
+          hasMenuItem: Boolean(window?.document?.getElementById?.(descriptors.menuCommand.toolsMenuItemID)),
+          hasStyle: Boolean(window?.document?.getElementById?.(descriptors.menuCommand.injectedStyleID)),
           closed: Boolean(window?.closed),
         }));
         return {

@@ -130,6 +130,16 @@ describe("Build Artifacts", () => {
       `${config.addonRef}.js`,
     );
     const bundleSource = fs.readFileSync(bundlePath, "utf-8");
+    const enUSLocalePath = path.join(projectRoot, "build", config.addonRef, "locale", "en-US", "main.ftl");
+    const enUSLocaleSource = fs.readFileSync(enUSLocalePath, "utf-8");
+    const reactDemoShellPath = path.join(projectRoot, "build", config.addonRef, "content", "react-ui", "demo.xhtml");
+    const reactDemoShell = fs.readFileSync(reactDemoShellPath, "utf-8");
+    const preferencesScriptPath = path.join(projectRoot, "build", config.addonRef, "content", "preferences.js");
+    const preferencesScript = fs.readFileSync(preferencesScriptPath, "utf-8");
+    const themeScriptPath = path.join(projectRoot, "build", config.addonRef, "content", "theme.js");
+    const themeScript = fs.readFileSync(themeScriptPath, "utf-8");
+    const preferenceBridgeScriptPath = path.join(projectRoot, "build", config.addonRef, "content", "preference-pane-load-bridge.js");
+    const preferenceBridgeScript = fs.readFileSync(preferenceBridgeScriptPath, "utf-8");
     const report = readJSON(
       path.join(projectRoot, "build", config.addonRef, "build-report.json"),
     );
@@ -142,5 +152,40 @@ describe("Build Artifacts", () => {
     assert.equal(bundleSource.includes("successSignals"), false);
     assert.equal(bundleSource.includes("agent-runtime"), false);
     assert.equal(bundleSource.includes("ai-service"), false);
+    assert.equal(bundleSource.includes("cleanroom-template-menuitem"), false);
+    assert.equal(bundleSource.includes("cleanroom-template-style"), false);
+    assert.equal(bundleSource.includes(`${config.addonRef}-preferences`), false);
+    assert.equal(bundleSource.includes(`${config.addonRef}-reader-selection-snapshot`), false);
+    assert.equal(bundleSource.includes(`${config.addonRef}-context-action`), false);
+    assert.equal(bundleSource.includes(`${config.addonRef}-selection-summary`), false);
+    assert.equal(bundleSource.includes(`${config.addonRef}.runtime-core`), false);
+    assert.equal(bundleSource.includes(`${config.addonRef}.host-signals`), false);
+    assert.equal(bundleSource.includes("Open Cleanroom Action"), false);
+    assert.equal(bundleSource.includes("Show Reader Demo Summary"), false);
+    assert.equal(bundleSource.includes("Show Reader Selection Snapshot"), false);
+    assert.equal(bundleSource.includes("Baseline demos ready"), false);
+    assert.equal(bundleSource.includes("No notifier event yet."), false);
+    assert.equal(bundleSource.includes("Optional React UI Demo"), false);
+    assert.equal(bundleSource.includes("Optional React Host Surface"), false);
+    assert.equal(bundleSource.includes("Runtime Core"), false);
+    assert.equal(bundleSource.includes("Host Signal Collector"), false);
+    assert.equal(bundleSource.includes("Host Nonce Store"), false);
+    assert.equal(bundleSource.includes("Runtime Bridge"), false);
+    assert.equal(enUSLocaleSource.includes("Open Cleanroom Action"), false);
+    assert.equal(enUSLocaleSource.includes("Show Reader Demo Summary"), false);
+    assert.equal(enUSLocaleSource.includes("Cleanroom Template Preferences"), false);
+    assert.equal(enUSLocaleSource.includes("Cleanroom Summary"), false);
+    assert.equal(enUSLocaleSource.includes("Cleanroom Demo"), false);
+    assert.equal(reactDemoShell.includes("React UI Demo"), false);
+    assert.equal(reactDemoShell.includes("React UI demo requires JavaScript."), false);
+    assert.equal(preferencesScript.includes("bootstrapCleanroomPreferencesController"), false);
+    assert.equal(preferencesScript.includes("__CLEANROOM_THEME_CONTRACT__"), false);
+    assert.equal(preferencesScript.includes("__CLEANROOM_PREFERENCE_BRIDGE__"), false);
+    assert.equal(preferencesScript.includes("initCleanroomPreferences"), false);
+    assert.equal(themeScript.includes("bootstrapCleanroomThemeContract"), false);
+    assert.equal(themeScript.includes("__CLEANROOM_THEME_CONTRACT__"), false);
+    assert.equal(preferenceBridgeScript.includes("bootstrapCleanroomPreferencePaneLoadBridge"), false);
+    assert.equal(preferenceBridgeScript.includes("__CLEANROOM_PREFERENCE_PANE_LOAD_API__"), false);
+    assert.equal(preferenceBridgeScript.includes("__CLEANROOM_PREFERENCE_PANE_LOAD_BRIDGE_STATE__"), false);
   });
 });

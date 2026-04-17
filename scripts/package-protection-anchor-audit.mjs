@@ -138,6 +138,84 @@ export const PACKAGE_PROTECTION_ROUTE_AUDIT_BASE_ANCHORS = Object.freeze([
     needle: "generatedAt",
     category: "loader-metadata",
   },
+  {
+    id: "tools-menu-item-id",
+    label: "tools menu item id",
+    needle: "cleanroom-template-menuitem",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "tools-menu-style-id",
+    label: "tools menu stylesheet id",
+    needle: "cleanroom-template-style",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "command-copy-open-cleanroom-action",
+    label: "Open Cleanroom Action",
+    needle: "Open Cleanroom Action",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "reader-copy-demo-summary",
+    label: "Show Reader Demo Summary",
+    needle: "Show Reader Demo Summary",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "reader-copy-selection-snapshot",
+    label: "Show Reader Selection Snapshot",
+    needle: "Show Reader Selection Snapshot",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "demo-copy-idle",
+    label: "No notifier event yet.",
+    needle: "No notifier event yet.",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "demo-copy-ready",
+    label: "Baseline demos ready",
+    needle: "Baseline demos ready",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "react-copy-command",
+    label: "Open Optional React UI Demo",
+    needle: "Open Optional React UI Demo",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "react-copy-surface",
+    label: "Optional React Host Surface",
+    needle: "Optional React Host Surface",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "service-label-runtime-core",
+    label: "Runtime Core",
+    needle: "Runtime Core",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "service-label-host-signals",
+    label: "Host Signal Collector",
+    needle: "Host Signal Collector",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "service-label-host-nonce",
+    label: "Host Nonce Store",
+    needle: "Host Nonce Store",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "service-label-runtime-bridge",
+    label: "Runtime Bridge",
+    needle: "Runtime Bridge",
+    category: "inner-bundle-semantics",
+  },
 ]);
 
 const STATUS_LABELS = Object.freeze({
@@ -341,6 +419,33 @@ function buildDynamicAnchors(config = {}) {
       label: "addonVersion literal",
       needle: addonVersion,
       category: "loader-metadata",
+    });
+  }
+
+  if (addonRef) {
+    [
+      ["preference-pane-id", `${addonRef}-preferences`],
+      ["primary-action-command-id", `${addonRef}-primary-action`],
+      ["reader-summary-entry-id", `${addonRef}-reader-summary`],
+      ["reader-selection-command-id", `${addonRef}-reader-selection-snapshot`],
+      ["react-ui-demo-command-id", `${addonRef}-open-react-ui-demo`],
+      ["context-action-menu-id", `${addonRef}-context-action`],
+      ["demo-info-row-id", `${addonRef}-selection-summary`],
+      ["demo-section-id", `${addonRef}-details`],
+      ["demo-column-key", `${addonRef}-status`],
+      ["demo-notifier-id", `${addonRef}-activity`],
+      ["runtime-core-service-id", `${addonRef}.runtime-core`],
+      ["host-signals-service-id", `${addonRef}.host-signals`],
+      ["host-nonce-service-id", `${addonRef}.host-nonce`],
+      ["runtime-bridge-service-id", `${addonRef}.runtime-bridge`],
+      ["react-ui-demo-service-id", `${addonRef}.react-ui-demo`],
+    ].forEach(([id, needle]) => {
+      dynamicAnchors.push({
+        id,
+        label: id,
+        needle,
+        category: "inner-bundle-semantics",
+      });
     });
   }
 

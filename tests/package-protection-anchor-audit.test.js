@@ -57,6 +57,11 @@ describe("Package Protection Anchor Audit", () => {
     assert.ok(ids.includes("addon-ref-literal"));
     assert.ok(ids.includes("addon-version-literal"));
     assert.ok(ids.includes("plugin-api-agent-surface"));
+    assert.ok(ids.includes("reader-selection-command-id"));
+    assert.ok(ids.includes("runtime-core-service-id"));
+    assert.ok(ids.includes("tools-menu-item-id"));
+    assert.ok(ids.includes("command-copy-open-cleanroom-action"));
+    assert.ok(ids.includes("service-label-runtime-core"));
   });
 
   it("should resolve output suffixes for base and experimental audit variants", () => {

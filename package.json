@@ -39,6 +39,7 @@
     "package:protection:inner:audit:jsconfuser:string": "node scripts/package-protection-inner-audit.mjs --variant shielded-jsconfuser-string",
     "package:protection:score": "node scripts/package-protection-manual-score.mjs",
     "package:protection:score:llm": "node scripts/package-protection-llm-score.mjs",
+    "package:protection:score:guided": "node scripts/package-protection-guided-attack-score.mjs",
     "package:protection:verdict": "node scripts/package-protection-verdict.mjs",
     "export:project": "node scripts/export-project.mjs",
     "verify": "node scripts/verify.mjs",

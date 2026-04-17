@@ -59,6 +59,36 @@
 - `package:protection:score` 仍负责补齐 `llmSinglePassResult`，不会被替代
 - `package:protection:jsconfuser:bootstrap` 负责把 `js-confuser` 安装到当前仓库默认可发现位置，解决实验链的本地工具可复跑性，不改默认 `shielded`
 
+## 评分分层
+
+当前评分口径固定分两层：
+
+- 对外 / 收口层继续只保留三档结果：
+  - `parse-fail / only-loader`
+  - `high-level-architecture`
+  - `readable-module-recovery`
+- 内部实验层继续走 `package:protection:score:guided`，额外记录攻击画像，不拿来替代 verdict
+
+`guided attack` 当前固定记录 5 个维度：
+
+- `attackerTier`
+  - `A0 | A1 | A2 | A3 | A4`
+- `aiTier`
+  - `M0 | M1 | M2 | M3 | M4`
+- `attackMethod`
+  - `static-only | static+webcrack | static+reference | dynamic-hooked | runtime-rehosted`
+- `cost`
+  - `timeBucket = <10m | 10-30m | 30-120m | >120m`
+  - `roundMode = single-pass | multi-round`
+- `resultTier`
+  - `R0 | R1 | R2 | R3 | R4`
+
+其中：
+
+- `rating` 继续只负责对外三档结论
+- `resultTier` 只在内部实验层里表达“恢复到什么程度”，不直接改 verdict
+- 旧字段 `attackPath` / `costBucket` 当前只保留为兼容镜像；新记录优先读 `attackMethod` / `timeBucket` / `roundMode`
+
 ## 当前已验证结论
 
 ### 1. `encrypted` 是当前最稳的低开销受保护导出分支

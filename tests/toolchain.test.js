@@ -863,6 +863,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(packageJSON.scripts["package:protection:inner:audit:jsconfuser:string"], "node scripts/package-protection-inner-audit.mjs --variant shielded-jsconfuser-string");
     assert.equal(packageJSON.scripts["package:protection:score"], "node scripts/package-protection-manual-score.mjs");
     assert.equal(packageJSON.scripts["package:protection:score:llm"], "node scripts/package-protection-llm-score.mjs");
+    assert.equal(packageJSON.scripts["package:protection:score:guided"], "node scripts/package-protection-guided-attack-score.mjs");
     assert.equal(packageJSON.scripts["package:protection:verdict"], "node scripts/package-protection-verdict.mjs");
     assert.equal(packageJSON.devDependencies.esbuild, "^0.21.5");
     assert.equal(packageJSON.devDependencies["javascript-obfuscator"], "^5.4.1");
@@ -1217,6 +1218,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(exportPackage.scripts["package:protection:inner:audit:jsconfuser:string"], "node scripts/package-protection-inner-audit.mjs --variant shielded-jsconfuser-string");
     assert.equal(exportPackage.scripts["package:protection:score"], "node scripts/package-protection-manual-score.mjs");
     assert.equal(exportPackage.scripts["package:protection:score:llm"], "node scripts/package-protection-llm-score.mjs");
+    assert.equal(exportPackage.scripts["package:protection:score:guided"], "node scripts/package-protection-guided-attack-score.mjs");
     assert.equal(exportPackage.scripts["package:protection:verdict"], "node scripts/package-protection-verdict.mjs");
     assert.equal(exportPackage.devDependencies.esbuild, "^0.21.5");
     assert.equal(exportPackage.devDependencies["javascript-obfuscator"], "^5.4.1");
@@ -1251,6 +1253,7 @@ describe("Toolchain Scripts", () => {
     assert.ok(exportReadme.includes("package:protection:inner:audit:jsconfuser:string"));
     assert.ok(exportReadme.includes("package:protection:score"));
     assert.ok(exportReadme.includes("package:protection:score:llm"));
+    assert.ok(exportReadme.includes("package:protection:score:guided"));
     assert.ok(exportReadme.includes("package:protection:verdict"));
     assert.ok(exportReadme.includes("react-dom"));
     assert.ok(exportReadme.includes("addon-static/content/style/main.css"));

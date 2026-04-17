@@ -25,10 +25,12 @@ import { createServiceRegistry } from "../services/index.js";
 import { createPluginKernel } from "./kernel.js";
 import { createPluginAPI } from "./plugin-api.js";
 import { createPluginAgent } from "./plugin-agent.js";
+import { createCopyFallbacks } from "./copy-fallbacks.js";
 import { createFeatureComposer } from "./feature-composer.js";
 import { createOptionalBundleRuntime } from "./optional-bundles.js";
 import { createRuntimeCapabilityState } from "./runtime-capabilities.js";
 import { createHostActionRunner } from "./host-actions.js";
+import { createSurfaceDescriptors } from "./surface-descriptors.js";
 import { createReactUIDemoLauncher } from "../features/react-ui-demo.js";
 
 function normalizeLogLevel(input, fallback = "info") {
@@ -304,6 +306,8 @@ function mergeHostBindingSummary(base = null, patch = null) {
 export function createPlugin({ globalScope, config }) {
   const runtime = globalScope.__CLEANROOM_TEMPLATE_RUNTIME__ || {};
   const optionalBundleRegistry = globalScope.__CLEANROOM_TEMPLATE_OPTIONAL_BUNDLES__ || null;
+  const copy = createCopyFallbacks();
+  const surfaceDescriptors = createSurfaceDescriptors(config);
   const bundleRuntime = createOptionalBundleRuntime({
     registry: optionalBundleRegistry,
   });
@@ -408,8 +412,8 @@ export function createPlugin({ globalScope, config }) {
   }
 
   servicesHub.register({
-    id: `${config.addonRef}.runtime-core`,
-    label: "Runtime Core",
+    id: surfaceDescriptors.serviceIDs.runtimeCore,
+    label: surfaceDescriptors.serviceLabels.runtimeCore,
     enabledWhen() {
       return true;
     },
@@ -424,8 +428,8 @@ export function createPlugin({ globalScope, config }) {
   });
 
   servicesHub.register({
-    id: `${config.addonRef}.host-signals`,
-    label: "Host Signal Collector",
+    id: surfaceDescriptors.serviceIDs.hostSignals,
+    label: surfaceDescriptors.serviceLabels.hostSignals,
     enabledWhen() {
       return true;
     },
@@ -450,8 +454,8 @@ export function createPlugin({ globalScope, config }) {
   });
 
   servicesHub.register({
-    id: `${config.addonRef}.host-nonce`,
-    label: "Host Nonce Store",
+    id: surfaceDescriptors.serviceIDs.hostNonce,
+    label: surfaceDescriptors.serviceLabels.hostNonce,
     enabledWhen() {
       return true;
     },
@@ -476,8 +480,8 @@ export function createPlugin({ globalScope, config }) {
   });
 
   servicesHub.register({
-    id: `${config.addonRef}.runtime-bridge`,
-    label: "Runtime Bridge",
+    id: surfaceDescriptors.serviceIDs.runtimeBridge,
+    label: surfaceDescriptors.serviceLabels.runtimeBridge,
     enabledWhen() {
       return true;
     },
@@ -497,6 +501,7 @@ export function createPlugin({ globalScope, config }) {
     logger,
     prefs,
     i18n,
+    surfaceDescriptors,
   });
   const themeManager = createThemeManager({
     logger,
@@ -513,8 +518,8 @@ export function createPlugin({ globalScope, config }) {
   });
 
   servicesHub.register({
-    id: `${config.addonRef}.react-ui-demo`,
-    label: "Optional React UI Demo",
+    id: surfaceDescriptors.serviceIDs.reactUIDemo,
+    label: surfaceDescriptors.serviceLabels.reactUIDemo,
     enabledWhen() {
       return bundleRuntime.isEnabled("react-ui");
     },
@@ -594,7 +599,7 @@ export function createPlugin({ globalScope, config }) {
       const styleHref = host.resolveContentUrl("content/style/main.css");
       cleanups.push(
         host.injectStyleSheet(window, {
-          id: "cleanroom-template-style",
+          id: surfaceDescriptors.menuCommand.injectedStyleID,
           href: styleHref,
         }),
       );
@@ -603,11 +608,11 @@ export function createPlugin({ globalScope, config }) {
       cleanups.push(menuCommand.mount(window));
 
       const shortcutId = keyboard.registerShortcut({
-        id: `${config.addonRef}-shortcut-${Math.random().toString(16).slice(2)}`,
+        id: `${surfaceDescriptors.shortcutIDPrefix}-${Math.random().toString(16).slice(2)}`,
         shortcut: "Ctrl+Shift+Y",
         description: i18n.t(
           "cleanroom-shortcut-description",
-          "Show the clean-room shortcut demo toast.",
+          copy.shortcut.description,
         ),
         window,
         handler: () => {
@@ -625,7 +630,7 @@ export function createPlugin({ globalScope, config }) {
             "info",
             2500,
             {
-              title: i18n.t("cleanroom-shortcut-toast-title", "Cleanroom Shortcut"),
+              title: i18n.t("cleanroom-shortcut-toast-title", copy.shortcut.toastTitle),
             },
           );
           refreshDemoViews();
@@ -640,10 +645,10 @@ export function createPlugin({ globalScope, config }) {
   });
 
   const demoSectionRefreshers = new Set();
-  const demoInfoRowID = `${config.addonRef}-selection-summary`;
-  const demoSectionID = `${config.addonRef}-details`;
-  const demoColumnKey = `${config.addonRef}-status`;
-  const demoNotifierID = `${config.addonRef}-activity`;
+  const demoInfoRowID = surfaceDescriptors.demoInfoRowID;
+  const demoSectionID = surfaceDescriptors.demoSectionID;
+  const demoColumnKey = surfaceDescriptors.demoColumnKey;
+  const demoNotifierID = surfaceDescriptors.demoNotifierID;
   const demoState = {
     shortcutLabel: keyboard.formatShortcut(
       "Y",
@@ -653,7 +658,7 @@ export function createPlugin({ globalScope, config }) {
     lastShortcutAt: null,
     lastNotifierEvent: i18n.t(
       "cleanroom-demo-notifier-idle",
-      "No notifier event yet.",
+      copy.demo.notifierIdle,
     ),
   };
   let lifecycleTelemetrySummary = cloneLifecycleTelemetrySummary();
@@ -686,16 +691,16 @@ export function createPlugin({ globalScope, config }) {
 
   function getItemTitle(item) {
     if (!item || typeof item.getField !== "function") {
-      return i18n.t("cleanroom-demo-no-selection", "No item selected.");
+      return i18n.t("cleanroom-demo-no-selection", copy.demo.noSelection);
     }
 
     const title = item.getField("title");
-    return title || i18n.t("cleanroom-demo-untitled", "Untitled item");
+    return title || i18n.t("cleanroom-demo-untitled", copy.demo.untitled);
   }
 
   function getItemSummary(item) {
     if (!item) {
-      return i18n.t("cleanroom-demo-no-selection", "No item selected.");
+      return i18n.t("cleanroom-demo-no-selection", copy.demo.noSelection);
     }
 
     const parts = [
@@ -755,11 +760,11 @@ export function createPlugin({ globalScope, config }) {
     const summary = reader.getActiveSummary();
     if (!summary) {
       progress.showToast(
-        i18n.t("cleanroom-reader-no-active", "No active reader tab."),
+        i18n.t("cleanroom-reader-no-active", copy.reader.noActive),
         "warning",
         2500,
         {
-          title: i18n.t("cleanroom-reader-toast-title", "Cleanroom Reader"),
+          title: i18n.t("cleanroom-reader-toast-title", copy.reader.toastTitle),
         },
       );
       return false;
@@ -781,13 +786,13 @@ export function createPlugin({ globalScope, config }) {
       "info",
       3000,
       {
-        title: i18n.t("cleanroom-reader-toast-title", "Cleanroom Reader"),
+        title: i18n.t("cleanroom-reader-toast-title", copy.reader.toastTitle),
       },
     );
     return true;
   }
 
-  async function runReaderSelectionActionDemo(actionId = `${config.addonRef}-reader-selection-snapshot`) {
+  async function runReaderSelectionActionDemo(actionId = surfaceDescriptors.readerSelectionCommandID) {
     const execution = await readerSelectionActions.executeAction(actionId);
     const result = execution?.result && typeof execution.result === "object"
       ? execution.result
@@ -803,14 +808,14 @@ export function createPlugin({ globalScope, config }) {
       progress.showToast(
         i18n.t(
           "cleanroom-reader-selection-toast-empty",
-          "No reader selection is currently available.",
+          copy.reader.selectionToastEmpty,
         ),
         "warning",
         2500,
         {
           title: i18n.t(
             "cleanroom-reader-selection-toast-title",
-            "Reader Selection",
+            copy.reader.selectionToastTitle,
           ),
         },
       );
@@ -833,7 +838,7 @@ export function createPlugin({ globalScope, config }) {
       {
         title: i18n.t(
           "cleanroom-reader-selection-toast-title",
-          "Reader Selection",
+          copy.reader.selectionToastTitle,
         ),
       },
     );
@@ -888,7 +893,7 @@ export function createPlugin({ globalScope, config }) {
     if (!prefs.get("enabled")) {
       const message = i18n.t(
         "cleanroom-command-disabled",
-        "Plugin is disabled. Re-enable it in preferences first.",
+        copy.command.disabled,
       );
 
       logger.warn("command.execute.disabled");
@@ -924,6 +929,7 @@ export function createPlugin({ globalScope, config }) {
     itemPane,
     bundleRuntime,
     openReactDemoWindow: reactUIDemo.openDemoWindow,
+    surfaceDescriptors,
   });
 
   const agent = createPluginAgent({
@@ -956,6 +962,7 @@ export function createPlugin({ globalScope, config }) {
     getLifecycleSummary: () => cloneLifecycleTelemetrySummary(lifecycleTelemetrySummary),
     getProtectionSummary,
     getCapabilityManifestOverlay,
+    surfaceDescriptors,
   });
 
   const featureComposer = createFeatureComposer({
@@ -988,6 +995,7 @@ export function createPlugin({ globalScope, config }) {
     updateDemoNotifierState,
     bundleRuntime,
     openReactDemoWindow: reactUIDemo.openDemoWindow,
+    surfaceDescriptors,
     presentReactSurface: reactUIDemo.presentSurface,
     renderReactItemPaneSurface: reactUIDemo.renderItemPaneSurface,
     unmountReactItemPaneSurface: reactUIDemo.unmountItemPaneSurface,

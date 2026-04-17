@@ -1,4 +1,9 @@
 import { isOptionalBundleEnabled } from "./optional-bundles.js";
+import { createCopyFallbacks } from "./copy-fallbacks.js";
+import { createSurfaceDescriptors } from "./surface-descriptors.js";
+
+const PREFERENCE_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
+const PREFERENCE_INIT_API_KEY = "initCleanroomPreferences";
 
 export function createFeatureComposer({
   config,
@@ -33,7 +38,12 @@ export function createFeatureComposer({
   presentReactSurface,
   renderReactItemPaneSurface,
   unmountReactItemPaneSurface,
+  surfaceDescriptors = null,
 }) {
+  const copy = createCopyFallbacks();
+  const descriptors = surfaceDescriptors && typeof surfaceDescriptors === "object"
+    ? surfaceDescriptors
+    : createSurfaceDescriptors(config);
   let baselineReady = false;
   const reactUIBundleEnabled = isOptionalBundleEnabled(bundleRuntime, "react-ui");
   const reactSurfacePresenter = typeof presentReactSurface === "function"
@@ -91,10 +101,10 @@ export function createFeatureComposer({
       return;
     }
     baselineReady = true;
-    const readerSelectionCommandID = `${config.addonRef}-reader-selection-snapshot`;
+    const readerSelectionCommandID = descriptors.readerSelectionCommandID;
 
     await preferencePanes.registerPane({
-      id: `${config.addonRef}-preferences`,
+      id: descriptors.preferencePaneID,
       src: "content/preferences.xhtml",
       label: config.addonName,
       image: config.icons?.["48"] || config.icons?.["96"],
@@ -112,7 +122,7 @@ export function createFeatureComposer({
           instanceKey: config.instanceKey,
           strings: typeof i18n.getBundle === "function" ? i18n.getBundle() : null,
         };
-        window.__CLEANROOM_PREFERENCE_BRIDGE__ = bridge;
+        window[PREFERENCE_BRIDGE_KEY] = bridge;
 
         if (typeof window?.MozXULElement?.insertFTLIfNeeded === "function") {
           window.MozXULElement.insertFTLIfNeeded("main.ftl");
@@ -121,22 +131,22 @@ export function createFeatureComposer({
         scriptLoader.loadSubScript(resolveURI("content/theme.js"), window);
         scriptLoader.loadSubScript(resolveURI("content/preferences.js"), window);
 
-        if (typeof window.initCleanroomPreferences !== "function") {
-          throw new Error(`window.initCleanroomPreferences() is unavailable for pane '${paneID}'`);
+        if (typeof window[PREFERENCE_INIT_API_KEY] !== "function") {
+          throw new Error(`window[${PREFERENCE_INIT_API_KEY}]() is unavailable for pane '${paneID}'`);
         }
-        return window.initCleanroomPreferences({
+        return window[PREFERENCE_INIT_API_KEY]({
           bridge,
         });
       },
     });
 
     commandPalette.registerCommand({
-      id: `${config.addonRef}-primary-action`,
-      label: i18n.t("cleanroom-command-label", "Open Cleanroom Action"),
+      id: descriptors.primaryActionCommandID,
+      label: i18n.t("cleanroom-command-label", copy.command.label),
       category: config.addonName,
       description: i18n.t(
         "cleanroom-command-description",
-        "Run the default clean-room template action.",
+        copy.command.description,
       ),
       condition: () => Boolean(prefs.get("enabled")),
       handler: () => {
@@ -145,15 +155,15 @@ export function createFeatureComposer({
     });
 
     commandPalette.registerCommand({
-      id: `${config.addonRef}-reader-summary`,
+      id: descriptors.readerSummaryCommandID,
       label: i18n.t(
         "cleanroom-reader-menu-label",
-        "Show Reader Demo Summary",
+        copy.reader.menuLabel,
       ),
       category: config.addonName,
       description: i18n.t(
         "cleanroom-reader-command-description",
-        "Show the active reader summary.",
+        copy.reader.commandDescription,
       ),
       condition: () => Boolean(reader.getActiveSummary()),
       handler: () => {
@@ -165,11 +175,11 @@ export function createFeatureComposer({
       id: readerSelectionCommandID,
       label: i18n.t(
         "cleanroom-reader-selection-command-label",
-        "Show Reader Selection Snapshot",
+        copy.reader.selectionCommandLabel,
       ),
       description: i18n.t(
         "cleanroom-reader-selection-command-description",
-        "Inspect the current reader selection.",
+        copy.reader.selectionCommandDescription,
       ),
       aliases: ["selection snapshot"],
       keywords: ["reader", "selection", "snapshot"],
@@ -192,12 +202,12 @@ export function createFeatureComposer({
       id: readerSelectionCommandID,
       label: i18n.t(
         "cleanroom-reader-selection-command-label",
-        "Show Reader Selection Snapshot",
+        copy.reader.selectionCommandLabel,
       ),
       category: config.addonName,
       description: i18n.t(
         "cleanroom-reader-selection-command-description",
-        "Inspect the current reader selection.",
+        copy.reader.selectionCommandDescription,
       ),
       aliases: ["selection snapshot"],
       keywords: ["reader", "selection", "snapshot"],
@@ -216,15 +226,15 @@ export function createFeatureComposer({
 
     if (reactUIBundleEnabled && typeof openReactDemoWindow === "function") {
       commandPalette.registerCommand({
-        id: `${config.addonRef}-open-react-ui-demo`,
+        id: descriptors.reactUIDemoCommandID,
         label: i18n.t(
           "cleanroom-react-ui-demo-command-label",
-          "Open Optional React UI Demo",
+          copy.react.demoCommandLabel,
         ),
         category: config.addonName,
         description: i18n.t(
           "cleanroom-react-ui-demo-command-description",
-          "Open the default-disabled React UI demo window.",
+          copy.react.demoCommandDescription,
         ),
         condition: () => Boolean(prefs.get("enabled")),
         handler: () => {
@@ -241,7 +251,7 @@ export function createFeatureComposer({
 
     if (menuManager.isOfficialAPIAvailable()) {
       menuManager.registerItemMenuItem({
-        id: `${config.addonRef}-context-action`,
+        id: descriptors.contextMenuItemID,
         l10nID: "cleanroom-menu-label",
         onCommand: (event, context) => {
           runPrimaryAction(context?.window || getPrimaryWindow());
@@ -253,7 +263,7 @@ export function createFeatureComposer({
       });
 
       menuManager.registerReaderMenubarViewMenuItem({
-        id: `${config.addonRef}-reader-summary`,
+        id: descriptors.readerSummaryMenuItemID,
         l10nID: "cleanroom-reader-menu-label",
         onShowing: (event, context) => {
           if (context && typeof context.setVisible === "function") {
@@ -336,23 +346,23 @@ export function createFeatureComposer({
         const contractRoot = createItemPaneContractRoot(doc, demoSectionID, [
           createSectionLine(
             doc,
-            i18n.t("cleanroom-demo-field-item", "Item"),
+            i18n.t("cleanroom-demo-field-item", copy.demo.item),
             getItemSummary(item),
           ),
           createSectionLine(
             doc,
-            i18n.t("cleanroom-demo-field-shortcut", "Shortcut"),
+            i18n.t("cleanroom-demo-field-shortcut", copy.demo.shortcut),
             `${demoState.shortcutLabel} · ${demoState.shortcutTriggerCount}`,
           ),
           createSectionLine(
             doc,
-            i18n.t("cleanroom-demo-field-notifier", "Notifier"),
+            i18n.t("cleanroom-demo-field-notifier", copy.demo.notifier),
             demoState.lastNotifierEvent,
           ),
           createSectionLine(
             doc,
-            i18n.t("cleanroom-demo-field-status", "Status"),
-            i18n.t("cleanroom-demo-status-ready", "Baseline demos ready"),
+            i18n.t("cleanroom-demo-field-status", copy.demo.status),
+            i18n.t("cleanroom-demo-status-ready", copy.demo.statusReady),
           ),
         ]);
 
@@ -362,23 +372,23 @@ export function createFeatureComposer({
           body.replaceChildren(
             createSectionLine(
               doc,
-              i18n.t("cleanroom-demo-field-item", "Item"),
+              i18n.t("cleanroom-demo-field-item", copy.demo.item),
               getItemSummary(item),
             ),
             createSectionLine(
               doc,
-              i18n.t("cleanroom-demo-field-shortcut", "Shortcut"),
+              i18n.t("cleanroom-demo-field-shortcut", copy.demo.shortcut),
               `${demoState.shortcutLabel} · ${demoState.shortcutTriggerCount}`,
             ),
             createSectionLine(
               doc,
-              i18n.t("cleanroom-demo-field-notifier", "Notifier"),
+              i18n.t("cleanroom-demo-field-notifier", copy.demo.notifier),
               demoState.lastNotifierEvent,
             ),
             createSectionLine(
               doc,
-              i18n.t("cleanroom-demo-field-status", "Status"),
-              i18n.t("cleanroom-demo-status-ready", "Baseline demos ready"),
+              i18n.t("cleanroom-demo-field-status", copy.demo.status),
+              i18n.t("cleanroom-demo-status-ready", copy.demo.statusReady),
             ),
           );
         }
@@ -395,22 +405,22 @@ export function createFeatureComposer({
             props: {
               title: i18n.t(
                 "cleanroom-react-ui-surface-title",
-                "Optional React Host Surface",
+                copy.react.surfaceTitle,
               ),
               message: i18n.t(
                 "cleanroom-react-ui-surface-message",
-                "This item pane section proves the optional React lane can mount inside a real Zotero host surface while the JS core keeps ownership of lifecycle and evidence.",
+                copy.react.surfaceMessage,
               ),
               statusText: i18n.t(
                 "cleanroom-react-ui-surface-status",
-                "Mounted through the item pane section",
+                copy.react.surfaceStatus,
               ),
               surfaceVariant: "host-pane",
               items: [
-                `${i18n.t("cleanroom-demo-field-item", "Item")}: ${getItemSummary(item)}`,
-                `${i18n.t("cleanroom-demo-field-shortcut", "Shortcut")}: ${demoState.shortcutLabel} · ${demoState.shortcutTriggerCount}`,
-                `${i18n.t("cleanroom-demo-field-notifier", "Notifier")}: ${demoState.lastNotifierEvent}`,
-                `${i18n.t("cleanroom-demo-field-status", "Status")}: ${i18n.t("cleanroom-demo-status-ready", "Baseline demos ready")}`,
+                `${i18n.t("cleanroom-demo-field-item", copy.demo.item)}: ${getItemSummary(item)}`,
+                `${i18n.t("cleanroom-demo-field-shortcut", copy.demo.shortcut)}: ${demoState.shortcutLabel} · ${demoState.shortcutTriggerCount}`,
+                `${i18n.t("cleanroom-demo-field-notifier", copy.demo.notifier)}: ${demoState.lastNotifierEvent}`,
+                `${i18n.t("cleanroom-demo-field-status", copy.demo.status)}: ${i18n.t("cleanroom-demo-status-ready", copy.demo.statusReady)}`,
               ],
             },
           })).catch((error) => {

@@ -3,6 +3,7 @@ import {
   isExecutableHostAction,
   listHostActionDescriptors,
 } from "./host-action-catalog.js";
+import { createSurfaceDescriptors } from "./surface-descriptors.js";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -1471,9 +1472,14 @@ export function createHostActionRunner({
   itemPane,
   bundleRuntime,
   openReactDemoWindow,
+  surfaceDescriptors = null,
 }) {
+  const descriptors = surfaceDescriptors && typeof surfaceDescriptors === "object"
+    ? surfaceDescriptors
+    : createSurfaceDescriptors(config);
+
   async function runPreferencesOpenPane(actionId, payload = {}) {
-    const paneID = toPlainString(payload.paneID) || `${config.addonRef}-preferences`;
+    const paneID = toPlainString(payload.paneID) || descriptors.preferencePaneID;
     const preconditions = [
       createCheck("host.preparePreferencePane", typeof host?.preparePreferencePane === "function"),
       createCheck("paneID", Boolean(paneID), { paneID }),
@@ -1623,7 +1629,7 @@ export function createHostActionRunner({
   }
 
   async function runPreferencesSelectTab(actionId, payload = {}) {
-    const paneID = toPlainString(payload.paneID) || `${config.addonRef}-preferences`;
+    const paneID = toPlainString(payload.paneID) || descriptors.preferencePaneID;
     const tabID = toPlainString(payload.tabID);
     const preconditions = [
       createCheck("host.preparePreferencePane", typeof host?.preparePreferencePane === "function"),
@@ -1810,7 +1816,7 @@ export function createHostActionRunner({
   }
 
   async function runPreferenceControlAction(actionId, payload = {}, kind) {
-    const paneID = toPlainString(payload.paneID) || `${config.addonRef}-preferences`;
+    const paneID = toPlainString(payload.paneID) || descriptors.preferencePaneID;
     const locator = buildPreferenceLocator(payload);
     const hasLocator = Boolean(locator.controlID || locator.preferenceID || locator.selector);
     const expectedValue = kind === "checkbox"

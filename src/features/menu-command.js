@@ -1,4 +1,10 @@
-export function createMenuCommand({ host, logger, prefs, i18n }) {
+import { createSurfaceDescriptors } from "../app/surface-descriptors.js";
+
+export function createMenuCommand({ host, logger, prefs, i18n, surfaceDescriptors = null }) {
+  const descriptors = surfaceDescriptors && typeof surfaceDescriptors === "object"
+    ? surfaceDescriptors
+    : createSurfaceDescriptors();
+
   function execute(window = null, options = {}) {
     const location = typeof options.location === "string" && options.location
       ? options.location
@@ -25,7 +31,7 @@ export function createMenuCommand({ host, logger, prefs, i18n }) {
     const label = override || i18n.t("cleanroom-menu-label");
 
     const remove = host.addToolsMenuItem(window, {
-      id: "cleanroom-template-menuitem",
+      id: descriptors.menuCommand.toolsMenuItemID,
       label,
       onCommand: () => execute(window),
     });
