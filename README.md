@@ -80,8 +80,9 @@
 4.7.1. 如需对这个实验变体直接做 Zotero smoke A/B，运行 `npm run package:protection:smoke:shielded:jsconfuser:string -- --repeats 3 --channel stable`；若自动发现失败，再补 `--jsconfuser-tool-path`
 4.7.2. 如需 fresh 打包后直接调用本地 `webcrack` 生成自动化工件，运行 `npm run package:protection:webcrack:shielded -- --channel stable`，或对实验变体运行 `npm run package:protection:webcrack:shielded:descriptor-bind -- --channel stable`、`npm run package:protection:webcrack:shielded:jsconfuser:string -- --channel stable`
 4.7.3. 如需把 `webcrack` 自动建议评级回填到 smoke report 的 `manualScorecard.webcrackInitialResult`，运行 `npm run package:protection:webcrack:score -- --variant shielded --channel stable`
-4.7.4. 如需把 `shielded` 基线和某个实验变体的 smoke / webcrack / audit / 手工 LLM 状态收口成一份 A/B 报告，运行 `npm run package:protection:compare:descriptor-bind -- --channel stable` 或 `npm run package:protection:compare:jsconfuser:string -- --channel stable`
-4.8. 如需回填 `shielded stable` 的手工评分，运行 `npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"`
+4.7.4. 如需在保留现有 `webcrack` 结果的前提下，只补一侧 `LLM single-pass` 评分，运行 `npm run package:protection:score:llm -- --variant shielded-jsconfuser-string --channel stable --llm "high-level-architecture"`
+4.7.5. 如需把 `shielded` 基线和某个实验变体的 smoke / webcrack / audit / 手工 LLM 状态收口成一份 A/B 报告，运行 `npm run package:protection:compare:descriptor-bind -- --channel stable` 或 `npm run package:protection:compare:jsconfuser:string -- --channel stable`
+4.8. 如需一次性回填完整手工评分，运行 `npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"`
 4.9. 如需生成当前手动实验链的 advisory 结论，运行 `npm run package:protection:verdict`
 5. 在 Zotero 中通过 “Install Add-on From File” 安装 `dist/<addonRef>-<addonVersion>.xpi`
 
@@ -296,6 +297,7 @@ npm run package:protection:compare:descriptor-bind -- --channel stable # 把 shi
 npm run package:protection:compare:jsconfuser:string -- --channel stable # 把 shielded vs jsconfuser-string 的 smoke/webcrack/audit/LLM 状态收成一份 A/B compare
 npm run package:protection:jsconfuser:preflight # 预检 JS-Confuser astScrambler 非 hostile 子集的兼容性/体积/语义压缩；如自动发现失败，再补 -- --tool-path /absolute/path/to/js-confuser
 npm run package:protection:jsconfuser:string:preflight # 预检 JS-Confuser 小范围 stringConcealing 的兼容性/体积/语义压缩；如自动发现失败，再补 -- --tool-path /absolute/path/to/js-confuser
+npm run package:protection:score:llm -- --variant shielded-jsconfuser-string --channel stable --llm "high-level-architecture" # 只补 LLM 单轮评分，保留已有 webcrack 结果
 npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture" # 回填 shielded stable 的手工评分
 npm run package:protection:verdict # 生成当前受保护打包链的 advisory verdict
 npm run release:metadata # 生成 dist/update.json 与 release-manifest.json

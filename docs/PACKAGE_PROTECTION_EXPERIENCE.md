@@ -16,6 +16,7 @@
 - `npm run package:protection:smoke -- --variant <plain|encrypted|shielded|shielded-descriptor-bind> --repeats 3 --channel <stable|beta>`
 - `npm run package:protection:webcrack -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta>`
 - `npm run package:protection:webcrack:score -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta>`
+- `npm run package:protection:score:llm -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta> --llm "<rating>"`
 - `npm run package:protection:compare -- --variant <shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta>`
 - `npm run package:protection:score -- --variant shielded --channel stable --webcrack "<rating>" --llm "<rating>"`
 - `npm run package:protection:verdict`
@@ -25,6 +26,7 @@
 当前正式手动收口链路固定为：
 
 - `package:protection:smoke -> package:protection:score -> package:protection:verdict`
+- 实验变体若已先录入 `webcrack`，可走 `package:protection:webcrack:score -> package:protection:score:llm -> package:protection:compare`
 - `plain` 固定只作为 control group 展示，不作为 protection failure 判据
 - `shielded stable` 的手工评分若落到 `readable-module-recovery`，只会把 verdict 降到 `attention` 并建议未来 hardening wave；当前不直接重开 `sidecar`
 

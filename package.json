@@ -33,6 +33,7 @@
     "package:protection:jsconfuser:string:preflight": "node scripts/package-protection-jsconfuser-preflight.mjs --profile targeted-string-concealing",
     "package:protection:lightweight:preflight": "node scripts/package-protection-lightweight-preflight.mjs",
     "package:protection:score": "node scripts/package-protection-manual-score.mjs",
+    "package:protection:score:llm": "node scripts/package-protection-llm-score.mjs",
     "package:protection:verdict": "node scripts/package-protection-verdict.mjs",
     "export:project": "node scripts/export-project.mjs",
     "verify": "node scripts/verify.mjs",

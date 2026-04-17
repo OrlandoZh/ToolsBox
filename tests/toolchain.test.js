@@ -857,6 +857,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(packageJSON.scripts["package:protection:jsconfuser:string:preflight"], "node scripts/package-protection-jsconfuser-preflight.mjs --profile targeted-string-concealing");
     assert.equal(packageJSON.scripts["package:protection:lightweight:preflight"], "node scripts/package-protection-lightweight-preflight.mjs");
     assert.equal(packageJSON.scripts["package:protection:score"], "node scripts/package-protection-manual-score.mjs");
+    assert.equal(packageJSON.scripts["package:protection:score:llm"], "node scripts/package-protection-llm-score.mjs");
     assert.equal(packageJSON.scripts["package:protection:verdict"], "node scripts/package-protection-verdict.mjs");
     assert.equal(packageJSON.devDependencies.esbuild, "^0.21.5");
     assert.equal(packageJSON.devDependencies["javascript-obfuscator"], "^5.4.1");
@@ -1204,6 +1205,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(exportPackage.scripts["package:protection:jsconfuser:string:preflight"], "node scripts/package-protection-jsconfuser-preflight.mjs --profile targeted-string-concealing");
     assert.equal(exportPackage.scripts["package:protection:lightweight:preflight"], "node scripts/package-protection-lightweight-preflight.mjs");
     assert.equal(exportPackage.scripts["package:protection:score"], "node scripts/package-protection-manual-score.mjs");
+    assert.equal(exportPackage.scripts["package:protection:score:llm"], "node scripts/package-protection-llm-score.mjs");
     assert.equal(exportPackage.scripts["package:protection:verdict"], "node scripts/package-protection-verdict.mjs");
     assert.equal(exportPackage.devDependencies.esbuild, "^0.21.5");
     assert.equal(exportPackage.devDependencies["javascript-obfuscator"], "^5.4.1");
@@ -1234,6 +1236,7 @@ describe("Toolchain Scripts", () => {
     assert.ok(exportReadme.includes("package:protection:jsconfuser:string:preflight"));
     assert.ok(exportReadme.includes("package:protection:lightweight:preflight"));
     assert.ok(exportReadme.includes("package:protection:score"));
+    assert.ok(exportReadme.includes("package:protection:score:llm"));
     assert.ok(exportReadme.includes("package:protection:verdict"));
     assert.ok(exportReadme.includes("react-dom"));
     assert.ok(exportReadme.includes("addon-static/content/style/main.css"));

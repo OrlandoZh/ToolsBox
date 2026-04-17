@@ -69,6 +69,7 @@ npm run package:protection:compare:descriptor-bind -- --channel stable
 npm run package:protection:compare:jsconfuser:string -- --channel stable
 npm run package:protection:jsconfuser:preflight
 npm run package:protection:jsconfuser:string:preflight
+npm run package:protection:score:llm -- --variant shielded-jsconfuser-string --channel stable --llm "high-level-architecture"
 npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"
 npm run package:protection:verdict
 ```
@@ -187,6 +188,14 @@ npm run package:protection:compare:jsconfuser:string -- --channel stable
 
 - `descriptor-bind` 当前是不是只该作为 `runtime-only` 实验分支保留
 - `jsconfuser-string` 当前到底已经是 `hardening win`，还是仍然只是 `leaning-same`
+
+如果你已经完成了一轮外部 AI / LLM 解读，只想把 `LLM single-pass` 评级补回现有 smoke report，而不重复填写已有的 `webcrack` 结果，执行：
+
+```bash
+npm run package:protection:score:llm -- --variant shielded-jsconfuser-string --channel stable --llm "high-level-architecture"
+```
+
+这条命令会保留当前 `manualScorecard.webcrackInitialResult`，只更新 `llmSinglePassResult`。如果当前还没有 webcrack 评分，它也能先记下 LLM 结果，但 `manualScorecard.status` 会继续保持 `pending`。
 
 当前正式手动收口链路固定为：
 
