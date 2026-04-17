@@ -70,6 +70,7 @@ npm run package:protection:compare:jsconfuser:string -- --channel stable
 npm run package:protection:jsconfuser:bootstrap
 npm run package:protection:jsconfuser:preflight
 npm run package:protection:jsconfuser:string:preflight
+npm run package:protection:lightweight:preflight
 npm run package:protection:inner:audit:shielded -- --channel stable
 npm run package:protection:inner:audit:descriptor-bind -- --channel stable
 npm run package:protection:inner:audit:jsconfuser:string -- --channel stable
@@ -188,6 +189,20 @@ npm run package:protection:smoke:shielded:jsconfuser:string -- --repeats 3 --cha
 
 它会复用现有 `packageProtection` 时序回读、runtime log bridge 与安装 smoke 探针，但不会被纳入正式 `smoke -> score -> verdict` 的 required target。
 如果本地自动发现 `js-confuser` 失败，优先先跑 `npm run package:protection:jsconfuser:bootstrap`，再考虑补 `--jsconfuser-tool-path /absolute/path/to/js-confuser`。
+
+如果你要重新验证 `lightweight-js-obfuscator` 这条更后置的 Stage 3 候选，执行：
+
+```bash
+npm run package:protection:lightweight:preflight
+```
+
+这条命令现在会优先自动发现本地 `lightweight-js-obfuscator` checkout；默认会搜索仓库邻近目录、`$HOME/.openclaw/workspace-coding*`、`~/Downloads` 和 `dist/package-protection-tools/lightweight-js-obfuscator`。只有自动发现失败时，才需要补：
+
+```bash
+npm run package:protection:lightweight:preflight -- --tool-path /absolute/path/to/lightweight-js-obfuscator
+```
+
+它仍然只生成 advisory 预检报告，不会改写默认 `package:shielded` 路线；当前作用只是让这条后续候选更容易复跑，不改变既有 retained decision。
 
 如果你要把 `shielded` 基线和某个实验变体的当前证据收口成一份 A/B compare 报告，执行：
 

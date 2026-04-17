@@ -77,6 +77,7 @@
 4.4.3. 如需先把本地 `js-confuser` 工具 bootstrap 到默认可发现位置，运行 `npm run package:protection:jsconfuser:bootstrap`；默认会安装到 `dist/package-protection-tools/js-confuser`
 4.5. 如需预检 `JS-Confuser` 的 `astScrambler` 非 hostile 子集，运行 `npm run package:protection:jsconfuser:preflight`；若自动发现失败，优先先跑 `npm run package:protection:jsconfuser:bootstrap`，再考虑补 `-- --tool-path /absolute/path/to/js-confuser`
 4.6. 如需预检 `JS-Confuser` 的小范围 `stringConcealing` 候选，运行 `npm run package:protection:jsconfuser:string:preflight`；若自动发现失败，再补 `-- --tool-path /absolute/path/to/js-confuser`
+4.6.1. 如需重新验证 `lightweight-js-obfuscator` 这条更后置的 Stage 3 候选，运行 `npm run package:protection:lightweight:preflight`；脚本会先自动发现本地 checkout，只有失败时才需要补 `-- --tool-path /absolute/path/to/lightweight-js-obfuscator`
 4.7. 如需在现有 `shielded` 基础上额外叠一层 `JS-Confuser` 的 targeted `stringConcealing`，运行 `npm run package:shielded:jsconfuser:string`；若自动发现失败，优先先跑 `npm run package:protection:jsconfuser:bootstrap`
 4.7.1. 如需对这个实验变体直接做 Zotero smoke A/B，运行 `npm run package:protection:smoke:shielded:jsconfuser:string -- --repeats 3 --channel stable`；若自动发现失败，优先先跑 `npm run package:protection:jsconfuser:bootstrap`
 4.7.2. 如需 fresh 打包后直接调用本地 `webcrack` 生成自动化工件，运行 `npm run package:protection:webcrack:shielded -- --channel stable`，或对实验变体运行 `npm run package:protection:webcrack:shielded:descriptor-bind -- --channel stable`、`npm run package:protection:webcrack:shielded:jsconfuser:string -- --channel stable`
@@ -300,6 +301,7 @@ npm run package:protection:compare:jsconfuser:string -- --channel stable # 把 s
 npm run package:protection:jsconfuser:bootstrap # 把 js-confuser 安装到 dist/package-protection-tools/js-confuser，供后续实验自动发现
 npm run package:protection:jsconfuser:preflight # 预检 JS-Confuser astScrambler 非 hostile 子集的兼容性/体积/语义压缩；如自动发现失败，优先先跑 bootstrap
 npm run package:protection:jsconfuser:string:preflight # 预检 JS-Confuser 小范围 stringConcealing 的兼容性/体积/语义压缩；如自动发现失败，再补 -- --tool-path /absolute/path/to/js-confuser
+npm run package:protection:lightweight:preflight # 预检 lightweight-js-obfuscator 的兼容性/体积；默认先自动发现本地 checkout，失败时再补 -- --tool-path /absolute/path/to/lightweight-js-obfuscator
 npm run package:protection:score:llm -- --variant shielded-jsconfuser-string --channel stable --llm "parse-fail / only-loader" # 只补 LLM 单轮评分，保留已有 webcrack 结果
 npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture" # 回填 shielded stable 的手工评分
 npm run package:protection:verdict # 生成当前受保护打包链的 advisory verdict

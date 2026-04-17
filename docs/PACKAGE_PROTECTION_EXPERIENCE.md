@@ -13,7 +13,7 @@
 - `npm run package:shielded`
 - `npm run package:protection:jsconfuser:bootstrap`
 - `npm run package:protection:jsconfuser:preflight`
-- `npm run package:protection:lightweight:preflight -- --tool-path /absolute/path/to/lightweight-js-obfuscator`
+- `npm run package:protection:lightweight:preflight`
 - `npm run package:protection:smoke -- --variant <plain|encrypted|shielded|shielded-descriptor-bind> --repeats 3 --channel <stable|beta>`
 - `npm run package:protection:webcrack -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta>`
 - `npm run package:protection:webcrack:score -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta>`
@@ -363,6 +363,19 @@
 - 若目标是继续压 AI 对 raw 包的一轮高层归纳能力，下一步优先级仍然是 inner semantic scrub / Stage 3 候选，而不是继续在 descriptor-bind 这条线上挤 loader 表面
 
 如果需要重新验证 `lightweight-js-obfuscator` 的当前适配状态，现已可使用仓库内的显式 preflight 入口：
+
+```bash
+npm run package:protection:lightweight:preflight
+```
+
+当前脚本会优先自动发现本地 `lightweight-js-obfuscator` checkout，默认搜索：
+
+- 仓库邻近目录
+- `$HOME/.openclaw/workspace-coding*`
+- `~/Downloads`
+- `dist/package-protection-tools/lightweight-js-obfuscator`
+
+只有自动发现失败时，才需要显式补：
 
 ```bash
 npm run package:protection:lightweight:preflight -- --tool-path /absolute/path/to/lightweight-js-obfuscator

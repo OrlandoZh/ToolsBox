@@ -28,6 +28,19 @@ const projectRoot = path.resolve(__dirname, "..");
 const scriptStartedAt = Date.now();
 const DEFAULT_REPORT_BASENAME = "package-protection-lightweight-preflight";
 const KNOWN_COMPAT_PATCH = "object-property-key-skip";
+export const PACKAGE_LIGHTWEIGHT_TOOL_PATH_ENV = "CLEANROOM_PACKAGE_LIGHTWEIGHT_TOOL_PATH";
+const DISCOVERY_SKIP_DIRS = new Set([
+  ".git",
+  ".hg",
+  ".svn",
+  "build",
+  "dist",
+  "node_modules",
+  ".zotero-runtime",
+  ".pytest_cache",
+  ".mypy_cache",
+  "__pycache__",
+]);
 
 function truncateOutput(value, maxChars = 1200) {
   const text = String(value || "");
@@ -114,12 +127,178 @@ export function parsePackageProtectionLightweightPreflightArgs(argv = process.ar
     }
   }
 
-  assertScript(Boolean(options.toolPath), "--tool-path is required", {
-    category: "args",
-    failedStage: "parse-args",
+  return options;
+}
+
+function normalizeUniqueAbsolutePaths(values = []) {
+  const seen = new Set();
+  const result = [];
+  for (const value of values) {
+    const normalized = String(value || "").trim();
+    if (!normalized) {
+      continue;
+    }
+    const absolutePath = path.resolve(normalized);
+    if (seen.has(absolutePath)) {
+      continue;
+    }
+    seen.add(absolutePath);
+    result.push(absolutePath);
+  }
+  return result;
+}
+
+export function buildLightweightDiscoveryRoots({ projectRootPath = projectRoot, env = process.env } = {}) {
+  const homePath = String(env?.HOME || os.homedir?.() || "").trim();
+  const tempPath = String(env?.TMPDIR || os.tmpdir?.() || "").trim();
+  const installRoot = resolveAgentArtifactPath(projectRootPath, "package-protection-tools", "lightweight-js-obfuscator");
+  const tempFallbackRoots = normalizeUniqueAbsolutePaths([
+    tempPath || null,
+    "/tmp",
+  ]);
+  const projectNeighborRoots = normalizeUniqueAbsolutePaths([
+    installRoot,
+    projectRootPath,
+    path.join(projectRootPath, ".."),
+    path.join(projectRootPath, "..", ".."),
+  ]).filter((candidate) => !tempFallbackRoots.includes(candidate));
+  return normalizeUniqueAbsolutePaths([
+    ...projectNeighborRoots,
+    homePath ? path.join(homePath, ".openclaw", "workspace-coding") : null,
+    homePath ? path.join(homePath, ".openclaw", "workspace-coding", "projects") : null,
+    homePath ? path.join(homePath, ".openclaw", "workspace-coding", "projects", "GitHub") : null,
+    homePath ? path.join(homePath, "Downloads") : null,
+    ...tempFallbackRoots,
+  ]);
+}
+
+async function listLightweightCandidates(rootPath, maxDepth = 4) {
+  const stats = await fs.stat(rootPath).catch(() => null);
+  if (!stats?.isDirectory()) {
+    return [];
+  }
+
+  const queue = [{ dirPath: rootPath, depth: 0 }];
+  const seenDirs = new Set();
+  const seenCandidates = new Set();
+  const candidates = [];
+
+  while (queue.length > 0) {
+    const { dirPath, depth } = queue.shift();
+    const normalizedDirPath = path.resolve(dirPath);
+    if (seenDirs.has(normalizedDirPath)) {
+      continue;
+    }
+    seenDirs.add(normalizedDirPath);
+
+    const directCandidates = normalizeUniqueAbsolutePaths([
+      path.basename(normalizedDirPath) === "lightweight-js-obfuscator" ? normalizedDirPath : null,
+      path.join(normalizedDirPath, "lightweight-js-obfuscator"),
+      path.join(normalizedDirPath, "node_modules", "lightweight-js-obfuscator"),
+    ]);
+    for (const candidate of directCandidates) {
+      if (seenCandidates.has(candidate)) {
+        continue;
+      }
+      seenCandidates.add(candidate);
+      candidates.push(candidate);
+    }
+
+    if (depth >= maxDepth) {
+      continue;
+    }
+
+    const entries = await fs.readdir(normalizedDirPath, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      if (!entry?.isDirectory?.()) {
+        continue;
+      }
+      if (entry.name === "." || entry.name === "..") {
+        continue;
+      }
+      if (DISCOVERY_SKIP_DIRS.has(entry.name)) {
+        continue;
+      }
+      queue.push({
+        dirPath: path.join(normalizedDirPath, entry.name),
+        depth: depth + 1,
+      });
+    }
+  }
+
+  return candidates;
+}
+
+async function resolveReadyLightweightDiscoveryCandidate(candidatePath) {
+  try {
+    return await ensureToolReady(candidatePath);
+  } catch {
+    return null;
+  }
+}
+
+export async function discoverLightweightToolPath({ projectRootPath = projectRoot, env = process.env } = {}) {
+  const searchedRoots = [];
+  for (const rootPath of buildLightweightDiscoveryRoots({ projectRootPath, env })) {
+    searchedRoots.push(rootPath);
+    const candidates = await listLightweightCandidates(rootPath);
+    for (const candidate of candidates) {
+      const readyCandidate = await resolveReadyLightweightDiscoveryCandidate(candidate);
+      if (!readyCandidate) {
+        continue;
+      }
+      return {
+        toolPath: readyCandidate.toolPath,
+        searchedRoots,
+        discovered: true,
+      };
+    }
+  }
+
+  return {
+    toolPath: null,
+    searchedRoots,
+    discovered: false,
+  };
+}
+
+export async function resolvePackageProtectionLightweightToolSelection({
+  toolPath = null,
+  projectRootPath = projectRoot,
+  env = process.env,
+} = {}) {
+  const explicitToolPath = String(
+    toolPath
+    || env?.[PACKAGE_LIGHTWEIGHT_TOOL_PATH_ENV]
+    || "",
+  ).trim() || null;
+
+  if (explicitToolPath) {
+    return {
+      toolPath: explicitToolPath,
+      discovered: false,
+      searchedRoots: [],
+    };
+  }
+
+  const discovery = await discoverLightweightToolPath({
+    projectRootPath,
+    env,
+  });
+  assertScript(Boolean(discovery.toolPath), "unable to discover local lightweight-js-obfuscator checkout; pass --tool-path or set CLEANROOM_PACKAGE_LIGHTWEIGHT_TOOL_PATH", {
+    category: "environment",
+    failedStage: "resolve-lightweight-tool",
+    details: {
+      envVar: PACKAGE_LIGHTWEIGHT_TOOL_PATH_ENV,
+      searchedRoots: discovery.searchedRoots,
+    },
   });
 
-  return options;
+  return {
+    toolPath: discovery.toolPath,
+    discovered: true,
+    searchedRoots: discovery.searchedRoots,
+  };
 }
 
 export function detectLightweightHostileDefaults(sourceCode = "") {
@@ -571,7 +750,12 @@ async function main(argv = process.argv.slice(2)) {
       },
     });
 
-    const toolInfo = await ensureToolReady(options.toolPath);
+    const toolSelection = await resolvePackageProtectionLightweightToolSelection({
+      toolPath: options.toolPath,
+      projectRootPath: projectRoot,
+      env: process.env,
+    });
+    const toolInfo = await ensureToolReady(toolSelection.toolPath);
     if (!options.bundlePath) {
       await ensureProtectedBuildBundle();
     }
