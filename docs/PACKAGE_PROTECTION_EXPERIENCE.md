@@ -27,6 +27,7 @@
 - `npm run package:protection:score:guided -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest> --channel <stable|beta> --rating "<rating>" --result-tier <R0|R1|R2|R3|R4> --attacker-tier <A0|A1|A2|A3|A4> --ai-tier <M0|M1|M2|M3|M4> --attack-method <static-only|static+webcrack|static+reference|dynamic-hooked|runtime-rehosted> --time-bucket <<10m|10-30m|30-120m|>120m> --round-mode <single-pass|multi-round> --summary "<summary>"`
 - `npm run package:protection:attack`
 - `npm run package:protection:attack:plan`
+- `npm run package:protection:strategy`
 - `npm run package:protection:review`
 - `npm run package:protection:wasm:admission`
 - `npm run package:protection:compare -- --variant <shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest> --channel <stable|beta>`
@@ -89,6 +90,7 @@
   - `guidedA2M3`
 - `package:protection:attack` 对 `current` 候选会优先提示“先补固定覆盖线证据”，再谈 `probe-candidate-hardening`；避免把“证据不足”误读成“已经适合继续 hardening A/B”
 - `package:protection:attack:plan` 只把这些 fixed-profile gap 翻译成下一步命令模板，不重跑实验、不回写评分；controller 可以直接按它给出的顺序补 `current` 缺口，再决定是否继续 review retained experiment
+- `package:protection:strategy` 是当前 controller-facing 总览入口：它固定读取 `matrix / retained review / wasm admission / candidates registry`，回答“当前 primary 是谁、retained top hardening 候选是谁、Wasm 是否只应继续停在 bounded experiment”，不重跑实验、不改 release/gate
 - `package:protection:attack:plan` 现在还会对 retained experiment review queue 做固定排序：先按 `compare status / decision`，再按 `unpacked support surface` 收缩幅度，最后看 `xpi / prepare / decode` 成本；当前固定画像缺口补齐后，会稳定把 `shielded-surface-scrub` 排在 `shielded-pref-bridge` 之前
 - 实验候选如果已经是 `hardening-win`，但 `compare.evidence.llmSymmetryComplete` 仍未补齐，矩阵和 retained review 不再直接给 `promote-experimental-candidate`；当前统一收口为 `collect-llm-symmetry-evidence`
 - 对应地，`package:protection:attack:plan` 现在会先生成 `collect-experimental-llm-symmetry-evidence` 任务，再进入 retained experiment review；避免把“仍缺对称 single-pass LLM 证据”的候选误当成已可 promotion

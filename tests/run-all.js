@@ -131,6 +131,7 @@ import './package-protection-smoke.test.js';
 import './package-protection-webcrack-audit.test.js';
 import './package-protection-webcrack-score.test.js';
 import './package-protection-manual-score.test.js';
+import './package-protection-strategy-report.test.js';
 import './package-protection-verdict.test.js';
 import './package-protection-wasm-admission.test.js';
 import './cleanroom-audit.test.js';

@@ -1005,6 +1005,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(packageJSON.scripts["package:protection:audit:surface-scrub"], "node scripts/package-protection-anchor-audit.mjs --include-surface-scrub");
     assert.equal(packageJSON.scripts["package:protection:attack"], "node scripts/package-protection-attack-report.mjs");
     assert.equal(packageJSON.scripts["package:protection:attack:plan"], "node scripts/package-protection-guided-attack-plan.mjs");
+    assert.equal(packageJSON.scripts["package:protection:strategy"], "node scripts/package-protection-strategy-report.mjs");
     assert.equal(packageJSON.scripts["package:protection:review"], "node scripts/package-protection-retained-review.mjs");
     assert.equal(packageJSON.scripts["package:protection:matrix"], "node scripts/package-protection-matrix-report.mjs");
     assert.equal(packageJSON.scripts["package:protection:wasm:admission"], "node scripts/package-protection-wasm-admission.mjs");
@@ -1394,6 +1395,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(exportPackage.scripts["package:protection:audit:surface-scrub"], "node scripts/package-protection-anchor-audit.mjs --include-surface-scrub");
     assert.equal(exportPackage.scripts["package:protection:attack"], "node scripts/package-protection-attack-report.mjs");
     assert.equal(exportPackage.scripts["package:protection:attack:plan"], "node scripts/package-protection-guided-attack-plan.mjs");
+    assert.equal(exportPackage.scripts["package:protection:strategy"], "node scripts/package-protection-strategy-report.mjs");
     assert.equal(exportPackage.scripts["package:protection:review"], "node scripts/package-protection-retained-review.mjs");
     assert.equal(exportPackage.scripts["package:protection:matrix"], "node scripts/package-protection-matrix-report.mjs");
     assert.equal(exportPackage.scripts["package:protection:wasm:admission"], "node scripts/package-protection-wasm-admission.mjs");
@@ -1463,6 +1465,7 @@ describe("Toolchain Scripts", () => {
     assert.ok(exportReadme.includes("package:protection:audit:surface-scrub"));
     assert.ok(exportReadme.includes("package:protection:attack"));
     assert.ok(exportReadme.includes("package:protection:attack:plan"));
+    assert.ok(exportReadme.includes("package:protection:strategy"));
     assert.ok(exportReadme.includes("package:protection:review"));
     assert.ok(exportReadme.includes("package:protection:matrix"));
     assert.ok(exportReadme.includes("package:protection:wasm:admission"));

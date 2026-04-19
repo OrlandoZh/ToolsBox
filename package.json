@@ -40,6 +40,7 @@
     "package:protection:audit:surface-scrub": "node scripts/package-protection-anchor-audit.mjs --include-surface-scrub",
     "package:protection:attack": "node scripts/package-protection-attack-report.mjs",
     "package:protection:attack:plan": "node scripts/package-protection-guided-attack-plan.mjs",
+    "package:protection:strategy": "node scripts/package-protection-strategy-report.mjs",
     "package:protection:review": "node scripts/package-protection-retained-review.mjs",
     "package:protection:matrix": "node scripts/package-protection-matrix-report.mjs",
     "package:protection:wasm:admission": "node scripts/package-protection-wasm-admission.mjs",
