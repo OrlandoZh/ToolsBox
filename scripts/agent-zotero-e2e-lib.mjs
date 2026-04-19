@@ -1129,6 +1129,27 @@ export function buildE2EMarkdown(report) {
     report.hints.forEach((item) => lines.push(`- ${item}`));
   }
 
+  if (report.debugProbe && typeof report.debugProbe === "object") {
+    lines.push("", "## Debug Probe", "");
+    lines.push(`- 状态: \`${report.debugProbe.statusLabel || report.debugProbe.status || "-"}\``);
+    lines.push(`- 模式: \`${report.debugProbe.requestedMode || report.debugProbe.mode || "-"}\``);
+    lines.push(`- 已选 bundles: \`${report.debugProbe.selectedProbeCount ?? 0}\``);
+    lines.push(`- 已执行 bundles: \`${report.debugProbe.executedProbeCount ?? 0}\``);
+    lines.push(`- 失败 bundles: \`${report.debugProbe.failedProbeCount ?? 0}\``);
+    lines.push(`- Promotion: ${(report.debugProbe.promotions || []).join("、") || "-"}`);
+    lines.push(`- 对齐本轮 E2E: \`${report.debugProbe.freshForLatestE2E === null ? "-" : (report.debugProbe.freshForLatestE2E ? "yes" : "no")}\``);
+    lines.push(`- 摘要: ${report.debugProbe.summary || "-"}`);
+    if (report.debugProbe.nextSuggestedAction) {
+      lines.push(`- 下一步: ${report.debugProbe.nextSuggestedAction}`);
+    }
+    if (report.debugProbe.reportJSON) {
+      lines.push(`- JSON: ${toMarkdownLink(report.debugProbe.reportJSON)}`);
+    }
+    if (report.debugProbe.reportMD) {
+      lines.push(`- Markdown: ${toMarkdownLink(report.debugProbe.reportMD)}`);
+    }
+  }
+
   if (summary.domContractReport?.present) {
     lines.push("", "## DOM Contract", "");
     lines.push(`- 状态: \`${summary.domContractReport.statusLabel || summary.domContractReport.status || "-"}\``);

@@ -282,6 +282,103 @@ describe("Agent Frontpage Summary Lib", () => {
     assert.ok(frontpage.advisorySignals.some((item) => item.includes("queued in background")));
   });
 
+  it("should surface fresh debug probe results as advisory without changing stable next action", () => {
+    const frontpage = buildMonitorFrontpageSummary({
+      watchStatus: {
+        present: true,
+        status: "healthy",
+        statusLabel: "健康",
+        ageText: "1 分钟",
+      },
+      zoteroValidation: {
+        e2e: {
+          present: true,
+          status: "passed",
+          statusLabel: "通过",
+          ageText: "1 分钟",
+        },
+        autofix: {
+          present: true,
+          status: "clean",
+          statusLabel: "干净",
+          ageText: "1 分钟",
+        },
+        watchRecovery: {
+          present: true,
+          status: "passed",
+          statusLabel: "通过",
+          ageText: "1 分钟",
+        },
+        debugProbe: {
+          present: true,
+          status: "completed",
+          statusLabel: "已完成",
+          ageText: "1 分钟",
+          executedProbeCount: 1,
+          selectedProbeCount: 1,
+          failedProbeCount: 0,
+          promotions: ["interaction-proved"],
+          summary: "已选 1 个 bundle；已执行 1 个 bundle；完成 1 个；promotion interaction-proved",
+          freshForLatestE2E: true,
+        },
+      },
+    });
+
+    assert.equal(frontpage.status, "stable");
+    assert.equal(frontpage.nextAction, "npm run agent:gate");
+    assert.equal(frontpage.debugProbe.status, "completed");
+    assert.ok(frontpage.advisorySignals.some((item) => item.includes("debug probe ready")));
+  });
+
+  it("should recommend debug probe as advisory when latest failed e2e has no fresh probe", () => {
+    const frontpage = buildMonitorFrontpageSummary({
+      watchStatus: {
+        present: true,
+        status: "healthy",
+        statusLabel: "健康",
+        ageText: "1 分钟",
+      },
+      zoteroValidation: {
+        e2e: {
+          present: true,
+          status: "failed",
+          statusLabel: "失败",
+          ageText: "1 分钟",
+          note: "Reader sidebar toggle 未闭环。",
+        },
+        autofix: {
+          present: false,
+          status: "missing",
+          statusLabel: "缺失",
+          ageText: "-",
+        },
+        watchRecovery: {
+          present: true,
+          status: "passed",
+          statusLabel: "通过",
+          ageText: "1 分钟",
+        },
+        debugProbe: {
+          present: true,
+          status: "completed",
+          statusLabel: "已完成",
+          ageText: "20 分钟",
+          executedProbeCount: 1,
+          selectedProbeCount: 1,
+          failedProbeCount: 0,
+          promotions: ["interaction-proved"],
+          summary: "上一轮 probe 已完成。",
+          freshForLatestE2E: false,
+        },
+      },
+    });
+
+    assert.equal(frontpage.status, "attention");
+    assert.equal(frontpage.nextAction, "npm run agent:zotero:e2e");
+    assert.ok(frontpage.primarySignals.some((item) => item.includes("尚未对齐最新 debug probe")));
+    assert.ok(frontpage.advisorySignals.some((item) => item.includes("fresh debug probe")));
+  });
+
   it("should surface dead-chain audit as advisory signals without changing stable next action", () => {
     const frontpage = buildMonitorFrontpageSummary({
       watchStatus: {
@@ -372,6 +469,55 @@ describe("Agent Frontpage Summary Lib", () => {
     assert.equal(frontpage.deadChainAudit.retiredChainCount, 1);
     assert.equal(frontpage.deadChainAudit.historyRetainedCount, 1);
     assert.ok(frontpage.advisorySignals.some((item) => item.includes("dead-chain audit advisory")));
+  });
+
+  it("should surface fresh debug probe in gate frontpage summary without turning it into a blocker", () => {
+    const frontpage = buildGateFrontpageSummary({
+      gatePassed: false,
+      profile: "dev",
+      issues: [
+        "最近 Zotero E2E 未通过：失败。",
+      ],
+      recommendations: [
+        "优先重新执行 `npm run agent:zotero:e2e`，确认真实 Zotero 动作、测试与视觉基线是否全部通过。",
+      ],
+      watchStatus: {
+        status: "healthy",
+        statusLabel: "健康",
+        ageText: "1 分钟",
+      },
+      zoteroValidation: {
+        e2e: {
+          present: true,
+          status: "failed",
+          statusLabel: "失败",
+          ageText: "1 分钟",
+        },
+        watchRecovery: {
+          present: true,
+          status: "passed",
+          statusLabel: "通过",
+          ageText: "1 分钟",
+        },
+        debugProbe: {
+          present: true,
+          status: "completed",
+          statusLabel: "已完成",
+          ageText: "1 分钟",
+          selectedProbeCount: 1,
+          executedProbeCount: 1,
+          failedProbeCount: 0,
+          promotions: ["interaction-proved"],
+          summary: "已选 1 个 bundle；已执行 1 个 bundle；完成 1 个；promotion interaction-proved",
+          freshForLatestE2E: true,
+        },
+      },
+    });
+
+    assert.equal(frontpage.status, "blocked");
+    assert.equal(frontpage.debugProbe.status, "completed");
+    assert.ok(frontpage.advisorySignals.some((item) => item.includes("debug probe ready")));
+    assert.equal(frontpage.primaryBlockers.length, 1);
   });
 
   it("should prefer concrete watch recovery action over generic validation pipeline guidance", () => {

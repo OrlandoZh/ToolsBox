@@ -15,6 +15,71 @@
       "notes": "authoritative source rolling snapshot"
     },
     {
+      "id": "zotero-schema",
+      "label": "Zotero Schema",
+      "enabled": false,
+      "targetPath": "reference/Templetereference/zotero-schema-master",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/zotero/zotero-schema.git",
+        "ref": "master",
+        "refType": "branch"
+      },
+      "notes": "官方数据模型 JSON；适合 item/field/creator/CSL/locale 元数据对照，不替代 zotero-main 宿主 contract。⚠️ 目录尚未克隆，参考路由见 REFERENCE_ZOTERO_OFFICIAL_ECOSYSTEM.md"
+    },
+    {
+      "id": "zotero-utilities",
+      "label": "Zotero Utilities",
+      "enabled": false,
+      "targetPath": "reference/Templetereference/zotero-utilities-master",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/zotero/utilities.git",
+        "ref": "master",
+        "refType": "branch"
+      },
+      "notes": "官方共享工具库；适合 schema/date/openurl/item utility 行为对照，不作为模板运行时依赖。⚠️ 目录尚未克隆，参考路由见 REFERENCE_ZOTERO_OFFICIAL_ECOSYSTEM.md"
+    },
+    {
+      "id": "zotero-translators",
+      "label": "Zotero Translators",
+      "enabled": false,
+      "targetPath": "reference/Templetereference/zotero-translators-master",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/zotero/translators.git",
+        "ref": "master",
+        "refType": "branch"
+      },
+      "notes": "官方 translator 集合；适合导入导出、网页抓取与 translator 行为对照。⚠️ 目录尚未克隆，参考路由见 REFERENCE_ZOTERO_OFFICIAL_ECOSYSTEM.md"
+    },
+    {
+      "id": "zotero-translation-server",
+      "label": "Zotero Translation Server",
+      "enabled": false,
+      "targetPath": "reference/Templetereference/zotero-translation-server-master",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/zotero/translation-server.git",
+        "ref": "master",
+        "refType": "branch"
+      },
+      "notes": "官方 Node translator runtime；适合无客户端翻译与服务侧 translator 执行链研究。⚠️ 目录尚未克隆，参考路由见 REFERENCE_ZOTERO_OFFICIAL_ECOSYSTEM.md"
+    },
+    {
+      "id": "zotero-connectors",
+      "label": "Zotero Connectors",
+      "enabled": false,
+      "targetPath": "reference/Templetereference/zotero-connectors-master",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/zotero/zotero-connectors.git",
+        "ref": "master",
+        "refType": "branch"
+      },
+      "notes": "官方浏览器连接器；适合网页捕获、browser integration 与 connector/translators 协作边界研究。⚠️ 目录尚未克隆，参考路由见 REFERENCE_ZOTERO_OFFICIAL_ECOSYSTEM.md"
+    },
+    {
       "id": "zotero-exitem-main",
       "label": "Zotero Exitem",
       "enabled": true,
@@ -429,6 +494,78 @@
         "refType": "branch"
       },
       "notes": "Zotero 状态监控工具 v0.0.6，activity-oriented 采样思路已在 CURRENT_BACKLOG 中引用"
+    },
+    {
+      "id": "zotseek-main",
+      "label": "ZotSeek (Semantic Search)",
+      "enabled": true,
+      "targetPath": "reference/plugin/ZotSeek-main",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/introfini/zotseek.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "本地语义搜索 + Transformers.js ChromeWorker + nomic-embed + SQLite vector store + RRF hybrid search + Plugin API"
+    },
+    {
+      "id": "yanzheng-mindmap",
+      "label": "Zotero Mindmap (yanzheng)",
+      "enabled": false,
+      "targetPath": "reference/yanzheng/reference/zotero-mindmap-plugin",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/samreading/zotero-mindmap.git",
+        "ref": "main",
+        "refType": "branch"
+      },
+      "notes": "安全研究专用：思维导图插件，硬编码 AES 密钥、伪造设备绑定、激活机制分析见 yanzheng/docs/"
+    },
+    {
+      "id": "yanzheng-style",
+      "label": "Zotero Style (yanzheng)",
+      "enabled": false,
+      "targetPath": "reference/yanzheng/reference/zotero-style",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/MuiseDestiny/zotero-style.git",
+        "ref": "master",
+        "refType": "branch"
+      },
+      "notes": "安全研究专用：Ethereal Style v5.9.9，远程验证端点、eval 风险、HTTP 明文传输分析见 yanzheng/docs/"
+    },
+    {
+      "id": "yanzheng-reference",
+      "label": "Zotero Reference (yanzheng)",
+      "enabled": false,
+      "targetPath": "reference/yanzheng/reference/zotero-reference",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/MuiseDestiny/zotero-reference.git",
+        "ref": "master",
+        "refType": "branch"
+      },
+      "notes": "安全研究专用：Ethereal Reference v1.7.1，隐藏快捷键、window.eval 代码注入分析见 yanzheng/docs/"
+    },
+    {
+      "id": "yanzheng-ai4paper",
+      "label": "AI4Paper v3.2 (yanzheng)",
+      "enabled": false,
+      "targetPath": "reference/yanzheng/reference/ai4paper-v3.2.1.6",
+      "source": {
+        "type": "archive"
+      },
+      "notes": "安全研究专用：AI4Paper 最新版本，与主 reference v1.3.1.0 对比"
+    },
+    {
+      "id": "yanzheng-bibgenie",
+      "label": "BibGenie v0.6.4 (yanzheng)",
+      "enabled": false,
+      "targetPath": "reference/yanzheng/reference/bibgenie-0.6.4",
+      "source": {
+        "type": "archive"
+      },
+      "notes": "安全研究专用：BibGenie 最新版本，与主 reference v0.6.2 对比"
     },
     {
       "id": "actions-and-tags-for-zotero",

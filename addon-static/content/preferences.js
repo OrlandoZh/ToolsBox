@@ -5,11 +5,45 @@
   const INIT_API_KEY = "initCleanroomPreferences";
   const STORAGE_KEY = "__cleanroomPreferenceThemeState__";
   const PREF_ELEMENT_ID = "pref-themeMode";
+  const PREFERENCE_BINDING_MODE_BRIDGE = "bridge";
   const ROOT_SELECTOR = ".cleanroom-pref-root";
   const FIELD_ROW_SELECTOR = ".cleanroom-pref-field-row";
   const DEFAULT_MODE = "follow-host";
   const INLINE_LAYOUT_MODE = "inline";
   const STACKED_LAYOUT_MODE = "stacked";
+  const PREFERENCE_BINDINGS = Object.freeze([
+    Object.freeze({
+      prefId: "pref-enabled",
+      controlId: "cleanroom-enabled",
+      bridgeKey: "enabled",
+      type: "bool",
+      fallback: false,
+    }),
+    Object.freeze({
+      prefId: "pref-menuLabel",
+      controlId: "cleanroom-menu-label",
+      bridgeKey: "menuLabel",
+      type: "string",
+      fallback: "",
+    }),
+    Object.freeze({
+      prefId: "pref-logLevel",
+      controlId: "cleanroom-log-level",
+      bridgeKey: "logLevel",
+      type: "string",
+      fallback: "info",
+    }),
+    Object.freeze({
+      prefId: "pref-themeMode",
+      controlId: "cleanroom-theme-mode",
+      bridgeKey: "themeMode",
+      type: "string",
+      fallback: DEFAULT_MODE,
+      normalize(value) {
+        return normalizeMode(value);
+      },
+    }),
+  ]);
   const LOCALIZED_TEXT_SPECS = Object.freeze([
     Object.freeze({
       id: "cleanroom-pref-caption",
@@ -101,6 +135,24 @@
     return strings && !Array.isArray(strings) ? strings : null;
   }
 
+  function getBridgePreferenceNames(options = {}) {
+    const bridge = getBridge(options);
+    const preferenceNames = bridge && typeof bridge.preferenceNames === "object"
+      ? bridge.preferenceNames
+      : null;
+    return preferenceNames && !Array.isArray(preferenceNames)
+      ? preferenceNames
+      : null;
+  }
+
+  function getPreferenceBindingMode(options = {}) {
+    const bridge = getBridge(options);
+    const mode = String(bridge?.preferenceBindingMode || "").trim().toLowerCase();
+    return mode === PREFERENCE_BINDING_MODE_BRIDGE
+      ? PREFERENCE_BINDING_MODE_BRIDGE
+      : "native";
+  }
+
   function getRoot(options = {}) {
     if (options.rootElement && typeof options.rootElement === "object") {
       return options.rootElement;
@@ -121,6 +173,58 @@
     }
     const name = prefElement.getAttribute("name") || prefElement.name;
     return typeof name === "string" && name.trim() ? name.trim() : null;
+  }
+
+  function getPreferenceElement(prefId) {
+    return typeof document?.getElementById === "function"
+      ? document.getElementById(prefId)
+      : null;
+  }
+
+  function getPreferenceControl(controlId) {
+    return typeof document?.getElementById === "function"
+      ? document.getElementById(controlId)
+      : null;
+  }
+
+  function applyBridgePreferenceNames(options = {}) {
+    const preferenceNames = getBridgePreferenceNames(options);
+    if (!preferenceNames) {
+      return {
+        applied: false,
+        appliedCount: 0,
+        prefNames: {},
+      };
+    }
+
+    let appliedCount = 0;
+    const resolvedPrefNames = {};
+    PREFERENCE_BINDINGS.forEach((binding) => {
+      const prefName = typeof preferenceNames[binding.bridgeKey] === "string"
+        ? preferenceNames[binding.bridgeKey].trim()
+        : "";
+      if (!prefName) {
+        return;
+      }
+      resolvedPrefNames[binding.prefId] = prefName;
+      const prefElement = getPreferenceElement(binding.prefId);
+      if (!prefElement) {
+        return;
+      }
+      if (typeof prefElement.setAttribute === "function") {
+        prefElement.setAttribute("name", prefName);
+      }
+      try {
+        prefElement.name = prefName;
+      } catch {}
+      appliedCount += 1;
+    });
+
+    return {
+      applied: appliedCount > 0,
+      appliedCount,
+      prefNames: resolvedPrefNames,
+    };
   }
 
   function setDatasetAttribute(element, datasetKey, attributeName, value) {
@@ -384,6 +488,200 @@
     }
   }
 
+  function readBooleanPref(prefName, fallbackValue = false) {
+    const services = getServices();
+    if (
+      !prefName
+      || !services?.prefs
+      || typeof services.prefs.getBoolPref !== "function"
+    ) {
+      return Boolean(fallbackValue);
+    }
+    try {
+      return Boolean(services.prefs.getBoolPref(prefName, Boolean(fallbackValue)));
+    } catch {
+      return Boolean(fallbackValue);
+    }
+  }
+
+  function readStringPref(prefName, fallbackValue = "") {
+    const services = getServices();
+    if (
+      !prefName
+      || !services?.prefs
+      || typeof services.prefs.getStringPref !== "function"
+    ) {
+      return String(fallbackValue || "");
+    }
+    try {
+      return String(services.prefs.getStringPref(prefName, String(fallbackValue || "")) || fallbackValue || "");
+    } catch {
+      return String(fallbackValue || "");
+    }
+  }
+
+  function writeBooleanPref(prefName, value) {
+    const services = getServices();
+    if (
+      !prefName
+      || !services?.prefs
+      || typeof services.prefs.setBoolPref !== "function"
+    ) {
+      return;
+    }
+    try {
+      services.prefs.setBoolPref(prefName, Boolean(value));
+    } catch {}
+  }
+
+  function writeStringPref(prefName, value) {
+    const services = getServices();
+    if (
+      !prefName
+      || !services?.prefs
+      || typeof services.prefs.setStringPref !== "function"
+    ) {
+      return;
+    }
+    try {
+      services.prefs.setStringPref(prefName, String(value || ""));
+    } catch {}
+  }
+
+  function setControlValue(control, binding, value) {
+    if (!control) {
+      return;
+    }
+    if (binding.type === "bool") {
+      const nextValue = Boolean(value);
+      try {
+        control.checked = nextValue;
+      } catch {}
+      if (typeof control.setAttribute === "function") {
+        control.setAttribute("checked", nextValue ? "true" : "false");
+      }
+      return;
+    }
+
+    const nextValue = binding.normalize ? binding.normalize(value) : String(value || "");
+    try {
+      control.value = nextValue;
+    } catch {}
+    if (typeof control.setAttribute === "function") {
+      control.setAttribute("value", nextValue);
+    }
+  }
+
+  function readControlValue(control, binding) {
+    if (!control) {
+      return binding.fallback;
+    }
+    if (binding.type === "bool") {
+      return Boolean(control.checked);
+    }
+    const rawValue = typeof control.value === "string"
+      ? control.value
+      : (typeof control.getAttribute === "function" ? control.getAttribute("value") : "");
+    return binding.normalize ? binding.normalize(rawValue) : String(rawValue || "");
+  }
+
+  function createBridgePreferenceBindings(options = {}) {
+    if (getPreferenceBindingMode(options) !== PREFERENCE_BINDING_MODE_BRIDGE) {
+      return {
+        active: false,
+        appliedCount: 0,
+        prefNames: {},
+        syncAll() {},
+        dispose() {},
+      };
+    }
+
+    const resolvedNames = applyBridgePreferenceNames(options);
+    if (!resolvedNames.applied) {
+      return {
+        active: false,
+        appliedCount: 0,
+        prefNames: resolvedNames.prefNames || {},
+        syncAll() {},
+        dispose() {},
+      };
+    }
+
+    const listeners = [];
+    const syncControllers = [];
+
+    PREFERENCE_BINDINGS.forEach((binding) => {
+      const prefName = resolvedNames.prefNames[binding.prefId] || null;
+      const control = getPreferenceControl(binding.controlId);
+      if (!prefName || !control) {
+        return;
+      }
+
+      const syncFromPrefs = () => {
+        const value = binding.type === "bool"
+          ? readBooleanPref(prefName, binding.fallback)
+          : readStringPref(prefName, binding.fallback);
+        setControlValue(control, binding, value);
+        return value;
+      };
+
+      const writeFromControl = () => {
+        const value = readControlValue(control, binding);
+        if (binding.type === "bool") {
+          writeBooleanPref(prefName, value);
+        } else {
+          writeStringPref(prefName, value);
+        }
+      };
+
+      ["command", "change", "input"].forEach((eventName) => {
+        if (typeof control.addEventListener !== "function") {
+          return;
+        }
+        const handler = () => {
+          writeFromControl();
+        };
+        try {
+          control.addEventListener(eventName, handler);
+          listeners.push({
+            control,
+            eventName,
+            handler,
+          });
+        } catch {}
+      });
+
+      syncControllers.push({
+        prefId: binding.prefId,
+        prefName,
+        controlId: binding.controlId,
+        syncFromPrefs,
+      });
+      syncFromPrefs();
+    });
+
+    return {
+      active: syncControllers.length > 0,
+      appliedCount: syncControllers.length,
+      prefNames: resolvedNames.prefNames || {},
+      syncAll() {
+        syncControllers.forEach((controller) => {
+          controller.syncFromPrefs();
+        });
+      },
+      dispose() {
+        listeners.forEach(({ control, eventName, handler }) => {
+          if (typeof control?.removeEventListener !== "function") {
+            return;
+          }
+          try {
+            control.removeEventListener(eventName, handler);
+          } catch {}
+        });
+      },
+    };
+  }
+
   function persistNormalizedMode(prefName, rawMode, normalizedMode) {
     const services = getServices();
     if (
@@ -436,6 +734,9 @@
       };
     }
 
+    const preferenceBridge = createBridgePreferenceBindings({
+      bridge,
+    });
     const bridgeLocalization = applyBridgeLocalization({
       bridge,
     });
@@ -446,6 +747,7 @@
     let rawMode = readRawThemeMode(prefName);
     let mode = normalizeMode(rawMode);
     persistNormalizedMode(prefName, rawMode, mode);
+    preferenceBridge.syncAll();
 
     const previousColorScheme = root?.style && typeof root.style.colorScheme === "string"
       ? root.style.colorScheme
@@ -466,6 +768,7 @@
         rawMode = readRawThemeMode(prefName);
         mode = normalizeMode(rawMode);
         persistNormalizedMode(prefName, rawMode, mode);
+        preferenceBridge.syncAll();
         themeControl.refresh();
       },
     };
@@ -486,6 +789,7 @@
     function cleanup() {
       themeControl.dispose();
       layoutController.dispose();
+      preferenceBridge.dispose();
 
       if (
         prefName
@@ -513,6 +817,9 @@
       bridge,
       cleanup,
       prefName,
+      preferenceBindingMode: getPreferenceBindingMode({
+        bridge,
+      }),
       root,
     };
 
@@ -524,6 +831,11 @@
       bridgeLocalizationApplied: bridgeLocalization.applied,
       fluentTranslationRequested,
       localizedCount: bridgeLocalization.localizedCount,
+      preferenceBindingMode: getPreferenceBindingMode({
+        bridge,
+      }),
+      preferenceBridgeApplied: preferenceBridge.active,
+      preferenceBridgeAppliedCount: preferenceBridge.appliedCount,
       prefName,
       rootFound: true,
       mode: state.mode,

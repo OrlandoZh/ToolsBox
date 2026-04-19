@@ -82,6 +82,29 @@ function sortByTaskOrder(values, taskIndexMap) {
   });
 }
 
+function stripFencedCodeBlocks(content) {
+  const lines = String(content || "").split("\n");
+  const stripped = [];
+  let activeFenceChar = null;
+
+  for (const line of lines) {
+    const fenceMatch = line.match(/^\s*(`{3,}|~{3,})/u);
+    if (fenceMatch) {
+      const fenceChar = fenceMatch[1][0];
+      if (!activeFenceChar) {
+        activeFenceChar = fenceChar;
+      } else if (activeFenceChar === fenceChar) {
+        activeFenceChar = null;
+      }
+      stripped.push("");
+      continue;
+    }
+    stripped.push(activeFenceChar ? "" : line);
+  }
+
+  return stripped.join("\n");
+}
+
 async function exists(targetPath) {
   try {
     await fs.access(targetPath);
@@ -324,7 +347,7 @@ async function collectDocLinkFindings(projectRoot, trackedFiles) {
 
   for (const relativePath of markdownFiles) {
     const absolutePath = path.join(projectRoot, relativePath);
-    const content = await fs.readFile(absolutePath, "utf-8");
+    const content = stripFencedCodeBlocks(await fs.readFile(absolutePath, "utf-8"));
     let match;
     while ((match = MARKDOWN_LINK_PATTERN.exec(content)) !== null) {
       const rawTarget = normalizeString(match[1]);

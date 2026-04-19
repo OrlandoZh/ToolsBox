@@ -13,12 +13,19 @@ const REQUIRED_CONTROLLER_FRAGMENTS = Object.freeze([
     fragment: 'const WINDOW_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";',
   }),
   Object.freeze({
+    label: "init-api-key",
+    fragment: 'const INIT_API_KEY = "initCleanroomPreferences";',
+  }),
+  Object.freeze({
     label: "bridge-read",
     fragment: "const bridge = window[WINDOW_BRIDGE_KEY];",
   }),
   Object.freeze({
     label: "controller-export",
-    fragment: "window.initCleanroomPreferences = initCleanroomPreferences;",
+    anyOf: [
+      'window.initCleanroomPreferences = initCleanroomPreferences;',
+      "window[INIT_API_KEY] = initCleanroomPreferences;",
+    ],
   }),
   Object.freeze({
     label: "bridge localization",
@@ -51,8 +58,19 @@ const REQUIRED_COMPOSER_FRAGMENTS = Object.freeze([
     fragment: "onPreferenceLoad({ window, paneID, pluginID, resolveURI }) {",
   }),
   Object.freeze({
+    label: "bridge-key",
+    fragment: 'const PREFERENCE_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";',
+  }),
+  Object.freeze({
+    label: "init-api-key",
+    fragment: 'const PREFERENCE_INIT_API_KEY = "initCleanroomPreferences";',
+  }),
+  Object.freeze({
     label: "window bridge write",
-    fragment: "window.__CLEANROOM_PREFERENCE_BRIDGE__ = bridge;",
+    anyOf: [
+      "window.__CLEANROOM_PREFERENCE_BRIDGE__ = bridge;",
+      "window[PREFERENCE_BRIDGE_KEY] = bridge;",
+    ],
   }),
   Object.freeze({
     label: "bridge locale",
@@ -76,18 +94,27 @@ const REQUIRED_COMPOSER_FRAGMENTS = Object.freeze([
   }),
   Object.freeze({
     label: "controller init guard",
-    fragment: 'if (typeof window.initCleanroomPreferences !== "function") {',
+    anyOf: [
+      'if (typeof window.initCleanroomPreferences !== "function") {',
+      `if (typeof window[PREFERENCE_INIT_API_KEY] !== "function") {`,
+    ],
   }),
   Object.freeze({
     label: "controller init call",
-    fragment: "return window.initCleanroomPreferences({",
+    anyOf: [
+      "return window.initCleanroomPreferences({",
+      "return window[PREFERENCE_INIT_API_KEY]({",
+    ],
   }),
 ]);
 
 const REQUIRED_TEMPLATE_FRAGMENTS = Object.freeze([
   Object.freeze({
     label: "preference root id",
-    fragment: 'id="cleanroomtemplate-preferences-root"',
+    anyOf: [
+      'id="__PREFERENCE_ROOT_ID__"',
+      'id="cleanroomtemplate-preferences-root"',
+    ],
   }),
   Object.freeze({
     label: "preference root marker",
@@ -166,13 +193,22 @@ function buildMissingFileIssue(file) {
 
 function collectFragmentIssues(source, file, fragments) {
   return fragments
-    .filter((entry) => !source.includes(entry.fragment))
+    .filter((entry) => {
+      if (typeof entry.fragment === "string") {
+        return !source.includes(entry.fragment);
+      }
+      if (Array.isArray(entry.anyOf) && entry.anyOf.length > 0) {
+        return !entry.anyOf.some((fragment) => source.includes(fragment));
+      }
+      return true;
+    })
     .map((entry) => {
       return {
         file,
         reason: "required-fragment-missing",
         label: entry.label,
         fragment: entry.fragment,
+        anyOf: entry.anyOf,
         message: `${file} is missing required fragment '${entry.label}'.`,
       };
     });

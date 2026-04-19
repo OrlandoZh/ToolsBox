@@ -28,9 +28,9 @@
     - Use For: 描述 MenuData.menuType=submenu、submenu root 与 submenu popup 的 host-visible surface。
     - Avoid: `menu group`
 - Enums:
-  - `VALID_TARGETS`: `main/menubar/file`, `main/library/item`, `main/library/collection`, `reader/menubar/view`, `itemPane/info/row`, `notesPane/addItemNote`, `sidenav/locate`
+  - `VALID_TARGETS`: `main/menubar/file`, `main/menubar/edit`, `main/menubar/view`, `main/menubar/go`, `main/menubar/tools`, `main/menubar/help`, `main/library/item`, `main/library/collection`, `main/library/addAttachment`, `main/library/addNote`, `main/tab`, `reader/menubar/file`, `reader/menubar/edit`, `reader/menubar/view`, `reader/menubar/go`, `reader/menubar/window`, `itemPane/info/row`, `notesPane/addItemNote`, `notesPane/addStandaloneNote`, `sidenav/locate`
     - Extensible: `false`
-    - Notes: 仅列出模板当前最常触达的 authoritative target 样本；完整 authoritative source 仍以 reference anchor 为准。
+    - Notes: 当前列出 rolling snapshot 中的完整官方 target 列表；新增 target 时必须先刷新 reference 与宿主索引。
   - `VALID_MENU_TYPES`: `menuitem`, `separator`, `submenu`
     - Extensible: `false`
     - Notes: MenuData.menuType 只认 Zotero 官方枚举。
@@ -78,7 +78,7 @@
 - Owner Files:
   - `src/features/preference-panes.js`
 - Reference Sources:
-  - `chrome/content/zotero/xpcom/preferencePanes.js` includes `Register a pane to be displayed in the preferences.`, `if (!options.pluginID || !options.src)`, `rawLabel: options.label || (await Zotero.Plugins.getName(options.pluginID))`, `src: await Zotero.Plugins.resolveURI(options.pluginID, options.src)`, `unregister: function (id) {`
+  - `chrome/content/zotero/xpcom/preferencePanes.js` includes `Register a pane to be displayed in the preferences.`, `if (!options.pluginID || !options.src)`, `rawLabel: options.label || (await Zotero.Plugins.getName(options.pluginID))`, `image: options.image && (await Zotero.Plugins.resolveURI(options.pluginID, options.image))`, `|| (await Zotero.Plugins.getIconURI(options.pluginID, 24)),`, `src: await Zotero.Plugins.resolveURI(options.pluginID, options.src)`, `stylesheets: await Promise.all(options.stylesheets.map(uri => Zotero.Plugins.resolveURI(options.pluginID, uri))),`, `unregister: function (id) {`
 - Canonical Terms:
   - `PreferencePanes` / 偏好设置面板 API
     - Use For: 指代 Zotero.PreferencePanes 宿主注册接口。
@@ -93,21 +93,21 @@
     - Use For: 指代 preference pane 内由 tab 切换出的 active panel surface。
     - Avoid: -
 - Enums:
-  - `builtInPanes sample IDs`: `zotero-prefpane-general`, `zotero-prefpane-sync`, `zotero-prefpane-export`, `zotero-prefpane-cite`, `zotero-prefpane-advanced`
+  - `builtInPanes sample IDs`: `zotero-prefpane-general`, `zotero-prefpane-account`, `zotero-prefpane-export`, `zotero-prefpane-cite`, `zotero-prefpane-advanced`, `zotero-subpane-reset-sync`
     - Extensible: `false`
     - Notes: 用于说明 pane / subpane 语义，不要求下游复用这些 built-in ID。
 - Option Schemas:
   - `PreferencePaneOptions`
     - Required: `pluginID`, `src`
     - Optional: `id`, `parent`, `label`, `image`, `scripts`, `stylesheets`, `helpURL`, `onPreferenceLoad`
-    - Notes: label 缺失时回退插件名；URI 字段按 plugin root 解析；模板默认更偏向 onPreferenceLoad bridge，而非 legacy scripts。
+    - Notes: label 缺失时回退插件名；image 缺失时回退插件图标；src/image/scripts/stylesheets 都按 plugin root 解析；模板默认更偏向 onPreferenceLoad bridge，而非 legacy scripts。
 - Surface Semantics:
   - `preference-pane` / `preference-pane`
     - Host Events: -
     - Surface Terms: `PreferencePanes`, `preference pane`, `preferences sidebar`, `interactive root`, `tab panel`
     - Notes: 验证 preference pane 时，需证明 pane 已从侧边栏可打开且核心控件已渲染。；若 pane 暴露 tab/panel 结构，需进一步证明 interactive root、active tab 与 active panel content 已就绪；单页 pane 仍可按结构/行为签名验证推进。
 - Required Types:
-  - `types/features.d.ts` includes `registerPane(options: PreferencePaneOptions): Promise<string | null>;`, `resolveURI(uri: string): string;`, `label?: string;`, `onPreferenceLoad?: (`
+  - `types/features.d.ts` includes `registerPane(options: PreferencePaneOptions): Promise<string | null>;`, `resolveURI(uri: string): string;`, `label?: string;`, `stylesheets?: string[];`, `helpURL?: string;`, `onPreferenceLoad?: (`
 - Required Tests:
   - `zotero-host-semantic-index-lib.test.js`
   - `zotero-host-semantic-index.test.js`
@@ -142,7 +142,7 @@
   - `SectionOptions`
     - Required: `paneID`, `pluginID`, `header`, `sidenav`, `onRender`
     - Optional: `onInit`, `onDestroy`, `onItemChange`, `onAsyncRender`, `onToggle`, `sectionButtons`
-    - Notes: onRender 负责首帧 DOM 构建；header.l10nID 对应 FTL `.label`，sidenav.l10nID 对应 FTL `.tooltiptext`，两者必须已注入。
+    - Notes: onRender 负责首帧 DOM 构建；header.l10nID 对应 FTL `.label`，sidenav.l10nID 对应 FTL `.tooltiptext`，两者必须已注入；sidenav.orderable 控制 section 是否允许在 Item Pane sidenav 中排序。
   - `InfoRowOptions`
     - Required: `rowID`, `pluginID`, `label`, `onGetData`
     - Optional: `position`, `multiline`, `nowrap`, `editable`, `onSetData`, `onItemChange`
@@ -157,7 +157,7 @@
     - Surface Terms: `Item Pane`, `sidenav`, `data-pane`, `scrollToPane`
     - Notes: 当验证 Item Pane sidenav 时，先证明目标 pane 已被切换并 visible，再补局部视觉证据。
 - Required Types:
-  - `types/features.d.ts` includes `registerSection(options: SectionOptions): string | null;`, `registerInfoRow(options: InfoRowOptions): string | null;`, `onRender: (props: {`, `headerL10nID: string;`, `labelL10nID: string;`
+  - `types/features.d.ts` includes `registerSection(options: SectionOptions): string | null;`, `registerInfoRow(options: InfoRowOptions): string | null;`, `onRender: (props: {`, `sidenav?: SectionHeader & { orderable?: boolean };`, `sectionButtons?: Array<{`, `headerL10nID: string;`, `labelL10nID: string;`, `refreshInfoRow(rowID: string): boolean;`
 - Required Tests:
   - `zotero-host-semantic-index-lib.test.js`
   - `zotero-host-semantic-index.test.js`

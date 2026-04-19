@@ -170,6 +170,24 @@ describe("agent-dead-chain-audit-lib", () => {
     assert.ok(report.items.some((item) => item.kind === "missing-doc-link"));
   });
 
+  it("should ignore fenced code blocks when checking markdown links", async () => {
+    const root = createAuditFixture({
+      readmeContent: [
+        "```ts",
+        "items = filterFunctions[i](items);",
+        "```",
+        "",
+        "[Current Truth](docs/CURRENT_BACKLOG.md)",
+        "",
+      ].join("\n"),
+    });
+
+    const report = await runAgentDeadChainAudit({ projectRoot: root });
+
+    assert.equal(report.status, "clean");
+    assert.ok(!report.items.some((item) => item.kind === "missing-doc-link"));
+  });
+
   it("should classify stale delegation tasks and superseded bundles as advisory retired chains", async () => {
     const root = createAuditFixture({
       delegationTasks: [

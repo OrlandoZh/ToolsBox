@@ -47,6 +47,70 @@ describe("Agent Zotero Loop Lib", () => {
     assert.equal(state.loopPassed, false);
   });
 
+  it("should attach smart probe mode to next e2e when failed state has fresh candidates but no fresh probe", () => {
+    const state = summarizeZoteroLoopState({
+      watchStatus: { present: true, status: "healthy", statusLabel: "健康", ageText: "1 分钟内" },
+      e2e: { present: true, status: "failed", statusLabel: "失败", ageText: "2 分钟" },
+      autofix: { present: true, status: "missing", statusLabel: "缺失", ageText: "-" },
+      watchRecovery: { present: true, status: "passed", statusLabel: "通过", ageText: "3 分钟" },
+      debugProbe: { present: false, status: "missing", statusLabel: "缺失" },
+      debugProbeCandidates: {
+        candidateCount: 1,
+        probeIDs: ["reader-sidebar-view-closure"],
+      },
+      gate: {
+        gatePassed: false,
+        frontpageSummary: {
+          status: "blocked",
+          statusLabel: "需先处理",
+          headline: "Reader sidebar 交互未闭环。",
+        },
+      },
+    });
+
+    const actions = deriveZoteroLoopActions(state);
+    assert.equal(state.smartDebugProbeRecommended, true);
+    assert.equal(state.debugProbeCandidateCount, 1);
+    assert.deepEqual(state.debugProbeCandidateProbeIDs, ["reader-sidebar-view-closure"]);
+    assert.equal(actions[0].id, "run-e2e");
+    assert.equal(actions[0].commandLabel, "npm run agent:zotero:e2e -- --probe-mode smart");
+    assert.deepEqual(actions[0].commandArgs, ["run", "agent:zotero:e2e", "--", "--probe-mode", "smart"]);
+  });
+
+  it("should avoid repeating smart probe when latest failed e2e already has fresh probe evidence", () => {
+    const state = summarizeZoteroLoopState({
+      watchStatus: { present: true, status: "healthy", statusLabel: "健康", ageText: "1 分钟内" },
+      e2e: { present: true, status: "failed", statusLabel: "失败", ageText: "2 分钟" },
+      autofix: { present: true, status: "missing", statusLabel: "缺失", ageText: "-" },
+      watchRecovery: { present: true, status: "passed", statusLabel: "通过", ageText: "3 分钟" },
+      debugProbe: {
+        present: true,
+        status: "completed",
+        statusLabel: "已完成",
+        ageText: "1 分钟",
+        freshForLatestE2E: true,
+        executedProbeCount: 1,
+      },
+      debugProbeCandidates: {
+        candidateCount: 1,
+        probeIDs: ["reader-sidebar-view-closure"],
+      },
+      gate: {
+        gatePassed: false,
+        frontpageSummary: {
+          status: "blocked",
+          statusLabel: "需先处理",
+          headline: "Reader sidebar 交互未闭环。",
+        },
+      },
+    });
+
+    const actions = deriveZoteroLoopActions(state);
+    assert.equal(state.smartDebugProbeRecommended, false);
+    assert.equal(actions[0].id, "run-autofix");
+    assert.equal(actions[0].commandLabel, "npm run agent:zotero:autofix");
+  });
+
   it("should avoid autofix and refresh baseline for pure visual geometry mismatch", () => {
     const state = summarizeZoteroLoopState({
       watchStatus: { present: true, status: "healthy", statusLabel: "健康", ageText: "1 分钟内" },
@@ -316,6 +380,45 @@ describe("Agent Zotero Loop Lib", () => {
     assert.ok(markdown.includes("执行模式"));
     assert.ok(markdown.includes("npm run agent:zotero:autofix"));
     assert.ok(markdown.includes("当前 gate 未通过"));
+  });
+
+  it("should render smart probe planning in markdown report", () => {
+    const markdown = buildZoteroLoopMarkdown({
+      generatedAt: "2026-04-17T11:00:00.000Z",
+      dryRun: true,
+      loopPassed: false,
+      initialState: {
+        watchNeedsRefresh: false,
+        e2eNeedsRun: true,
+        smartDebugProbeRecommended: true,
+        debugProbeCandidateCount: 1,
+        debugProbeCandidateProbeIDs: ["reader-sidebar-view-closure"],
+        autofixRecommended: false,
+        watchRecoveryNeeded: false,
+      },
+      steps: [{
+        label: "执行 Zotero 真机 E2E",
+        status: "planned",
+        commandLabel: "npm run agent:zotero:e2e -- --probe-mode smart",
+      }],
+      finalState: {
+        frontpageSummary: {
+          statusLabel: "需关注",
+          headline: "当前失败命中 smart debug probe 候选。",
+          nextAction: "npm run agent:zotero:e2e -- --probe-mode smart",
+        },
+        gate: {
+          statusLabel: "需先处理",
+          headline: "当前 gate 未通过。",
+        },
+        issues: ["当前失败命中 1 个 smart debug probe 候选；下一次 E2E 应附带受控 probe sidecar。"],
+      },
+      nextAction: "npm run agent:zotero:e2e -- --probe-mode smart",
+    });
+
+    assert.ok(markdown.includes("下一次 E2E 将带 smart probe"));
+    assert.ok(markdown.includes("reader-sidebar-view-closure"));
+    assert.ok(markdown.includes("npm run agent:zotero:e2e -- --probe-mode smart"));
   });
 
   it("should render error fields in markdown when present", () => {

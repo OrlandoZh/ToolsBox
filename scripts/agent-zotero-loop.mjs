@@ -8,6 +8,10 @@ import {
   summarizeE2EReport,
   summarizeWatchRecoveryReport,
 } from "./agent-zotero-validation-lib.mjs";
+import {
+  deriveSmartDebugProbeCandidates,
+  summarizeDebugProbeReport,
+} from "./agent-zotero-debug-probe-lib.mjs";
 import { resolveAgentArtifactPath } from "./agent-artifacts.mjs";
 import {
   buildZoteroLoopMarkdown,
@@ -21,6 +25,7 @@ import {
   summarizeZoteroWatchStatus,
 } from "./zotero-watch-status-lib.mjs";
 import {
+  resolveZoteroDebugProbeArtifacts,
   resolveZoteroLoopArtifacts,
   resolveZoteroWatchRecoveryArtifacts,
 } from "./zotero-agent-artifacts.mjs";
@@ -209,13 +214,16 @@ async function refreshWatchHealth(options) {
 }
 
 async function loadLoopInputs(options) {
-  const [rawWatchStatus, rawE2E, rawAutofix, rawWatchRecovery, rawGate] = await Promise.all([
+  const debugProbeArtifacts = resolveZoteroDebugProbeArtifacts(projectRoot);
+  const [rawWatchStatus, rawE2E, rawAutofix, rawWatchRecovery, rawGate, rawDebugProbe] = await Promise.all([
     readJSONIfExists(resolveAgentArtifactPath(projectRoot, "zotero-watch-status.json")),
     readJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-zotero-e2e.json")),
     readJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-zotero-autofix.json")),
     readJSONIfExists(resolveAgentArtifactPath(projectRoot, "zotero-watch-recovery-regression.json")),
     readJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-gate.json")),
+    readJSONIfExists(debugProbeArtifacts.reportJSON),
   ]);
+  const smartProbeCandidates = deriveSmartDebugProbeCandidates(rawE2E);
 
   return {
     watchStatus: summarizeZoteroWatchStatus(rawWatchStatus, {
@@ -224,13 +232,24 @@ async function loadLoopInputs(options) {
     e2e: summarizeE2EReport(rawE2E),
     autofix: summarizeAutofixReport(rawAutofix),
     watchRecovery: summarizeWatchRecoveryReport(rawWatchRecovery),
+    debugProbe: summarizeDebugProbeReport(rawDebugProbe, {
+      e2eGeneratedAt: rawE2E?.generatedAt || null,
+    }),
+    debugProbeCandidates: {
+      candidateCount: Array.isArray(smartProbeCandidates?.candidates)
+        ? smartProbeCandidates.candidates.length
+        : 0,
+      probeIDs: Array.isArray(smartProbeCandidates?.candidates)
+        ? smartProbeCandidates.candidates.map((item) => item?.probeId).filter(Boolean)
+        : [],
+    },
     gate: rawGate,
     options,
   };
 }
 
-function createAction(id, label, commandLabel) {
-  return { id, label, commandLabel };
+function createAction(id, label, commandLabel, commandArgs = null) {
+  return { id, label, commandLabel, commandArgs };
 }
 
 function actionFromOverride(commandText) {
@@ -239,19 +258,32 @@ function actionFromOverride(commandText) {
     return null;
   }
   if (text.includes("agent:zotero:e2e:update-baseline")) {
-    return createAction("update-visual-baseline", "刷新视觉基线并复验", "npm run agent:zotero:e2e:update-baseline");
+    return createAction(
+      "update-visual-baseline",
+      "刷新视觉基线并复验",
+      "npm run agent:zotero:e2e:update-baseline",
+      ["run", "agent:zotero:e2e:update-baseline"],
+    );
   }
   if (text.includes("agent:zotero:autofix")) {
-    return createAction("run-autofix", "执行 Zotero 自动修复闭环", "npm run agent:zotero:autofix");
+    return createAction("run-autofix", "执行 Zotero 自动修复闭环", "npm run agent:zotero:autofix", ["run", "agent:zotero:autofix"]);
   }
   if (text.includes("agent:zotero:watch-recovery")) {
-    return createAction("run-watch-recovery", "执行 watch 恢复回归", "npm run agent:zotero:watch-recovery");
+    return createAction("run-watch-recovery", "执行 watch 恢复回归", "npm run agent:zotero:watch-recovery", ["run", "agent:zotero:watch-recovery"]);
   }
   if (text.includes("agent:obsidian")) {
-    return createAction("run-obsidian", "刷新 Obsidian 人工介入工作台", "npm run agent:obsidian");
+    return createAction("run-obsidian", "刷新 Obsidian 人工介入工作台", "npm run agent:obsidian", ["run", "agent:obsidian"]);
+  }
+  if (text.includes("agent:zotero:e2e -- --probe-mode smart")) {
+    return createAction(
+      "run-e2e",
+      "执行 Zotero 真机 E2E",
+      "npm run agent:zotero:e2e -- --probe-mode smart",
+      ["run", "agent:zotero:e2e", "--", "--probe-mode", "smart"],
+    );
   }
   if (text.includes("agent:zotero:e2e")) {
-    return createAction("run-e2e", "执行 Zotero 真机 E2E", "npm run agent:zotero:e2e");
+    return createAction("run-e2e", "执行 Zotero 真机 E2E", "npm run agent:zotero:e2e", ["run", "agent:zotero:e2e"]);
   }
   if (text.includes("zotero:watch")) {
     return createAction("refresh-watch", "刷新 Zotero watch 健康状态", "内部刷新 `zotero:watch` 启动健康状态");
@@ -268,7 +300,11 @@ function actionFromOverride(commandText) {
 function insertAutofixIfNeeded(queue, currentIndex) {
   const exists = queue.some((item) => item.id === "run-autofix");
   if (!exists) {
-    queue.splice(currentIndex + 1, 0, createAction("run-autofix", "执行 Zotero 自动修复闭环", "npm run agent:zotero:autofix"));
+    queue.splice(
+      currentIndex + 1,
+      0,
+      createAction("run-autofix", "执行 Zotero 自动修复闭环", "npm run agent:zotero:autofix", ["run", "agent:zotero:autofix"]),
+    );
   }
 }
 
@@ -333,19 +369,19 @@ async function executeAction(action, options) {
   }
   const npm = getNpmCommand();
   if (action.id === "run-e2e") {
-    return await runCommand(npm, ["run", "agent:zotero:e2e"], action.label, action.commandLabel);
+    return await runCommand(npm, Array.isArray(action.commandArgs) ? action.commandArgs : ["run", "agent:zotero:e2e"], action.label, action.commandLabel);
   }
   if (action.id === "update-visual-baseline") {
-    return await runCommand(npm, ["run", "agent:zotero:e2e:update-baseline"], action.label, action.commandLabel);
+    return await runCommand(npm, Array.isArray(action.commandArgs) ? action.commandArgs : ["run", "agent:zotero:e2e:update-baseline"], action.label, action.commandLabel);
   }
   if (action.id === "run-autofix") {
-    return await runCommand(npm, ["run", "agent:zotero:autofix"], action.label, action.commandLabel);
+    return await runCommand(npm, Array.isArray(action.commandArgs) ? action.commandArgs : ["run", "agent:zotero:autofix"], action.label, action.commandLabel);
   }
   if (action.id === "run-watch-recovery") {
-    return await runCommand(npm, ["run", "agent:zotero:watch-recovery"], action.label, action.commandLabel);
+    return await runCommand(npm, Array.isArray(action.commandArgs) ? action.commandArgs : ["run", "agent:zotero:watch-recovery"], action.label, action.commandLabel);
   }
   if (action.id === "run-obsidian") {
-    return await runCommand(npm, ["run", "agent:obsidian"], action.label, action.commandLabel);
+    return await runCommand(npm, Array.isArray(action.commandArgs) ? action.commandArgs : ["run", "agent:obsidian"], action.label, action.commandLabel);
   }
   if (action.id === "run-monitor") {
     return await runCommand(process.execPath, [path.join(projectRoot, "scripts", "agent-monitor.mjs")], action.label, action.commandLabel);

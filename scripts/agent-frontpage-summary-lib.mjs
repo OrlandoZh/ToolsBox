@@ -30,6 +30,25 @@ function getReaderEventSlice(e2e) {
   });
 }
 
+function getDebugProbeSlice(zoteroValidation) {
+  const debugProbe = zoteroValidation?.debugProbe && typeof zoteroValidation.debugProbe === "object"
+    ? zoteroValidation.debugProbe
+    : {};
+  return normalizeStatusSlice(debugProbe, {
+    mode: debugProbe.mode || null,
+    selectionSource: debugProbe.selectionSource || null,
+    selectedProbeCount: debugProbe.selectedProbeCount ?? 0,
+    executedProbeCount: debugProbe.executedProbeCount ?? 0,
+    failedProbeCount: debugProbe.failedProbeCount ?? 0,
+    promotions: Array.isArray(debugProbe.promotions) ? debugProbe.promotions : [],
+    summary: debugProbe.summary || "当前未采集 debug probe。",
+    nextSuggestedAction: debugProbe.nextSuggestedAction || null,
+    freshForLatestE2E: typeof debugProbe.freshForLatestE2E === "boolean"
+      ? debugProbe.freshForLatestE2E
+      : null,
+  });
+}
+
 function looksLikeCommand(text) {
   return /^(npm|node|bun|pnpm|yarn|npx)\b/u.test(String(text || "").trim());
 }
@@ -329,10 +348,12 @@ export function buildGateFrontpageSummary({
   const recovery = zoteroValidation?.watchRecovery && typeof zoteroValidation.watchRecovery === "object"
     ? zoteroValidation.watchRecovery
     : {};
+  const debugProbe = getDebugProbeSlice(zoteroValidation);
   const readerEvent = getReaderEventSlice(e2e);
   const pureVisualReaderFailure = isPureVisualReaderFailure(e2e);
   const pureVisualReaderSummary = buildPureVisualReaderFailureSummary(e2e);
   const deadChain = normalizeDeadChainAuditSlice(deadChainAudit);
+  const freshDebugProbe = debugProbe.status !== "missing" && debugProbe.freshForLatestE2E !== false;
   const actionCandidates = validationDecision?.level && validationDecision.level !== "visual-required"
     ? normalizedRecommendations.filter((item) => !isVisualFocusedAction(item))
     : normalizedRecommendations;
@@ -361,6 +382,18 @@ export function buildGateFrontpageSummary({
   }
 
   const advisorySignals = [];
+  if (freshDebugProbe && debugProbe.status === "completed" && debugProbe.executedProbeCount > 0) {
+    advisorySignals.push(`debug probe ready：${debugProbe.summary}`);
+  } else if (freshDebugProbe && debugProbe.status === "failed") {
+    advisorySignals.push(`debug probe failed：${debugProbe.summary}`);
+  } else if (freshDebugProbe && debugProbe.status === "no-candidates") {
+    advisorySignals.push("debug probe smart mode 未命中 bundle；当前仍主要依赖 E2E / 诊断摘要。");
+  } else if (
+    e2e.status !== "passed"
+    && (debugProbe.status === "missing" || debugProbe.freshForLatestE2E === false)
+  ) {
+    advisorySignals.push("当前失败 E2E 还没有对齐最新 debug probe；如需继续压缩根因，可补跑一轮 smart probe。");
+  }
   if (deadChain.status === "warning") {
     advisorySignals.push(`dead-chain audit warning：${deadChain.summary}`);
   } else if (deadChain.status === "advisory") {
@@ -415,6 +448,7 @@ export function buildGateFrontpageSummary({
         : [],
     }),
     watchRecovery: normalizeStatusSlice(recovery),
+    debugProbe,
     deadChainAudit: deadChain,
   };
 }
@@ -435,6 +469,7 @@ export function buildMonitorFrontpageSummary(summary) {
   const watchRecovery = zoteroValidation.watchRecovery && typeof zoteroValidation.watchRecovery === "object"
     ? zoteroValidation.watchRecovery
     : {};
+  const debugProbe = getDebugProbeSlice(zoteroValidation);
   const agentMemory = summary.agentMemory && typeof summary.agentMemory === "object"
     ? summary.agentMemory
     : {};
@@ -454,6 +489,7 @@ export function buildMonitorFrontpageSummary(summary) {
   const pureVisualNextAction = pureVisualReaderFailure
     ? pickPureVisualReaderNextAction(e2e)
     : null;
+  const freshDebugProbe = debugProbe.status !== "missing" && debugProbe.freshForLatestE2E !== false;
   const readerEventHealthy = !readerEventRelevant
     || (
       readerEvent.status === "passed"
@@ -504,10 +540,28 @@ export function buildMonitorFrontpageSummary(summary) {
     }
   }
 
+  if (e2e.status !== "passed") {
+    if (debugProbe.status === "missing" || debugProbe.freshForLatestE2E === false) {
+      primarySignals.push("当前失败 E2E 尚未对齐最新 debug probe，问题定位仍停留在主线摘要层。");
+    }
+  }
+
   if (!stable && autofix.present && autofix.status === "unrecovered") {
     primarySignals.push("最近自动修复未恢复成功，建议回看补丁计划与诊断。");
   }
   const advisorySignals = [];
+  if (freshDebugProbe && debugProbe.status === "completed" && debugProbe.executedProbeCount > 0) {
+    advisorySignals.push(`debug probe ready：${debugProbe.summary}`);
+  } else if (freshDebugProbe && debugProbe.status === "failed") {
+    advisorySignals.push(`debug probe failed：${debugProbe.summary}`);
+  } else if (freshDebugProbe && debugProbe.status === "no-candidates") {
+    advisorySignals.push("debug probe smart mode 未命中 bundle；如需继续追问，可显式指定 `--probe`。");
+  } else if (
+    e2e.status !== "passed"
+    && (debugProbe.status === "missing" || debugProbe.freshForLatestE2E === false)
+  ) {
+    advisorySignals.push("当前失败 E2E 尚未补跑 fresh debug probe；可执行 `npm run agent:zotero:debug-probe -- --mode smart`。");
+  }
   if (referenceDistillation.status === "pending" && referenceDistillation.pendingCount > 0) {
     advisorySignals.push(`reference distillation pending：${referenceDistillation.pendingCount} 个 topic 等待在 fresh sync 后整理。`);
   } else if (referenceDistillation.status === "queued") {
@@ -608,6 +662,7 @@ export function buildMonitorFrontpageSummary(summary) {
       patchPlanStatusLabel: autofix.patchPlanStatusLabel || "缺失",
     },
     watchRecovery: normalizeStatusSlice(watchRecovery),
+    debugProbe,
     referenceDistillation,
     deadChainAudit,
     latestRun: summary.latest

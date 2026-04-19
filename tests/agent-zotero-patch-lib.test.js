@@ -1674,7 +1674,7 @@ describe("Agent Zotero Patch Lib", () => {
     assert.equal(result.ok, true);
     assert.equal(result.status, "applied");
     assert.ok(created.includes('id="cleanroom-preferences"'));
-    assert.ok(created.includes('name="__PREFS_PREFIX__.enabled"'));
+    assert.ok(created.includes('name="__PREF_ENABLED_NAME__"'));
   });
 
   it("should create a missing bootstrap startup file from clean-room baseline", async () => {

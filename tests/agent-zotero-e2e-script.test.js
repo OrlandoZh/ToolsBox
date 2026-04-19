@@ -37,4 +37,31 @@ describe("Agent Zotero E2E Script", () => {
       fs.rmSync(artifactsDir, { recursive: true, force: true });
     }
   });
+
+  it("should reject unknown probe modes before runtime startup", () => {
+    const artifactsDir = fs.mkdtempSync(path.join(os.tmpdir(), "cleanroom-agent-e2e-artifacts-"));
+
+    try {
+      const result = spawnSync("node", ["scripts/agent-zotero-e2e.mjs", "--probe-mode", "invalid"], {
+        cwd: projectRoot,
+        stdio: "pipe",
+        encoding: "utf-8",
+        env: {
+          ...process.env,
+          AGENT_ARTIFACTS_DIR: artifactsDir,
+        },
+      });
+
+      assert.equal(result.status, 1);
+      const reportPath = path.join(artifactsDir, "agent-zotero-e2e.json");
+      assert.ok(fs.existsSync(reportPath), "expected failure report to be written");
+      const report = JSON.parse(fs.readFileSync(reportPath, "utf-8"));
+      assert.equal(report.failedStage, "parse-args");
+      assert.equal(report.errorCategory, "args");
+      assert.ok(String(report.errorMessage || "").includes("probe-mode must be one of"));
+      assert.equal(report.probeMode, null);
+    } finally {
+      fs.rmSync(artifactsDir, { recursive: true, force: true });
+    }
+  });
 });

@@ -13,7 +13,7 @@
         "^src/features/react-ui-demo(?:/|\\.|$)",
         "^src/react-ui(?:/|\\.|$)",
         "^addon-static/content/(?:.*preferences|.*xhtml|.*css|.*icon)",
-        "^addon-static/content/react-ui(?:/|\\.|$)",
+        "^addon-static/content/lib/r(?:/|\\.|$)",
         "^tests/visual-baselines(?:/|$)",
         "^zotero-scenarios/(?:baseline|reader|annotation|ui)"
       ],

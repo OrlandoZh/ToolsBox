@@ -65,7 +65,11 @@ import {
   wrapScriptError,
   writeJSONArtifact,
 } from "./script-runtime-lib.mjs";
-import { resolveZoteroE2EArtifacts } from "./zotero-agent-artifacts.mjs";
+import { summarizeDebugProbeReport } from "./agent-zotero-debug-probe-lib.mjs";
+import {
+  resolveZoteroDebugProbeArtifacts,
+  resolveZoteroE2EArtifacts,
+} from "./zotero-agent-artifacts.mjs";
 import { inspectBaselineMainLocaleFiles } from "./agent-zotero-locale-lib.mjs";
 import { inspectStaticRuntimeBaselineFiles } from "./static-runtime-baseline-lib.mjs";
 import { summarizeE2EReport } from "./agent-zotero-validation-lib.mjs";
@@ -228,6 +232,7 @@ function usage() {
 Options:
   --cycles <n>          Number of validation cycles (default: 2)
   --strategy <mode>     Reload mode: hot | restart (default: hot)
+  --probe-mode <mode>   Debug probe mode: off | smart | force (default: off)
   --fresh               Start with a fresh runtime profile/data
   --skip-tests          Skip zotero-tests execution
   --no-build            Do not rebuild addon before cycle actions
@@ -259,6 +264,18 @@ async function pathExists(targetPath) {
   }
   catch {
     return false;
+  }
+}
+
+async function readJSONIfExists(targetPath) {
+  try {
+    return JSON.parse(await fs.readFile(targetPath, "utf-8"));
+  }
+  catch (error) {
+    if (error?.code === "ENOENT") {
+      return null;
+    }
+    throw error;
   }
 }
 
@@ -540,6 +557,82 @@ async function execFileText(command, args, options = {}) {
       },
     );
   });
+}
+
+function shouldRunDebugProbeSidecar(report, options) {
+  return Boolean(
+    report?.passed === false
+    && normalizeScenarioName(options?.probeMode) !== "off"
+  );
+}
+
+async function runDebugProbeSidecar({
+  options,
+  e2eReport,
+  artifactsDir,
+}) {
+  const debugProbeArtifacts = resolveZoteroDebugProbeArtifacts(projectRoot);
+  const args = [
+    "scripts/agent-zotero-debug-probe.mjs",
+    "--mode",
+    options.probeMode,
+    "--skip-build",
+  ];
+  if (options.fresh) {
+    args.push("--fresh");
+  }
+
+  let subprocessExitCode = 0;
+  let stdout = "";
+  let stderr = "";
+  try {
+    const result = await execFileText(process.execPath, args, {
+      cwd: projectRoot,
+      env: {
+        ...process.env,
+        AGENT_ARTIFACTS_DIR: artifactsDir,
+        CLEANROOM_BUILD_LOCK_HELD: "1",
+      },
+      timeoutMs: 120000,
+    });
+    stdout = result.stdout;
+    stderr = result.stderr;
+  }
+  catch (error) {
+    subprocessExitCode = Number.isFinite(Number(error?.exitCode))
+      ? Number(error.exitCode)
+      : 1;
+    stdout = String(error?.stdout || "");
+    stderr = String(error?.stderr || "");
+  }
+
+  const probeReport = await readJSONIfExists(debugProbeArtifacts.reportJSON);
+  const fallbackReport = probeReport || {
+    generatedAt: new Date().toISOString(),
+    mode: options.probeMode,
+    selectionSource: null,
+    selectedProbeIDs: [],
+    smartSelection: null,
+    status: "failed",
+    executed: [],
+    failedStage: "debug-probe-sidecar",
+    errorMessage: String(stderr || stdout || "debug probe sidecar failed").trim() || "debug probe sidecar failed",
+  };
+  const summary = summarizeDebugProbeReport(fallbackReport, {
+    e2eGeneratedAt: e2eReport?.generatedAt || null,
+  });
+
+  return {
+    ...summary,
+    present: true,
+    advisory: true,
+    gateEffect: "non-blocking",
+    requestedMode: options.probeMode,
+    command: [process.execPath, ...args].join(" "),
+    subprocessExitCode,
+    reportJSON: debugProbeArtifacts.reportJSON,
+    reportMD: debugProbeArtifacts.reportMD,
+  };
 }
 
 function parseProcessSnapshotLine(line) {
@@ -1105,6 +1198,7 @@ function parseArgs(argv) {
   const options = {
     cycles: 2,
     strategy: "hot",
+    probeMode: "off",
     fresh: false,
     skipTests: false,
     skipBuild: false,
@@ -1132,6 +1226,14 @@ function parseArgs(argv) {
       options.strategy = parseEnumOption(argv[i + 1], {
         name: "strategy",
         allowed: ["hot", "restart"],
+      });
+      i += 1;
+      continue;
+    }
+    if (arg === "--probe-mode") {
+      options.probeMode = parseEnumOption(argv[i + 1], {
+        name: "probe-mode",
+        allowed: ["off", "smart", "force"],
       });
       i += 1;
       continue;
@@ -4307,6 +4409,7 @@ async function main() {
     const report = {
       generatedAt: new Date().toISOString(),
       strategy: options.strategy,
+      probeMode: options.probeMode,
       zoteroVersion: "unknown",
       visualBaselineDir: options.visualBaselineDir,
       visualBaselineMode: options.updateVisualBaseline ? "update" : "compare",
@@ -4316,6 +4419,7 @@ async function main() {
       hints: [],
       diagnostics: [],
       primaryDiagnosis: null,
+      debugProbe: null,
       details: {
         runtimeSanitization,
       },
@@ -4612,6 +4716,16 @@ async function main() {
     await writeJSONArtifact(zoteroArtifacts.reportJSON, report);
     await fs.writeFile(zoteroArtifacts.reportMD, `${buildE2EMarkdown(report)}\n`, "utf-8");
 
+    if (shouldRunDebugProbeSidecar(report, options)) {
+      report.debugProbe = await runDebugProbeSidecar({
+        options,
+        e2eReport: report,
+        artifactsDir: zoteroArtifacts.artifactsDir,
+      });
+      await writeJSONArtifact(zoteroArtifacts.reportJSON, report);
+      await fs.writeFile(zoteroArtifacts.reportMD, `${buildE2EMarkdown(report)}\n`, "utf-8");
+    }
+
     console.log(`Agent Zotero E2E report generated: ${zoteroArtifacts.reportJSON}`);
     if (!report.passed) {
       process.exitCode = 2;
@@ -4628,11 +4742,13 @@ main().catch(async (error) => {
   const failureReport = {
     generatedAt: new Date().toISOString(),
     strategy: null,
+    probeMode: null,
     passed: false,
     issues: [failureInfo.errorMessage],
     hints: [],
     diagnostics: [],
     primaryDiagnosis: null,
+    debugProbe: null,
     cycles: [],
     durationMs: failureInfo.durationMs,
     ...failureInfo,

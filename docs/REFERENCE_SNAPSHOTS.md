@@ -7,7 +7,7 @@
 当前本地 `reference/` 目录按四个顶层篮子治理：
 
 - `reference/Templetereference/`
-  开发框架参考。
+  开发框架参考，也承接非宿主 authoritative source 的 Zotero 官方辅助仓库。
 - `reference/zotero-main/`
   Zotero 宿主源码 authoritative source。
 - `reference/plugin/`
@@ -20,6 +20,7 @@
 1. 在现有四个顶层篮子下放置或整理只读快照，不再额外平铺新的一级目录。
 2. 按素材类型归位，例如：
    - `reference/Templetereference/zotero-plugin-template-main`
+   - `reference/Templetereference/zotero-schema-master`
    - `reference/zotero-main`
    - `reference/plugin/zotero-ai-assistant-main`
    - `reference/lajiplugin/bibgenie-0.5.7`

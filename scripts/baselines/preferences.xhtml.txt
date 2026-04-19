@@ -1,6 +1,6 @@
 <vbox
   xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-  id="cleanroomtemplate-preferences-root"
+  id="__PREFERENCE_ROOT_ID__"
   flex="1"
   class="cleanroom-pref-root"
   data-pref-root="true"
@@ -8,10 +8,10 @@
   data-pref-width-bucket="regular"
 >
   <preferences id="cleanroom-preferences">
-    <preference id="pref-enabled" name="__PREFS_PREFIX__.enabled" type="bool" />
-    <preference id="pref-menuLabel" name="__PREFS_PREFIX__.menuLabel" type="string" />
-    <preference id="pref-logLevel" name="__PREFS_PREFIX__.logLevel" type="string" />
-    <preference id="pref-themeMode" name="__PREFS_PREFIX__.themeMode" type="string" />
+    <preference id="pref-enabled" name="__PREF_ENABLED_NAME__" type="bool" />
+    <preference id="pref-menuLabel" name="__PREF_MENU_LABEL_NAME__" type="string" />
+    <preference id="pref-logLevel" name="__PREF_LOG_LEVEL_NAME__" type="string" />
+    <preference id="pref-themeMode" name="__PREF_THEME_MODE_NAME__" type="string" />
   </preferences>
 
   <groupbox class="cleanroom-pref-section">

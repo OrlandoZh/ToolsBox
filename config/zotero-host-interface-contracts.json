@@ -27,9 +27,17 @@
           "snippets": [
             "export const MENU_TARGETS = {",
             "MAIN_MENU_FILE: \"main/menubar/file\"",
+            "MAIN_MENU_EDIT: \"main/menubar/edit\"",
+            "MAIN_MENU_TOOLS: \"main/menubar/tools\"",
             "LIBRARY_ITEM: \"main/library/item\"",
+            "LIBRARY_ADD_ATTACHMENT: \"main/library/addAttachment\"",
+            "LIBRARY_ADD_NOTE: \"main/library/addNote\"",
+            "MAIN_TAB: \"main/tab\"",
+            "READER_MENU_FILE: \"reader/menubar/file\"",
             "READER_MENU_VIEW: \"reader/menubar/view\"",
-            "ITEM_PANE_INFO_ROW: \"itemPane/info/row\""
+            "READER_MENU_WINDOW: \"reader/menubar/window\"",
+            "ITEM_PANE_INFO_ROW: \"itemPane/info/row\"",
+            "NOTES_PANE_STANDALONE_NOTE: \"notesPane/addStandaloneNote\""
           ]
         },
         {
@@ -155,6 +163,8 @@
             "error(\"itemPane.registerSection.noOnRender\", { paneID });",
             "config.header.l10nID = header.l10nID;",
             "config.sidenav.l10nID = sidenav.l10nID;",
+            "config.sidenav.orderable = sidenav.orderable;",
+            "config.sectionButtons = sectionButtons;",
             "const registeredPaneID = Zotero.ItemPaneManager.registerSection(config);"
           ]
         },
@@ -166,6 +176,14 @@
             "const registeredRowID = Zotero.ItemPaneManager.registerInfoRow(config);",
             "function refreshInfoRow(rowID) {"
           ]
+        },
+        {
+          "label": "registration snapshot helpers",
+          "file": "src/features/item-pane.js",
+          "snippets": [
+            "function resolveSectionPaneID(paneID) {",
+            "function getRegistrationSnapshot() {"
+          ]
         }
       ],
       "requiredTypes": [
@@ -174,9 +192,14 @@
           "snippets": [
             "registerSection(options: SectionOptions): string | null;",
             "registerInfoRow(options: InfoRowOptions): string | null;",
+            "sidenav?: SectionHeader & { orderable?: boolean };",
+            "sectionButtons?: Array<{",
             "onRender: (props: {",
             "headerL10nID: string;",
-            "labelL10nID: string;"
+            "labelL10nID: string;",
+            "refreshInfoRow(rowID: string): boolean;",
+            "resolveSectionPaneID(paneID: string): string | null;",
+            "getRegistrationSnapshot(): {"
           ]
         }
       ],
@@ -260,7 +283,10 @@
           "requiredSnippets": [
             "Zotero.PreferencePanes.register({",
             "throw new Error('pluginID and src must be provided');",
+            "image: options.image && (await Zotero.Plugins.resolveURI(options.pluginID, options.image))",
+            "|| (await Zotero.Plugins.getIconURI(options.pluginID, 24)),",
             "src: await Zotero.Plugins.resolveURI(options.pluginID, options.src)",
+            "stylesheets: await Promise.all(options.stylesheets.map(uri => Zotero.Plugins.resolveURI(options.pluginID, uri))),",
             "unregister: function (id) {"
           ]
         }
@@ -274,9 +300,12 @@
             "async function registerPane(paneOptions) {",
             "const resolvedSrc = resolveURI(src);",
             "const useOnPreferenceLoad = typeof onPreferenceLoad === \"function\";",
+            "const resolvedStylesheets = stylesheets.map(resolveURI);",
+            "const resolvedImage = image ? resolveURI(image) : undefined;",
             "registerPreferencePaneLoadHandler(paneId, onPreferenceLoad);",
             "const paneId = await Zotero.PreferencePanes.register(registerOptions);",
-            "Zotero.PreferencePanes.unregister(paneId);"
+            "Zotero.PreferencePanes.unregister(paneId);",
+            "function getAllPanes() {"
           ]
         }
       ],
@@ -287,7 +316,10 @@
             "registerPane(options: PreferencePaneOptions): Promise<string | null>;",
             "resolveURI(uri: string): string;",
             "label?: string;",
-            "onPreferenceLoad?: ("
+            "stylesheets?: string[];",
+            "helpURL?: string;",
+            "onPreferenceLoad?: (",
+            "getAllPanes(): string[];"
           ]
         }
       ],

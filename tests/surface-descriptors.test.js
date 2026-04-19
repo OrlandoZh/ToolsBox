@@ -9,6 +9,7 @@ describe("Surface Descriptors", () => {
     });
 
     assert.equal(descriptors.preferencePaneID, "cleanroomtemplate-preferences");
+    assert.equal(descriptors.preferenceRootID, "cleanroomtemplate-preferences-root");
     assert.equal(descriptors.primaryActionCommandID, "cleanroomtemplate-primary-action");
     assert.equal(descriptors.readerSummaryCommandID, "cleanroomtemplate-reader-summary");
     assert.equal(descriptors.readerSelectionCommandID, "cleanroomtemplate-reader-selection-snapshot");
@@ -21,6 +22,7 @@ describe("Surface Descriptors", () => {
     assert.equal(descriptors.serviceIDs.runtimeCore, "cleanroomtemplate.runtime-core");
     assert.equal(descriptors.serviceLabels.runtimeCore, "Runtime Core");
     assert.equal(descriptors.serviceLabels.reactUIDemo, "Optional React UI Demo");
+    assert.equal(descriptors.preferenceBindingMode, "native");
   });
 
   it("should derive deterministic protected ids without readable semantic suffixes", () => {
@@ -30,12 +32,16 @@ describe("Surface Descriptors", () => {
     });
 
     assert.equal(descriptors.preferencePaneID.startsWith("cr"), true);
+    assert.equal(descriptors.preferenceRootID.startsWith("cr"), true);
+    assert.equal(descriptors.preferenceRootID.endsWith("-root"), true);
     assert.equal(descriptors.primaryActionCommandID.startsWith("cr"), true);
     assert.equal(descriptors.readerSummaryCommandID.startsWith("cr"), true);
     assert.equal(descriptors.menuCommand.toolsMenuItemID.startsWith("cr"), true);
     assert.equal(descriptors.serviceIDs.runtimeCore.startsWith("cr"), true);
     assert.equal(descriptors.preferencePaneID.includes("cleanroomtemplate"), false);
     assert.equal(descriptors.preferencePaneID.includes("preferences"), false);
+    assert.equal(descriptors.preferenceRootID.includes("cleanroomtemplate"), false);
+    assert.equal(descriptors.preferenceRootID.includes("preferences"), false);
     assert.equal(descriptors.readerSelectionCommandID.includes("reader-selection-snapshot"), false);
     assert.equal(descriptors.contextMenuItemID.includes("context-action"), false);
     assert.equal(descriptors.demoInfoRowID.includes("selection-summary"), false);
@@ -43,6 +49,7 @@ describe("Surface Descriptors", () => {
     assert.equal(descriptors.serviceIDs.hostSignals.includes("host-signals"), false);
     assert.equal(descriptors.serviceLabels.runtimeCore, "Service 0");
     assert.equal(descriptors.serviceLabels.reactUIDemo, "Service 4");
+    assert.equal(descriptors.preferenceBindingMode, "native");
   });
 
   it("should keep protected ids stable for the same addon identity", () => {

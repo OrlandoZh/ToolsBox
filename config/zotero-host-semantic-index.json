@@ -57,14 +57,27 @@
           "name": "VALID_TARGETS",
           "values": [
             "main/menubar/file",
+            "main/menubar/edit",
+            "main/menubar/view",
+            "main/menubar/go",
+            "main/menubar/tools",
+            "main/menubar/help",
             "main/library/item",
             "main/library/collection",
+            "main/library/addAttachment",
+            "main/library/addNote",
+            "main/tab",
+            "reader/menubar/file",
+            "reader/menubar/edit",
             "reader/menubar/view",
+            "reader/menubar/go",
+            "reader/menubar/window",
             "itemPane/info/row",
             "notesPane/addItemNote",
+            "notesPane/addStandaloneNote",
             "sidenav/locate"
           ],
-          "notes": "仅列出模板当前最常触达的 authoritative target 样本；完整 authoritative source 仍以 reference anchor 为准。"
+          "notes": "当前列出 rolling snapshot 中的完整官方 target 列表；新增 target 时必须先刷新 reference 与宿主索引。"
         },
         {
           "name": "VALID_MENU_TYPES",
@@ -213,7 +226,10 @@
             "Register a pane to be displayed in the preferences.",
             "if (!options.pluginID || !options.src)",
             "rawLabel: options.label || (await Zotero.Plugins.getName(options.pluginID))",
+            "image: options.image && (await Zotero.Plugins.resolveURI(options.pluginID, options.image))",
+            "|| (await Zotero.Plugins.getIconURI(options.pluginID, 24)),",
             "src: await Zotero.Plugins.resolveURI(options.pluginID, options.src)",
+            "stylesheets: await Promise.all(options.stylesheets.map(uri => Zotero.Plugins.resolveURI(options.pluginID, uri))),",
             "unregister: function (id) {"
           ]
         }
@@ -259,10 +275,11 @@
           "name": "builtInPanes sample IDs",
           "values": [
             "zotero-prefpane-general",
-            "zotero-prefpane-sync",
+            "zotero-prefpane-account",
             "zotero-prefpane-export",
             "zotero-prefpane-cite",
-            "zotero-prefpane-advanced"
+            "zotero-prefpane-advanced",
+            "zotero-subpane-reset-sync"
           ],
           "notes": "用于说明 pane / subpane 语义，不要求下游复用这些 built-in ID。"
         }
@@ -284,7 +301,7 @@
             "helpURL",
             "onPreferenceLoad"
           ],
-          "notes": "label 缺失时回退插件名；URI 字段按 plugin root 解析；模板默认更偏向 onPreferenceLoad bridge，而非 legacy scripts。"
+          "notes": "label 缺失时回退插件名；image 缺失时回退插件图标；src/image/scripts/stylesheets 都按 plugin root 解析；模板默认更偏向 onPreferenceLoad bridge，而非 legacy scripts。"
         }
       ],
       "surfaceSemantics": [
@@ -312,6 +329,8 @@
             "registerPane(options: PreferencePaneOptions): Promise<string | null>;",
             "resolveURI(uri: string): string;",
             "label?: string;",
+            "stylesheets?: string[];",
+            "helpURL?: string;",
             "onPreferenceLoad?: ("
           ]
         }
@@ -394,7 +413,7 @@
             "onToggle",
             "sectionButtons"
           ],
-          "notes": "onRender 负责首帧 DOM 构建；header.l10nID 对应 FTL `.label`，sidenav.l10nID 对应 FTL `.tooltiptext`，两者必须已注入。"
+          "notes": "onRender 负责首帧 DOM 构建；header.l10nID 对应 FTL `.label`，sidenav.l10nID 对应 FTL `.tooltiptext`，两者必须已注入；sidenav.orderable 控制 section 是否允许在 Item Pane sidenav 中排序。"
         },
         {
           "name": "InfoRowOptions",
@@ -454,8 +473,11 @@
             "registerSection(options: SectionOptions): string | null;",
             "registerInfoRow(options: InfoRowOptions): string | null;",
             "onRender: (props: {",
+            "sidenav?: SectionHeader & { orderable?: boolean };",
+            "sectionButtons?: Array<{",
             "headerL10nID: string;",
-            "labelL10nID: string;"
+            "labelL10nID: string;",
+            "refreshInfoRow(rowID: string): boolean;"
           ]
         }
       ],

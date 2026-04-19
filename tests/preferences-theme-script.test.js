@@ -25,26 +25,48 @@ function createFakeStyle() {
 }
 
 function createFakeElement(id) {
+  const listeners = new Map();
   return {
     id,
     dataset: {},
     attributes: {},
     style: createFakeStyle(),
     textContent: "",
+    value: "",
+    checked: false,
     setAttribute(name, value) {
       this.attributes[name] = String(value);
-      if (name === "label" || name === "value") {
+      if (name === "label" || name === "value" || name === "name") {
         this[name] = String(value);
+      }
+      if (name === "checked") {
+        this.checked = String(value) === "true";
       }
     },
     removeAttribute(name) {
       delete this.attributes[name];
-      if (name === "label" || name === "value") {
+      if (name === "label" || name === "value" || name === "name") {
         delete this[name];
+      }
+      if (name === "checked") {
+        this.checked = false;
       }
     },
     getAttribute(name) {
       return this.attributes[name] || null;
+    },
+    addEventListener(type, handler) {
+      const handlers = listeners.get(type) || [];
+      handlers.push(handler);
+      listeners.set(type, handlers);
+    },
+    removeEventListener(type, handler) {
+      const handlers = listeners.get(type) || [];
+      listeners.set(type, handlers.filter((item) => item !== handler));
+    },
+    dispatch(type) {
+      const handlers = listeners.get(type) || [];
+      handlers.slice().forEach((handler) => handler({ type, target: this }));
     },
   };
 }
@@ -59,8 +81,18 @@ function createHarness({
   rootClientWidth = 720,
   rootScrollWidth = rootClientWidth,
 } = {}) {
-  const prefName = "extensions.zotero.cleanroomtemplate.themeMode";
-  const prefValues = new Map([[prefName, themeMode]]);
+  const prefNames = {
+    enabled: "extensions.zotero.cleanroomtemplate.enabled",
+    menuLabel: "extensions.zotero.cleanroomtemplate.menuLabel",
+    logLevel: "extensions.zotero.cleanroomtemplate.logLevel",
+    themeMode: "extensions.zotero.cleanroomtemplate.themeMode",
+  };
+  const prefValues = new Map([
+    [prefNames.enabled, true],
+    [prefNames.menuLabel, ""],
+    [prefNames.logLevel, "info"],
+    [prefNames.themeMode, themeMode],
+  ]);
   const observers = new Map();
   const listeners = new Map();
   const resizeObservers = new Set();
@@ -100,15 +132,23 @@ function createHarness({
       };
     },
   };
-  const prefElement = {
-    name: prefName,
-    getAttribute(name) {
-      return name === "name" ? prefName : null;
-    },
-  };
+  const prefElements = new Map([
+    ["pref-enabled", Object.assign(createFakeElement("pref-enabled"), { name: prefNames.enabled })],
+    ["pref-menuLabel", Object.assign(createFakeElement("pref-menuLabel"), { name: prefNames.menuLabel })],
+    ["pref-logLevel", Object.assign(createFakeElement("pref-logLevel"), { name: prefNames.logLevel })],
+    ["pref-themeMode", Object.assign(createFakeElement("pref-themeMode"), { name: prefNames.themeMode })],
+  ]);
+  prefElements.forEach((element) => {
+    element.setAttribute("name", element.name);
+  });
+  const controls = new Map([
+    ["cleanroom-enabled", Object.assign(createFakeElement("cleanroom-enabled"), { checked: true })],
+    ["cleanroom-menu-label", Object.assign(createFakeElement("cleanroom-menu-label"), { value: "" })],
+    ["cleanroom-log-level", Object.assign(createFakeElement("cleanroom-log-level"), { value: "info" })],
+    ["cleanroom-theme-mode", Object.assign(createFakeElement("cleanroom-theme-mode"), { value: themeMode })],
+  ]);
   const localizedElements = new Map([
     ["cleanroom-pref-caption", createFakeElement("cleanroom-pref-caption")],
-    ["cleanroom-enabled", createFakeElement("cleanroom-enabled")],
     ["cleanroom-pref-menu-section", createFakeElement("cleanroom-pref-menu-section")],
     ["cleanroom-pref-menu-label-text", createFakeElement("cleanroom-pref-menu-label-text")],
     ["cleanroom-pref-menu-hint", createFakeElement("cleanroom-pref-menu-hint")],
@@ -194,8 +234,11 @@ function createHarness({
       return selector === ".cleanroom-pref-root" ? root : null;
     },
     getElementById(id) {
-      if (id === "pref-themeMode") {
-        return prefElement;
+      if (prefElements.has(id)) {
+        return prefElements.get(id);
+      }
+      if (controls.has(id)) {
+        return controls.get(id);
       }
       return localizedElements.get(id) || null;
     },
@@ -224,8 +267,18 @@ function createHarness({
   };
   context.Services = {
     prefs: {
+      getBoolPref(key, fallback) {
+        return prefValues.has(key) ? Boolean(prefValues.get(key)) : Boolean(fallback);
+      },
       getStringPref(key, fallback) {
         return prefValues.has(key) ? prefValues.get(key) : fallback;
+      },
+      setBoolPref(key, value) {
+        prefValues.set(key, Boolean(value));
+        const observer = observers.get(key);
+        if (observer) {
+          observer.observe(null, "nsPref:changed", key);
+        }
       },
       setStringPref(key, value) {
         prefValues.set(key, String(value));
@@ -254,6 +307,9 @@ function createHarness({
   return {
     context,
     prefValues,
+    prefNames,
+    prefElements,
+    controls,
     root,
     localizedElements,
     translatedRoots,
@@ -305,7 +361,7 @@ describe("Preference Theme Script", () => {
     const result = harness.context.initCleanroomPreferences();
 
     assert.equal(result.ok, true);
-    assert.equal(harness.prefValues.get("extensions.zotero.cleanroomtemplate.themeMode"), "follow-host");
+    assert.equal(harness.prefValues.get(harness.prefNames.themeMode), "follow-host");
     assert.equal(harness.root.dataset.cleanroomThemeMode, "follow-host");
     assert.equal(harness.root.dataset.cleanroomTheme, "light");
     assert.equal(harness.root.style.getPropertyValue("color-scheme"), "light dark");
@@ -467,6 +523,52 @@ describe("Preference Theme Script", () => {
     });
   });
 
+  it("should hydrate pref names and control writeback through the bridge binding mode", () => {
+    const harness = createHarness({
+      themeMode: "follow-host",
+      hostDark: false,
+    });
+
+    harness.prefElements.get("pref-enabled").setAttribute("name", "extensions.zotero.placeholder.p0");
+    harness.prefElements.get("pref-menuLabel").setAttribute("name", "extensions.zotero.placeholder.p1");
+    harness.prefElements.get("pref-logLevel").setAttribute("name", "extensions.zotero.placeholder.p2");
+    harness.prefElements.get("pref-themeMode").setAttribute("name", "extensions.zotero.placeholder.p3");
+
+    const result = harness.context.initCleanroomPreferences({
+      bridge: {
+        preferenceBindingMode: "bridge",
+        preferenceNames: {
+          enabled: harness.prefNames.enabled,
+          menuLabel: harness.prefNames.menuLabel,
+          logLevel: harness.prefNames.logLevel,
+          themeMode: harness.prefNames.themeMode,
+        },
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.preferenceBindingMode, "bridge");
+    assert.equal(result.preferenceBridgeApplied, true);
+    assert.equal(result.preferenceBridgeAppliedCount, 4);
+    assert.equal(result.prefName, harness.prefNames.themeMode);
+    assert.equal(harness.prefElements.get("pref-enabled").getAttribute("name"), harness.prefNames.enabled);
+    assert.equal(harness.prefElements.get("pref-themeMode").getAttribute("name"), harness.prefNames.themeMode);
+
+    harness.controls.get("cleanroom-enabled").checked = false;
+    harness.controls.get("cleanroom-enabled").dispatch("command");
+    assert.equal(harness.prefValues.get(harness.prefNames.enabled), false);
+
+    harness.controls.get("cleanroom-log-level").value = "warn";
+    harness.controls.get("cleanroom-log-level").dispatch("change");
+    assert.equal(harness.prefValues.get(harness.prefNames.logLevel), "warn");
+
+    harness.controls.get("cleanroom-theme-mode").value = "dark";
+    harness.controls.get("cleanroom-theme-mode").dispatch("command");
+    assert.equal(harness.prefValues.get(harness.prefNames.themeMode), "dark");
+    assert.equal(harness.root.dataset.cleanroomThemeMode, "dark");
+    assert.equal(harness.root.dataset.cleanroomTheme, "dark");
+  });
+
   it("should localize preference pane copy from bridge strings and request fluent translation", () => {
     const harness = createHarness({
       themeMode: "follow-host",
@@ -498,7 +600,7 @@ describe("Preference Theme Script", () => {
     assert.equal(result.fluentTranslationRequested, true);
     assert.equal(result.localizedCount, 13);
     assert.equal(harness.localizedElements.get("cleanroom-pref-caption").attributes.label, "Cleanroom 模板首选项");
-    assert.equal(harness.localizedElements.get("cleanroom-enabled").attributes.label, "启用插件");
+    assert.equal(harness.controls.get("cleanroom-enabled").attributes.label, "启用插件");
     assert.equal(harness.localizedElements.get("cleanroom-pref-menu-label-text").attributes.value, "菜单标签");
     assert.equal(harness.localizedElements.get("cleanroom-pref-menu-hint").textContent, "留空使用默认本地化文案。");
     assert.equal(harness.localizedElements.get("cleanroom-pref-theme-follow-host").attributes.label, "跟随 Zotero");

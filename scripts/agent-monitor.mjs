@@ -29,11 +29,15 @@ import {
   writeJSONArtifact,
 } from "./script-runtime-lib.mjs";
 import { summarizeEngineeringHardening } from "./engineering-hardening-lib.mjs";
+import { summarizeDebugProbeReport } from "./agent-zotero-debug-probe-lib.mjs";
 import {
   DEFAULT_WATCH_STALE_AFTER_MINUTES,
   summarizeZoteroWatchStatus,
 } from "./zotero-watch-status-lib.mjs";
-import { resolveZoteroAutofixArtifacts } from "./zotero-agent-artifacts.mjs";
+import {
+  resolveZoteroAutofixArtifacts,
+  resolveZoteroDebugProbeArtifacts,
+} from "./zotero-agent-artifacts.mjs";
 import { evaluateArtifactProvenance } from "./agent-provenance-lib.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -269,16 +273,21 @@ async function loadZoteroValidationSummary() {
   const e2ePath = resolveAgentArtifactPath(projectRoot, "agent-zotero-e2e.json");
   const autofixPath = resolveAgentArtifactPath(projectRoot, "agent-zotero-autofix.json");
   const watchRecoveryPath = resolveAgentArtifactPath(projectRoot, "zotero-watch-recovery-regression.json");
-  const [e2eReport, autofixReport, watchRecoveryReport] = await Promise.all([
+  const debugProbeArtifacts = resolveZoteroDebugProbeArtifacts(projectRoot);
+  const [e2eReport, autofixReport, watchRecoveryReport, debugProbeReport] = await Promise.all([
     loadJSONIfExists(e2ePath),
     loadJSONIfExists(autofixPath),
     loadJSONIfExists(watchRecoveryPath),
+    loadJSONIfExists(debugProbeArtifacts.reportJSON),
   ]);
 
   return {
     e2e: summarizeE2EReport(e2eReport),
     autofix: summarizeAutofixReport(autofixReport),
     watchRecovery: summarizeWatchRecoveryReport(watchRecoveryReport),
+    debugProbe: summarizeDebugProbeReport(debugProbeReport, {
+      e2eGeneratedAt: e2eReport?.generatedAt || null,
+    }),
   };
 }
 
@@ -482,6 +491,7 @@ function buildMarkdown(summary) {
     `- 真机验证: \`${summary.frontpageSummary?.e2e?.statusLabel || "缺失"}\` / ${summary.frontpageSummary?.e2e?.ageText || "-"}`,
     `- 自动修复: \`${summary.frontpageSummary?.autofix?.statusLabel || "缺失"}\` / ${summary.frontpageSummary?.autofix?.ageText || "-"}`,
     `- 恢复回归: \`${summary.frontpageSummary?.watchRecovery?.statusLabel || "缺失"}\` / ${summary.frontpageSummary?.watchRecovery?.ageText || "-"}`,
+    `- Debug Probe: \`${summary.frontpageSummary?.debugProbe?.statusLabel || "缺失"}\` / ${summary.frontpageSummary?.debugProbe?.ageText || "-"} / fresh-e2e \`${summary.frontpageSummary?.debugProbe?.freshForLatestE2E === null ? "-" : (summary.frontpageSummary?.debugProbe?.freshForLatestE2E ? "yes" : "no")}\``,
     `- Reference Distillation: \`${summary.frontpageSummary?.referenceDistillation?.statusLabel || "缺失"}\` / pending \`${summary.frontpageSummary?.referenceDistillation?.pendingCount ?? 0}\` / topic \`${summary.frontpageSummary?.referenceDistillation?.lastTopic || "-"}\``,
     `- Dead-Chain Audit: \`${summary.frontpageSummary?.deadChainAudit?.statusLabel || "缺失"}\` / hard-dead \`${summary.frontpageSummary?.deadChainAudit?.hardDeadCount ?? 0}\` / retired \`${summary.frontpageSummary?.deadChainAudit?.retiredChainCount ?? 0}\``,
     "",
@@ -574,6 +584,9 @@ function buildMarkdown(summary) {
     `- 补丁复验合同: \`${summary.zoteroValidation?.autofix?.patchVerificationStatusLabel || "缺失"}\``,
     `- 恢复回归: \`${summary.zoteroValidation?.watchRecovery?.statusLabel || "缺失"}\``,
     `- 恢复回归新鲜度: \`${summary.zoteroValidation?.watchRecovery?.ageText || "-"}\``,
+    `- Debug Probe: \`${summary.zoteroValidation?.debugProbe?.statusLabel || "缺失"}\``,
+    `- Debug Probe 新鲜度: \`${summary.zoteroValidation?.debugProbe?.ageText || "-"}\``,
+    `- Debug Probe 对齐最新 E2E: \`${summary.zoteroValidation?.debugProbe?.freshForLatestE2E === null ? "-" : (summary.zoteroValidation?.debugProbe?.freshForLatestE2E ? "yes" : "no")}\``,
     "",
   );
 
@@ -757,6 +770,26 @@ function buildMarkdown(summary) {
     lines.push(`- E2E 失败分类: \`${summary.zoteroValidation.e2e.errorCategoryLabel || summary.zoteroValidation.e2e.errorCategory || "-"}\``);
     lines.push(`- E2E 失败阶段: \`${summary.zoteroValidation.e2e.failedStage || "-"}\``);
     lines.push(`- E2E 失败信息: ${summary.zoteroValidation.e2e.errorMessage || "-"}`, "");
+  }
+  if (summary.zoteroValidation?.debugProbe?.present) {
+    lines.push("### Debug Probe", "");
+    lines.push(`- 状态: \`${summary.zoteroValidation.debugProbe.statusLabel || summary.zoteroValidation.debugProbe.status || "缺失"}\``);
+    lines.push(`- 模式: \`${summary.zoteroValidation.debugProbe.mode || "-"}\``);
+    lines.push(`- 选择来源: \`${summary.zoteroValidation.debugProbe.selectionSource || "-"}\``);
+    lines.push(`- 已选 bundles: \`${summary.zoteroValidation.debugProbe.selectedProbeCount ?? 0}\``);
+    lines.push(`- 已执行 bundles: \`${summary.zoteroValidation.debugProbe.executedProbeCount ?? 0}\``);
+    lines.push(`- 失败 bundles: \`${summary.zoteroValidation.debugProbe.failedProbeCount ?? 0}\``);
+    lines.push(`- Promotion: ${(summary.zoteroValidation.debugProbe.promotions || []).join("、") || "-"}`);
+    lines.push(`- 对齐最新 E2E: \`${summary.zoteroValidation.debugProbe.freshForLatestE2E === null ? "-" : (summary.zoteroValidation.debugProbe.freshForLatestE2E ? "yes" : "no")}\``);
+    lines.push(`- 摘要: ${summary.zoteroValidation.debugProbe.summary || "-"}`);
+    lines.push(`- 下一步: ${summary.zoteroValidation.debugProbe.nextSuggestedAction || "-"}`);
+    if (summary.zoteroValidation.debugProbe.reportJSON) {
+      lines.push(`- JSON: \`${summary.zoteroValidation.debugProbe.reportJSON}\``);
+    }
+    if (summary.zoteroValidation.debugProbe.reportMD) {
+      lines.push(`- Markdown: \`${summary.zoteroValidation.debugProbe.reportMD}\``);
+    }
+    lines.push("");
   }
   if (summary.zoteroValidation?.autofix?.errorCategoryLabel || summary.zoteroValidation?.autofix?.failedStage) {
     lines.push(`- Autofix 失败分类: \`${summary.zoteroValidation.autofix.errorCategoryLabel || summary.zoteroValidation.autofix.errorCategory || "-"}\``);

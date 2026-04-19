@@ -38,6 +38,8 @@ export function summarizeZoteroLoopState({
   autofix,
   watchRecovery,
   gate,
+  debugProbe,
+  debugProbeCandidates,
 }, options = {}) {
   const requireWatchRecovery = options.requireWatchRecovery !== false;
   const gateSummary = normalizeGateReport(gate);
@@ -48,18 +50,31 @@ export function summarizeZoteroLoopState({
       e2e,
       autofix,
       watchRecovery,
+      debugProbe,
     },
   });
 
   const watchNeedsRefresh = !watchStatus?.present || watchStatus.status !== "healthy";
   const e2eMissing = !e2e?.present;
   const e2eNeedsRefresh = watchNeedsRefresh && e2e?.present === true && e2e?.status !== "passed";
-  const e2eNeedsRun = e2eMissing || e2eNeedsRefresh;
   const pureVisualReaderFailure = isPureVisualReaderFailure(e2e);
   const pureVisualNextAction = pickPureVisualReaderNextAction(e2e);
   const pureVisualNeedsBaselineUpdate = pureVisualReaderFailure && pureVisualNextAction === "npm run agent:zotero:e2e:update-baseline";
   const pureVisualNeedsObsidian = pureVisualReaderFailure && pureVisualNextAction === "npm run agent:obsidian";
   const pureVisualNeedsE2ERerun = pureVisualReaderFailure && pureVisualNextAction === "npm run agent:zotero:e2e";
+  const debugProbeCandidateCount = Math.max(0, Number(debugProbeCandidates?.candidateCount || 0));
+  const debugProbeCandidateProbeIDs = Array.isArray(debugProbeCandidates?.probeIDs)
+    ? debugProbeCandidates.probeIDs
+    : [];
+  const freshDebugProbe = Boolean(debugProbe?.present) && debugProbe?.freshForLatestE2E !== false;
+  const smartDebugProbeRecommended = Boolean(
+    e2e?.present
+    && e2e?.status === "failed"
+    && !pureVisualReaderFailure
+    && debugProbeCandidateCount > 0
+    && !freshDebugProbe
+  );
+  const e2eNeedsRun = e2eMissing || e2eNeedsRefresh || smartDebugProbeRecommended;
   const autofixRecommended = !e2eNeedsRun
     && !pureVisualReaderFailure
     && (e2e?.status === "failed" || autofix?.status === "unrecovered");
@@ -91,6 +106,9 @@ export function summarizeZoteroLoopState({
       }
     }
   }
+  if (smartDebugProbeRecommended) {
+    issues.push(`当前失败命中 ${debugProbeCandidateCount} 个 smart debug probe 候选；下一次 E2E 应附带受控 probe sidecar。`);
+  }
   if (autofix?.status === "unrecovered") {
     issues.push("最近自动修复未恢复成功。");
   }
@@ -117,6 +135,10 @@ export function summarizeZoteroLoopState({
     pureVisualNeedsBaselineUpdate,
     pureVisualNeedsObsidian,
     pureVisualNeedsE2ERerun,
+    debugProbe: debugProbe || { present: false, status: "missing", statusLabel: "缺失" },
+    debugProbeCandidateCount,
+    debugProbeCandidateProbeIDs,
+    smartDebugProbeRecommended,
     autofixRecommended,
     watchRecoveryNeeded,
     stable,
@@ -139,31 +161,40 @@ export function deriveZoteroLoopActions(state) {
     actions.push({
       id: "run-e2e",
       label: "执行 Zotero 真机 E2E",
-      commandLabel: "npm run agent:zotero:e2e",
+      commandLabel: state.smartDebugProbeRecommended
+        ? "npm run agent:zotero:e2e -- --probe-mode smart"
+        : "npm run agent:zotero:e2e",
+      commandArgs: state.smartDebugProbeRecommended
+        ? ["run", "agent:zotero:e2e", "--", "--probe-mode", "smart"]
+        : ["run", "agent:zotero:e2e"],
     });
   } else if (state.pureVisualNeedsBaselineUpdate) {
     actions.push({
       id: "update-visual-baseline",
       label: "刷新视觉基线并复验",
       commandLabel: "npm run agent:zotero:e2e:update-baseline",
+      commandArgs: ["run", "agent:zotero:e2e:update-baseline"],
     });
   } else if (state.pureVisualNeedsObsidian) {
     actions.push({
       id: "run-obsidian",
       label: "刷新 Obsidian 人工介入工作台",
       commandLabel: "npm run agent:obsidian",
+      commandArgs: ["run", "agent:obsidian"],
     });
   } else if (state.pureVisualNeedsE2ERerun) {
     actions.push({
       id: "run-e2e",
       label: "复核视觉稳定性并重跑 Zotero 真机 E2E",
       commandLabel: "npm run agent:zotero:e2e",
+      commandArgs: ["run", "agent:zotero:e2e"],
     });
   } else if (state.autofixRecommended) {
     actions.push({
       id: "run-autofix",
       label: "执行 Zotero 自动修复闭环",
       commandLabel: "npm run agent:zotero:autofix",
+      commandArgs: ["run", "agent:zotero:autofix"],
     });
   }
 
@@ -172,6 +203,7 @@ export function deriveZoteroLoopActions(state) {
       id: "run-watch-recovery",
       label: "执行 watch 恢复回归",
       commandLabel: "npm run agent:zotero:watch-recovery",
+      commandArgs: ["run", "agent:zotero:watch-recovery"],
     });
   }
 
@@ -180,11 +212,13 @@ export function deriveZoteroLoopActions(state) {
       id: "run-monitor",
       label: "刷新 agent monitor",
       commandLabel: "npm run agent:monitor",
+      commandArgs: null,
     },
     {
       id: "run-gate",
       label: "刷新 agent gate",
       commandLabel: "npm run agent:gate",
+      commandArgs: null,
     },
   );
 
@@ -216,6 +250,8 @@ export function buildZoteroLoopMarkdown(report) {
     "",
     `- 需要刷新 watch: \`${report.initialState?.watchNeedsRefresh ? "true" : "false"}\``,
     `- 需要补跑 E2E: \`${report.initialState?.e2eNeedsRun ? "true" : "false"}\``,
+    `- 下一次 E2E 将带 smart probe: \`${report.initialState?.smartDebugProbeRecommended ? "true" : "false"}\``,
+    `- smart probe 候选 bundles: \`${report.initialState?.debugProbeCandidateCount ?? 0}\` / ${(report.initialState?.debugProbeCandidateProbeIDs || []).join("、") || "-"}`,
     `- 建议自动修复: \`${report.initialState?.autofixRecommended ? "true" : "false"}\``,
     `- 需要恢复回归: \`${report.initialState?.watchRecoveryNeeded ? "true" : "false"}\``,
     "",
@@ -241,6 +277,12 @@ export function buildZoteroLoopMarkdown(report) {
   lines.push("", "## Gate 摘要", "");
   lines.push(`- Gate: \`${report.finalState?.gate?.statusLabel || "缺失"}\``);
   lines.push(`- Gate 结论: ${report.finalState?.gate?.headline || "-"}`);
+  lines.push("", "## Debug Probe 摘要", "");
+  lines.push(`- 最新 Debug Probe: \`${report.finalState?.debugProbe?.statusLabel || "缺失"}\``);
+  lines.push(`- 是否 fresh: \`${report.finalState?.debugProbe?.freshForLatestE2E === null || report.finalState?.debugProbe?.freshForLatestE2E === undefined ? "-" : (report.finalState?.debugProbe?.freshForLatestE2E ? "true" : "false")}\``);
+  lines.push(`- smart 候选 bundles: \`${report.finalState?.debugProbeCandidateCount ?? 0}\` / ${(report.finalState?.debugProbeCandidateProbeIDs || []).join("、") || "-"}`);
+  lines.push(`- 下一次 E2E 带 smart probe: \`${report.finalState?.smartDebugProbeRecommended ? "true" : "false"}\``);
+  lines.push(`- Probe 摘要: ${report.finalState?.debugProbe?.summary || "-"}`);
   lines.push("");
   return lines.join("\n");
 }

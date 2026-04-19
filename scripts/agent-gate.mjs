@@ -26,6 +26,7 @@ import {
   summarizeE2EReport,
   summarizeWatchRecoveryReport,
 } from "./agent-zotero-validation-lib.mjs";
+import { summarizeDebugProbeReport } from "./agent-zotero-debug-probe-lib.mjs";
 import {
   evaluateObsidianWorkspaceGuard,
 } from "./agent-obsidian-guard-lib.mjs";
@@ -48,6 +49,7 @@ import {
   RELEASE_PLAN_RUN_DESCRIPTION,
   RELEASE_PLAN_RUN_NAME,
 } from "./release-flow-contract-lib.mjs";
+import { resolveZoteroDebugProbeArtifacts } from "./zotero-agent-artifacts.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -132,16 +134,21 @@ async function loadZoteroValidationSummary() {
   const e2ePath = resolveAgentArtifactPath(projectRoot, "agent-zotero-e2e.json");
   const autofixPath = resolveAgentArtifactPath(projectRoot, "agent-zotero-autofix.json");
   const watchRecoveryPath = resolveAgentArtifactPath(projectRoot, "zotero-watch-recovery-regression.json");
-  const [e2eReport, autofixReport, watchRecoveryReport] = await Promise.all([
+  const debugProbeArtifacts = resolveZoteroDebugProbeArtifacts(projectRoot);
+  const [e2eReport, autofixReport, watchRecoveryReport, debugProbeReport] = await Promise.all([
     loadJSONIfExists(e2ePath),
     loadJSONIfExists(autofixPath),
     loadJSONIfExists(watchRecoveryPath),
+    loadJSONIfExists(debugProbeArtifacts.reportJSON),
   ]);
 
   return {
     e2e: summarizeE2EReport(e2eReport),
     autofix: summarizeAutofixReport(autofixReport),
     watchRecovery: summarizeWatchRecoveryReport(watchRecoveryReport),
+    debugProbe: summarizeDebugProbeReport(debugProbeReport, {
+      e2eGeneratedAt: e2eReport?.generatedAt || null,
+    }),
   };
 }
 
@@ -409,6 +416,9 @@ function evaluateZoteroValidation(validationSummary, policy, validationDecision 
   const watchRecovery = validationSummary?.watchRecovery && typeof validationSummary.watchRecovery === "object"
     ? validationSummary.watchRecovery
     : null;
+  const debugProbe = validationSummary?.debugProbe && typeof validationSummary.debugProbe === "object"
+    ? validationSummary.debugProbe
+    : null;
 
   const issues = [];
   const recommendations = [];
@@ -598,6 +608,13 @@ function evaluateZoteroValidation(validationSummary, policy, validationDecision 
       } else {
         recommendations.push("优先重新执行 `npm run agent:zotero:e2e`，确认真实 Zotero 动作、测试与视觉基线是否全部通过。");
       }
+      if (!debugProbe?.present || debugProbe.freshForLatestE2E === false) {
+        recommendations.push("若需要继续压缩本轮根因，可补跑 `npm run agent:zotero:e2e -- --probe-mode smart` 或独立执行 `npm run agent:zotero:debug-probe -- --mode smart`；该步骤只提供 advisory 解释力，不改 gate 语义。");
+      } else if (debugProbe.status === "failed") {
+        recommendations.push("最新 debug probe 自身未完成；先查看 `dist/agent-zotero-debug-probe.md`，确认失败 bundle 与 stopReason。");
+      } else if (debugProbe.executedProbeCount > 0) {
+        recommendations.push(`最新 debug probe 已补充解释：${debugProbe.summary || "可查看对应 bundle 结果"}`);
+      }
     } else if (Number.isFinite(e2e.ageMinutes) && e2e.ageMinutes > policy.zoteroE2EStaleAfterMinutes) {
       issues.push(`最近 Zotero E2E 结果已过期：距离现在约 ${e2e.ageText}。`);
       recommendations.push("重新执行 `npm run agent:zotero:e2e`，刷新当前开发态的真机验证结论。");
@@ -666,6 +683,7 @@ function evaluateZoteroValidation(validationSummary, policy, validationDecision 
       : { present: false, status: "missing", statusLabel: "缺失", primaryDiagnosis: null, diagnosisBlocking: false },
     autofix: autofix || { present: false, status: "missing", statusLabel: "缺失" },
     watchRecovery: watchRecovery || { present: false, status: "missing", statusLabel: "缺失" },
+    debugProbe: debugProbe || { present: false, status: "missing", statusLabel: "缺失" },
     issues,
     recommendations,
   };
@@ -1110,6 +1128,7 @@ function buildMarkdown(report) {
   } else {
     const e2e = report.zoteroValidation.e2e || {};
     const autofix = report.zoteroValidation.autofix || {};
+    const debugProbe = report.zoteroValidation.debugProbe || {};
     if (!e2e.present) {
       lines.push("- 最近 E2E: 未发现 `dist/agent-zotero-e2e.json`。");
     } else {
@@ -1222,6 +1241,20 @@ function buildMarkdown(report) {
           });
         }
       }
+    }
+    if (!debugProbe.present) {
+      lines.push("- 最近 Debug Probe: 未发现 `dist/agent-zotero-debug-probe.json`。");
+    } else {
+      lines.push(`- 最近 Debug Probe: \`${debugProbe.status || "unknown"}\` (${debugProbe.statusLabel || "未知"})`);
+      lines.push(`- Debug Probe 新鲜度: \`${debugProbe.ageText || "-"}\``);
+      lines.push(`- Debug Probe 模式: \`${debugProbe.mode || "-"}\``);
+      lines.push(`- Debug Probe 已选 bundles: \`${debugProbe.selectedProbeCount ?? 0}\``);
+      lines.push(`- Debug Probe 已执行 bundles: \`${debugProbe.executedProbeCount ?? 0}\``);
+      lines.push(`- Debug Probe 失败 bundles: \`${debugProbe.failedProbeCount ?? 0}\``);
+      lines.push(`- Debug Probe 对齐最新 E2E: \`${debugProbe.freshForLatestE2E === null ? "-" : (debugProbe.freshForLatestE2E ? "yes" : "no")}\``);
+      lines.push(`- Debug Probe Promotion: ${(debugProbe.promotions || []).join("、") || "-"}`);
+      lines.push(`- Debug Probe 摘要: ${debugProbe.summary || "-"}`);
+      lines.push(`- Debug Probe 下一步: ${debugProbe.nextSuggestedAction || "-"}`);
     }
     if (!autofix.present) {
       lines.push("- 最近自动修复: 未发现 `dist/agent-zotero-autofix.json`。");

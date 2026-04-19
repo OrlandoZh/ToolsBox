@@ -17,7 +17,7 @@
 - Reference Sources:
   - `chrome/content/zotero/xpcom/pluginAPI/menuManager.js` includes `const VALID_TARGETS = [`, `const VALID_MENU_TYPES = [`, `Zotero.MenuManager = {`, `registerMenu(options) {`
 - Exported Surface:
-  - menu targets: `src/features/menu-manager.js` includes `export const MENU_TARGETS = {`, `MAIN_MENU_FILE: "main/menubar/file"`, `LIBRARY_ITEM: "main/library/item"`, `READER_MENU_VIEW: "reader/menubar/view"`, `ITEM_PANE_INFO_ROW: "itemPane/info/row"`
+  - menu targets: `src/features/menu-manager.js` includes `export const MENU_TARGETS = {`, `MAIN_MENU_FILE: "main/menubar/file"`, `MAIN_MENU_EDIT: "main/menubar/edit"`, `MAIN_MENU_TOOLS: "main/menubar/tools"`, `LIBRARY_ITEM: "main/library/item"`, `LIBRARY_ADD_ATTACHMENT: "main/library/addAttachment"`, `LIBRARY_ADD_NOTE: "main/library/addNote"`, `MAIN_TAB: "main/tab"`, `READER_MENU_FILE: "reader/menubar/file"`, `READER_MENU_VIEW: "reader/menubar/view"`, `READER_MENU_WINDOW: "reader/menubar/window"`, `ITEM_PANE_INFO_ROW: "itemPane/info/row"`, `NOTES_PANE_STANDALONE_NOTE: "notesPane/addStandaloneNote"`
   - menu types: `src/features/menu-manager.js` includes `export const MENU_TYPES = {`, `MENUITEM: "menuitem"`, `SUBMENU: "submenu"`
   - tab types: `src/features/menu-manager.js` includes `export const TAB_TYPES = {`, `READER_PDF: "reader/pdf"`, `READER_SNAPSHOT: "reader/snapshot"`
   - official registration bridge: `src/features/menu-manager.js` includes `function hasOfficialAPI() {`, `return Zotero && Zotero.MenuManager && typeof Zotero.MenuManager.registerMenu === "function";`, `function register(config) {`, `const menuData = menus.map((menuItem, index) => wrapMenuData(menuId, menuItem, `${index}`, menuPaths));`, `function getMenuRegistrationSnapshot(menuId = null) {`, `function getLiveMenuState(menuId, menuPath = null) {`
@@ -43,10 +43,11 @@
 - Reference Sources:
   - `chrome/content/zotero/xpcom/pluginAPI/itemPaneManager.js` includes `Zotero.ItemPaneManager.registerSection({`, `registerSection(options) {`, `Zotero.ItemPaneManager.registerInfoRow({`, `refreshInfoRow(rowID) {`
 - Exported Surface:
-  - section registration bridge: `src/features/item-pane.js` includes `function registerSection(sectionOptions) {`, `error("itemPane.registerSection.noOnRender", { paneID });`, `config.header.l10nID = header.l10nID;`, `config.sidenav.l10nID = sidenav.l10nID;`, `const registeredPaneID = Zotero.ItemPaneManager.registerSection(config);`
+  - section registration bridge: `src/features/item-pane.js` includes `function registerSection(sectionOptions) {`, `error("itemPane.registerSection.noOnRender", { paneID });`, `config.header.l10nID = header.l10nID;`, `config.sidenav.l10nID = sidenav.l10nID;`, `config.sidenav.orderable = sidenav.orderable;`, `config.sectionButtons = sectionButtons;`, `const registeredPaneID = Zotero.ItemPaneManager.registerSection(config);`
   - info row registration bridge: `src/features/item-pane.js` includes `function registerInfoRow(rowOptions) {`, `const registeredRowID = Zotero.ItemPaneManager.registerInfoRow(config);`, `function refreshInfoRow(rowID) {`
+  - registration snapshot helpers: `src/features/item-pane.js` includes `function resolveSectionPaneID(paneID) {`, `function getRegistrationSnapshot() {`
 - Required Types:
-  - `types/features.d.ts` includes `registerSection(options: SectionOptions): string | null;`, `registerInfoRow(options: InfoRowOptions): string | null;`, `onRender: (props: {`, `headerL10nID: string;`, `labelL10nID: string;`
+  - `types/features.d.ts` includes `registerSection(options: SectionOptions): string | null;`, `registerInfoRow(options: InfoRowOptions): string | null;`, `sidenav?: SectionHeader & { orderable?: boolean };`, `sectionButtons?: Array<{`, `onRender: (props: {`, `headerL10nID: string;`, `labelL10nID: string;`, `refreshInfoRow(rowID: string): boolean;`, `resolveSectionPaneID(paneID: string): string | null;`, `getRegistrationSnapshot(): {`
 - Required Tests:
   - `item-pane.test.js`
   - `plugin.test.js`
@@ -84,11 +85,11 @@
 - Owner Files:
   - `src/features/preference-panes.js`
 - Reference Sources:
-  - `chrome/content/zotero/xpcom/preferencePanes.js` includes `Zotero.PreferencePanes.register({`, `throw new Error('pluginID and src must be provided');`, `src: await Zotero.Plugins.resolveURI(options.pluginID, options.src)`, `unregister: function (id) {`
+  - `chrome/content/zotero/xpcom/preferencePanes.js` includes `Zotero.PreferencePanes.register({`, `throw new Error('pluginID and src must be provided');`, `image: options.image && (await Zotero.Plugins.resolveURI(options.pluginID, options.image))`, `|| (await Zotero.Plugins.getIconURI(options.pluginID, 24)),`, `src: await Zotero.Plugins.resolveURI(options.pluginID, options.src)`, `stylesheets: await Promise.all(options.stylesheets.map(uri => Zotero.Plugins.resolveURI(options.pluginID, uri))),`, `unregister: function (id) {`
 - Exported Surface:
-  - preference pane registration bridge: `src/features/preference-panes.js` includes `function resolveURI(uri) {`, `async function registerPane(paneOptions) {`, `const resolvedSrc = resolveURI(src);`, `const useOnPreferenceLoad = typeof onPreferenceLoad === "function";`, `registerPreferencePaneLoadHandler(paneId, onPreferenceLoad);`, `const paneId = await Zotero.PreferencePanes.register(registerOptions);`, `Zotero.PreferencePanes.unregister(paneId);`
+  - preference pane registration bridge: `src/features/preference-panes.js` includes `function resolveURI(uri) {`, `async function registerPane(paneOptions) {`, `const resolvedSrc = resolveURI(src);`, `const useOnPreferenceLoad = typeof onPreferenceLoad === "function";`, `const resolvedStylesheets = stylesheets.map(resolveURI);`, `const resolvedImage = image ? resolveURI(image) : undefined;`, `registerPreferencePaneLoadHandler(paneId, onPreferenceLoad);`, `const paneId = await Zotero.PreferencePanes.register(registerOptions);`, `Zotero.PreferencePanes.unregister(paneId);`, `function getAllPanes() {`
 - Required Types:
-  - `types/features.d.ts` includes `registerPane(options: PreferencePaneOptions): Promise<string | null>;`, `resolveURI(uri: string): string;`, `label?: string;`, `onPreferenceLoad?: (`
+  - `types/features.d.ts` includes `registerPane(options: PreferencePaneOptions): Promise<string | null>;`, `resolveURI(uri: string): string;`, `label?: string;`, `stylesheets?: string[];`, `helpURL?: string;`, `onPreferenceLoad?: (`, `getAllPanes(): string[];`
 - Required Tests:
   - `plugin.test.js`
   - `toolchain.test.js`
