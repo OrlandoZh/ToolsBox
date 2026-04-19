@@ -7,9 +7,14 @@ type ShellContext = {
 };
 
 function readShellContext(rootElement: HTMLElement): ShellContext {
+  const documentElement = rootElement.ownerDocument?.documentElement;
   return {
-    addonRef: rootElement.dataset.addonRef || "cleanroomtemplate",
-    addonName: rootElement.dataset.addonName || "Cleanroom Template",
+    addonRef: documentElement?.getAttribute("data-addon-ref")
+      || rootElement.dataset.addonRef
+      || "tool",
+    addonName: documentElement?.getAttribute("data-addon-name")
+      || rootElement.dataset.addonName
+      || "Tool",
   };
 }
 

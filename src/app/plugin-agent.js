@@ -3,6 +3,7 @@ import {
   findCapabilityById as findCapabilityByIdFromManifest,
   getCapabilityManifestView as getCapabilityManifestViewFactory,
 } from "./capability-manifest.js";
+import { AGENT_SCENARIO_IDS } from "./agent-scenario-ids.js";
 import { createSurfaceDescriptors } from "./surface-descriptors.js";
 
 const BASELINE_ITEM_PANE_L10N = Object.freeze({
@@ -508,15 +509,15 @@ export function createPluginAgent({
 
   function listAgentScenarios() {
     return [
-      "baseline-registration",
-      "capability-manifest",
-      "sample-item-pane",
-      "settings-snapshot",
-      "notifier-preview",
-      "reader-current",
-      "window-snapshot",
-      "command-no-ui",
-      "host-actions",
+      AGENT_SCENARIO_IDS.baselineRegistration,
+      AGENT_SCENARIO_IDS.capabilityManifest,
+      AGENT_SCENARIO_IDS.sampleItemPane,
+      AGENT_SCENARIO_IDS.settingsSnapshot,
+      AGENT_SCENARIO_IDS.notifierPreview,
+      AGENT_SCENARIO_IDS.readerCurrent,
+      AGENT_SCENARIO_IDS.windowSnapshot,
+      AGENT_SCENARIO_IDS.commandNoUI,
+      AGENT_SCENARIO_IDS.hostActions,
     ];
   }
 
@@ -531,9 +532,9 @@ export function createPluginAgent({
 
   function runAgentScenario(name, payload = {}) {
     switch (name) {
-      case "baseline-registration":
+      case AGENT_SCENARIO_IDS.baselineRegistration:
         return collectAgentDiagnostics();
-      case "capability-manifest":
+      case AGENT_SCENARIO_IDS.capabilityManifest:
         {
           const capabilityManifest = getCurrentCapabilityManifest();
         return {
@@ -543,10 +544,10 @@ export function createPluginAgent({
           capabilities: listCapabilities(),
         };
         }
-      case "sample-item-pane": {
+      case AGENT_SCENARIO_IDS.sampleItemPane: {
         return inspectItemPresentation(payload.itemID ?? payload.item ?? payload);
       }
-      case "settings-snapshot": {
+      case AGENT_SCENARIO_IDS.settingsSnapshot: {
         const definitions = settings && typeof settings.listDefinitions === "function"
           ? settings.listDefinitions()
           : [];
@@ -561,7 +562,7 @@ export function createPluginAgent({
           paneIDs: preferencePanes.getAllPanes(),
         };
       }
-      case "notifier-preview": {
+      case AGENT_SCENARIO_IDS.notifierPreview: {
         const event = payload.event || "modify";
         const type = payload.type || "item";
         const ids = Array.isArray(payload.ids) ? payload.ids : [payload.id ?? 42];
@@ -570,7 +571,7 @@ export function createPluginAgent({
           lastNotifierEvent: demoState.lastNotifierEvent,
         };
       }
-      case "reader-current":
+      case AGENT_SCENARIO_IDS.readerCurrent:
         {
           const interaction = typeof reader.getReaderInteractionSnapshot === "function"
             ? reader.getReaderInteractionSnapshot(payload.itemID ?? payload.tabID ?? payload.target)
@@ -586,7 +587,7 @@ export function createPluginAgent({
               || (typeof reader.getWindowStates === "function" ? reader.getWindowStates() : []),
           };
         }
-      case "window-snapshot": {
+      case AGENT_SCENARIO_IDS.windowSnapshot: {
         const windows = host && typeof host.listMainWindows === "function"
           ? host.listMainWindows()
           : [];
@@ -608,11 +609,11 @@ export function createPluginAgent({
           windows: details,
         };
       }
-      case "command-no-ui":
+      case AGENT_SCENARIO_IDS.commandNoUI:
         return {
           ok: executeAgentAction(),
         };
-      case "host-actions":
+      case AGENT_SCENARIO_IDS.hostActions:
         return {
           total: typeof listHostActions === "function"
             ? listHostActions().length

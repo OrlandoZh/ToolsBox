@@ -1,3 +1,5 @@
+import { CAPABILITY_IDS } from "./capability-ids.js";
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -7,6 +9,8 @@ function buildToken(parts) {
 }
 
 const OVERLAY_FIELD_KEYS = Object.freeze([
+  "label",
+  "category",
   "description",
   buildToken(["entry", "points"]),
   buildToken(["owned", "By"]),
@@ -19,123 +23,39 @@ const HOST_BINDING_REQUIREMENTS = Object.freeze([
   "noncePresent",
 ]);
 
+const PROTECTED_CAPABILITY_CATEGORY = buildToken(["protected"]);
+
+function buildProtectedCapabilityLabel(index) {
+  return buildToken([
+    "C",
+    "-",
+    String(Math.max(1, Number(index) + 1)).padStart(2, "0"),
+  ]);
+}
+
 function buildProtectedCapabilityManifest() {
   const redactedDescription = "受保护导出不附带该能力的详细说明。";
-
-  return [
-    {
-      id: "baseline-registration",
-      label: "基线注册",
-      category: "baseline",
-      description: redactedDescription,
-      agentScenario: "baseline-registration",
-      zoteroScenarios: ["baseline registration diagnostics"],
-    },
-    {
-      id: "item-presentation",
-      label: "条目展示摘要",
-      category: "feature",
-      description: redactedDescription,
-      agentScenario: "sample-item-pane",
-      zoteroScenarios: ["real item selection diagnostics"],
-    },
-    {
-      id: "notifier-sync",
-      label: "通知器联动",
-      category: "feature",
-      description: redactedDescription,
-      agentScenario: "notifier-preview",
-      zoteroScenarios: ["real notifier follows item updates"],
-    },
-    {
-      id: "reader-summary",
-      label: "Reader 摘要",
-      category: "feature",
-      description: redactedDescription,
-      agentScenario: "reader-current",
-      zoteroScenarios: [
-        "real reader summary on generated pdf",
-        "reader interaction diagnostics",
-      ],
-    },
-    {
-      id: "reader-annotation-roundtrip",
-      label: "Reader 批注回环",
-      category: "feature",
-      description: redactedDescription,
-      agentScenario: "reader-current",
-      zoteroScenarios: ["reader annotation roundtrip"],
-    },
-    {
-      id: "reader-ui-state",
-      label: "Reader UI 状态",
-      category: "feature",
-      description: redactedDescription,
-      agentScenario: "reader-current",
-      zoteroScenarios: ["reader interaction diagnostics"],
-    },
-    {
-      id: "reader-event-hooks",
-      label: "Reader 事件桥",
-      category: "feature",
-      description: redactedDescription,
-      agentScenario: "reader-current",
-      zoteroScenarios: [
-        "reader event hook diagnostics",
-        "reader fine-grained hook diagnostics",
-      ],
-    },
-    {
-      id: "command-nonblocking",
-      label: "无阻塞动作执行",
-      category: "feature",
-      description: redactedDescription,
-      agentScenario: "command-no-ui",
-      zoteroScenarios: ["agent action runs without blocking UI"],
-    },
-    {
-      id: "host-actions",
-      label: "宿主动作编排",
-      category: "feature",
-      description: redactedDescription,
-      agentScenario: "host-actions",
-      zoteroScenarios: [
-        "preference pane surface smoke",
-        "preference pane control interaction",
-        "library item pane surface smoke",
-        "context pane surface smoke",
-        "reader surface smoke",
-        "live menu surface smoke",
-      ],
-    },
-    {
-      id: "settings-governance",
-      label: "设置治理",
-      category: "governance",
-      description: redactedDescription,
-      agentScenario: "settings-snapshot",
-      zoteroScenarios: [
-        "settings schema and preference pane diagnostics",
-        "preference pane control interaction",
-      ],
-    },
-    {
-      id: "multi-window-mount",
-      label: "多窗口挂载",
-      category: "runtime",
-      description: redactedDescription,
-      agentScenario: "window-snapshot",
-      zoteroScenarios: ["multi-window mount diagnostics"],
-    },
-    {
-      id: "runtime-bridge-report",
-      label: "运行时桥接报告",
-      category: "runtime",
-      description: redactedDescription,
-      agentScenario: "capability-manifest",
-      zoteroScenarios: [],
-    },
+  const capabilityOrder = [
+    CAPABILITY_IDS.baselineRegistration,
+    CAPABILITY_IDS.itemPresentation,
+    CAPABILITY_IDS.notifierSync,
+    CAPABILITY_IDS.readerSummary,
+    CAPABILITY_IDS.readerAnnotationRoundtrip,
+    CAPABILITY_IDS.readerUIState,
+    CAPABILITY_IDS.readerEventHooks,
+    CAPABILITY_IDS.commandNonblocking,
+    CAPABILITY_IDS.hostActions,
+    CAPABILITY_IDS.settingsGovernance,
+    CAPABILITY_IDS.multiWindowMount,
+    CAPABILITY_IDS.runtimeBridgeReport,
   ];
+
+  return capabilityOrder.map((id, index) => ({
+    id,
+    label: buildProtectedCapabilityLabel(index),
+    category: PROTECTED_CAPABILITY_CATEGORY,
+    description: redactedDescription,
+  }));
 }
 
 function normalizeStringArray(input) {
@@ -151,6 +71,12 @@ function normalizeOverlayItem(item) {
   }
 
   const normalized = { id };
+  if (typeof item?.label === "string" && item.label.trim()) {
+    normalized.label = item.label.trim();
+  }
+  if (typeof item?.category === "string" && item.category.trim()) {
+    normalized.category = item.category.trim();
+  }
   if (typeof item?.description === "string" && item.description.trim()) {
     normalized.description = item.description.trim();
   }

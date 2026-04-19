@@ -604,6 +604,8 @@ describe("Plugin Agent", () => {
     let overlayEnabled = false;
     const descriptorOverlay = [{
       id: "host-actions",
+      label: "宿主动作编排",
+      category: "feature",
       description: "验证 host action overlay 已按宿主弱绑定解锁。",
       entrypoints: ["plugin.api.agent.runHostAction(actionId, payload)"],
       ownedBy: ["src/app/host-actions.js"],
@@ -644,6 +646,8 @@ describe("Plugin Agent", () => {
       limitedCapability.description,
       "受保护导出不附带该能力的详细说明。",
     );
+    assert.equal(limitedCapability.label, "C-09");
+    assert.equal(limitedCapability.category, "protected");
     assert.equal(Object.prototype.hasOwnProperty.call(limitedCapability, "entrypoints"), false);
 
     overlayEnabled = true;
@@ -663,6 +667,8 @@ describe("Plugin Agent", () => {
       fullCapability.description,
       "验证 host action overlay 已按宿主弱绑定解锁。",
     );
+    assert.equal(fullCapability.label, "宿主动作编排");
+    assert.equal(fullCapability.category, "feature");
     assert.deepEqual(
       fullCapability.entrypoints,
       ["plugin.api.agent.runHostAction(actionId, payload)"],

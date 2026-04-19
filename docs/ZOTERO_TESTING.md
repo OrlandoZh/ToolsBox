@@ -28,6 +28,7 @@
 - `npm run agent:zotero:watch-recovery` 当前已验证：可在真机中自动完成“启动 watch -> 注入一次性 build 失败 -> 注入一次性 runtime 恢复失败 -> 观测 session-restart-recovery 成功”的受控回归，并输出独立恢复报告
 - `agent:monitor` / `agent:dashboard` / `agent:gate` 已接入 `dist/zotero-watch-status.json`：agent 主报告会展示热重载状态、状态时间与简单问题摘要；开发档位门禁会额外识别“健康但已过期”或“时间超前”的旧状态，避免误把陈旧/异常结果当成当前可用结论
 - `agent:monitor.json` 现在额外提供 `frontpageSummary` / `readinessSummary` 轻量摘要，包含当前状态、摘要结论、下一步建议，以及 `watch / e2e / autofix / watchRecovery` 的压缩视图；`e2e.readerEventReport` 会继续暴露 Reader 事件桥状态、已知事件类型数、探针类型数与 synthetic-fallback 摘要，方便 agent 先快速判定，再决定是否继续读取 `agent-gate.json`
+- `agent:monitor` 当前已接入 `debugProbe` 压缩视图：会显示最近 probe 状态、是否对齐最新 E2E、已执行 bundle 数与 advisory 摘要，用来区分“当前失败还没补追问”与“probe 已给出额外解释力”
 - `agent:gate` 现已识别 Reader 事件桥退化：如果真机报告显示 Reader 事件 API 不可用、细粒度 Hook 摘要异常，或 `synthetic-fallback` 缺失，开发档位会阻断继续推进，并明确指向 Reader 事件桥实现与对应真机场景
 - `agent:memory` / `agent:monitor` 现在会把 Reader 事件桥作为独立信号归档到 `agent-memory/signals/readerEvent.json`，用于识别“主闭环仍通过，但 Reader 事件桥在回归退化”的历史趋势
 - `agent:zotero:e2e` / `agent:monitor` / `agent:gate` 现已接入 capability manifest 覆盖摘要：会按能力维度汇总“已覆盖 / 失败 / 未覆盖”，并在开发档位下拦截“能力地图有新增但未接入真机场景”的状态
@@ -64,6 +65,7 @@ npm run zotero:smoke
 npm run zotero:test
 npm run zotero:scenario
 npm run agent:zotero:e2e
+npm run agent:zotero:debug-probe
 npm run agent:zotero:e2e:restart
 npm run agent:zotero:loop
 npm run agent:zotero:loop:human
@@ -72,6 +74,44 @@ npm run agent:zotero:autofix
 npm run agent:obsidian
 npm run export:project
 ```
+
+## Debug Probe Design
+
+当前仓库已新增独立命令 `npm run agent:zotero:debug-probe`，用于按 `smart` / `force` 模式执行受控 `debug probe` bundles。
+
+这份设计的核心语义是：
+
+- 主线仍以 `watch -> e2e -> monitor -> gate` 为准
+- `debug probe` 只在失败后按条件触发，不进入每轮主线
+- probe 优先复用已有 `Host Action`、`Agent Scenario`、`evaluateInChrome(...)` 与 runtime log bridge
+- probe 默认只提升解释力和 host-visible 成熟度标签，不直接改写 `agent:gate` 语义
+
+当前第一期实现形态：
+
+- `npm run agent:zotero:debug-probe`
+  - 默认 `smart` 模式
+  - 会尝试从最新 `agent-zotero-e2e.json` 中挑选匹配的 probe bundles
+- `npm run agent:zotero:debug-probe -- --mode force`
+  - 强制执行当前已登记 bundles
+- `npm run agent:zotero:debug-probe -- --probe reader-sidebar-view-closure`
+  - 显式执行单个 bundle
+- `npm run agent:zotero:debug-probe -- --list-probes`
+  - 只列出可用 bundles
+- `npm run agent:zotero:e2e -- --probe-mode smart`
+  - 默认仍是 `off`
+  - 仅在 E2E 失败尾声触发一轮 advisory sidecar
+  - 先写出本轮 `agent-zotero-e2e.json`，再让 debug probe 读取最新失败信号做 `smart` 选择
+  - debug probe 结果会回填到 `agent-zotero-e2e.json/.md`，同时独立写到 `agent-zotero-debug-probe.json/.md`
+
+当前尚未做的事情：
+
+- 还没有扩展到模板之外的下游自定义 surface
+
+因此当前应把它理解为：
+
+- 一个独立可跑、也可作为 E2E 失败尾声 sidecar，并已被 monitor / gate 以 advisory 方式消费的调试支线
+- 不是默认主线
+- 即使现在已支持 `agent:zotero:e2e -- --probe-mode smart|force`，仍应继续以 [ZOTERO_DEBUG_PROBE_CONTRACT.md](./ZOTERO_DEBUG_PROBE_CONTRACT.md) 为准，而不是把 `zotero:console` 直接产品化成任意 Console UI 自动化。
 
 说明：
 
@@ -109,10 +149,12 @@ npm run export:project
   - 每轮都执行：插件动作校验 + `zotero-tests` + `zotero-scenarios` + 控制台/`Zotero.debug` 日志采集
   - 在 macOS 上默认额外采集每轮 `库视图` 与 `Reader` 截图，输出到 `dist/agent-zotero-e2e-assets/`
   - 输出 `dist/agent-zotero-e2e.json` 和 `dist/agent-zotero-e2e.md`
+  - 支持 `--probe-mode off|smart|force`；默认 `off`，仅在失败尾声补跑 advisory debug probe
   - 失败时返回非零退出码，可直接作为 agent gate
 - `npm run agent:zotero:loop`
   - 先读取当前 `watch / e2e / autofix / watch-recovery / gate` 工件
   - 自动推导本轮最小动作集合，例如“只刷新 watch”或“直接进入 autofix”
+  - 若最新失败 E2E 命中 smart debug probe 候选、且当前还没有 fresh probe 结果，loop 会优先把下一次 E2E 升级成 `npm run agent:zotero:e2e -- --probe-mode smart`
   - 默认会在需要时刷新 `zotero:watch` 启动健康状态，并在末尾重建 `agent:monitor` 与 `agent:gate`
   - 输出 `dist/agent-zotero-loop.json` 与 `dist/agent-zotero-loop.md`
   - 支持 `--dry-run` 仅生成计划，不实际打开 Zotero

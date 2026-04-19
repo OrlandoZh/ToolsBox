@@ -1,7 +1,7 @@
 # Reference 路由
 
 > 用途：在不展开长篇研究正文的前提下，快速选择“该读哪份参考资料、为什么读、先读哪个入口”。
-> 最后更新：2026-04-13
+> 最后更新：2026-04-19
 
 ## 使用方式
 
@@ -15,7 +15,7 @@
 
 | 目录 | 用途 | 路由提示 |
 |------|------|----------|
-| `reference/Templetereference/` | 开发框架、模板骨架、agent/runtime 等框架侧参考 | 这是“开发框架参考”篮子；需要回看模板/框架来源时，先按项目名直达对应快照，不把它混入 Zotero 插件路线分析 |
+| `reference/Templetereference/` | 开发框架参考、模板骨架、agent/runtime，以及非宿主 authoritative source 的 Zotero 官方辅助仓库 | 这是“开发框架/官方辅助仓库参考”篮子；需要回看模板/框架来源或 `schema / translators / connectors / utilities` 这类官方辅助仓库时，先按项目名直达对应快照，不把它混入 Zotero 插件路线分析，也不替代 `reference/zotero-main/` |
 | `reference/zotero-main/` | Zotero 宿主源码 authoritative source | 触达宿主接口、术语、字段、事件和 surface 语义时，以这里为准，不用 `reference/plugin/*` 里的同名快照替代 |
 | `reference/plugin/` | Zotero 开源插件参考 | UI 路线、菜单模式、通用技术链、专项对比默认从这里取只读样本 |
 | `reference/lajiplugin/` | Zotero 其他插件参考 | 用于补充历史插件、非主流实现或特殊案例；和 `reference/plugin/` 一样只作为只读研究输入 |
@@ -25,6 +25,7 @@
 | 任务 | 首选 | 次选 | 说明 |
 |------|------|------|------|
 | 开发框架 / 模板骨架 / agent runtime 参考 | 直接定位 `reference/Templetereference/*` 对应项目快照 | [ARCHITECTURE.md](./ARCHITECTURE.md), [HISTORY_INDEX.md](./HISTORY_INDEX.md) | 这是框架参考篮子，不替代当前项目 truth，也不参与 Zotero 插件路线选型 |
+| Zotero 官方生态仓库（schema / utilities / translators / translation-server / connectors）怎么选 | [REFERENCE_ZOTERO_OFFICIAL_ECOSYSTEM.md](./REFERENCE_ZOTERO_OFFICIAL_ECOSYSTEM.md) | [ZOTERO_HOST_INTERFACE_CONTRACTS.md](./ZOTERO_HOST_INTERFACE_CONTRACTS.md), [REFERENCE_PDF_TRANSLATE_PATTERNS.md](./REFERENCE_PDF_TRANSLATE_PATTERNS.md) | 先区分宿主 authoritative source 与官方辅助仓库；不要把 `reference/zotero-main/` 以外的官方仓库误写成宿主 contract |
 | 通用 DOM contract / route-specific validator 可行性 | [REFERENCE_DOM_CONTRACT_VALIDATION_FEASIBILITY.md](./REFERENCE_DOM_CONTRACT_VALIDATION_FEASIBILITY.md) | [UI_VALIDATION_PATHS.md](./UI_VALIDATION_PATHS.md), [ZOTERO_HOST_INTERFACE_CONTRACTS.md](./ZOTERO_HOST_INTERFACE_CONTRACTS.md) | 回答“更深入的 DOM contract 检查是否值得做、应按哪些宿主锚点分 route”，先看宿主 source 提供了哪些稳定 primitive |
 | React 面板创建 / 切换 / surface bridge | [REFERENCE_AIASSISTANT_REACT_PANEL_PATTERNS.md](./REFERENCE_AIASSISTANT_REACT_PANEL_PATTERNS.md) | [UI_CREATION_PATHS.md](./UI_CREATION_PATHS.md) | 先看 host-mounted React surface、window mode 与哪些部分已吸收到模板 |
 | Item Pane Chat 面板 / Reader 文本弹出 / LLM 流式调用 | [REFERENCE_AIASSISTANT_PATTERNS.md](./REFERENCE_AIASSISTANT_PATTERNS.md) | [REFERENCE_AIASSISTANT_REACT_PANEL_PATTERNS.md](./REFERENCE_AIASSISTANT_REACT_PANEL_PATTERNS.md) | 轻量 Chat Section 动态 UI、附件会话持久化、renderTextSelectionPopup 路由 |
@@ -64,6 +65,8 @@
 | 轻量 AI 对话 / Function Calling / 多 Provider | [REFERENCE_PAPER_CHAT_PATTERNS.md](./REFERENCE_PAPER_CHAT_PATTERNS.md) | [REFERENCE_COMPARISON.md](./REFERENCE_COMPARISON.md) | 多 Provider 接口 + Fallback、30+ 工具定义、流式 Tool Calling、SQLite 迁移、AISummary 批量管线 |
 | clean-room 参考快照治理 | [REFERENCE_SNAPSHOTS.md](./REFERENCE_SNAPSHOTS.md) | [HISTORY_INDEX.md](./HISTORY_INDEX.md) | 先看本地快照如何使用，再看历史研究入口 |
 | git-backed reference 快照人工更新 | [REFERENCE_SNAPSHOTS.md](./REFERENCE_SNAPSHOTS.md) | [`../config/reference-projects.json`](../config/reference-projects.json) | 只更新 manifest 声明的 rolling git 快照；版本号命名的归档快照继续人工维护 |
+| Zotero 宿主索引刷新 / authoritative source 漂移复核 | [REFERENCE_ZOTERO_HOST_INDEX_REFRESH_NOTES.md](./REFERENCE_ZOTERO_HOST_INDEX_REFRESH_NOTES.md) | [ZOTERO_HOST_INTERFACE_CONTRACTS.md](./ZOTERO_HOST_INTERFACE_CONTRACTS.md), [ZOTERO_HOST_SEMANTIC_INDEX.md](./ZOTERO_HOST_SEMANTIC_INDEX.md) | 先看最近一次从 `reference/zotero-main` 抽出的漂移点，再决定是否更新 host contract / semantic index / types |
+| 本地语义搜索 / Transformers.js ChromeWorker / Embedding 管线 / SQLite vector store / RRF 混合搜索 / Plugin API | [REFERENCE_ZOTSEEK_PATTERNS.md](./REFERENCE_ZOTSEEK_PATTERNS.md) | [REFERENCE_SMART_HIGHLIGHTER_PATTERNS.md](./REFERENCE_SMART_HIGHLIGHTER_PATTERNS.md), [REFERENCE_ZOTERO_MCP_PATTERNS.md](./REFERENCE_ZOTERO_MCP_PATTERNS.md) | 纯本地 AI、无 API Key、ChromeWorker + nomic-embed-text-v1.5、ATTACH DATABASE SQLite、RRF Hybrid Search、Plugin API 可调用；与 Smart Highlighter 的 Sidecar Reranker 和 MCP Plugin 的外部 semantic search 对比 |
 | Zotero 宿主权威命名 / 接口锚点 | [ZOTERO_HOST_INTERFACE_CONTRACTS.md](./ZOTERO_HOST_INTERFACE_CONTRACTS.md) | [ZOTERO_HOST_SEMANTIC_INDEX.md](./ZOTERO_HOST_SEMANTIC_INDEX.md), [ZOTERO_TERMINOLOGY_GUIDE.md](./ZOTERO_TERMINOLOGY_GUIDE.md) | 这里是权威 contract，不是普通参考摘要 |
 
 ## 参考专题正文
@@ -73,6 +76,7 @@
 - Agent 运行时 + 多模型适配 + MCP：[REFERENCE_LLM_FOR_ZOTERO_PATTERNS.md](./REFERENCE_LLM_FOR_ZOTERO_PATTERNS.md)
 - 外部 MCP Server + RDP 远程调试 + Zotero 桥接：[REFERENCE_MCP_SERVER_ZOTERO_DEV_PATTERNS.md](./REFERENCE_MCP_SERVER_ZOTERO_DEV_PATTERNS.md)
 - 内部集成 MCP Server + Streamable HTTP + 语义搜索 + 写操作门控：[REFERENCE_ZOTERO_MCP_PATTERNS.md](./REFERENCE_ZOTERO_MCP_PATTERNS.md)
+- 本地语义搜索 + Transformers.js ChromeWorker + SQLite vector store + RRF 混合搜索 + Plugin API：[REFERENCE_ZOTSEEK_PATTERNS.md](./REFERENCE_ZOTSEEK_PATTERNS.md)
 - Vue UI + Vite + Worker 架构：[REFERENCE_CHARTERO_PATTERNS.md](./REFERENCE_CHARTERO_PATTERNS.md)
 - Hook + Custom Element + 笔记系统：[REFERENCE_BETTER_NOTES_PATTERNS.md](./REFERENCE_BETTER_NOTES_PATTERNS.md)
 
@@ -125,10 +129,15 @@
 
 ### 宿主 Contract
 
+- 宿主索引刷新笔记：[REFERENCE_ZOTERO_HOST_INDEX_REFRESH_NOTES.md](./REFERENCE_ZOTERO_HOST_INDEX_REFRESH_NOTES.md)
 - DOM contract / 路由验证可行性：[REFERENCE_DOM_CONTRACT_VALIDATION_FEASIBILITY.md](./REFERENCE_DOM_CONTRACT_VALIDATION_FEASIBILITY.md)
 - 宿主接口契约：[ZOTERO_HOST_INTERFACE_CONTRACTS.md](./ZOTERO_HOST_INTERFACE_CONTRACTS.md)
 - 宿主语义索引：[ZOTERO_HOST_SEMANTIC_INDEX.md](./ZOTERO_HOST_SEMANTIC_INDEX.md)
 - 宿主术语指南：[ZOTERO_TERMINOLOGY_GUIDE.md](./ZOTERO_TERMINOLOGY_GUIDE.md)
+
+### 官方生态
+
+- Zotero 官方生态分流：[REFERENCE_ZOTERO_OFFICIAL_ECOSYSTEM.md](./REFERENCE_ZOTERO_OFFICIAL_ECOSYSTEM.md)
 
 ### 专项分析
 
@@ -140,6 +149,27 @@
 - 跨项目比较：[REFERENCE_COMPARISON.md](./REFERENCE_COMPARISON.md)
 - 快照治理：[REFERENCE_SNAPSHOTS.md](./REFERENCE_SNAPSHOTS.md)
 - manifest：[`../config/reference-projects.json`](../config/reference-projects.json)
+
+### yanzheng 安全研究子仓库
+
+`reference/yanzheng/` 是独立的安全/防盗版研究仓库，包含专门的插件安全分析文档：
+
+- yanzheng 安全研究 README：[`../reference/yanzheng/docs/README.md`](../reference/yanzheng/docs/README.md)
+- Mindmap 插件安全分析（硬编码 AES、伪造设备绑定）：[`../reference/yanzheng/docs/mindmap完整分析报告.md`](../reference/yanzheng/docs/mindmap完整分析报告.md)
+- Style 插件攻击行为分析（远程验证、eval 风险）：[`../reference/yanzheng/docs/style插件攻击行为分析.md`](../reference/yanzheng/docs/style插件攻击行为分析.md)
+- 彩蛋与隐藏功能分析（GPT 硬编码 API Key、Reference 隐藏快捷键）：[`../reference/yanzheng/docs/彩蛋与字段验证分析.md`](../reference/yanzheng/docs/彩蛋与字段验证分析.md)
+- 安全机制图谱：[`../reference/yanzheng/docs/安全机制图谱.md`](../reference/yanzheng/docs/安全机制图谱.md)
+
+**yanzheng 子仓库项目清单**（详见 `yanzheng/docs/README.md`）：
+
+| 项目 | 版本 | 状态 | 用途 |
+|------|------|------|------|
+| zotero-mindmap-plugin | 1.0.3 | 安全研究 | 激活机制破解、硬编码密钥、伪造设备绑定分析 |
+| zotero-style (Ethereal Style) | 5.9.9 | 安全研究 | 远程验证端点、eval 风险、HTTP 明文传输分析 |
+| zotero-reference (Ethereal Reference) | 1.7.1 | 安全研究 | 隐藏快捷键、window.eval 代码注入分析 |
+| zotero-gpt | 3.0.9 | 安全研究 | 硬编码 API Key、远程更新劫持分析 |
+| bibgenie | 0.6.4 | 安全研究 | 更新版本，与主 reference 对比 |
+| ai4paper | 3.2.1.6 | 安全研究 | 更新版本，与主 reference 对比 |
 
 ## 当前参考资产
 

@@ -1,6 +1,11 @@
+import {
+  REACT_UI_SURFACE_BRIDGE_SCRIPT_PATH,
+  REACT_UI_SURFACE_BRIDGE_STYLE_PATH,
+} from "./optional-bundle-paths.js";
+
 export const DEFAULT_REACT_SURFACE_GLOBAL_KEY = "__CleanroomTemplateReactSurface__";
-export const DEFAULT_REACT_SURFACE_SCRIPT_PATH = "content/scripts/react-ui-surface-bridge.js";
-export const DEFAULT_REACT_SURFACE_STYLE_PATH = "content/styles/react-ui-surface-bridge.css";
+export const DEFAULT_REACT_SURFACE_SCRIPT_PATH = REACT_UI_SURFACE_BRIDGE_SCRIPT_PATH;
+export const DEFAULT_REACT_SURFACE_STYLE_PATH = REACT_UI_SURFACE_BRIDGE_STYLE_PATH;
 export const DEFAULT_REACT_SURFACE_STYLE_ID = "cleanroomtemplate-react-surface-style";
 
 function toErrorMessage(error, fallbackMessage) {

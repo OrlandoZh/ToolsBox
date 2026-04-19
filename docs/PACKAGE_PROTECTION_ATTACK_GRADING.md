@@ -2,7 +2,7 @@
 
 > 用途：把受保护打包这条线里的“攻击者 + AI 组合能力”评测标准固定下来，避免把 `single-pass LLM`、`webcrack + AI`、`带参考样本的多轮重建` 混成同一种结论。
 > 范围：这是 package protection 的实验/评估标准，不是 current truth；它不改默认 `release` / `agent:gate` 主线。
-> 更新时间：2026-04-17
+> 更新时间：2026-04-19
 
 ## 结论先看
 
@@ -46,10 +46,49 @@ npm run package:protection:score:guided -- \
 
 输出工件固定写到：
 
-- `dist/package-protection-guided-attack/<variant>-<channel>.json`
-- `dist/package-protection-guided-attack/<variant>-<channel>.md`
+- `dist/package-protection-guided-attack/<variant>-<channel>-<profileKey>.json`
+- `dist/package-protection-guided-attack/<variant>-<channel>-<profileKey>.md`
+- `dist/package-protection-guided-attack/<variant>-<channel>.json` (`legacy alias`，仅用于兼容当前 compare / 手工定位入口，不再承载所有画像)
+- `dist/package-protection-guided-attack/<variant>-<channel>.md` (`legacy alias`)
 - `dist/package-protection-guided-attack.json`
 - `dist/package-protection-guided-attack.md`
+
+如果需要把当前所有 `webcrack / single-pass LLM / guided-attack / compare` 证据统一收成一份攻击视角摘要，再运行：
+
+```bash
+npm run package:protection:attack
+```
+
+如果需要把 attack report 里的 fixed-profile coverage gap 直接翻成下一步命令模板，再运行：
+
+```bash
+npm run package:protection:attack:plan
+```
+
+输出：
+
+- `dist/package-protection-attack-report.json`
+- `dist/package-protection-attack-report.md`
+- `dist/package-protection-guided-attack-plan.json`
+- `dist/package-protection-guided-attack-plan.md`
+
+它不新增评分标准，只负责按本页的两层口径汇总已有证据；`attack:plan` 则继续把这些固定口径转成下一步补证据任务。
+
+当前 attack report 还会固定标出两条覆盖线：
+
+- `singlePassAutomation`
+  来自 `webcrackInitialResult + llmSinglePassResult`
+- `guidedA2M3`
+  指“至少达到 `A2 / M3 / static+reference / multi-round / 30-120m`”的更强攻击画像
+
+这样后续子 agent / 人工补证据时，可以直接回答“某个候选是否已经覆盖这两条固定画像”，而不是继续手动对照零散工件。
+
+当前 attack report 的 `recommendedAction` 还固定遵循一条收口顺序：
+
+- `current` 候选如果还没覆盖固定画像，先提示补 `singlePassAutomation` / `guidedA2M3`
+- 只有固定画像已经覆盖，才继续沿用 guided-attack / compare 里的 `probe-candidate-hardening` 一类候选建议
+
+其中 `profileKey` 固定由 `attackerTier + aiTier + attackMethod + roundMode + timeBucket` 组成，用来区分同一 `variant/channel` 下的不同攻击画像，避免单轮静态分析把多轮 reference-guided 结果覆盖掉。
 
 ## 对外三档
 
@@ -218,6 +257,31 @@ npm run package:protection:score:guided -- \
   - service registration model
   - plugin assembly graph
   但仍未恢复可读模块主体，那么它仍停留在 `rating = high-level-architecture`，只是强度显著高于单纯 `webcrack + GPT`。
+
+### 样例 3：`shielded-surface-scrub-wasm-digest` 的固定强档画像
+
+推荐映射：
+
+- `attackerTier = A2`
+- `aiTier = M3`
+- `attackMethod = static+reference`
+- `timeBucket = 30-120m`
+- `roundMode = multi-round`
+- `resultTier = R1`
+- `rating = high-level-architecture`
+
+补充判断：
+
+- 这类结果当前的典型含义是：
+  - 攻击者已经能识别它是一个 `shielded-surface-scrub` 衍生候选
+  - 还能识别它带有 default-disabled / lazy 的 Wasm digest micro-kernel
+  - 也能看出这条 Wasm lane 被限制在 `content/lib/w/*`
+- 但只要当前证据仍然是：
+  - `webcrack = parse-fail / only-loader`
+  - `inner audit = parse-fail / only-loader`
+  - 没有稳定恢复可读 inner modules
+  那它就仍然只能停在 `rating = high-level-architecture`
+- 不应因为“能认出 Wasm 候选角色和边界”就把它抬到 `readable-module-recovery`
 
 ## 评估时的保守规则
 

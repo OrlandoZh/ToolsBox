@@ -1,6 +1,8 @@
 import { describe, it, assert } from "./test-framework.js";
 import {
   DEFAULT_REACT_SURFACE_GLOBAL_KEY,
+  DEFAULT_REACT_SURFACE_SCRIPT_PATH,
+  DEFAULT_REACT_SURFACE_STYLE_PATH,
   DEFAULT_REACT_SURFACE_STYLE_ID,
   ensureReactSurfaceRenderer,
   mountReactSurface,
@@ -53,7 +55,7 @@ describe("React Surface Bridge", () => {
       scriptloader: {
         loadSubScript(url, targetView) {
           loadCount += 1;
-          assert.equal(url, "chrome://cleanroomtemplate/content/scripts/react-ui-surface-bridge.js");
+          assert.equal(url, `chrome://cleanroomtemplate/${DEFAULT_REACT_SURFACE_SCRIPT_PATH}`);
           targetView[DEFAULT_REACT_SURFACE_GLOBAL_KEY] = renderer;
         },
       },
@@ -75,7 +77,7 @@ describe("React Surface Bridge", () => {
     assert.equal(second.success, true);
     assert.equal(second.loadAttempted, false);
     assert.equal(loadCount, 1);
-    assert.equal(doc.getElementById(DEFAULT_REACT_SURFACE_STYLE_ID)?.href, "chrome://cleanroomtemplate/content/styles/react-ui-surface-bridge.css");
+    assert.equal(doc.getElementById(DEFAULT_REACT_SURFACE_STYLE_ID)?.href, `chrome://cleanroomtemplate/${DEFAULT_REACT_SURFACE_STYLE_PATH}`);
     assert.equal(doc.head.children.length, 1);
   });
 

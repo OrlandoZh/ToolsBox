@@ -34,6 +34,7 @@ function createDeps() {
         addonRef: "cleanroomtemplate",
         addonName: "Cleanroom",
         instanceKey: "CleanroomTemplate",
+        prefsPrefix: "extensions.zotero.cleanroomtemplate",
         icons: {
           "48": "content/icons/icon-48.png",
         },
@@ -322,6 +323,8 @@ describe("Feature Composer", () => {
     assert.equal(window.__CLEANROOM_PREFERENCE_BRIDGE__.addonRef, "cleanroomtemplate");
     assert.equal(window.__CLEANROOM_PREFERENCE_BRIDGE__.locale, "en-US");
     assert.equal(window.__CLEANROOM_PREFERENCE_BRIDGE__.instanceKey, "CleanroomTemplate");
+    assert.equal(window.__CLEANROOM_PREFERENCE_BRIDGE__.preferenceBindingMode, "native");
+    assert.equal(window.__CLEANROOM_PREFERENCE_BRIDGE__.preferenceNames, null);
     assert.deepEqual(window.__CLEANROOM_PREFERENCE_BRIDGE__.strings, {
       "cleanroom-pref-caption": "Cleanroom Template Preferences",
     });
@@ -332,12 +335,82 @@ describe("Feature Composer", () => {
           locale: "en-US",
           pluginID: "cleanroom-template@example.com",
           instanceKey: "CleanroomTemplate",
+          preferenceBindingMode: "native",
+          preferenceNames: null,
           strings: {
             "cleanroom-pref-caption": "Cleanroom Template Preferences",
           },
         },
       },
     ]);
+  });
+
+  it("should pass pref bridge metadata only for the pref-bridge descriptor mode", async () => {
+    const { deps, paneRegistrations } = createDeps();
+    deps.surfaceDescriptors = {
+      preferencePaneID: "crabc-p0",
+      preferenceRootID: "crabc-p0-root",
+      preferenceBindingMode: "bridge",
+      readerSelectionCommandID: "crabc-c2",
+      primaryActionCommandID: "crabc-c0",
+      readerSummaryCommandID: "crabc-c1",
+      reactUIDemoCommandID: "crabc-c3",
+      contextMenuItemID: "crabc-m2",
+      readerSummaryMenuItemID: "crabc-c1",
+      demoInfoRowID: "crabc-r0",
+      demoSectionID: "crabc-r1",
+      demoColumnKey: "crabc-r2",
+      demoNotifierID: "crabc-r3",
+      shortcutIDPrefix: "crabc-k0",
+      menuCommand: {
+        toolsMenuItemID: "crabc-m0",
+        injectedStyleID: "crabc-m1",
+      },
+      serviceIDs: {
+        runtimeCore: "crabc.s0",
+        hostSignals: "crabc.s1",
+        hostNonce: "crabc.s2",
+        runtimeBridge: "crabc.s3",
+        reactUIDemo: "crabc.s4",
+      },
+      serviceLabels: {
+        runtimeCore: "Service 0",
+        hostSignals: "Service 1",
+        hostNonce: "Service 2",
+        runtimeBridge: "Service 3",
+        reactUIDemo: "Service 4",
+      },
+    };
+    const composer = createFeatureComposer(deps);
+
+    await composer.registerBaselineFeatures();
+
+    const window = {
+      Services: {
+        scriptloader: {
+          loadSubScript(_uri, scope) {
+            scope.initCleanroomPreferences = (options) => options;
+          },
+        },
+      },
+    };
+
+    const result = await paneRegistrations[0].onPreferenceLoad({
+      window,
+      paneID: "crabc-p0",
+      pluginID: "cleanroom-template@example.com",
+      resolveURI(uri) {
+        return `chrome://cleanroomtemplate/${uri}`;
+      },
+    });
+
+    assert.equal(result.bridge.preferenceBindingMode, "bridge");
+    assert.deepEqual(result.bridge.preferenceNames, {
+      enabled: "extensions.zotero.cleanroomtemplate.enabled",
+      menuLabel: "extensions.zotero.cleanroomtemplate.menuLabel",
+      logLevel: "extensions.zotero.cleanroomtemplate.logLevel",
+      themeMode: "extensions.zotero.cleanroomtemplate.themeMode",
+    });
   });
 
   it("should pass notifier events to updater callback", async () => {

@@ -23,6 +23,7 @@ function buildScope(config = {}) {
 
 export function createSurfaceDescriptors(config = {}) {
   const scope = buildScope(config);
+  const preferencePaneID = `${scope}-p0`;
 
   return Object.freeze({
     serviceIDs: Object.freeze({
@@ -43,7 +44,9 @@ export function createSurfaceDescriptors(config = {}) {
       toolsMenuItemID: `${scope}-m0`,
       injectedStyleID: `${scope}-m1`,
     }),
-    preferencePaneID: `${scope}-p0`,
+    preferenceBindingMode: "native",
+    preferencePaneID,
+    preferenceRootID: `${preferencePaneID}-root`,
     primaryActionCommandID: `${scope}-c0`,
     readerSummaryCommandID: `${scope}-c1`,
     readerSelectionCommandID: `${scope}-c2`,

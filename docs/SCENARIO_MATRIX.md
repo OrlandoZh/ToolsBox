@@ -62,6 +62,12 @@
 |---|---|---|---|
 | 性能预算 | `performance-budget.scenario.js` | functional-only | covered |
 
+### Runtime / Wasm
+
+| 场景 | 脚本 | 验证类型 | 状态 |
+|---|---|---|---|
+| Wasm 小内核探针 | `wasm-kernel-probe.scenario.js` | functional-only | covered |
+
 ### 多窗口
 
 | 场景 | 脚本 | 验证类型 | 状态 |

@@ -18,8 +18,43 @@ describe("Optional Bundles Lib", () => {
     assert.ok(registry.bundles.some((entry) => entry.id === "react-ui"));
     assert.ok(registry.bundles.some((entry) => entry.id === "agent-runtime"));
     assert.ok(registry.bundles.some((entry) => entry.id === "ai-service"));
+    assert.ok(registry.bundles.some((entry) => entry.id === "wasm-kernel"));
     assert.equal(getOptionalBundle(registry, "react-ui")?.lane, "ts-isolated");
     assert.equal(getOptionalBundle(registry, "react-ui")?.implementationStatus, "implemented");
+    assert.equal(getOptionalBundle(registry, "wasm-kernel")?.lane, "js-core");
+    assert.equal(getOptionalBundle(registry, "wasm-kernel")?.implementationStatus, "planned");
+    assert.equal(getOptionalBundle(registry, "wasm-kernel")?.enabled, false);
+    assert.equal(getOptionalBundle(registry, "wasm-kernel")?.build, null);
+    assert.equal(
+      getOptionalBundle(registry, "wasm-kernel")?.validation?.requiredFiles?.includes("addon-static/content/lib/w/probe.wasm"),
+      true,
+    );
+    assert.equal(
+      getOptionalBundle(registry, "wasm-kernel")?.validation?.requiredFiles?.includes("src/features/wasm-kernel-probe.js"),
+      true,
+    );
+    assert.equal(
+      getOptionalBundle(registry, "wasm-kernel")?.validation?.requiredFiles?.includes("scripts/wasm-kernel-smoke.mjs"),
+      true,
+    );
+    assert.equal(
+      getOptionalBundle(registry, "wasm-kernel")?.validation?.requiredFiles?.includes("scripts/wasm-kernel-performance-report.mjs"),
+      true,
+    );
+    assert.equal(
+      getOptionalBundle(registry, "wasm-kernel")?.validation?.requiredFiles?.includes("scripts/wasm-kernel-disabled-contract-report.mjs"),
+      true,
+    );
+    assert.equal(
+      getOptionalBundle(registry, "wasm-kernel")?.validation?.requiredFiles?.includes("scripts/wasm-kernel-matrix-report.mjs"),
+      true,
+    );
+    assert.deepEqual(getOptionalBundle(registry, "wasm-kernel")?.validation?.requiredPackageScripts, [
+      "wasm:kernel:smoke",
+      "wasm:kernel:perf",
+      "wasm:kernel:disabled-contract",
+      "wasm:kernel:matrix",
+    ]);
     assert.deepEqual(getOptionalBundle(registry, "react-ui")?.build?.requiredPackages, [
       "esbuild",
       "react",
@@ -58,6 +93,28 @@ describe("Optional Bundles Lib", () => {
               },
             ],
           },
+        },
+      ],
+    }));
+  });
+
+  it("should reject validation contracts without required files", () => {
+    assert.throws(() => normalizeOptionalBundleRegistry({
+      schemaVersion: 1,
+      summary: "broken",
+      bundles: [
+        {
+          id: "wasm-kernel",
+          enabled: false,
+          lane: "js-core",
+          implementationStatus: "planned",
+          summary: "broken",
+          validation: {
+            summary: "broken",
+            requiredFiles: [],
+            requiredPackageScripts: [],
+          },
+          docs: ["docs/OPTIONAL_BUNDLES.md"],
         },
       ],
     }));

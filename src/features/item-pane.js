@@ -121,13 +121,16 @@ export function createItemPane(options) {
       }
 
       // 侧边栏配置
-      if (sidenav.l10nID || sidenav.icon) {
+      if (sidenav.l10nID || sidenav.icon || typeof sidenav.orderable === "boolean") {
         config.sidenav = {};
         if (sidenav.l10nID) {
           config.sidenav.l10nID = sidenav.l10nID;
         }
         if (sidenav.icon) {
           config.sidenav.icon = sidenav.icon;
+        }
+        if (typeof sidenav.orderable === "boolean") {
+          config.sidenav.orderable = sidenav.orderable;
         }
       }
 

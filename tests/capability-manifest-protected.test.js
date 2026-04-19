@@ -26,6 +26,10 @@ describe("Protected Capability Manifest", () => {
       baseline.description,
       "受保护导出不附带该能力的详细说明。",
     );
+    assert.equal(baseline.label, "C-01");
+    assert.equal(baseline.category, "protected");
+    assert.equal(Object.prototype.hasOwnProperty.call(baseline, "agentScenario"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(baseline, "zoteroScenarios"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(baseline, "entrypoints"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(baseline, "ownedBy"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(baseline, "successSignals"), false);
@@ -34,6 +38,8 @@ describe("Protected Capability Manifest", () => {
   it("should keep limited baseline when host binding is incomplete even if overlay is present", () => {
     const descriptorOverlay = [{
       id: "host-actions",
+      label: "宿主动作编排",
+      category: "feature",
       description: "overlay description",
       entrypoints: ["plugin.api.agent.runHostAction(actionId, payload)"],
       ownedBy: ["src/app/host-actions.js"],
@@ -69,12 +75,18 @@ describe("Protected Capability Manifest", () => {
       hostActions.description,
       "受保护导出不附带该能力的详细说明。",
     );
+    assert.equal(hostActions.label, "C-09");
+    assert.equal(hostActions.category, "protected");
+    assert.equal(Object.prototype.hasOwnProperty.call(hostActions, "agentScenario"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(hostActions, "zoteroScenarios"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(hostActions, "entrypoints"), false);
   });
 
   it("should merge richer overlay fields only when host binding requirements are satisfied", () => {
     const descriptorOverlay = [{
       id: "host-actions",
+      label: "宿主动作编排",
+      category: "feature",
       description: "验证 host action overlay 已按宿主弱绑定解锁。",
       entrypoints: ["plugin.api.agent.runHostAction(actionId, payload)"],
       ownedBy: ["src/app/host-actions.js", "src/app/plugin-agent.js"],
@@ -100,6 +112,8 @@ describe("Protected Capability Manifest", () => {
     assert.equal(view.activationSatisfied, true);
     assert.deepEqual(view.activationMissing, []);
 
+    assert.equal(hostActions.label, descriptorOverlay[0].label);
+    assert.equal(hostActions.category, descriptorOverlay[0].category);
     assert.equal(hostActions.description, descriptorOverlay[0].description);
     assert.deepEqual(hostActions.entrypoints, descriptorOverlay[0].entrypoints);
     assert.deepEqual(hostActions.ownedBy, descriptorOverlay[0].ownedBy);

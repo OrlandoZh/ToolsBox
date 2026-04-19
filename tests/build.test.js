@@ -8,14 +8,29 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { describe, it, assert } from "./test-framework.js";
 import {
+  REACT_UI_DEMO_SHELL_PATH,
+  WASM_KERNEL_PROBE_PATH,
+  WASM_KERNEL_PROBE_WORKER_PATH,
+} from "../src/utils/optional-bundle-paths.js";
+import {
   BUILD_MODULE_ID_MODE_ANONYMIZED,
   BUILD_MODULE_ID_MODE_PATH,
+  BUILD_PREFERENCE_BINDING_MODE_BRIDGE,
+  BUILD_PREFERENCE_BINDING_MODE_NATIVE,
+  BUILD_PREFERENCE_BINDING_MODE_ENV,
   BUILD_SEMANTIC_SCRUB_NONE,
   BUILD_SEMANTIC_SCRUB_PROTECTED,
+  BUILD_STATIC_SURFACE_MODE_ENV,
+  BUILD_STATIC_SURFACE_MODE_SCRUB,
+  BUILD_STATIC_SURFACE_MODE_STANDARD,
   createBundleModuleId,
   resolveBuildModuleIdMode,
+  resolveBuildPreferenceBindingMode,
   resolveBuildSemanticScrubMode,
+  resolveBuildStaticSurfaceMode,
+  stripProtectedSourceComments,
 } from "../scripts/build.mjs";
+import { createSurfaceDescriptors as createProtectedSurfaceDescriptors } from "../src/app/surface-descriptors-protected.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,6 +65,30 @@ describe("Build Artifacts", () => {
     );
   });
 
+  it("should resolve build preference binding mode from environment safely", () => {
+    assert.equal(resolveBuildPreferenceBindingMode({}), BUILD_PREFERENCE_BINDING_MODE_NATIVE);
+    assert.equal(
+      resolveBuildPreferenceBindingMode({ [BUILD_PREFERENCE_BINDING_MODE_ENV]: "bridge" }),
+      BUILD_PREFERENCE_BINDING_MODE_BRIDGE,
+    );
+    assert.equal(
+      resolveBuildPreferenceBindingMode({ [BUILD_PREFERENCE_BINDING_MODE_ENV]: "unexpected" }),
+      BUILD_PREFERENCE_BINDING_MODE_NATIVE,
+    );
+  });
+
+  it("should resolve build static surface mode from environment safely", () => {
+    assert.equal(resolveBuildStaticSurfaceMode({}), BUILD_STATIC_SURFACE_MODE_STANDARD);
+    assert.equal(
+      resolveBuildStaticSurfaceMode({ [BUILD_STATIC_SURFACE_MODE_ENV]: "scrub" }),
+      BUILD_STATIC_SURFACE_MODE_SCRUB,
+    );
+    assert.equal(
+      resolveBuildStaticSurfaceMode({ [BUILD_STATIC_SURFACE_MODE_ENV]: "unexpected" }),
+      BUILD_STATIC_SURFACE_MODE_STANDARD,
+    );
+  });
+
   it("should anonymize bundle module ids only in protected build mode", () => {
     const srcRootPath = fs.mkdtempSync(path.join(os.tmpdir(), "addontemplate-build-mode-"));
     const mainFile = path.join(srcRootPath, "app", "main.js");
@@ -78,6 +117,27 @@ describe("Build Artifacts", () => {
     }
   });
 
+  it("should strip standalone comments from protected bundle source without touching code lines", () => {
+    const source = [
+      "/**",
+      " * Reader 摘要",
+      " */",
+      "import { demo } from \"./demo.js\";",
+      "",
+      "  // host action hint",
+      "const value = demo();",
+      "const url = \"https://example.com/reader-summary\";",
+    ].join("\n");
+
+    const stripped = stripProtectedSourceComments(source);
+
+    assert.equal(stripped.includes("Reader 摘要"), false);
+    assert.equal(stripped.includes("host action hint"), false);
+    assert.equal(stripped.includes("import { demo } from \"./demo.js\";"), true);
+    assert.equal(stripped.includes("const value = demo();"), true);
+    assert.equal(stripped.includes("https://example.com/reader-summary"), true);
+  });
+
   it("should generate manifest with non-empty zotero update_url", () => {
     execFileSync("node", ["scripts/build.mjs"], {
       cwd: projectRoot,
@@ -102,11 +162,27 @@ describe("Build Artifacts", () => {
     const reactUIBundle = Array.isArray(report.optionalBundles)
       ? report.optionalBundles.find((entry) => entry.bundleId === "react-ui")
       : null;
+    const wasmKernelBundle = Array.isArray(report.optionalBundles)
+      ? report.optionalBundles.find((entry) => entry.bundleId === "wasm-kernel")
+      : null;
 
     assert.equal(reactUIBundle?.status, "skipped");
     assert.equal(reactUIBundle?.reason, "disabled");
+    assert.equal(wasmKernelBundle?.status, "planned");
+    assert.equal(wasmKernelBundle?.reason, "not-implemented");
+    assert.equal(wasmKernelBundle?.enabled, false);
+    assert.equal(wasmKernelBundle?.lane, "js-core");
     assert.equal(report.moduleIdMode, "path");
     assert.equal(report.semanticScrubMode, "none");
+    assert.equal(report.staticSurfaceMode, "standard");
+    assert.equal(
+      fs.existsSync(path.join(projectRoot, "build", config.addonRef, ...WASM_KERNEL_PROBE_PATH.split("/"))),
+      true,
+    );
+    assert.equal(
+      fs.existsSync(path.join(projectRoot, "build", config.addonRef, ...WASM_KERNEL_PROBE_WORKER_PATH.split("/"))),
+      true,
+    );
   });
 
   it("should build a protected source proxy with semantic anchors reduced", () => {
@@ -132,8 +208,10 @@ describe("Build Artifacts", () => {
     const bundleSource = fs.readFileSync(bundlePath, "utf-8");
     const enUSLocalePath = path.join(projectRoot, "build", config.addonRef, "locale", "en-US", "main.ftl");
     const enUSLocaleSource = fs.readFileSync(enUSLocalePath, "utf-8");
-    const reactDemoShellPath = path.join(projectRoot, "build", config.addonRef, "content", "react-ui", "demo.xhtml");
+    const reactDemoShellPath = path.join(projectRoot, "build", config.addonRef, ...REACT_UI_DEMO_SHELL_PATH.split("/"));
     const reactDemoShell = fs.readFileSync(reactDemoShellPath, "utf-8");
+    const preferencesXHTMLPath = path.join(projectRoot, "build", config.addonRef, "content", "preferences.xhtml");
+    const preferencesXHTML = fs.readFileSync(preferencesXHTMLPath, "utf-8");
     const preferencesScriptPath = path.join(projectRoot, "build", config.addonRef, "content", "preferences.js");
     const preferencesScript = fs.readFileSync(preferencesScriptPath, "utf-8");
     const themeScriptPath = path.join(projectRoot, "build", config.addonRef, "content", "theme.js");
@@ -143,6 +221,7 @@ describe("Build Artifacts", () => {
     const report = readJSON(
       path.join(projectRoot, "build", config.addonRef, "build-report.json"),
     );
+    const protectedDescriptors = createProtectedSurfaceDescriptors(config);
 
     assert.equal(report.moduleIdMode, "anonymized");
     assert.equal(report.semanticScrubMode, "protected");
@@ -171,13 +250,41 @@ describe("Build Artifacts", () => {
     assert.equal(bundleSource.includes("Host Signal Collector"), false);
     assert.equal(bundleSource.includes("Host Nonce Store"), false);
     assert.equal(bundleSource.includes("Runtime Bridge"), false);
+    assert.equal(bundleSource.includes("基线注册"), false);
+    assert.equal(bundleSource.includes("条目展示摘要"), false);
+    assert.equal(bundleSource.includes("通知器联动"), false);
+    assert.equal(bundleSource.includes("Reader 摘要"), false);
+    assert.equal(bundleSource.includes("Reader 批注回环"), false);
+    assert.equal(bundleSource.includes("Reader UI 状态"), false);
+    assert.equal(bundleSource.includes("Reader 事件桥"), false);
+    assert.equal(bundleSource.includes("无阻塞动作执行"), false);
+    assert.equal(bundleSource.includes("宿主动作编排"), false);
+    assert.equal(bundleSource.includes("设置治理"), false);
+    assert.equal(bundleSource.includes("多窗口挂载"), false);
+    assert.equal(bundleSource.includes("运行时桥接报告"), false);
+    assert.equal(bundleSource.includes("preferences.openPane"), false);
+    assert.equal(bundleSource.includes("runtime.probeWasmKernel"), false);
+    assert.equal(bundleSource.includes("runtime.deriveWasmKernelDigest"), false);
+    assert.equal(bundleSource.includes("runtime.deriveWasmKernelUnlockToken"), false);
+    assert.equal(bundleSource.includes("window.openReactDemo"), false);
+    assert.equal(bundleSource.includes("Open Preference Pane"), false);
+    assert.equal(bundleSource.includes("authoritativeSource"), false);
+    assert.equal(bundleSource.includes("readinessAssertions"), false);
     assert.equal(enUSLocaleSource.includes("Open Cleanroom Action"), false);
     assert.equal(enUSLocaleSource.includes("Show Reader Demo Summary"), false);
     assert.equal(enUSLocaleSource.includes("Cleanroom Template Preferences"), false);
     assert.equal(enUSLocaleSource.includes("Cleanroom Summary"), false);
     assert.equal(enUSLocaleSource.includes("Cleanroom Demo"), false);
+    assert.equal(reactDemoShell.includes(config.addonRef), true);
+    assert.equal(reactDemoShell.includes(config.addonName), true);
     assert.equal(reactDemoShell.includes("React UI Demo"), false);
     assert.equal(reactDemoShell.includes("React UI demo requires JavaScript."), false);
+    assert.equal(reactDemoShell.includes('href="./react-ui-demo.css"'), true);
+    assert.equal(reactDemoShell.includes('src="./react-ui-demo.js"'), true);
+    assert.equal(reactDemoShell.includes("chrome://"), false);
+    assert.equal(preferencesXHTML.includes("cleanroomtemplate-preferences-root"), false);
+    assert.equal(preferencesXHTML.includes("__PREFERENCE_ROOT_ID__"), false);
+    assert.equal(preferencesXHTML.includes(protectedDescriptors.preferenceRootID), true);
     assert.equal(preferencesScript.includes("bootstrapCleanroomPreferencesController"), false);
     assert.equal(preferencesScript.includes("__CLEANROOM_THEME_CONTRACT__"), false);
     assert.equal(preferencesScript.includes("__CLEANROOM_PREFERENCE_BRIDGE__"), false);
@@ -187,5 +294,82 @@ describe("Build Artifacts", () => {
     assert.equal(preferenceBridgeScript.includes("bootstrapCleanroomPreferencePaneLoadBridge"), false);
     assert.equal(preferenceBridgeScript.includes("__CLEANROOM_PREFERENCE_PANE_LOAD_API__"), false);
     assert.equal(preferenceBridgeScript.includes("__CLEANROOM_PREFERENCE_PANE_LOAD_BRIDGE_STATE__"), false);
+  });
+
+  it("should patch preference names to opaque placeholders in bridge binding mode", () => {
+    execFileSync("node", ["scripts/build.mjs"], {
+      cwd: projectRoot,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
+        CLEANROOM_BUILD_SEMANTIC_SCRUB: "protected",
+        CLEANROOM_BUILD_PREFERENCE_BINDING_MODE: "bridge",
+      },
+    });
+
+    const config = readJSON(path.join(projectRoot, "config", "addon.config.json"));
+    const preferencesXHTMLPath = path.join(projectRoot, "build", config.addonRef, "content", "preferences.xhtml");
+    const preferencesXHTML = fs.readFileSync(preferencesXHTMLPath, "utf-8");
+    const protectedDescriptors = createProtectedSurfaceDescriptors(config);
+
+    assert.equal(preferencesXHTML.includes(config.prefsPrefix), false);
+    assert.equal(preferencesXHTML.includes(`${config.prefsPrefix}.enabled`), false);
+    assert.equal(preferencesXHTML.includes(`${config.prefsPrefix}.themeMode`), false);
+    assert.equal(preferencesXHTML.includes(`extensions.zotero.${protectedDescriptors.preferencePaneID}.p0`), true);
+    assert.equal(preferencesXHTML.includes(`extensions.zotero.${protectedDescriptors.preferencePaneID}.p3`), true);
+  });
+
+  it("should scrub bootstrap literals in static surface scrub mode", () => {
+    execFileSync("node", ["scripts/build.mjs"], {
+      cwd: projectRoot,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
+        CLEANROOM_BUILD_SEMANTIC_SCRUB: "protected",
+        CLEANROOM_BUILD_PREFERENCE_BINDING_MODE: "bridge",
+        CLEANROOM_BUILD_STATIC_SURFACE_MODE: "scrub",
+      },
+    });
+
+    const config = readJSON(path.join(projectRoot, "config", "addon.config.json"));
+    const bootstrapPath = path.join(projectRoot, "build", config.addonRef, "bootstrap.js");
+    const bootstrapSource = fs.readFileSync(bootstrapPath, "utf-8");
+    const manifestPath = path.join(projectRoot, "build", config.addonRef, "manifest.json");
+    const manifest = readJSON(manifestPath);
+    const wasmWorkerPath = path.join(projectRoot, "build", config.addonRef, ...WASM_KERNEL_PROBE_WORKER_PATH.split("/"));
+    const wasmWorkerSource = fs.readFileSync(wasmWorkerPath, "utf-8");
+    const reactDemoShellPath = path.join(projectRoot, "build", config.addonRef, ...REACT_UI_DEMO_SHELL_PATH.split("/"));
+    const reactDemoShell = fs.readFileSync(reactDemoShellPath, "utf-8");
+    const report = readJSON(
+      path.join(projectRoot, "build", config.addonRef, "build-report.json"),
+    );
+
+    assert.equal(report.staticSurfaceMode, "scrub");
+    assert.equal(manifest.name, "Zotero Tool Package");
+    assert.equal(manifest.description, "Protected Zotero add-on package.");
+    assert.equal(manifest.author, "Tool Package");
+    assert.equal(Object.prototype.hasOwnProperty.call(manifest, "homepage_url"), false);
+    assert.equal(manifest.applications.zotero.update_url, config.updateURL);
+    assert.equal(bootstrapSource.includes(config.addonRef), false);
+    assert.equal(bootstrapSource.includes(config.instanceKey), false);
+    assert.equal(bootstrapSource.includes(config.addonName), false);
+    assert.equal(bootstrapSource.includes(config.homepage), false);
+    assert.equal(bootstrapSource.includes("cleanroom.bootstrap"), false);
+    assert.equal(bootstrapSource.includes("console-bridge"), false);
+    assert.equal(bootstrapSource.includes("capability-report"), false);
+    assert.equal(bootstrapSource.includes('"__ADDON_REF__"'), false);
+    assert.equal(bootstrapSource.includes('"__INSTANCE_KEY__"'), false);
+    assert.equal(reactDemoShell.includes(config.addonRef), false);
+    assert.equal(reactDemoShell.includes(config.addonName), false);
+    assert.equal(reactDemoShell.includes('data-addon-ref="tool"'), true);
+    assert.equal(reactDemoShell.includes('data-addon-name="Tool"'), true);
+    assert.equal(reactDemoShell.includes("<title>Tool Panel</title>"), true);
+    assert.equal(reactDemoShell.includes('href="./react-ui-demo.css"'), true);
+    assert.equal(reactDemoShell.includes('src="./react-ui-demo.js"'), true);
+    assert.equal(reactDemoShell.includes("chrome://"), false);
+    assert.equal(wasmWorkerSource.includes("WebAssembly.instantiate"), false);
+    assert.equal(wasmWorkerSource.includes("worker cannot fetch wasm bytes"), false);
   });
 });

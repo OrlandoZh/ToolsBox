@@ -1,0 +1,257 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-04-18",
+  "summary": "Package protection candidate registry for the manual experiment matrix. Advisory only; does not change release/gate defaults.",
+  "candidates": [
+    {
+      "id": "plain",
+      "class": "control",
+      "stage": "stage0",
+      "baseVariant": null,
+      "executionMode": "buildable-xpi",
+      "evaluationKind": "variant",
+      "variant": "plain",
+      "channel": "stable",
+      "artifactCoverage": [
+        "smoke",
+        "perf",
+        "anchor-audit"
+      ],
+      "promotionGate": "control-only",
+      "status": "control",
+      "summary": "Unprotected control group used to measure baseline compatibility and visible surface."
+    },
+    {
+      "id": "encrypted",
+      "class": "current",
+      "stage": "stage0",
+      "baseVariant": "plain",
+      "executionMode": "buildable-xpi",
+      "evaluationKind": "variant",
+      "variant": "encrypted",
+      "channel": "stable",
+      "artifactCoverage": [
+        "smoke",
+        "perf",
+        "guided-attack",
+        "verdict"
+      ],
+      "promotionGate": "keep-low-overhead-baseline",
+      "status": "current-baseline",
+      "summary": "Current low-overhead protected baseline. Keep it stable before adding heavier routes."
+    },
+    {
+      "id": "shielded",
+      "class": "current",
+      "stage": "stage0",
+      "baseVariant": "plain",
+      "executionMode": "buildable-xpi",
+      "evaluationKind": "variant",
+      "variant": "shielded",
+      "channel": "stable",
+      "artifactCoverage": [
+        "smoke",
+        "perf",
+        "webcrack",
+        "guided-attack",
+        "verdict",
+        "anchor-audit"
+      ],
+      "promotionGate": "keep-current-shielded",
+      "status": "current-primary",
+      "summary": "Current stronger manual protected branch. Keep loader-lite and fast decode path."
+    },
+    {
+      "id": "shielded-descriptor-bind",
+      "class": "experiment",
+      "stage": "stage2-runtime-recovery",
+      "baseVariant": "shielded",
+      "executionMode": "buildable-xpi",
+      "evaluationKind": "compare",
+      "compareVariant": "shielded-descriptor-bind",
+      "channel": "stable",
+      "artifactCoverage": [
+        "smoke",
+        "webcrack",
+        "compare",
+        "inner-audit"
+      ],
+      "promotionGate": "runtime-only",
+      "status": "retained-runtime-only",
+      "summary": "Retained only as a runtime-semantic-recovery lane, not as a static hardening upgrade."
+    },
+    {
+      "id": "shielded-jsconfuser-string",
+      "class": "experiment",
+      "stage": "stage3-ab",
+      "baseVariant": "shielded",
+      "executionMode": "buildable-xpi",
+      "evaluationKind": "compare",
+      "compareVariant": "shielded-jsconfuser-string",
+      "channel": "stable",
+      "artifactCoverage": [
+        "smoke",
+        "perf",
+        "webcrack",
+        "guided-attack",
+        "compare",
+        "preflight"
+      ],
+      "promotionGate": "hardening-win-only",
+      "status": "stop-current-candidate",
+      "summary": "Experimental only. Do not promote unless it beats shielded in symmetric attack evidence, not just single-pass impressions."
+    },
+    {
+      "id": "shielded-pref-bridge",
+      "class": "experiment",
+      "stage": "stage2-static-surface",
+      "baseVariant": "shielded",
+      "executionMode": "buildable-xpi",
+      "evaluationKind": "compare",
+      "compareVariant": "shielded-pref-bridge",
+      "channel": "stable",
+      "artifactCoverage": [
+        "smoke",
+        "perf",
+        "webcrack",
+        "guided-attack",
+        "compare",
+        "anchor-audit",
+        "inner-audit"
+      ],
+      "promotionGate": "hardening-win-only",
+      "status": "promoted-hardening-candidate",
+      "summary": "Promoted low-risk static support-surface hardening candidate. Keep it advisory-only and do not replace default shielded unless a future wave explicitly promotes it."
+    },
+    {
+      "id": "shielded-surface-scrub",
+      "class": "experiment",
+      "stage": "stage2-static-surface",
+      "baseVariant": "shielded",
+      "executionMode": "buildable-xpi",
+      "evaluationKind": "compare",
+      "compareVariant": "shielded-surface-scrub",
+      "channel": "stable",
+      "artifactCoverage": [
+        "smoke",
+        "perf",
+        "webcrack",
+        "guided-attack",
+        "compare",
+        "anchor-audit",
+        "inner-audit"
+      ],
+      "promotionGate": "prove-static-surface-benefit",
+      "status": "promoted-hardening-candidate",
+      "summary": "Validated retained static-surface hardening candidate that layers bootstrap literal scrub on top of the existing protected surface reduction route. Advisory only; do not replace default shielded automatically."
+    },
+    {
+      "id": "shielded-surface-scrub-randomized",
+      "class": "future",
+      "stage": "stage2-static-surface",
+      "baseVariant": "shielded-surface-scrub",
+      "executionMode": "future-buildable",
+      "evaluationKind": "future",
+      "artifactCoverage": [
+        "none-yet"
+      ],
+      "promotionGate": "surface-scrub-first",
+      "status": "not-started",
+      "summary": "Future polymorphic variant. Do not start before the non-randomized surface-scrub lane proves useful."
+    },
+    {
+      "id": "shielded-host-weak-binding",
+      "class": "future",
+      "stage": "host-weak-binding",
+      "baseVariant": "shielded",
+      "executionMode": "preplan-only",
+      "evaluationKind": "future",
+      "artifactCoverage": [
+        "design-doc"
+      ],
+      "promotionGate": "second-stage-unlock-only",
+      "status": "preplan-only",
+      "summary": "Future host weak-binding lane. Only valid as second-stage unlock, never in bootstrap critical path."
+    },
+    {
+      "id": "jsconfuser-astscrambler-preflight",
+      "class": "preflight",
+      "stage": "stage3-ab",
+      "baseVariant": "plain-proxy",
+      "executionMode": "buildless-preflight",
+      "evaluationKind": "preflight",
+      "preflightArtifact": "package-protection-jsconfuser-preflight.json",
+      "artifactCoverage": [
+        "preflight"
+      ],
+      "promotionGate": "promising-semantic-reduction",
+      "status": "evaluated-not-promising",
+      "summary": "Official non-hostile JS-Confuser subset preflight. Current evidence does not show meaningful semantic reduction."
+    },
+    {
+      "id": "lightweight-wrapper-preflight",
+      "class": "preflight",
+      "stage": "stage3-ab",
+      "baseVariant": "plain-proxy",
+      "executionMode": "buildless-preflight",
+      "evaluationKind": "preflight",
+      "preflightArtifact": "package-protection-lightweight-preflight.json",
+      "artifactCoverage": [
+        "preflight"
+      ],
+      "promotionGate": "wrapper-before-smoke",
+      "status": "wrapper-needed",
+      "summary": "lightweight-js-obfuscator remains a wrapper or fork candidate only. Upstream defaults conflict with the current loader-lite route."
+    },
+    {
+      "id": "obfuscator-pro-selective-vm-paper",
+      "class": "paper",
+      "stage": "cloud-vm-paper",
+      "baseVariant": "shielded",
+      "executionMode": "paper-eval-only",
+      "evaluationKind": "paper",
+      "artifactCoverage": [
+        "official-docs-only"
+      ],
+      "promotionGate": "cloud-upload-acceptable",
+      "status": "paper-only",
+      "summary": "Selective VM route remains paper-eval only because it requires cloud processing and source upload."
+    },
+    {
+      "id": "route4-control-plane-preplan",
+      "class": "preplan",
+      "stage": "route4-light-service",
+      "baseVariant": "shielded",
+      "executionMode": "preplan-only",
+      "evaluationKind": "preplan",
+      "artifactCoverage": [
+        "design-only"
+      ],
+      "promotionGate": "minimal-control-plane",
+      "status": "preplan-only",
+      "summary": "Future light service-control plane. Keep server usage minimal and avoid turning the plugin into a remote-first bootstrap path."
+    },
+    {
+      "id": "shielded-surface-scrub-wasm-digest",
+      "class": "experiment",
+      "stage": "route5-wasm",
+      "baseVariant": "shielded-surface-scrub",
+      "executionMode": "buildable-xpi",
+      "evaluationKind": "compare",
+      "compareVariant": "shielded-surface-scrub-wasm-digest",
+      "channel": "stable",
+      "artifactCoverage": [
+        "smoke",
+        "perf",
+        "webcrack",
+        "guided-attack",
+        "compare",
+        "anchor-audit",
+        "inner-audit"
+      ],
+      "promotionGate": "bounded-wasm-candidate-only",
+      "status": "retained-experiment-candidate",
+      "summary": "Explicit Wasm digest experiment on top of shielded-surface-scrub. Keep it default-disabled, lazy, advisory-only, and bounded to the content/lib/w digest micro-kernel."
+    }
+  ]
+}

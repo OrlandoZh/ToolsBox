@@ -10,6 +10,9 @@ import {
   SHIELDED_PACKAGE_VARIANT,
   SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT,
   SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT,
+  SHIELDED_PREF_BRIDGE_PACKAGE_VARIANT,
+  SHIELDED_SURFACE_SCRUB_PACKAGE_VARIANT,
+  SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT,
 } from "../scripts/package-protection-lib.mjs";
 
 const originalFromBase64Descriptor = Object.getOwnPropertyDescriptor(globalThis.Uint8Array, "fromBase64");
@@ -169,6 +172,8 @@ describe("Package Protection Lib", () => {
 
     const descriptorOverlay = [{
       id: "host-actions",
+      label: "宿主动作编排",
+      category: "feature",
       description: "overlay description",
       entrypoints: ["plugin.api.agent.runHostAction(actionId, payload)"],
       ownedBy: ["src/app/host-actions.js"],
@@ -195,6 +200,7 @@ describe("Package Protection Lib", () => {
     assert.equal(typeof runtime?.packageProtection?.overlayResolver, "function");
     assert.deepEqual(runtime.packageProtection.overlayResolver(), descriptorOverlay);
     assert.equal(loaderSource.includes("overlay description"), false);
+    assert.equal(loaderSource.includes("宿主动作编排"), false);
     assert.equal(loaderSource.includes("runHostAction"), false);
     assert.equal(loaderSource.includes("src/app/host-actions.js"), false);
   });
@@ -232,6 +238,105 @@ describe("Package Protection Lib", () => {
     assert.equal(typeof scope.__CLEANROOM_TEMPLATE_RUNTIME__?.packageProtection?.overlayResolver, "undefined");
   });
 
+  it("should keep the pref-bridge experiment variant on the runtime marker without enabling overlay recovery", async () => {
+    const sourceCode = `
+      (function (__global) {
+        "use strict";
+        async function bootstrapPlugin() {
+          return "ready";
+        }
+        __global.bootstrapPlugin = bootstrapPlugin;
+      })(this);
+    `;
+
+    const { loaderSource, metadata } = protectBundleSource(sourceCode, {
+      addonRef: "demo-addon",
+      addonVersion: "0.0.1",
+      variant: SHIELDED_PREF_BRIDGE_PACKAGE_VARIANT,
+    });
+
+    const scope = createLoaderScope();
+    const loadProtectedBundle = new Function(`${loaderSource}\nreturn this.bootstrapPlugin;`);
+    const bootstrap = loadProtectedBundle.call(scope);
+    const result = await bootstrap.call(scope);
+
+    assert.equal(result, "ready");
+    assert.equal(metadata.variant, SHIELDED_PREF_BRIDGE_PACKAGE_VARIANT);
+    assert.equal(scope.__CLEANROOM_PACKAGE_VARIANT__, SHIELDED_PREF_BRIDGE_PACKAGE_VARIANT);
+    assert.equal(scope.__CLEANROOM_SHIELDED_BUNDLE__, 1);
+    assert.equal(
+      scope.__CLEANROOM_TEMPLATE_RUNTIME__?.packageProtection?.variant,
+      SHIELDED_PREF_BRIDGE_PACKAGE_VARIANT,
+    );
+    assert.equal(typeof scope.__CLEANROOM_TEMPLATE_RUNTIME__?.packageProtection?.overlayResolver, "undefined");
+  });
+
+  it("should keep the surface-scrub experiment variant on the runtime marker without enabling overlay recovery", async () => {
+    const sourceCode = `
+      (function (__global) {
+        "use strict";
+        async function bootstrapPlugin() {
+          return "ready";
+        }
+        __global.bootstrapPlugin = bootstrapPlugin;
+      })(this);
+    `;
+
+    const { loaderSource, metadata } = protectBundleSource(sourceCode, {
+      addonRef: "demo-addon",
+      addonVersion: "0.0.1",
+      variant: SHIELDED_SURFACE_SCRUB_PACKAGE_VARIANT,
+    });
+
+    const scope = createLoaderScope();
+    const loadProtectedBundle = new Function(`${loaderSource}\nreturn this.bootstrapPlugin;`);
+    const bootstrap = loadProtectedBundle.call(scope);
+    const result = await bootstrap.call(scope);
+
+    assert.equal(result, "ready");
+    assert.equal(metadata.variant, SHIELDED_SURFACE_SCRUB_PACKAGE_VARIANT);
+    assert.equal(scope.__CLEANROOM_PACKAGE_VARIANT__, SHIELDED_SURFACE_SCRUB_PACKAGE_VARIANT);
+    assert.equal(scope.__CLEANROOM_SHIELDED_BUNDLE__, 1);
+    assert.equal(
+      scope.__CLEANROOM_TEMPLATE_RUNTIME__?.packageProtection?.variant,
+      SHIELDED_SURFACE_SCRUB_PACKAGE_VARIANT,
+    );
+    assert.equal(typeof scope.__CLEANROOM_TEMPLATE_RUNTIME__?.packageProtection?.overlayResolver, "undefined");
+  });
+
+  it("should keep the surface-scrub-wasm-digest experiment variant on the runtime marker without enabling overlay recovery", async () => {
+    const sourceCode = `
+      (function (__global) {
+        "use strict";
+        async function bootstrapPlugin() {
+          return "ready";
+        }
+        __global.bootstrapPlugin = bootstrapPlugin;
+      })(this);
+    `;
+
+    const { loaderSource, metadata } = protectBundleSource(sourceCode, {
+      addonRef: "demo-addon",
+      addonVersion: "0.0.1",
+      variant: SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT,
+    });
+
+    const scope = createLoaderScope();
+    const loadProtectedBundle = new Function(`${loaderSource}\nreturn this.bootstrapPlugin;`);
+    const bootstrap = loadProtectedBundle.call(scope);
+    const result = await bootstrap.call(scope);
+
+    assert.equal(result, "ready");
+    assert.equal(metadata.variant, SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT);
+    assert.equal(scope.__CLEANROOM_PACKAGE_VARIANT__, SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT);
+    assert.equal(scope.__CLEANROOM_SHIELDED_BUNDLE__, 1);
+    assert.equal(
+      scope.__CLEANROOM_TEMPLATE_RUNTIME__?.packageProtection?.variant,
+      SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT,
+    );
+    assert.equal(typeof scope.__CLEANROOM_TEMPLATE_RUNTIME__?.packageProtection?.overlayResolver, "undefined");
+  });
+
   it("should derive a minimal descriptor overlay from the source capability manifest", () => {
     const overlay = createCapabilityManifestDescriptorOverlay({
       config: {
@@ -242,11 +347,12 @@ describe("Package Protection Lib", () => {
 
     assert.ok(Array.isArray(overlay));
     assert.ok(overlay.length >= 12);
+    assert.equal(hostActions?.label, "宿主动作编排");
+    assert.equal(hostActions?.category, "feature");
     assert.equal(typeof hostActions?.description, "string");
     assert.ok(Array.isArray(hostActions?.entrypoints));
     assert.ok(Array.isArray(hostActions?.ownedBy));
     assert.ok(Array.isArray(hostActions?.successSignals));
-    assert.equal(Object.prototype.hasOwnProperty.call(hostActions || {}, "label"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(hostActions || {}, "agentScenario"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(hostActions || {}, "zoteroScenarios"), false);
   });
@@ -265,6 +371,8 @@ describe("Package Protection Lib", () => {
     `;
     const descriptorOverlay = [{
       id: "host-actions",
+      label: "宿主动作编排",
+      category: "feature",
       description: "overlay description",
       entrypoints: ["plugin.api.agent.runHostAction(actionId, payload)"],
       ownedBy: ["src/app/host-actions.js"],
@@ -294,6 +402,7 @@ describe("Package Protection Lib", () => {
       assert.equal(typeof scope.__CLEANROOM_TEMPLATE_RUNTIME__?.packageProtection?.overlayResolver, "function");
       assert.deepEqual(scope.__CLEANROOM_TEMPLATE_RUNTIME__.packageProtection.overlayResolver(), descriptorOverlay);
       assert.equal(loaderSource.includes("overlay description"), false);
+      assert.equal(loaderSource.includes("宿主动作编排"), false);
       assert.equal(loaderSource.includes("runHostAction"), false);
       assert.equal(loaderSource.includes("src/app/host-actions.js"), false);
     } finally {

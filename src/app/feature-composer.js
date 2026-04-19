@@ -4,6 +4,20 @@ import { createSurfaceDescriptors } from "./surface-descriptors.js";
 
 const PREFERENCE_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
 const PREFERENCE_INIT_API_KEY = "initCleanroomPreferences";
+const PREFERENCE_BINDING_MODE_BRIDGE = "bridge";
+
+function buildPreferenceNameMap(config = {}) {
+  const prefsPrefix = String(config?.prefsPrefix || "").trim();
+  if (!prefsPrefix) {
+    return null;
+  }
+  return Object.freeze({
+    enabled: `${prefsPrefix}.enabled`,
+    menuLabel: `${prefsPrefix}.menuLabel`,
+    logLevel: `${prefsPrefix}.logLevel`,
+    themeMode: `${prefsPrefix}.themeMode`,
+  });
+}
 
 export function createFeatureComposer({
   config,
@@ -120,6 +134,10 @@ export function createFeatureComposer({
           locale: i18n.locale,
           pluginID,
           instanceKey: config.instanceKey,
+          preferenceBindingMode: descriptors.preferenceBindingMode || "native",
+          preferenceNames: descriptors.preferenceBindingMode === PREFERENCE_BINDING_MODE_BRIDGE
+            ? buildPreferenceNameMap(config)
+            : null,
           strings: typeof i18n.getBundle === "function" ? i18n.getBundle() : null,
         };
         window[PREFERENCE_BRIDGE_KEY] = bridge;

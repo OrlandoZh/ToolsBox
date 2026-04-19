@@ -11,6 +11,9 @@ export const ENCRYPTED_PACKAGE_VARIANT = "encrypted";
 export const SHIELDED_PACKAGE_VARIANT = "shielded";
 export const SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT = "shielded-descriptor-bind";
 export const SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT = "shielded-jsconfuser-string";
+export const SHIELDED_PREF_BRIDGE_PACKAGE_VARIANT = "shielded-pref-bridge";
+export const SHIELDED_SURFACE_SCRUB_PACKAGE_VARIANT = "shielded-surface-scrub";
+export const SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT = "shielded-surface-scrub-wasm-digest";
 export const ENCRYPTED_BUNDLE_MARKER = "__CLEANROOM_ENCRYPTED_BUNDLE__";
 export const SHIELDED_BUNDLE_MARKER = "__CLEANROOM_SHIELDED_BUNDLE__";
 
@@ -18,7 +21,10 @@ function isShieldedProtectedVariant(variant) {
   const normalizedVariant = String(variant || "").trim().toLowerCase();
   return normalizedVariant === SHIELDED_PACKAGE_VARIANT
     || normalizedVariant === SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT
-    || normalizedVariant === SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT;
+    || normalizedVariant === SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT
+    || normalizedVariant === SHIELDED_PREF_BRIDGE_PACKAGE_VARIANT
+    || normalizedVariant === SHIELDED_SURFACE_SCRUB_PACKAGE_VARIANT
+    || normalizedVariant === SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT;
 }
 
 function resolveProtectedBundleVariant(variant) {
@@ -28,6 +34,15 @@ function resolveProtectedBundleVariant(variant) {
   }
   if (normalizedVariant === SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT) {
     return SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT;
+  }
+  if (normalizedVariant === SHIELDED_PREF_BRIDGE_PACKAGE_VARIANT) {
+    return SHIELDED_PREF_BRIDGE_PACKAGE_VARIANT;
+  }
+  if (normalizedVariant === SHIELDED_SURFACE_SCRUB_PACKAGE_VARIANT) {
+    return SHIELDED_SURFACE_SCRUB_PACKAGE_VARIANT;
+  }
+  if (normalizedVariant === SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT) {
+    return SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT;
   }
   return isShieldedProtectedVariant(normalizedVariant)
     ? SHIELDED_PACKAGE_VARIANT
@@ -110,6 +125,12 @@ function normalizeDescriptorOverlay(descriptorOverlay = null) {
       }
 
       const normalized = { id };
+      if (typeof item?.label === "string" && item.label.trim()) {
+        normalized.label = item.label.trim();
+      }
+      if (typeof item?.category === "string" && item.category.trim()) {
+        normalized.category = item.category.trim();
+      }
       if (typeof item?.description === "string" && item.description.trim()) {
         normalized.description = item.description.trim();
       }

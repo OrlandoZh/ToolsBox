@@ -434,6 +434,8 @@ export function buildScenarioLastRunMarkdown(report) {
     `- Registered: \`${Array.isArray(report.registered) ? report.registered.length : 0}\``,
     `- Selected: \`${Array.isArray(report.selected) ? report.selected.length : 0}\``,
     `- Completed: \`${Array.isArray(report.completed) ? report.completed.length : 0}\``,
+    `- Result Total: \`${Number(report.total || 0)}\``,
+    `- Passed/Failed/Skipped: \`${Number(report.passed || 0)}/${Number(report.failed || 0)}/${Number(report.skipped || 0)}\``,
     `- Incomplete: \`${report.incomplete ? "yes" : "no"}\``,
     `- Last Started Scenario: \`${report.lastStartedScenario || "-"}\``,
     `- Last Completed Scenario: \`${report.lastCompletedScenario || "-"}\``,
@@ -455,6 +457,17 @@ export function buildScenarioLastRunMarkdown(report) {
   else {
     selectedScenarios.forEach((entry) => {
       lines.push(`- \`${entry.name}\`${entry.sourceFile ? ` -> \`${entry.sourceFile}\`` : ""}`);
+    });
+  }
+
+  lines.push("", "## Selected Results", "");
+  const selectedResults = Array.isArray(report.results) ? report.results : [];
+  if (selectedResults.length === 0) {
+    lines.push("- None");
+  }
+  else {
+    selectedResults.forEach((entry) => {
+      lines.push(`- \`${entry.name}\`: \`${entry.status || "-"}\` (${Number(entry.durationMs || 0)}ms)`);
     });
   }
 

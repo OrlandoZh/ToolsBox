@@ -4,11 +4,19 @@ import path from "node:path";
 import { describe, it, assert } from "./test-framework.js";
 import { buildReactUI } from "../scripts/build-react-ui.mjs";
 import { loadOptionalBundleRegistry } from "../scripts/optional-bundles-lib.mjs";
+import {
+  REACT_UI_DEMO_SCRIPT_PATH,
+  REACT_UI_SURFACE_BRIDGE_SCRIPT_PATH,
+} from "../src/utils/optional-bundle-paths.js";
 
 const projectRoot = path.resolve(".");
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function resolveBuildPath(buildRoot, relativePath) {
+  return path.join(buildRoot, ...relativePath.split("/"));
 }
 
 function makeConfig() {
@@ -33,8 +41,8 @@ describe("Build React UI", () => {
       assert.equal(result.status, "skipped");
       assert.equal(result.reason, "disabled");
       assert.deepEqual(result.artifacts, []);
-      assert.equal(fs.existsSync(path.join(buildRoot, "content", "scripts", "react-ui-demo.js")), false);
-      assert.equal(fs.existsSync(path.join(buildRoot, "content", "scripts", "react-ui-surface-bridge.js")), false);
+      assert.equal(fs.existsSync(resolveBuildPath(buildRoot, REACT_UI_DEMO_SCRIPT_PATH)), false);
+      assert.equal(fs.existsSync(resolveBuildPath(buildRoot, REACT_UI_SURFACE_BRIDGE_SCRIPT_PATH)), false);
     } finally {
       fs.rmSync(buildRoot, { recursive: true, force: true });
     }

@@ -649,6 +649,182 @@ describe("Plugin", () => {
     assert.equal(notifierUnregistrations[0], "cleanroomtemplate-activity");
   });
 
+  it("should keep the wasm probe inert until the host action is invoked", async () => {
+    startupReady.initialization.resolve();
+    startupReady.unlock.resolve();
+    startupReady.uiReady.resolve();
+
+    let createWasmKernelProbeCalls = 0;
+    let closeCalls = 0;
+    const probePayloads = [];
+    const plugin = createPlugin({
+      globalScope: globalThis,
+      config: createConfig(),
+      createWasmKernelProbeImpl() {
+        createWasmKernelProbeCalls += 1;
+        return {
+          async runProbe(payload = {}) {
+            probePayloads.push(payload);
+            return {
+              ok: true,
+              mode: "main-thread",
+              mainThread: {
+                ok: true,
+                matchesExpected: true,
+                sum: 42,
+                expectedSum: 42,
+              },
+              worker: null,
+              consistentAcrossTransports: null,
+              errors: [],
+            };
+          },
+          async close() {
+            closeCalls += 1;
+          },
+        };
+      },
+    });
+
+    await plugin.start();
+    assert.equal(createWasmKernelProbeCalls, 0);
+
+    const result = await plugin.api.agent.runHostAction("runtime.probeWasmKernel", {
+      mode: "main-thread",
+      left: 19,
+      right: 23,
+    });
+
+    assert.equal(createWasmKernelProbeCalls, 1);
+    assert.equal(result.ok, true);
+    assert.deepEqual(probePayloads, [{
+      mode: "main-thread",
+      left: 19,
+      right: 23,
+    }]);
+
+    await plugin.shutdown();
+    assert.equal(closeCalls, 1);
+  });
+
+  it("should reuse the lazy wasm probe runtime for digest host actions", async () => {
+    startupReady.initialization.resolve();
+    startupReady.unlock.resolve();
+    startupReady.uiReady.resolve();
+
+    let createWasmKernelProbeCalls = 0;
+    let closeCalls = 0;
+    const digestPayloads = [];
+    const plugin = createPlugin({
+      globalScope: globalThis,
+      config: createConfig(),
+      createWasmKernelProbeImpl() {
+        createWasmKernelProbeCalls += 1;
+        return {
+          async deriveDigest(payload = {}) {
+            digestPayloads.push(payload);
+            return {
+              ok: true,
+              mode: "main-thread",
+              mainThread: {
+                ok: true,
+                digestUint32: 305419896,
+                digestHex: "12345678",
+              },
+              worker: null,
+              consistentAcrossTransports: null,
+              errors: [],
+            };
+          },
+          async close() {
+            closeCalls += 1;
+          },
+        };
+      },
+    });
+
+    await plugin.start();
+    assert.equal(createWasmKernelProbeCalls, 0);
+
+    const result = await plugin.api.agent.runHostAction("runtime.deriveWasmKernelDigest", {
+      mode: "main-thread",
+      text: "probe-to-digest",
+    });
+
+    assert.equal(createWasmKernelProbeCalls, 1);
+    assert.equal(result.ok, true);
+    assert.deepEqual(digestPayloads, [{
+      mode: "main-thread",
+      text: "probe-to-digest",
+    }]);
+
+    await plugin.shutdown();
+    assert.equal(closeCalls, 1);
+  });
+
+  it("should reuse the lazy wasm probe runtime for unlock host actions", async () => {
+    startupReady.initialization.resolve();
+    startupReady.unlock.resolve();
+    startupReady.uiReady.resolve();
+
+    let createWasmKernelProbeCalls = 0;
+    let closeCalls = 0;
+    const unlockPayloads = [];
+    const plugin = createPlugin({
+      globalScope: globalThis,
+      config: createConfig(),
+      createWasmKernelProbeImpl() {
+        createWasmKernelProbeCalls += 1;
+        return {
+          async deriveUnlockToken(payload = {}) {
+            unlockPayloads.push(payload);
+            return {
+              ok: true,
+              mode: "main-thread",
+              activationRequirements: ["profileHash", "dbAvailable", "noncePresent"],
+              activationMissing: [],
+              activationSatisfied: true,
+              shadowWouldApply: true,
+              mainThread: {
+                ok: true,
+                stage2DigestUint32: 305419896,
+                stage2DigestHex: "12345678",
+                unlockTokenUint32: 2271560481,
+                unlockTokenHex: "87654321",
+              },
+              worker: null,
+              consistentAcrossTransports: null,
+              errors: [],
+            };
+          },
+          async close() {
+            closeCalls += 1;
+          },
+        };
+      },
+    });
+
+    await plugin.start();
+    assert.equal(createWasmKernelProbeCalls, 0);
+
+    const result = await plugin.api.agent.runHostAction("runtime.deriveWasmKernelUnlockToken", {
+      mode: "main-thread",
+      bundleSeed: "cleanroom-stage2-shadow-seed-v1",
+    });
+
+    assert.equal(createWasmKernelProbeCalls, 1);
+    assert.equal(result.ok, true);
+    assert.equal(unlockPayloads.length, 1);
+    assert.equal(unlockPayloads[0].mode, "main-thread");
+    assert.equal(unlockPayloads[0].bundleSeed, "cleanroom-stage2-shadow-seed-v1");
+    assert.equal(typeof unlockPayloads[0].hostBinding?.profileHash, "string");
+    assert.equal(unlockPayloads[0].hostBinding?.dbAvailable, true);
+    assert.equal(unlockPayloads[0].hostBinding?.noncePresent, true);
+
+    await plugin.shutdown();
+    assert.equal(closeCalls, 1);
+  });
+
   it("should enable the reader demo command when a reader tab is active", async () => {
     startupReady.initialization.resolve();
     startupReady.unlock.resolve();

@@ -38,6 +38,30 @@ describe("Package Protection Inner Audit", () => {
     assert.equal(options.packageFirst, false);
   });
 
+  it("should accept pref-bridge as an inner-audit experiment variant alias", () => {
+    const options = parsePackageProtectionInnerAuditArgs([
+      "--variant",
+      "pref-bridge",
+      "--channel",
+      "stable",
+    ]);
+
+    assert.equal(options.variant, "shielded-pref-bridge");
+    assert.equal(options.channel, "stable");
+  });
+
+  it("should accept surface-scrub as an inner-audit experiment variant alias", () => {
+    const options = parsePackageProtectionInnerAuditArgs([
+      "--variant",
+      "surface-scrub",
+      "--channel",
+      "stable",
+    ]);
+
+    assert.equal(options.variant, "shielded-surface-scrub");
+    assert.equal(options.channel, "stable");
+  });
+
   it("should capture decrypted inner source and descriptor overlay without executing payload", async () => {
     const loaderSource = buildLoaderSource(`
 globalThis.__INNER_EXECUTED__ = true;

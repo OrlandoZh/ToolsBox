@@ -36,6 +36,9 @@ export const PACKAGE_PROTECTION_INNER_AUDIT_VARIANTS = Object.freeze([
   "shielded",
   "shielded-descriptor-bind",
   "shielded-jsconfuser-string",
+  "shielded-pref-bridge",
+  "shielded-surface-scrub",
+  "shielded-surface-scrub-wasm-digest",
 ]);
 
 export const PACKAGE_PROTECTION_PROXY_LLM_LEVELS = Object.freeze([
@@ -130,6 +133,15 @@ function normalizeVariant(value) {
   }
   if (normalized === "jsconfuser-string") {
     return "shielded-jsconfuser-string";
+  }
+  if (normalized === "pref-bridge") {
+    return "shielded-pref-bridge";
+  }
+  if (normalized === "surface-scrub") {
+    return "shielded-surface-scrub";
+  }
+  if (normalized === "surface-scrub-wasm-digest" || normalized === "wasm-digest") {
+    return "shielded-surface-scrub-wasm-digest";
   }
   return PACKAGE_PROTECTION_INNER_AUDIT_VARIANTS.includes(normalized)
     ? normalized
@@ -306,7 +318,7 @@ export function parsePackageProtectionInnerAuditArgs(argv = process.argv.slice(2
     }
   }
 
-  assertScript(Boolean(options.variant), "--variant must be one of shielded|shielded-descriptor-bind|shielded-jsconfuser-string|all", {
+  assertScript(Boolean(options.variant), "--variant must be one of shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|all", {
     category: "args",
     failedStage: "parse-args",
   });
@@ -649,7 +661,7 @@ export async function createPackageProtectionInnerAudit(options = {}) {
   const projectRootPath = path.resolve(options.projectRootPath || projectRoot);
   const normalizedChannel = normalizeChannel(options.channel) || "stable";
   const selectedVariants = listSelectedVariants(options.variant);
-  assertScript(selectedVariants.every(Boolean), "variant must be one of shielded|shielded-descriptor-bind|shielded-jsconfuser-string|all", {
+  assertScript(selectedVariants.every(Boolean), "variant must be one of shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|all", {
     category: "args",
     failedStage: "validate-options",
   });

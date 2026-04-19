@@ -221,7 +221,7 @@ function parseChromeEvalResult(rawResult) {
   return rawResult;
 }
 
-function createScenarioLastRunReport({
+export function createScenarioLastRunReport({
   result,
   generatedAt = new Date().toISOString(),
 }) {
@@ -234,10 +234,15 @@ function createScenarioLastRunReport({
     registered: Array.isArray(execution.registered) ? execution.registered : [],
     selected: Array.isArray(execution.selected) ? execution.selected : [],
     completed: Array.isArray(execution.completed) ? execution.completed : [],
+    total: Number(result?.total || 0),
+    passed: Number(result?.passed || 0),
+    failed: Number(result?.failed || 0),
+    skipped: Number(result?.skipped || 0),
     incomplete: execution.incomplete === true,
     lastStartedScenario: execution.lastStartedScenario || null,
     lastCompletedScenario: execution.lastCompletedScenario || null,
     timeoutKind: execution.timeoutKind || null,
+    results: Array.isArray(result?.results) ? result.results : [],
     failedResults: Array.isArray(result?.failedResults) ? result.failedResults : [],
     filtersApplied: execution.filtersApplied || {
       scenario: null,
@@ -434,9 +439,10 @@ function spawnManagedChild({
   binaryPath,
   args,
   processLogs,
+  cwd = projectRoot,
 }) {
   const child = spawn(binaryPath, args, {
-    cwd: projectRoot,
+    cwd,
     stdio: ["ignore", "pipe", "pipe"],
   });
   attachChildProcessLogs(child, processLogs);
@@ -497,11 +503,13 @@ async function launchManagedSession({
   processLogs,
   config,
   runtimeSanitization = null,
+  cwd = projectRoot,
 }) {
   const child = spawnManagedChild({
     binaryPath,
     args,
     processLogs,
+    cwd,
   });
   let rdp = null;
   try {
@@ -665,8 +673,200 @@ async function runIntegratedTests({
   }
 }
 
+function assertScenarioBatchPassed(scenarioResult) {
+  if (!scenarioResult || typeof scenarioResult !== "object") {
+    throw createScriptError("validation", "Missing Zotero scenario result", {
+      failedStage: "run-scenarios",
+    });
+  }
 
-export async function main() {
+  if (scenarioResult.failed > 0 || scenarioResult.execution?.incomplete) {
+    throw createScriptError(
+      scenarioResult.execution?.timeoutKind === "chrome-evaluation-timeout" ? "timeout" : "validation",
+      scenarioResult.execution?.incomplete
+        ? `Zotero scenarios incomplete: ${scenarioResult.execution.lastStartedScenario || "unknown"}`
+        : `Zotero scenarios failed: ${scenarioResult.failed}`,
+      {
+        failedStage: "run-scenarios",
+        details: {
+          failed: scenarioResult.failed,
+          timeoutKind: scenarioResult.execution?.timeoutKind || null,
+          currentScenario: scenarioResult.execution?.lastStartedScenario || null,
+          completedCount: Array.isArray(scenarioResult.execution?.completed)
+            ? scenarioResult.execution.completed.length
+            : 0,
+        },
+      },
+    );
+  }
+}
+
+export async function runScenarioMode({
+  projectRootPath = projectRoot,
+  skipPackage = false,
+  listScenarios = false,
+  scenarioPattern = null,
+  scenarioFilePattern = null,
+  quiet = false,
+} = {}) {
+  const mode = "scenario";
+  const baseMode = MODES[mode];
+
+  if (!skipPackage) {
+    try {
+      buildAddon(projectRootPath);
+    } catch (error) {
+      throw wrapScriptError(error, {
+        failedStage: "build-addon",
+      });
+    }
+  }
+
+  const { config, buildPath, xpiPath } = await readAddonRuntimeInfo(projectRootPath)
+    .catch((error) => {
+      throw wrapScriptError(error, {
+        failedStage: "read-runtime-info",
+      });
+    });
+  const runnerConfig = await readRunnerConfig({ projectRoot: projectRootPath, mode })
+    .catch((error) => {
+      throw wrapScriptError(error, {
+        failedStage: "read-runner-config",
+      });
+    });
+  const rdpPort = runnerConfig.rdpPort || await findFreePort().catch((error) => {
+    throw wrapScriptError(error, {
+      failedStage: "resolve-rdp-port",
+    });
+  });
+  const runtimeSanitization = await prepareRuntime({
+    projectRoot: projectRootPath,
+    profilePath: runnerConfig.profilePath,
+    dataDir: runnerConfig.dataDir,
+    fresh: baseMode.fresh,
+  }).catch((error) => {
+    throw wrapScriptError(error, {
+      failedStage: "prepare-runtime",
+    });
+  });
+  await installProxyAddon({
+    profilePath: runnerConfig.profilePath,
+    addonId: config.addonId,
+    addonPath: buildPath,
+  }).catch((error) => {
+    throw wrapScriptError(error, {
+      failedStage: "install-proxy-addon",
+    });
+  });
+
+  const args = buildStartupArgs({
+    profilePath: runnerConfig.profilePath,
+    dataDir: runnerConfig.dataDir,
+    rdpPort,
+    devtools: baseMode.devtools,
+  });
+
+  if (!quiet) {
+    console.log(`[zotero:${mode}] ${baseMode.label}`);
+    console.log(`[zotero:${mode}] Binary: ${runnerConfig.binaryPath}`);
+    console.log(`[zotero:${mode}] Profile: ${runnerConfig.profilePath}`);
+    console.log(`[zotero:${mode}] Data: ${runnerConfig.dataDir}`);
+    console.log(`[zotero:${mode}] Build: ${buildPath}`);
+    console.log(`[zotero:${mode}] Install Mode: proxy`);
+    if (xpiPath) {
+      console.log(`[zotero:${mode}] Package: ${xpiPath}`);
+    }
+    console.log(`[zotero:${mode}] RDP Port: ${rdpPort}`);
+  }
+
+  const processLogs = [];
+  let session = null;
+
+  try {
+    session = await launchManagedSession({
+      binaryPath: runnerConfig.binaryPath,
+      args,
+      rdpPort,
+      processLogs,
+      config,
+      runtimeSanitization,
+      cwd: projectRootPath,
+    }).catch((error) => {
+      throw wrapScriptError(error, {
+        failedStage: "launch-session",
+      });
+    });
+
+    if (!quiet) {
+      logSessionActivation({
+        mode,
+        addon: session.addon,
+        addonState: session.addonState,
+        readiness: session.readiness,
+        config,
+        devtools: baseMode.devtools,
+      });
+    }
+
+    const scenarioResult = await runIntegratedScenarioBatch({
+      projectRoot: projectRootPath,
+      rdp: session.rdp,
+      config,
+      listOnly: listScenarios,
+      scenarioPattern,
+      scenarioFilePattern,
+      modeLabel: "zotero:scenario",
+      processLogs,
+    });
+
+    if (!quiet) {
+      printScenarioBatchResults(scenarioResult);
+    }
+
+    const scenarioReport = createScenarioLastRunReport({
+      result: scenarioResult,
+    });
+    const reportPaths = await writeScenarioLastRunArtifacts({
+      projectRoot: projectRootPath,
+      report: scenarioReport,
+    });
+
+    if (!quiet) {
+      console.log(`[zotero:scenario] Last run report: ${reportPaths.jsonPath}`);
+    }
+
+    return {
+      config,
+      buildPath,
+      xpiPath,
+      runnerConfig,
+      rdpPort,
+      runtimeSanitization,
+      processLogs,
+      sessionReadiness: session.readiness,
+      scenarioResult,
+      scenarioReport,
+      reportPaths,
+    };
+  } catch (error) {
+    throw wrapScriptError(error, {
+      failedStage: error?.failedStage || "run-scenarios",
+      details: {
+        processLogs,
+      },
+    });
+  } finally {
+    await stopManagedSession(session);
+  }
+}
+
+
+export async function main(argv = process.argv.slice(2), options = {}) {
+  const {
+    buildAddonImpl = buildAddon,
+    runScenarioModeImpl = runScenarioMode,
+    assertScenarioBatchPassedImpl = assertScenarioBatchPassed,
+  } = options;
   const {
     mode,
     fresh,
@@ -676,12 +876,26 @@ export async function main() {
     listScenarios,
     scenarioPattern,
     scenarioFilePattern,
-  } = parseCli(process.argv.slice(2));
+  } = parseCli(argv);
   const baseMode = MODES[mode];
+
+  if (mode === "scenario") {
+    const scenarioRun = await runScenarioModeImpl({
+      projectRootPath: projectRoot,
+      skipPackage,
+      listScenarios,
+      scenarioPattern,
+      scenarioFilePattern,
+    });
+    if (!listScenarios) {
+      assertScenarioBatchPassedImpl(scenarioRun.scenarioResult);
+    }
+    return;
+  }
 
   if (!skipPackage) {
     try {
-      buildAddon(projectRoot);
+      buildAddonImpl(projectRoot);
     } catch (error) {
       throw wrapScriptError(error, {
         failedStage: "build-addon",
@@ -857,48 +1071,6 @@ export async function main() {
       });
     }
 
-    if (mode === "scenario") {
-      const scenarioResult = await runIntegratedScenarioBatch({
-        projectRoot,
-        rdp: session.rdp,
-        config,
-        listOnly: listScenarios,
-        scenarioPattern,
-        scenarioFilePattern,
-        modeLabel: "zotero:scenario",
-        processLogs,
-      });
-      printScenarioBatchResults(scenarioResult);
-      const scenarioReport = createScenarioLastRunReport({
-        result: scenarioResult,
-      });
-      const reportPaths = await writeScenarioLastRunArtifacts({
-        projectRoot,
-        report: scenarioReport,
-      });
-      console.log(`[zotero:scenario] Last run report: ${reportPaths.jsonPath}`);
-
-      if (!listScenarios && (scenarioResult.failed > 0 || scenarioResult.execution?.incomplete)) {
-        throw createScriptError(
-          scenarioResult.execution?.timeoutKind === "chrome-evaluation-timeout" ? "timeout" : "validation",
-          scenarioResult.execution?.incomplete
-            ? `Zotero scenarios incomplete: ${scenarioResult.execution.lastStartedScenario || "unknown"}`
-            : `Zotero scenarios failed: ${scenarioResult.failed}`,
-          {
-            failedStage: "run-scenarios",
-            details: {
-              failed: scenarioResult.failed,
-              timeoutKind: scenarioResult.execution?.timeoutKind || null,
-              currentScenario: scenarioResult.execution?.lastStartedScenario || null,
-              completedCount: Array.isArray(scenarioResult.execution?.completed)
-                ? scenarioResult.execution.completed.length
-                : 0,
-            },
-          },
-        );
-      }
-    }
-
     if (watch) {
       stopWatching = await startWatchLoop({
         projectRoot,
@@ -911,7 +1083,7 @@ export async function main() {
             `[zotero:watch] Detected changes: ${formatChangedFiles(changedFiles)}`,
           );
           try {
-            buildAddon(projectRoot);
+            buildAddonImpl(projectRoot);
             const reloadedAddon = await session.rdp.reloadAddonById(config.addonId);
             const runtimeState = await session.rdp.restartAddonRuntime({
               addonId: config.addonId,

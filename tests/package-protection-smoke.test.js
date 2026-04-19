@@ -38,6 +38,27 @@ describe("Package Protection Smoke", () => {
     assert.equal(options.jsConfuserToolEntry, "dist/index.js");
   });
 
+  it("should accept pref-bridge as a static-surface experiment variant alias", () => {
+    const options = parsePackageProtectionSmokeArgs(["--variant", "pref-bridge"]);
+
+    assert.equal(options.variant, "shielded-pref-bridge");
+    assert.equal(options.channel, "stable");
+  });
+
+  it("should accept surface-scrub as a static-surface experiment variant alias", () => {
+    const options = parsePackageProtectionSmokeArgs(["--variant", "surface-scrub"]);
+
+    assert.equal(options.variant, "shielded-surface-scrub");
+    assert.equal(options.channel, "stable");
+  });
+
+  it("should accept wasm-digest as a bounded wasm experiment variant alias", () => {
+    const options = parsePackageProtectionSmokeArgs(["--variant", "wasm-digest"]);
+
+    assert.equal(options.variant, "shielded-surface-scrub-wasm-digest");
+    assert.equal(options.channel, "stable");
+  });
+
   it("should reject missing variants and invalid repeat counts", () => {
     assert.throws(() => parsePackageProtectionSmokeArgs([]));
     assert.throws(() => parsePackageProtectionSmokeArgs(["--variant", "plain", "--repeats", "0"]));
@@ -56,6 +77,18 @@ describe("Package Protection Smoke", () => {
     ]);
     assert.deepEqual(resolvePackageProtectionSmokePackageArgs("shielded-descriptor-bind"), [
       "--descriptor-bind",
+      "--skip-release-metadata",
+    ]);
+    assert.deepEqual(resolvePackageProtectionSmokePackageArgs("shielded-pref-bridge"), [
+      "--pref-bridge",
+      "--skip-release-metadata",
+    ]);
+    assert.deepEqual(resolvePackageProtectionSmokePackageArgs("shielded-surface-scrub"), [
+      "--surface-scrub",
+      "--skip-release-metadata",
+    ]);
+    assert.deepEqual(resolvePackageProtectionSmokePackageArgs("shielded-surface-scrub-wasm-digest"), [
+      "--surface-scrub-wasm-digest",
       "--skip-release-metadata",
     ]);
     assert.deepEqual(resolvePackageProtectionSmokePackageArgs("shielded-jsconfuser-string", {
@@ -240,5 +273,53 @@ describe("Package Protection Smoke", () => {
     assert.ok(scorecard.leakedMarkers.includes("demo-addon"));
     assert.ok(scorecard.leakedMarkers.includes("1.2.3"));
     assert.equal(scorecard.maxBase64LiteralLength >= 640, true);
+  });
+
+  it("should preserve an explicit manual scorecard when summarizing a smoke report", () => {
+    const report = summarizePackageProtectionSmokeReport({
+      variant: "shielded",
+      channel: "stable",
+      repeats: 1,
+      xpi: {
+        path: "/tmp/demo-shielded.xpi",
+        sizeBytes: 1234,
+      },
+      bundle: {
+        path: "/tmp/demo.js",
+        sizeBytes: 5678,
+      },
+      automatedScorecard: {
+        metadataLeakFree: true,
+        leakedMarkers: [],
+        contiguousPayloadHidden: true,
+        maxBase64LiteralLength: 96,
+        plainModuleDefsHidden: true,
+        hostileRuntimeOptionsDisabled: true,
+        loaderOptions: null,
+      },
+      manualScorecard: {
+        webcrackInitialResult: "parse-fail / only-loader",
+        llmSinglePassResult: "high-level-architecture",
+        status: "completed",
+        completedAt: "2026-04-18T00:00:00.000Z",
+      },
+      runs: [
+        {
+          passed: true,
+          readinessMode: "native",
+          packageProtection: {
+            decodeMethod: "fromBase64",
+            decodeDurationMs: 100,
+            prepareDurationMs: 200,
+            bootstrapResolveDurationMs: 200,
+          },
+        },
+      ],
+    });
+
+    assert.equal(report.manualScorecard.webcrackInitialResult, "parse-fail / only-loader");
+    assert.equal(report.manualScorecard.llmSinglePassResult, "high-level-architecture");
+    assert.equal(report.manualScorecard.status, "completed");
+    assert.equal(report.manualScorecard.completedAt, "2026-04-18T00:00:00.000Z");
   });
 });

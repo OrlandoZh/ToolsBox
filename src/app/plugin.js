@@ -32,6 +32,7 @@ import { createRuntimeCapabilityState } from "./runtime-capabilities.js";
 import { createHostActionRunner } from "./host-actions.js";
 import { createSurfaceDescriptors } from "./surface-descriptors.js";
 import { createReactUIDemoLauncher } from "../features/react-ui-demo.js";
+import { createWasmKernelProbe } from "../features/wasm-kernel-probe.js";
 
 function normalizeLogLevel(input, fallback = "info") {
   const candidate = String(input || "").trim().toLowerCase();
@@ -303,7 +304,11 @@ function mergeHostBindingSummary(base = null, patch = null) {
   return merged;
 }
 
-export function createPlugin({ globalScope, config }) {
+export function createPlugin({
+  globalScope,
+  config,
+  createWasmKernelProbeImpl = createWasmKernelProbe,
+} = {}) {
   const runtime = globalScope.__CLEANROOM_TEMPLATE_RUNTIME__ || {};
   const optionalBundleRegistry = globalScope.__CLEANROOM_TEMPLATE_OPTIONAL_BUNDLES__ || null;
   const copy = createCopyFallbacks();
@@ -516,6 +521,21 @@ export function createPlugin({ globalScope, config }) {
     services: globalScope.Services,
     rootURI: runtime.rootURI,
   });
+  let wasmKernelProbe = null;
+
+  function getWasmKernelProbe() {
+    if (!wasmKernelProbe) {
+      wasmKernelProbe = createWasmKernelProbeImpl({
+        config,
+        logger,
+        rootURI: runtime.rootURI,
+        fetchImpl: globalScope.fetch || globalThis.fetch,
+        WebAssemblyImpl: globalScope.WebAssembly || globalThis.WebAssembly,
+        WorkerCtor: globalScope.ChromeWorker || globalScope.Worker || globalThis.ChromeWorker || globalThis.Worker,
+      });
+    }
+    return wasmKernelProbe;
+  }
 
   servicesHub.register({
     id: surfaceDescriptors.serviceIDs.reactUIDemo,
@@ -929,6 +949,8 @@ export function createPlugin({ globalScope, config }) {
     itemPane,
     bundleRuntime,
     openReactDemoWindow: reactUIDemo.openDemoWindow,
+    getWasmKernelProbe,
+    getProtectionSummary,
     surfaceDescriptors,
   });
 
@@ -1020,6 +1042,9 @@ export function createPlugin({ globalScope, config }) {
       });
     },
     stopServices: async () => {
+      if (typeof wasmKernelProbe?.close === "function") {
+        await wasmKernelProbe.close();
+      }
       await servicesHub.stopAll({
         host,
         prefs,

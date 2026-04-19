@@ -1,5 +1,12 @@
 import { describe, it, assert } from "./test-framework.js";
 import { createReactUIDemoLauncher } from "../src/features/react-ui-demo.js";
+import {
+  REACT_UI_DEMO_SHELL_PATH,
+  REACT_UI_SURFACE_BRIDGE_SCRIPT_PATH,
+} from "../src/utils/optional-bundle-paths.js";
+
+const REACT_UI_DEMO_HREF = `chrome://cleanroomtemplate/${REACT_UI_DEMO_SHELL_PATH}`;
+const REACT_UI_SURFACE_BRIDGE_URL = `chrome://cleanroomtemplate/${REACT_UI_SURFACE_BRIDGE_SCRIPT_PATH}`;
 
 function createFakeDocument(view = {}) {
   const elementsById = new Map();
@@ -74,7 +81,7 @@ function createFakeDocument(view = {}) {
   return doc;
 }
 
-function createFakeWindow({ href = "chrome://cleanroomtemplate/content/react-ui/demo.xhtml" } = {}) {
+function createFakeWindow({ href = REACT_UI_DEMO_HREF } = {}) {
   const window = {
     closed: false,
     focusCount: 0,
@@ -155,7 +162,7 @@ describe("React UI Demo", () => {
         scriptloader: {
           loadSubScript(url, targetView) {
             scriptLoadCount += 1;
-            assert.equal(url, "chrome://cleanroomtemplate/content/scripts/react-ui-surface-bridge.js");
+            assert.equal(url, REACT_UI_SURFACE_BRIDGE_URL);
             targetView.__CleanroomTemplateReactSurface__ = renderer;
           },
         },
@@ -347,7 +354,7 @@ describe("React UI Demo", () => {
     });
 
     assert.equal(opened.length, 1);
-    assert.equal(opened[0].href, "chrome://cleanroomtemplate/content/react-ui/demo.xhtml");
+    assert.equal(opened[0].href, REACT_UI_DEMO_HREF);
     assert.equal(opened[0].name, "cleanroomtemplate-react-ui-demo-floating");
     assert.equal(result.presentation.effectiveWindowMode, "floating");
     assert.equal(result.presentation.windowModeSource, "docked-fallback");

@@ -4,6 +4,7 @@ import {
   unmountReactSurface,
   updateReactSurface,
 } from "../utils/react-surface-bridge.js";
+import { REACT_UI_DEMO_SHELL_PATH } from "../utils/optional-bundle-paths.js";
 import {
   SURFACE_WINDOW_MODE_DOCKED,
   resolveSurfaceWindowModeDecision,
@@ -191,8 +192,8 @@ export function createReactUIDemoLauncher({
       }
 
       const href = typeof host?.resolveContentUrl === "function"
-        ? host.resolveContentUrl("content/react-ui/demo.xhtml")
-        : "content/react-ui/demo.xhtml";
+        ? host.resolveContentUrl(REACT_UI_DEMO_SHELL_PATH)
+        : REACT_UI_DEMO_SHELL_PATH;
       const presentation = context.surfaceWindowModeDecision || null;
 
       if (typeof mainWindow.openDialog === "function") {

@@ -4,6 +4,7 @@ import { createItemPane } from "../src/features/item-pane.js";
 describe("ItemPane", () => {
   let errors;
   let registeredSectionIDs;
+  let registeredSectionOptions;
   let registeredRowIDs;
   let unregisteredSectionIDs;
   let unregisteredRowIDs;
@@ -12,6 +13,7 @@ describe("ItemPane", () => {
   beforeEach(() => {
     errors = [];
     registeredSectionIDs = [];
+    registeredSectionOptions = [];
     registeredRowIDs = [];
     unregisteredSectionIDs = [];
     unregisteredRowIDs = [];
@@ -29,6 +31,7 @@ describe("ItemPane", () => {
           registerSection(options) {
             const id = `${options.pluginID}:${options.paneID}`;
             registeredSectionIDs.push(id);
+            registeredSectionOptions.push(options);
             return id;
           },
           unregisterSection(id) {
@@ -51,6 +54,7 @@ describe("ItemPane", () => {
   afterEach(() => {
     errors = [];
     registeredSectionIDs = [];
+    registeredSectionOptions = [];
     registeredRowIDs = [];
     unregisteredSectionIDs = [];
     unregisteredRowIDs = [];
@@ -147,5 +151,29 @@ describe("ItemPane", () => {
     assert.equal(itemPane.unregisterInfoRow(registeredRowID), true);
     assert.deepEqual(unregisteredSectionIDs, [registeredSectionID]);
     assert.deepEqual(unregisteredRowIDs, [registeredRowID]);
+  });
+
+  it("should forward sidenav orderable and sectionButtons to Zotero", () => {
+    const sectionButtons = [{
+      type: "icon",
+      icon: "chrome://cleanroom/content/icon.svg",
+      l10nID: "demo-section-action",
+    }];
+
+    const registeredSectionID = itemPane.registerSection({
+      paneID: "demo-section-orderable",
+      header: { l10nID: "demo-section-header" },
+      sidenav: {
+        l10nID: "demo-section-sidenav",
+        orderable: false,
+      },
+      sectionButtons,
+      onRender() {},
+    });
+
+    assert.equal(registeredSectionID, "cleanroom-template@example.com:demo-section-orderable");
+    assert.equal(registeredSectionOptions.length, 1);
+    assert.equal(registeredSectionOptions[0].sidenav.orderable, false);
+    assert.deepEqual(registeredSectionOptions[0].sectionButtons, sectionButtons);
   });
 });

@@ -3,6 +3,8 @@ import {
   isExecutableHostAction,
   listHostActionDescriptors,
 } from "./host-action-catalog.js";
+import { HOST_ACTION_IDS } from "./host-action-ids.js";
+import { HOST_ACTION_READINESS_IDS } from "./host-action-readiness-ids.js";
 import { createSurfaceDescriptors } from "./surface-descriptors.js";
 
 function clone(value) {
@@ -1472,11 +1474,28 @@ export function createHostActionRunner({
   itemPane,
   bundleRuntime,
   openReactDemoWindow,
+  wasmKernelProbe,
+  getWasmKernelProbe,
+  getProtectionSummary,
   surfaceDescriptors = null,
 }) {
   const descriptors = surfaceDescriptors && typeof surfaceDescriptors === "object"
     ? surfaceDescriptors
     : createSurfaceDescriptors(config);
+
+  async function resolveWasmKernelProbe() {
+    if (typeof getWasmKernelProbe === "function") {
+      return await getWasmKernelProbe();
+    }
+    return wasmKernelProbe || null;
+  }
+
+  function resolveProtectionSummary() {
+    if (typeof getProtectionSummary === "function") {
+      return getProtectionSummary();
+    }
+    return null;
+  }
 
   async function runPreferencesOpenPane(actionId, payload = {}) {
     const paneID = toPlainString(payload.paneID) || descriptors.preferencePaneID;
@@ -2564,7 +2583,7 @@ export function createHostActionRunner({
         preconditions,
         observedState: summary || { itemID },
         readinessChecks: [
-          createCheck("reader-summary", Boolean(summary?.itemID === itemID), {
+          createCheck(HOST_ACTION_READINESS_IDS.readerSummary, Boolean(summary?.itemID === itemID), {
             expected: itemID,
             actual: summary?.itemID ?? null,
           }),
@@ -3194,6 +3213,324 @@ export function createHostActionRunner({
     }
   }
 
+  async function runRuntimeProbeWasmKernel(actionId, payload = {}) {
+    const preconditions = [
+      createCheck(
+        "wasmKernelProbe.available",
+        typeof getWasmKernelProbe === "function" || typeof wasmKernelProbe?.runProbe === "function",
+      ),
+    ];
+    if (preconditions.some((entry) => entry.ok === false)) {
+      return buildFailureResult(actionId, {
+        preconditions,
+        failureKind: "precondition-failed",
+      });
+    }
+
+    try {
+      const resolvedWasmKernelProbe = await resolveWasmKernelProbe();
+      const probeChecks = [
+        ...preconditions,
+        createCheck("wasmKernelProbe.runProbe", typeof resolvedWasmKernelProbe?.runProbe === "function"),
+      ];
+      if (probeChecks.some((entry) => entry.ok === false)) {
+        return buildFailureResult(actionId, {
+          preconditions: probeChecks,
+          failureKind: "precondition-failed",
+        });
+      }
+
+      const observedState = await resolvedWasmKernelProbe.runProbe(payload);
+      const requestedMainThread = observedState.mode === "main-thread" || observedState.mode === "both";
+      const requestedWorker = observedState.mode === "worker" || observedState.mode === "both";
+
+      return buildResult({
+        actionId,
+        preconditions: probeChecks,
+        observedState,
+        readinessChecks: [
+          createCheck("probe-ok", observedState.ok === true, {
+            mode: observedState.mode,
+            errors: observedState.errors || [],
+          }),
+          createCheck(
+            "main-thread-ok",
+            requestedMainThread ? observedState.mainThread?.ok === true : true,
+            {
+              requested: requestedMainThread,
+              result: observedState.mainThread || null,
+            },
+          ),
+          createCheck(
+            "main-thread-sum-match",
+            requestedMainThread ? observedState.mainThread?.matchesExpected === true : true,
+            {
+              requested: requestedMainThread,
+              result: observedState.mainThread || null,
+            },
+          ),
+          createCheck(
+            "worker-ok",
+            requestedWorker ? observedState.worker?.ok === true : true,
+            {
+              requested: requestedWorker,
+              result: observedState.worker || null,
+            },
+          ),
+          createCheck(
+            "worker-sum-match",
+            requestedWorker ? observedState.worker?.matchesExpected === true : true,
+            {
+              requested: requestedWorker,
+              result: observedState.worker || null,
+            },
+          ),
+          createCheck(
+            "cross-transport-consistency",
+            observedState.consistentAcrossTransports === null
+              ? true
+              : observedState.consistentAcrossTransports === true,
+            {
+              consistentAcrossTransports: observedState.consistentAcrossTransports,
+            },
+          ),
+        ],
+        failureKind: observedState.ok ? null : "probe-failed",
+      });
+    } catch (error) {
+      return buildFailureResult(actionId, {
+        preconditions,
+        observedState: {
+          message: String(error?.message || error),
+        },
+        failureKind: "action-failed",
+      });
+    }
+  }
+
+  async function runRuntimeDeriveWasmKernelDigest(actionId, payload = {}) {
+    const preconditions = [
+      createCheck(
+        "wasmKernelProbe.available",
+        typeof getWasmKernelProbe === "function" || typeof wasmKernelProbe?.deriveDigest === "function",
+      ),
+    ];
+    if (preconditions.some((entry) => entry.ok === false)) {
+      return buildFailureResult(actionId, {
+        preconditions,
+        failureKind: "precondition-failed",
+      });
+    }
+
+    try {
+      const resolvedWasmKernelProbe = await resolveWasmKernelProbe();
+      const digestChecks = [
+        ...preconditions,
+        createCheck("wasmKernelProbe.deriveDigest", typeof resolvedWasmKernelProbe?.deriveDigest === "function"),
+      ];
+      if (digestChecks.some((entry) => entry.ok === false)) {
+        return buildFailureResult(actionId, {
+          preconditions: digestChecks,
+          failureKind: "precondition-failed",
+        });
+      }
+
+      const observedState = await resolvedWasmKernelProbe.deriveDigest(payload);
+      const requestedMainThread = observedState.mode === "main-thread" || observedState.mode === "both";
+      const requestedWorker = observedState.mode === "worker" || observedState.mode === "both";
+
+      return buildResult({
+        actionId,
+        preconditions: digestChecks,
+        observedState,
+        readinessChecks: [
+          createCheck("digest-ok", observedState.ok === true, {
+            mode: observedState.mode,
+            errors: observedState.errors || [],
+          }),
+          createCheck(
+            "main-thread-ok",
+            requestedMainThread ? observedState.mainThread?.ok === true : true,
+            {
+              requested: requestedMainThread,
+              result: observedState.mainThread || null,
+            },
+          ),
+          createCheck(
+            "main-thread-digest-present",
+            requestedMainThread ? typeof observedState.mainThread?.digestHex === "string" && observedState.mainThread.digestHex.length === 8 : true,
+            {
+              requested: requestedMainThread,
+              result: observedState.mainThread || null,
+            },
+          ),
+          createCheck(
+            "worker-ok",
+            requestedWorker ? observedState.worker?.ok === true : true,
+            {
+              requested: requestedWorker,
+              result: observedState.worker || null,
+            },
+          ),
+          createCheck(
+            "worker-digest-present",
+            requestedWorker ? typeof observedState.worker?.digestHex === "string" && observedState.worker.digestHex.length === 8 : true,
+            {
+              requested: requestedWorker,
+              result: observedState.worker || null,
+            },
+          ),
+          createCheck(
+            "cross-transport-consistency",
+            observedState.consistentAcrossTransports === null
+              ? true
+              : observedState.consistentAcrossTransports === true,
+            {
+              consistentAcrossTransports: observedState.consistentAcrossTransports,
+            },
+          ),
+        ],
+        failureKind: observedState.ok ? null : "digest-failed",
+      });
+    } catch (error) {
+      return buildFailureResult(actionId, {
+        preconditions,
+        observedState: {
+          message: String(error?.message || error),
+        },
+        failureKind: "action-failed",
+      });
+    }
+  }
+
+  async function runRuntimeDeriveWasmKernelUnlockToken(actionId, payload = {}) {
+    const preconditions = [
+      createCheck(
+        "wasmKernelProbe.available",
+        typeof getWasmKernelProbe === "function" || typeof wasmKernelProbe?.deriveUnlockToken === "function",
+      ),
+    ];
+    if (preconditions.some((entry) => entry.ok === false)) {
+      return buildFailureResult(actionId, {
+        preconditions,
+        failureKind: "precondition-failed",
+      });
+    }
+
+    try {
+      const resolvedWasmKernelProbe = await resolveWasmKernelProbe();
+      const protectionSummary = resolveProtectionSummary();
+      const effectiveHostBinding = payload?.hostBinding && typeof payload.hostBinding === "object"
+        ? payload.hostBinding
+        : protectionSummary?.hostBinding && typeof protectionSummary.hostBinding === "object"
+          ? protectionSummary.hostBinding
+          : null;
+      const unlockChecks = [
+        ...preconditions,
+        createCheck("wasmKernelProbe.deriveUnlockToken", typeof resolvedWasmKernelProbe?.deriveUnlockToken === "function"),
+      ];
+      if (unlockChecks.some((entry) => entry.ok === false)) {
+        return buildFailureResult(actionId, {
+          preconditions: unlockChecks,
+          failureKind: "precondition-failed",
+        });
+      }
+
+      const observedState = await resolvedWasmKernelProbe.deriveUnlockToken({
+        ...payload,
+        hostBinding: effectiveHostBinding,
+      });
+      const requestedMainThread = observedState.mode === "main-thread" || observedState.mode === "both";
+      const requestedWorker = observedState.mode === "worker" || observedState.mode === "both";
+
+      return buildResult({
+        actionId,
+        preconditions: unlockChecks,
+        observedState,
+        readinessChecks: [
+          createCheck("unlock-ok", observedState.ok === true, {
+            mode: observedState.mode,
+            errors: observedState.errors || [],
+          }),
+          createCheck(
+            "main-thread-ok",
+            requestedMainThread ? observedState.mainThread?.ok === true : true,
+            {
+              requested: requestedMainThread,
+              result: observedState.mainThread || null,
+            },
+          ),
+          createCheck(
+            "main-thread-stage2-present",
+            requestedMainThread
+              ? typeof observedState.mainThread?.stage2DigestHex === "string" && observedState.mainThread.stage2DigestHex.length === 8
+              : true,
+            {
+              requested: requestedMainThread,
+              result: observedState.mainThread || null,
+            },
+          ),
+          createCheck(
+            "main-thread-unlock-token-present",
+            requestedMainThread
+              ? typeof observedState.mainThread?.unlockTokenHex === "string" && observedState.mainThread.unlockTokenHex.length === 8
+              : true,
+            {
+              requested: requestedMainThread,
+              result: observedState.mainThread || null,
+            },
+          ),
+          createCheck(
+            "worker-ok",
+            requestedWorker ? observedState.worker?.ok === true : true,
+            {
+              requested: requestedWorker,
+              result: observedState.worker || null,
+            },
+          ),
+          createCheck(
+            "worker-stage2-present",
+            requestedWorker
+              ? typeof observedState.worker?.stage2DigestHex === "string" && observedState.worker.stage2DigestHex.length === 8
+              : true,
+            {
+              requested: requestedWorker,
+              result: observedState.worker || null,
+            },
+          ),
+          createCheck(
+            "worker-unlock-token-present",
+            requestedWorker
+              ? typeof observedState.worker?.unlockTokenHex === "string" && observedState.worker.unlockTokenHex.length === 8
+              : true,
+            {
+              requested: requestedWorker,
+              result: observedState.worker || null,
+            },
+          ),
+          createCheck(
+            "cross-transport-consistency",
+            observedState.consistentAcrossTransports === null
+              ? true
+              : observedState.consistentAcrossTransports === true,
+            {
+              consistentAcrossTransports: observedState.consistentAcrossTransports,
+            },
+          ),
+        ],
+        failureKind: observedState.ok ? null : "unlock-failed",
+      });
+    } catch (error) {
+      return buildFailureResult(actionId, {
+        preconditions,
+        observedState: {
+          message: String(error?.message || error),
+        },
+        failureKind: "action-failed",
+      });
+    }
+  }
+
   async function runHostAction(actionId, payload = {}) {
     const descriptor = getHostActionDescriptor(actionId, {
       bundleRuntime,
@@ -3213,35 +3550,41 @@ export function createHostActionRunner({
     }
 
     switch (actionId) {
-      case "preferences.openPane":
+      case HOST_ACTION_IDS.preferencesOpenPane:
         return await runPreferencesOpenPane(actionId, payload);
-      case "preferences.selectTab":
+      case HOST_ACTION_IDS.preferencesSelectTab:
         return await runPreferencesSelectTab(actionId, payload);
-      case "preferences.setCheckbox":
+      case HOST_ACTION_IDS.preferencesSetCheckbox:
         return await runPreferenceControlAction(actionId, payload, "checkbox");
-      case "preferences.setTextbox":
+      case HOST_ACTION_IDS.preferencesSetTextbox:
         return await runPreferenceControlAction(actionId, payload, "textbox");
-      case "preferences.selectMenulist":
+      case HOST_ACTION_IDS.preferencesSelectMenulist:
         return await runPreferenceControlAction(actionId, payload, "menulist");
-      case "contextPane.setOpen":
+      case HOST_ACTION_IDS.contextPaneSetOpen:
         return await runContextPaneSetOpen(actionId, payload);
-      case "itemPane.selectPane":
+      case HOST_ACTION_IDS.itemPaneSelectPane:
         return await runItemPaneSelectPane(actionId, payload);
-      case "contextPane.selectPane":
+      case HOST_ACTION_IDS.contextPaneSelectPane:
         return await runContextPaneSelectPane(actionId, payload);
-      case "reader.open":
+      case HOST_ACTION_IDS.readerOpen:
         return await runReaderOpen(actionId, payload);
-      case "reader.contextPane.setOpen":
+      case HOST_ACTION_IDS.readerContextPaneSetOpen:
         return await runReaderContextPaneSetOpen(actionId, payload);
-      case "reader.toolbar.triggerButton":
+      case HOST_ACTION_IDS.readerToolbarTriggerButton:
         return await runReaderToolbarTriggerButton(actionId, payload);
-      case "reader.sidebar.selectView":
+      case HOST_ACTION_IDS.readerSidebarSelectView:
         return await runReaderSidebarSelectView(actionId, payload);
-      case "menu.show":
+      case HOST_ACTION_IDS.menuShow:
         return await runMenuShow(actionId, payload);
-      case "menu.trigger":
+      case HOST_ACTION_IDS.menuTrigger:
         return await runMenuTrigger(actionId, payload);
-      case "window.openReactDemo":
+      case HOST_ACTION_IDS.runtimeProbeWasmKernel:
+        return await runRuntimeProbeWasmKernel(actionId, payload);
+      case HOST_ACTION_IDS.runtimeDeriveWasmKernelDigest:
+        return await runRuntimeDeriveWasmKernelDigest(actionId, payload);
+      case HOST_ACTION_IDS.runtimeDeriveWasmKernelUnlockToken:
+        return await runRuntimeDeriveWasmKernelUnlockToken(actionId, payload);
+      case HOST_ACTION_IDS.windowOpenReactDemo:
         return await runWindowOpenReactDemo(actionId, payload);
       default:
         return buildFailureResult(actionId, {

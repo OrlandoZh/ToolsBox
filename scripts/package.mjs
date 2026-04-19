@@ -5,8 +5,12 @@ import { fileURLToPath } from "node:url";
 import {
   BUILD_MODULE_ID_MODE_ANONYMIZED,
   BUILD_MODULE_ID_MODE_ENV,
+  BUILD_PREFERENCE_BINDING_MODE_BRIDGE,
+  BUILD_PREFERENCE_BINDING_MODE_ENV,
   BUILD_SEMANTIC_SCRUB_ENV,
   BUILD_SEMANTIC_SCRUB_PROTECTED,
+  BUILD_STATIC_SURFACE_MODE_ENV,
+  BUILD_STATIC_SURFACE_MODE_SCRUB,
 } from "./build.mjs";
 import { withBuildLock } from "./build-lock.mjs";
 import {
@@ -32,6 +36,9 @@ import {
   SHIELDED_PACKAGE_VARIANT,
   SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT,
   SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT,
+  SHIELDED_PREF_BRIDGE_PACKAGE_VARIANT,
+  SHIELDED_SURFACE_SCRUB_PACKAGE_VARIANT,
+  SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT,
   protectBuildBundle,
 } from "./package-protection-lib.mjs";
 import {
@@ -76,6 +83,9 @@ export function parsePackageArgs(argv = process.argv.slice(2)) {
     jsConfuserString: false,
     jsConfuserToolEntry: null,
     jsConfuserToolPath: null,
+    prefBridge: false,
+    surfaceScrub: false,
+    surfaceScrubWasmDigest: false,
     shieldBundle: false,
     outputSuffix: "",
     writeReleaseMetadata: true,
@@ -102,6 +112,24 @@ export function parsePackageArgs(argv = process.argv.slice(2)) {
         break;
       case "--jsconfuser-string":
         options.jsConfuserString = true;
+        options.shieldBundle = true;
+        options.encryptBundle = true;
+        break;
+      case "--pref-bridge":
+        options.prefBridge = true;
+        options.shieldBundle = true;
+        options.encryptBundle = true;
+        break;
+      case "--surface-scrub":
+        options.surfaceScrub = true;
+        options.prefBridge = true;
+        options.shieldBundle = true;
+        options.encryptBundle = true;
+        break;
+      case "--surface-scrub-wasm-digest":
+        options.surfaceScrubWasmDigest = true;
+        options.surfaceScrub = true;
+        options.prefBridge = true;
         options.shieldBundle = true;
         options.encryptBundle = true;
         break;
@@ -158,6 +186,26 @@ export function parsePackageArgs(argv = process.argv.slice(2)) {
     });
   }
 
+  if (options.prefBridge && options.descriptorBind) {
+    throw createScriptError("args", "--pref-bridge cannot be combined with --descriptor-bind", {
+      failedStage: "parse-args",
+      details: {
+        prefBridge: true,
+        descriptorBind: true,
+      },
+    });
+  }
+
+  if (options.prefBridge && options.jsConfuserString) {
+    throw createScriptError("args", "--pref-bridge cannot be combined with --jsconfuser-string", {
+      failedStage: "parse-args",
+      details: {
+        prefBridge: true,
+        jsConfuserString: true,
+      },
+    });
+  }
+
   if (!options.jsConfuserString && (options.jsConfuserToolPath || options.jsConfuserToolEntry)) {
     throw createScriptError("args", "--jsconfuser-tool-path/--jsconfuser-tool-entry require --jsconfuser-string", {
       failedStage: "parse-args",
@@ -171,9 +219,15 @@ export function parsePackageArgs(argv = process.argv.slice(2)) {
   if (options.shieldBundle && !options.outputSuffix) {
     options.outputSuffix = options.descriptorBind
       ? SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT
-      : options.jsConfuserString
-        ? SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT
-        : SHIELDED_PACKAGE_VARIANT;
+      : options.surfaceScrubWasmDigest
+        ? SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT
+        : options.surfaceScrub
+          ? SHIELDED_SURFACE_SCRUB_PACKAGE_VARIANT
+          : options.prefBridge
+            ? SHIELDED_PREF_BRIDGE_PACKAGE_VARIANT
+            : options.jsConfuserString
+              ? SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT
+              : SHIELDED_PACKAGE_VARIANT;
   }
 
   if (!options.outputSuffix && options.encryptBundle) {
@@ -200,6 +254,15 @@ export function resolvePackageProtectedVariant(options = {}) {
   if (options.descriptorBind) {
     return SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT;
   }
+  if (options.surfaceScrubWasmDigest) {
+    return SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT;
+  }
+  if (options.surfaceScrub) {
+    return SHIELDED_SURFACE_SCRUB_PACKAGE_VARIANT;
+  }
+  if (options.prefBridge) {
+    return SHIELDED_PREF_BRIDGE_PACKAGE_VARIANT;
+  }
   if (options.jsConfuserString) {
     return SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT;
   }
@@ -218,10 +281,17 @@ function buildOutputName(config, options = {}) {
 
 export function resolvePackageBuildEnv(options = {}) {
   if (options.encryptBundle || options.shieldBundle || options.outputSuffix) {
-    return {
+    const env = {
       [BUILD_MODULE_ID_MODE_ENV]: BUILD_MODULE_ID_MODE_ANONYMIZED,
       [BUILD_SEMANTIC_SCRUB_ENV]: BUILD_SEMANTIC_SCRUB_PROTECTED,
     };
+    if (options.prefBridge) {
+      env[BUILD_PREFERENCE_BINDING_MODE_ENV] = BUILD_PREFERENCE_BINDING_MODE_BRIDGE;
+    }
+    if (options.surfaceScrub) {
+      env[BUILD_STATIC_SURFACE_MODE_ENV] = BUILD_STATIC_SURFACE_MODE_SCRUB;
+    }
+    return env;
   }
 
   return {};

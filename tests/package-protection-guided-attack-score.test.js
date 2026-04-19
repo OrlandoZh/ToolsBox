@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, it, assert } from "./test-framework.js";
 import {
+  buildPackageProtectionGuidedAttackProfileKey,
   parsePackageProtectionGuidedAttackScoreArgs,
   recordPackageProtectionGuidedAttack,
 } from "../scripts/package-protection-guided-attack-score.mjs";
@@ -80,6 +81,18 @@ function writeSmokeAggregate(projectRoot, reports) {
 }
 
 describe("Package Protection Guided Attack Score", () => {
+  it("should build a stable profile key from the attacker profile", () => {
+    const profileKey = buildPackageProtectionGuidedAttackProfileKey({
+      attackerTier: "A1",
+      aiTier: "M1",
+      attackMethod: "static-only",
+      timeBucket: "<10m",
+      roundMode: "single-pass",
+    });
+
+    assert.equal(profileKey, "a1__m1__static-only__single-pass__lt10m");
+  });
+
   it("should parse required args and repeated evidence files", () => {
     const options = parsePackageProtectionGuidedAttackScoreArgs([
       "--variant", "shielded",
@@ -197,6 +210,9 @@ describe("Package Protection Guided Attack Score", () => {
         "utf-8",
       ));
 
+      assert.ok(paths.reportPath.endsWith("shielded-stable-a2__m3__static-reference__multi-round__30-120m.json"));
+      assert.equal(paths.aliasUpdated, true);
+      assert.equal(report.profileKey, "a2__m3__static-reference__multi-round__30-120m");
       assert.equal(report.guidedAttack.rating, "high-level-architecture");
       assert.equal(report.guidedAttack.resultTier, "R1");
       assert.equal(report.guidedAttack.attackerTier, "A2");
@@ -211,11 +227,88 @@ describe("Package Protection Guided Attack Score", () => {
       assert.equal(report.guidedAttack.evidenceFiles.length, 2);
       assert.equal(storedReport.guidedAttack.notes, "Requires reference project and multi-round prompting");
       assert.equal(aggregate.reports.length, 1);
+      assert.equal(aggregate.reports[0].profileKey, "a2__m3__static-reference__multi-round__30-120m");
       assert.ok(markdown.includes("attackMethod"));
       assert.ok(markdown.includes("roundMode"));
+      assert.ok(markdown.includes("profileKey"));
       assert.ok(markdown.includes("stronger-than-single-pass-llm"));
       assert.ok(markdown.includes("Recovered lifecycle facade and service assembly"));
       assert.equal(smokeAggregate.reports[0].manualScorecard.llmSinglePassResult, "parse-fail / only-loader");
+    } finally {
+      fs.rmSync(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("should preserve distinct guided-attack profiles for the same variant/channel", async () => {
+    const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "package-protection-guided-attack-multi-"));
+    const shieldedStable = buildSampleSmokeReport({
+      variant: "shielded",
+      channel: "stable",
+      webcrackInitialResult: "parse-fail / only-loader",
+      llmSinglePassResult: "high-level-architecture",
+    });
+
+    try {
+      writeSmokeAggregate(projectRoot, [shieldedStable]);
+
+      const first = await recordPackageProtectionGuidedAttack({
+        projectRootPath: projectRoot,
+        variant: "shielded",
+        channel: "stable",
+        rating: "high-level-architecture",
+        resultTier: "R1",
+        attackerTier: "A2",
+        aiTier: "M3",
+        attackMethod: "static+reference",
+        timeBucket: "30-120m",
+        roundMode: "multi-round",
+        summary: "guided multi-round review",
+        notes: "reference-assisted baseline",
+        generatedAt: "2026-04-17T19:00:00.000Z",
+      });
+      const second = await recordPackageProtectionGuidedAttack({
+        projectRootPath: projectRoot,
+        variant: "shielded",
+        channel: "stable",
+        rating: "high-level-architecture",
+        resultTier: "R1",
+        attackerTier: "A1",
+        aiTier: "M1",
+        attackMethod: "static-only",
+        timeBucket: "<10m",
+        roundMode: "single-pass",
+        summary: "single-pass static read only recovered architecture",
+        notes: "fresh-xpi subagent replay",
+        generatedAt: "2026-04-18T03:00:00.000Z",
+      });
+
+      const aggregate = JSON.parse(fs.readFileSync(
+        path.join(projectRoot, "dist", "package-protection-guided-attack.json"),
+        "utf-8",
+      ));
+      const legacyAlias = JSON.parse(fs.readFileSync(
+        path.join(projectRoot, "dist", "package-protection-guided-attack", "shielded-stable.json"),
+        "utf-8",
+      ));
+
+      assert.equal(first.paths.aliasUpdated, true);
+      assert.equal(second.paths.aliasUpdated, false);
+      assert.equal(aggregate.reports.length, 2);
+      assert.equal(aggregate.reports[0].profileKey, "a1__m1__static-only__single-pass__lt10m");
+      assert.equal(aggregate.reports[1].profileKey, "a2__m3__static-reference__multi-round__30-120m");
+      assert.equal(legacyAlias.profileKey, "a2__m3__static-reference__multi-round__30-120m");
+      assert.ok(fs.existsSync(path.join(
+        projectRoot,
+        "dist",
+        "package-protection-guided-attack",
+        "shielded-stable-a1__m1__static-only__single-pass__lt10m.json",
+      )));
+      assert.ok(fs.existsSync(path.join(
+        projectRoot,
+        "dist",
+        "package-protection-guided-attack",
+        "shielded-stable-a2__m3__static-reference__multi-round__30-120m.json",
+      )));
     } finally {
       fs.rmSync(projectRoot, { recursive: true, force: true });
     }

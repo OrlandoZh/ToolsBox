@@ -4,6 +4,7 @@ import path from "node:path";
 import { execFile, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { describe, it, assert } from "./test-framework.js";
+import { createSurfaceDescriptors as createProtectedSurfaceDescriptors } from "../src/app/surface-descriptors-protected.js";
 import {
   buildPackageZipArgs,
   parsePackageArgs,
@@ -454,6 +455,90 @@ describe("Toolchain Scripts", () => {
     }
   });
 
+  it("should build a manual pref-bridge shielded package variant without writing release metadata", () => {
+    const config = readJSON(path.join(projectRoot, "config", "addon.config.json"));
+    const distRoot = path.join(projectRoot, "dist");
+    const buildRoot = path.join(projectRoot, "build", config.addonRef);
+    const xpiName = `${config.addonRef}-${config.addonVersion}-shielded-pref-bridge.xpi`;
+    const xpiPath = path.join(distRoot, xpiName);
+    const preferencesXHTMLPath = path.join(buildRoot, "content", "preferences.xhtml");
+    const prefsJSPath = path.join(buildRoot, "prefs.js");
+    const protectedBundlePath = path.join(buildRoot, "content", "scripts", `${config.addonRef}.js`);
+    const releaseManifestPath = path.join(distRoot, "release-manifest.json");
+    const updateManifestPath = path.join(distRoot, "update.json");
+
+    removeDirIfExists(buildRoot);
+    removeIfExists(xpiPath);
+    removeIfExists(releaseManifestPath);
+    removeIfExists(updateManifestPath);
+
+    execFileSync("node", ["scripts/package.mjs", "--pref-bridge", "--skip-release-metadata"], {
+      cwd: projectRoot,
+      stdio: "pipe",
+    });
+
+    assert.ok(fs.existsSync(xpiPath));
+    assert.equal(fs.existsSync(releaseManifestPath), false);
+    assert.equal(fs.existsSync(updateManifestPath), false);
+
+    const protectedBundleSource = fs.readFileSync(protectedBundlePath, "utf-8");
+    const preferencesXHTML = fs.readFileSync(preferencesXHTMLPath, "utf-8");
+    const prefsJS = fs.readFileSync(prefsJSPath, "utf-8");
+    const protectedDescriptors = createProtectedSurfaceDescriptors(config);
+    assert.ok(protectedBundleSource.includes("__CLEANROOM_SHIELDED_BUNDLE__"));
+    assert.equal(preferencesXHTML.includes(config.prefsPrefix), false);
+    assert.equal(prefsJS.includes(config.prefsPrefix), false);
+    assert.equal(preferencesXHTML.includes(`extensions.zotero.${protectedDescriptors.preferencePaneID}.p0`), true);
+    assert.equal(preferencesXHTML.includes(`extensions.zotero.${protectedDescriptors.preferencePaneID}.p3`), true);
+    assert.equal(prefsJS.includes(`extensions.zotero.${protectedDescriptors.preferencePaneID}.p0`), true);
+    assert.equal(prefsJS.includes(`extensions.zotero.${protectedDescriptors.preferencePaneID}.p3`), true);
+
+    removeDirIfExists(buildRoot);
+    removeIfExists(xpiPath);
+  });
+
+  it("should build a manual surface-scrub shielded package variant without writing release metadata", () => {
+    const config = readJSON(path.join(projectRoot, "config", "addon.config.json"));
+    const distRoot = path.join(projectRoot, "dist");
+    const buildRoot = path.join(projectRoot, "build", config.addonRef);
+    const xpiName = `${config.addonRef}-${config.addonVersion}-shielded-surface-scrub.xpi`;
+    const xpiPath = path.join(distRoot, xpiName);
+    const bootstrapPath = path.join(buildRoot, "bootstrap.js");
+    const preferencesXHTMLPath = path.join(buildRoot, "content", "preferences.xhtml");
+    const prefsJSPath = path.join(buildRoot, "prefs.js");
+    const releaseManifestPath = path.join(distRoot, "release-manifest.json");
+    const updateManifestPath = path.join(distRoot, "update.json");
+
+    removeDirIfExists(buildRoot);
+    removeIfExists(xpiPath);
+    removeIfExists(releaseManifestPath);
+    removeIfExists(updateManifestPath);
+
+    execFileSync("node", ["scripts/package.mjs", "--surface-scrub", "--skip-release-metadata"], {
+      cwd: projectRoot,
+      stdio: "pipe",
+    });
+
+    assert.ok(fs.existsSync(xpiPath));
+    assert.equal(fs.existsSync(releaseManifestPath), false);
+    assert.equal(fs.existsSync(updateManifestPath), false);
+
+    const bootstrapSource = fs.readFileSync(bootstrapPath, "utf-8");
+    const preferencesXHTML = fs.readFileSync(preferencesXHTMLPath, "utf-8");
+    const prefsJS = fs.readFileSync(prefsJSPath, "utf-8");
+    const protectedDescriptors = createProtectedSurfaceDescriptors(config);
+    assert.equal(bootstrapSource.includes(config.addonRef), false);
+    assert.equal(bootstrapSource.includes(config.instanceKey), false);
+    assert.equal(bootstrapSource.includes("String.fromCharCode("), true);
+    assert.equal(preferencesXHTML.includes(config.prefsPrefix), false);
+    assert.equal(prefsJS.includes(config.prefsPrefix), false);
+    assert.equal(preferencesXHTML.includes(`extensions.zotero.${protectedDescriptors.preferencePaneID}.p0`), true);
+    assert.equal(prefsJS.includes(`extensions.zotero.${protectedDescriptors.preferencePaneID}.p0`), true);
+
+    removeDirIfExists(buildRoot);
+    removeIfExists(xpiPath);
+  });
+
   it("should keep protected package build env and zip exclusions scoped to custom variants", () => {
     assert.deepEqual(resolvePackageBuildEnv({}), {});
     assert.deepEqual(resolvePackageBuildEnv({ encryptBundle: true }), {
@@ -472,12 +557,32 @@ describe("Toolchain Scripts", () => {
       CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
       CLEANROOM_BUILD_SEMANTIC_SCRUB: "protected",
     });
+    assert.deepEqual(resolvePackageBuildEnv({ prefBridge: true, outputSuffix: "shielded-pref-bridge" }), {
+      CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
+      CLEANROOM_BUILD_SEMANTIC_SCRUB: "protected",
+      CLEANROOM_BUILD_PREFERENCE_BINDING_MODE: "bridge",
+    });
+    assert.deepEqual(resolvePackageBuildEnv({ surfaceScrub: true, prefBridge: true, outputSuffix: "shielded-surface-scrub" }), {
+      CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
+      CLEANROOM_BUILD_SEMANTIC_SCRUB: "protected",
+      CLEANROOM_BUILD_PREFERENCE_BINDING_MODE: "bridge",
+      CLEANROOM_BUILD_STATIC_SURFACE_MODE: "scrub",
+    });
+    assert.deepEqual(resolvePackageBuildEnv({ surfaceScrubWasmDigest: true, surfaceScrub: true, prefBridge: true, outputSuffix: "shielded-surface-scrub-wasm-digest" }), {
+      CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
+      CLEANROOM_BUILD_SEMANTIC_SCRUB: "protected",
+      CLEANROOM_BUILD_PREFERENCE_BINDING_MODE: "bridge",
+      CLEANROOM_BUILD_STATIC_SURFACE_MODE: "scrub",
+    });
 
     assert.deepEqual(resolvePackageZipExcludePatterns({}), []);
     assert.deepEqual(resolvePackageZipExcludePatterns({ encryptBundle: true }), ["build-report.json"]);
     assert.deepEqual(resolvePackageZipExcludePatterns({ shieldBundle: true }), ["build-report.json"]);
     assert.deepEqual(resolvePackageZipExcludePatterns({ descriptorBind: true, outputSuffix: "shielded-descriptor-bind" }), ["build-report.json"]);
     assert.deepEqual(resolvePackageZipExcludePatterns({ jsConfuserString: true, outputSuffix: "shielded-jsconfuser-string" }), ["build-report.json"]);
+    assert.deepEqual(resolvePackageZipExcludePatterns({ prefBridge: true, outputSuffix: "shielded-pref-bridge" }), ["build-report.json"]);
+    assert.deepEqual(resolvePackageZipExcludePatterns({ surfaceScrub: true, outputSuffix: "shielded-surface-scrub" }), ["build-report.json"]);
+    assert.deepEqual(resolvePackageZipExcludePatterns({ surfaceScrubWasmDigest: true, outputSuffix: "shielded-surface-scrub-wasm-digest" }), ["build-report.json"]);
 
     assert.deepEqual(buildPackageZipArgs("/tmp/demo.xpi", {}), ["-r", "/tmp/demo.xpi", "."]);
     assert.deepEqual(
@@ -505,6 +610,27 @@ describe("Toolchain Scripts", () => {
     assert.equal(jsConfuserArgs.outputSuffix, "shielded-jsconfuser-string");
     assert.equal(jsConfuserArgs.jsConfuserToolPath, "/tmp/js-confuser");
     assert.equal(jsConfuserArgs.jsConfuserToolEntry, "dist/index.js");
+
+    const prefBridgeArgs = parsePackageArgs(["--pref-bridge", "--skip-release-metadata"]);
+    assert.equal(prefBridgeArgs.encryptBundle, true);
+    assert.equal(prefBridgeArgs.shieldBundle, true);
+    assert.equal(prefBridgeArgs.prefBridge, true);
+    assert.equal(prefBridgeArgs.outputSuffix, "shielded-pref-bridge");
+
+    const surfaceScrubArgs = parsePackageArgs(["--surface-scrub", "--skip-release-metadata"]);
+    assert.equal(surfaceScrubArgs.encryptBundle, true);
+    assert.equal(surfaceScrubArgs.shieldBundle, true);
+    assert.equal(surfaceScrubArgs.prefBridge, true);
+    assert.equal(surfaceScrubArgs.surfaceScrub, true);
+    assert.equal(surfaceScrubArgs.outputSuffix, "shielded-surface-scrub");
+
+    const wasmDigestArgs = parsePackageArgs(["--surface-scrub-wasm-digest", "--skip-release-metadata"]);
+    assert.equal(wasmDigestArgs.encryptBundle, true);
+    assert.equal(wasmDigestArgs.shieldBundle, true);
+    assert.equal(wasmDigestArgs.prefBridge, true);
+    assert.equal(wasmDigestArgs.surfaceScrub, true);
+    assert.equal(wasmDigestArgs.surfaceScrubWasmDigest, true);
+    assert.equal(wasmDigestArgs.outputSuffix, "shielded-surface-scrub-wasm-digest");
 
     assert.deepEqual(resolvePackageJSConfuserToolOptions({
       jsConfuserToolPath: "/tmp/js-confuser",
@@ -836,23 +962,40 @@ describe("Toolchain Scripts", () => {
     assert.equal(packageJSON.scripts["package:shielded"], "node scripts/package.mjs --shield-bundle --skip-release-metadata");
     assert.equal(packageJSON.scripts["package:shielded:descriptor-bind"], "node scripts/package.mjs --descriptor-bind --skip-release-metadata");
     assert.equal(packageJSON.scripts["package:shielded:jsconfuser:string"], "node scripts/package.mjs --jsconfuser-string --skip-release-metadata");
+    assert.equal(packageJSON.scripts["package:shielded:pref-bridge"], "node scripts/package.mjs --pref-bridge --skip-release-metadata");
+    assert.equal(packageJSON.scripts["package:shielded:surface-scrub"], "node scripts/package.mjs --surface-scrub --skip-release-metadata");
+    assert.equal(packageJSON.scripts["package:shielded:surface-scrub:wasm:digest"], "node scripts/package.mjs --surface-scrub-wasm-digest --skip-release-metadata");
     assert.equal(packageJSON.scripts["package:protection:smoke"], "node scripts/package-protection-smoke.mjs");
     assert.equal(packageJSON.scripts["package:protection:smoke:plain"], "node scripts/package-protection-smoke.mjs --variant plain");
     assert.equal(packageJSON.scripts["package:protection:smoke:encrypted"], "node scripts/package-protection-smoke.mjs --variant encrypted");
     assert.equal(packageJSON.scripts["package:protection:smoke:shielded"], "node scripts/package-protection-smoke.mjs --variant shielded");
     assert.equal(packageJSON.scripts["package:protection:smoke:shielded:descriptor-bind"], "node scripts/package-protection-smoke.mjs --variant shielded-descriptor-bind");
     assert.equal(packageJSON.scripts["package:protection:smoke:shielded:jsconfuser:string"], "node scripts/package-protection-smoke.mjs --variant shielded-jsconfuser-string");
+    assert.equal(packageJSON.scripts["package:protection:smoke:shielded:pref-bridge"], "node scripts/package-protection-smoke.mjs --variant shielded-pref-bridge");
+    assert.equal(packageJSON.scripts["package:protection:smoke:shielded:surface-scrub"], "node scripts/package-protection-smoke.mjs --variant shielded-surface-scrub");
+    assert.equal(packageJSON.scripts["package:protection:perf"], "node scripts/package-protection-performance-report.mjs");
     assert.equal(packageJSON.scripts["package:protection:webcrack"], "node scripts/package-protection-webcrack-audit.mjs");
     assert.equal(packageJSON.scripts["package:protection:webcrack:shielded"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded");
     assert.equal(packageJSON.scripts["package:protection:webcrack:shielded:descriptor-bind"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded-descriptor-bind");
     assert.equal(packageJSON.scripts["package:protection:webcrack:shielded:jsconfuser:string"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded-jsconfuser-string");
+    assert.equal(packageJSON.scripts["package:protection:webcrack:shielded:pref-bridge"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded-pref-bridge");
+    assert.equal(packageJSON.scripts["package:protection:webcrack:shielded:surface-scrub"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded-surface-scrub");
     assert.equal(packageJSON.scripts["package:protection:webcrack:score"], "node scripts/package-protection-webcrack-score.mjs");
     assert.equal(packageJSON.scripts["package:protection:audit"], "node scripts/package-protection-anchor-audit.mjs");
     assert.equal(packageJSON.scripts["package:protection:audit:descriptor-bind"], "node scripts/package-protection-anchor-audit.mjs --include-descriptor-bind");
     assert.equal(packageJSON.scripts["package:protection:audit:jsconfuser:string"], "node scripts/package-protection-anchor-audit.mjs --include-jsconfuser-string");
+    assert.equal(packageJSON.scripts["package:protection:audit:pref-bridge"], "node scripts/package-protection-anchor-audit.mjs --include-pref-bridge");
+    assert.equal(packageJSON.scripts["package:protection:audit:surface-scrub"], "node scripts/package-protection-anchor-audit.mjs --include-surface-scrub");
+    assert.equal(packageJSON.scripts["package:protection:attack"], "node scripts/package-protection-attack-report.mjs");
+    assert.equal(packageJSON.scripts["package:protection:attack:plan"], "node scripts/package-protection-guided-attack-plan.mjs");
+    assert.equal(packageJSON.scripts["package:protection:review"], "node scripts/package-protection-retained-review.mjs");
+    assert.equal(packageJSON.scripts["package:protection:matrix"], "node scripts/package-protection-matrix-report.mjs");
+    assert.equal(packageJSON.scripts["package:protection:wasm:admission"], "node scripts/package-protection-wasm-admission.mjs");
     assert.equal(packageJSON.scripts["package:protection:compare"], "node scripts/package-protection-experiment-compare.mjs");
     assert.equal(packageJSON.scripts["package:protection:compare:descriptor-bind"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-descriptor-bind");
     assert.equal(packageJSON.scripts["package:protection:compare:jsconfuser:string"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-jsconfuser-string");
+    assert.equal(packageJSON.scripts["package:protection:compare:pref-bridge"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-pref-bridge");
+    assert.equal(packageJSON.scripts["package:protection:compare:surface-scrub"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-surface-scrub");
     assert.equal(packageJSON.scripts["package:protection:jsconfuser:bootstrap"], "node scripts/package-protection-jsconfuser-bootstrap.mjs");
     assert.equal(packageJSON.scripts["package:protection:jsconfuser:preflight"], "node scripts/package-protection-jsconfuser-preflight.mjs");
     assert.equal(packageJSON.scripts["package:protection:jsconfuser:string:preflight"], "node scripts/package-protection-jsconfuser-preflight.mjs --profile targeted-string-concealing");
@@ -861,6 +1004,8 @@ describe("Toolchain Scripts", () => {
     assert.equal(packageJSON.scripts["package:protection:inner:audit:shielded"], "node scripts/package-protection-inner-audit.mjs --variant shielded");
     assert.equal(packageJSON.scripts["package:protection:inner:audit:descriptor-bind"], "node scripts/package-protection-inner-audit.mjs --variant shielded-descriptor-bind");
     assert.equal(packageJSON.scripts["package:protection:inner:audit:jsconfuser:string"], "node scripts/package-protection-inner-audit.mjs --variant shielded-jsconfuser-string");
+    assert.equal(packageJSON.scripts["package:protection:inner:audit:pref-bridge"], "node scripts/package-protection-inner-audit.mjs --variant shielded-pref-bridge");
+    assert.equal(packageJSON.scripts["package:protection:inner:audit:surface-scrub"], "node scripts/package-protection-inner-audit.mjs --variant shielded-surface-scrub");
     assert.equal(packageJSON.scripts["package:protection:score"], "node scripts/package-protection-manual-score.mjs");
     assert.equal(packageJSON.scripts["package:protection:score:llm"], "node scripts/package-protection-llm-score.mjs");
     assert.equal(packageJSON.scripts["package:protection:score:guided"], "node scripts/package-protection-guided-attack-score.mjs");
@@ -1172,8 +1317,17 @@ describe("Toolchain Scripts", () => {
     assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "package-protection-webcrack-score.mjs")));
     assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "package-protection-manual-score.mjs")));
     assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "package-protection-verdict.mjs")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "package-protection-wasm-admission.mjs")));
     assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "zotero-runner-lib.mjs")));
     assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "zotero-agent-runtime-lib.mjs")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "addon-static", "content", "lib", "w", "probe.wasm")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "addon-static", "content", "lib", "w", "wasm-probe-worker.js")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "src", "services", "wasm-loader.js")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "src", "services", "wasm-worker.js")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "src", "features", "wasm-kernel-probe.js")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "wasm-kernel-smoke.mjs")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "wasm-kernel-performance-report.mjs")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "wasm-kernel-disabled-contract-report.mjs")));
     assert.ok(fs.existsSync(path.join(exportRoot, "LEGAL_RISK_CHECKLIST.md")));
     assert.ok(fs.existsSync(path.join(exportRoot, "CODE_PROVENANCE.md")));
     assert.ok(fs.existsSync(path.join(exportRoot, "THIRD_PARTY_NOTICES.md")));
@@ -1185,29 +1339,49 @@ describe("Toolchain Scripts", () => {
     assert.ok(exportManifest.includedPaths.includes("CODE_PROVENANCE.md"));
     assert.ok(exportManifest.includedPaths.includes("THIRD_PARTY_NOTICES.md"));
     assert.ok(exportManifest.includedPaths.includes("COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md"));
+    assert.equal(exportManifest.optionalBundles.some((entry) => entry.id === "wasm-kernel"), true);
+    assert.equal(exportManifest.optionalBundles.find((entry) => entry.id === "wasm-kernel")?.implementationStatus, "planned");
+    assert.equal(exportManifest.optionalBundles.find((entry) => entry.id === "wasm-kernel")?.enabled, false);
     assert.equal(exportPackage.scripts.build, "node scripts/build.mjs");
     assert.equal(exportPackage.scripts["build:react-ui"], "node scripts/build-react-ui.mjs");
     assert.equal(exportPackage.scripts["package:encrypted"], "node scripts/package.mjs --encrypt-bundle --skip-release-metadata");
     assert.equal(exportPackage.scripts["package:shielded"], "node scripts/package.mjs --shield-bundle --skip-release-metadata");
     assert.equal(exportPackage.scripts["package:shielded:descriptor-bind"], "node scripts/package.mjs --descriptor-bind --skip-release-metadata");
     assert.equal(exportPackage.scripts["package:shielded:jsconfuser:string"], "node scripts/package.mjs --jsconfuser-string --skip-release-metadata");
+    assert.equal(exportPackage.scripts["package:shielded:pref-bridge"], "node scripts/package.mjs --pref-bridge --skip-release-metadata");
+    assert.equal(exportPackage.scripts["package:shielded:surface-scrub"], "node scripts/package.mjs --surface-scrub --skip-release-metadata");
+    assert.equal(exportPackage.scripts["package:shielded:surface-scrub:wasm:digest"], "node scripts/package.mjs --surface-scrub-wasm-digest --skip-release-metadata");
     assert.equal(exportPackage.scripts["package:protection:smoke"], "node scripts/package-protection-smoke.mjs");
     assert.equal(exportPackage.scripts["package:protection:smoke:plain"], "node scripts/package-protection-smoke.mjs --variant plain");
     assert.equal(exportPackage.scripts["package:protection:smoke:encrypted"], "node scripts/package-protection-smoke.mjs --variant encrypted");
     assert.equal(exportPackage.scripts["package:protection:smoke:shielded"], "node scripts/package-protection-smoke.mjs --variant shielded");
     assert.equal(exportPackage.scripts["package:protection:smoke:shielded:descriptor-bind"], "node scripts/package-protection-smoke.mjs --variant shielded-descriptor-bind");
     assert.equal(exportPackage.scripts["package:protection:smoke:shielded:jsconfuser:string"], "node scripts/package-protection-smoke.mjs --variant shielded-jsconfuser-string");
+    assert.equal(exportPackage.scripts["package:protection:smoke:shielded:pref-bridge"], "node scripts/package-protection-smoke.mjs --variant shielded-pref-bridge");
+    assert.equal(exportPackage.scripts["package:protection:smoke:shielded:surface-scrub"], "node scripts/package-protection-smoke.mjs --variant shielded-surface-scrub");
+    assert.equal(exportPackage.scripts["package:protection:perf"], "node scripts/package-protection-performance-report.mjs");
     assert.equal(exportPackage.scripts["package:protection:webcrack"], "node scripts/package-protection-webcrack-audit.mjs");
     assert.equal(exportPackage.scripts["package:protection:webcrack:shielded"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded");
     assert.equal(exportPackage.scripts["package:protection:webcrack:shielded:descriptor-bind"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded-descriptor-bind");
     assert.equal(exportPackage.scripts["package:protection:webcrack:shielded:jsconfuser:string"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded-jsconfuser-string");
+    assert.equal(exportPackage.scripts["package:protection:webcrack:shielded:pref-bridge"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded-pref-bridge");
+    assert.equal(exportPackage.scripts["package:protection:webcrack:shielded:surface-scrub"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded-surface-scrub");
     assert.equal(exportPackage.scripts["package:protection:webcrack:score"], "node scripts/package-protection-webcrack-score.mjs");
     assert.equal(exportPackage.scripts["package:protection:audit"], "node scripts/package-protection-anchor-audit.mjs");
     assert.equal(exportPackage.scripts["package:protection:audit:descriptor-bind"], "node scripts/package-protection-anchor-audit.mjs --include-descriptor-bind");
     assert.equal(exportPackage.scripts["package:protection:audit:jsconfuser:string"], "node scripts/package-protection-anchor-audit.mjs --include-jsconfuser-string");
+    assert.equal(exportPackage.scripts["package:protection:audit:pref-bridge"], "node scripts/package-protection-anchor-audit.mjs --include-pref-bridge");
+    assert.equal(exportPackage.scripts["package:protection:audit:surface-scrub"], "node scripts/package-protection-anchor-audit.mjs --include-surface-scrub");
+    assert.equal(exportPackage.scripts["package:protection:attack"], "node scripts/package-protection-attack-report.mjs");
+    assert.equal(exportPackage.scripts["package:protection:attack:plan"], "node scripts/package-protection-guided-attack-plan.mjs");
+    assert.equal(exportPackage.scripts["package:protection:review"], "node scripts/package-protection-retained-review.mjs");
+    assert.equal(exportPackage.scripts["package:protection:matrix"], "node scripts/package-protection-matrix-report.mjs");
+    assert.equal(exportPackage.scripts["package:protection:wasm:admission"], "node scripts/package-protection-wasm-admission.mjs");
     assert.equal(exportPackage.scripts["package:protection:compare"], "node scripts/package-protection-experiment-compare.mjs");
     assert.equal(exportPackage.scripts["package:protection:compare:descriptor-bind"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-descriptor-bind");
     assert.equal(exportPackage.scripts["package:protection:compare:jsconfuser:string"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-jsconfuser-string");
+    assert.equal(exportPackage.scripts["package:protection:compare:pref-bridge"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-pref-bridge");
+    assert.equal(exportPackage.scripts["package:protection:compare:surface-scrub"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-surface-scrub");
     assert.equal(exportPackage.scripts["package:protection:jsconfuser:bootstrap"], "node scripts/package-protection-jsconfuser-bootstrap.mjs");
     assert.equal(exportPackage.scripts["package:protection:jsconfuser:preflight"], "node scripts/package-protection-jsconfuser-preflight.mjs");
     assert.equal(exportPackage.scripts["package:protection:jsconfuser:string:preflight"], "node scripts/package-protection-jsconfuser-preflight.mjs --profile targeted-string-concealing");
@@ -1216,10 +1390,16 @@ describe("Toolchain Scripts", () => {
     assert.equal(exportPackage.scripts["package:protection:inner:audit:shielded"], "node scripts/package-protection-inner-audit.mjs --variant shielded");
     assert.equal(exportPackage.scripts["package:protection:inner:audit:descriptor-bind"], "node scripts/package-protection-inner-audit.mjs --variant shielded-descriptor-bind");
     assert.equal(exportPackage.scripts["package:protection:inner:audit:jsconfuser:string"], "node scripts/package-protection-inner-audit.mjs --variant shielded-jsconfuser-string");
+    assert.equal(exportPackage.scripts["package:protection:inner:audit:pref-bridge"], "node scripts/package-protection-inner-audit.mjs --variant shielded-pref-bridge");
+    assert.equal(exportPackage.scripts["package:protection:inner:audit:surface-scrub"], "node scripts/package-protection-inner-audit.mjs --variant shielded-surface-scrub");
     assert.equal(exportPackage.scripts["package:protection:score"], "node scripts/package-protection-manual-score.mjs");
     assert.equal(exportPackage.scripts["package:protection:score:llm"], "node scripts/package-protection-llm-score.mjs");
     assert.equal(exportPackage.scripts["package:protection:score:guided"], "node scripts/package-protection-guided-attack-score.mjs");
     assert.equal(exportPackage.scripts["package:protection:verdict"], "node scripts/package-protection-verdict.mjs");
+    assert.equal(exportPackage.scripts["wasm:kernel:smoke"], "node scripts/wasm-kernel-smoke.mjs");
+    assert.equal(exportPackage.scripts["wasm:kernel:perf"], "node scripts/wasm-kernel-performance-report.mjs");
+    assert.equal(exportPackage.scripts["wasm:kernel:disabled-contract"], "node scripts/wasm-kernel-disabled-contract-report.mjs");
+    assert.equal(exportPackage.scripts["wasm:kernel:matrix"], "node scripts/wasm-kernel-matrix-report.mjs");
     assert.equal(exportPackage.devDependencies.esbuild, "^0.21.5");
     assert.equal(exportPackage.devDependencies["javascript-obfuscator"], "^5.4.1");
     assert.equal(exportPackage.devDependencies.react, "^18.3.1");
@@ -1230,27 +1410,51 @@ describe("Toolchain Scripts", () => {
     assert.ok(exportReadme.includes("中国法商业交付骨架"));
     assert.ok(exportReadme.includes("UNLICENSED"));
     assert.ok(exportReadme.includes("build:react-ui"));
+    assert.ok(exportReadme.includes("wasm-kernel"));
+    assert.ok(exportReadme.includes("addon-static/content/lib/w/probe.wasm"));
+    assert.ok(exportReadme.includes("addon-static/content/lib/w/wasm-probe-worker.js"));
+    assert.ok(exportReadme.includes("wasm:kernel:disabled-contract"));
+    assert.ok(exportReadme.includes("wasm:kernel:matrix"));
     assert.ok(exportReadme.includes("package:encrypted"));
     assert.ok(exportReadme.includes("package:shielded"));
     assert.ok(exportReadme.includes("package:shielded:jsconfuser:string"));
+    assert.ok(exportReadme.includes("package:shielded:pref-bridge"));
+    assert.ok(exportReadme.includes("package:shielded:surface-scrub"));
+    assert.ok(exportReadme.includes("package:shielded:surface-scrub:wasm:digest"));
     assert.ok(exportReadme.includes("package:protection:smoke"));
     assert.ok(exportReadme.includes("package:protection:smoke:shielded:descriptor-bind"));
     assert.ok(exportReadme.includes("package:protection:smoke:shielded:jsconfuser:string"));
+    assert.ok(exportReadme.includes("package:protection:smoke:shielded:pref-bridge"));
+    assert.ok(exportReadme.includes("package:protection:smoke:shielded:surface-scrub"));
+    assert.ok(exportReadme.includes("package:protection:perf"));
     assert.ok(exportReadme.includes("package:protection:webcrack:shielded"));
     assert.ok(exportReadme.includes("package:protection:webcrack:shielded:descriptor-bind"));
     assert.ok(exportReadme.includes("package:protection:webcrack:shielded:jsconfuser:string"));
+    assert.ok(exportReadme.includes("package:protection:webcrack:shielded:pref-bridge"));
+    assert.ok(exportReadme.includes("package:protection:webcrack:shielded:surface-scrub"));
     assert.ok(exportReadme.includes("package:protection:webcrack:score"));
     assert.ok(exportReadme.includes("package:protection:audit"));
     assert.ok(exportReadme.includes("package:protection:audit:descriptor-bind"));
     assert.ok(exportReadme.includes("package:protection:audit:jsconfuser:string"));
+    assert.ok(exportReadme.includes("package:protection:audit:pref-bridge"));
+    assert.ok(exportReadme.includes("package:protection:audit:surface-scrub"));
+    assert.ok(exportReadme.includes("package:protection:attack"));
+    assert.ok(exportReadme.includes("package:protection:attack:plan"));
+    assert.ok(exportReadme.includes("package:protection:review"));
+    assert.ok(exportReadme.includes("package:protection:matrix"));
+    assert.ok(exportReadme.includes("package:protection:wasm:admission"));
     assert.ok(exportReadme.includes("package:protection:compare:descriptor-bind"));
     assert.ok(exportReadme.includes("package:protection:compare:jsconfuser:string"));
+    assert.ok(exportReadme.includes("package:protection:compare:pref-bridge"));
+    assert.ok(exportReadme.includes("package:protection:compare:surface-scrub"));
     assert.ok(exportReadme.includes("package:protection:jsconfuser:preflight"));
     assert.ok(exportReadme.includes("package:protection:jsconfuser:string:preflight"));
     assert.ok(exportReadme.includes("package:protection:lightweight:preflight"));
     assert.ok(exportReadme.includes("package:protection:inner:audit:shielded"));
     assert.ok(exportReadme.includes("package:protection:inner:audit:descriptor-bind"));
     assert.ok(exportReadme.includes("package:protection:inner:audit:jsconfuser:string"));
+    assert.ok(exportReadme.includes("package:protection:inner:audit:pref-bridge"));
+    assert.ok(exportReadme.includes("package:protection:inner:audit:surface-scrub"));
     assert.ok(exportReadme.includes("package:protection:score"));
     assert.ok(exportReadme.includes("package:protection:score:llm"));
     assert.ok(exportReadme.includes("package:protection:score:guided"));

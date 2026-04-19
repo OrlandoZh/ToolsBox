@@ -64,18 +64,27 @@
     },
     {
       "id": "optional-bundle-wave-001",
-      "summary": "Completed optional bundle baseline: keep the JS core green first, and only require bundle-local smoke when the default-disabled react-ui lane is explicitly enabled or its shell changes.",
+      "summary": "Completed optional bundle baseline: keep the JS core green first, treat react-ui as the only implemented lane, and require bundle-local smoke when the default-disabled react-ui lane or the planned wasm-kernel probe contract changes.",
       "pathMatchers": [
         "^config/optional-bundles\\.json$",
         "^docs/OPTIONAL_BUNDLES\\.md$",
-        "^scripts/(?:optional-bundles-lib|build-react-ui)\\.mjs$",
+        "^docs/WASM_(?:DEVELOPMENT_INDEX|KERNEL_PROMOTION_PLAN)\\.md$",
+        "^scripts/(?:optional-bundles-lib|build-react-ui|export-project|wasm-kernel-(?:smoke|performance-report|disabled-contract-report|matrix-report)|zotero|zotero-agent-artifacts|zotero-scenario-runner-lib)\\.mjs$",
+        "^src/app/(?:plugin|host-actions)\\.js$",
+        "^src/app/host-action-(?:catalog|ids|owner-modules|readiness-ids)(?:-protected)?\\.js$",
         "^src/app/optional-bundles\\.js$",
         "^src/features/react-ui-demo(?:/|\\.|$)",
+        "^src/features/wasm-kernel-probe(?:/|\\.|$)",
+        "^src/services/wasm-(?:loader|worker)\\.js$",
         "^src/utils/(?:react-surface-bridge|surface-window-mode)\\.js$",
         "^src/react-ui(?:/|\\.|$)",
-        "^addon-static/content/react-ui(?:/|\\.|$)",
+        "^addon-static/content/lib/r(?:/|\\.|$)",
+        "^addon-static/content/lib/w(?:/|\\.|$)",
+        "^zotero-scenarios/wasm-kernel-(?:probe|digest|unlock)\\.scenario\\.js$",
         "^tests/(?:optional-bundles-lib|build-react-ui|react-surface-bridge|surface-window-mode|react-ui-demo)\\.test\\.js$",
-        "^tests/(?:feature-composer|host-actions|toolchain|run-all)\\.test\\.js$",
+        "^tests/(?:wasm-kernel-probe|wasm-kernel-smoke|wasm-kernel-performance-report|wasm-kernel-disabled-contract-report|wasm-kernel-matrix-report|wasm-loader|wasm-worker|protected-semantic-ids|plugin)\\.test\\.js$",
+        "^tests/(?:feature-composer|host-actions|toolchain|run-all|zotero-script)\\.test\\.js$",
+        "^tests/zotero-agent-artifacts\\.test\\.js$",
         "^config/project-expansion-wave\\.json$",
         "^config/project-validation-overrides\\.json$",
         "^config/validation-domains\\.json$",
@@ -85,12 +94,14 @@
       "decision": "visual-recommended",
       "requiredChecks": [
         "继续先通过 `npm run check` 的 JS-core 主链，不让 default-disabled bundle 破坏现有 build / verify / gate。",
-        "确认 `config/optional-bundles.json`、`build:react-ui` 与导出脚手架保持同轮同步。",
-        "当 `react-ui` 被启用，或其 window shell / surface bridge / host-mounted demo / host action 改动时，至少补一轮 bundle-local build smoke。"
+        "确认 `config/optional-bundles.json`、`build:react-ui`、Wasm probe 文档索引与导出脚手架保持同轮同步。",
+        "当 `react-ui` 被启用，或其 window shell / surface bridge / host-mounted demo / host action 改动时，至少补一轮 bundle-local build smoke。",
+        "当 `wasm-kernel` 的 probe / digest / unlock 入口、checked-in `.wasm` / worker 资产、host-action bridge、protected semantic 文件、smoke/perf/disabled-contract/matrix 报告或其场景契约改动时，至少补一轮 `tests/wasm-*`；涉及运行时路径或场景契约时，再按改动命中 `npm run zotero:scenario -- --scenario \"wasm kernel probe diagnostics\"`、`npm run zotero:scenario -- --scenario \"wasm kernel digest diagnostics\"` 或 `npm run zotero:scenario -- --scenario \"wasm kernel unlock diagnostics\"` 的 bundle-local smoke。"
       ],
       "nonGoals": [
         "在 bundle 默认禁用时把 React 依赖升级成主链强依赖",
-        "在 agent-runtime / ai-service 仍为 spec-only 时伪装为已实现"
+        "在 agent-runtime / ai-service 仍为 spec-only 时伪装为已实现",
+        "把 probe-backed `wasm-kernel` 误报成 implemented bundle 或默认主线能力"
       ]
     }
   ]

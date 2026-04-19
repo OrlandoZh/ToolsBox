@@ -71,22 +71,34 @@
 4.2. 如需进一步提高自动化工具与 AI 的直读门槛，运行 `npm run package:shielded` 生成 `dist/<addonRef>-<addonVersion>-shielded.xpi`
 4.3. 如需正式对比 `plain / encrypted / shielded` 三个控制组的安装态、`packageProtection` 时序和 base64 fast path 支持，运行 `npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable`
 4.3.1. 如需对 `shielded-descriptor-bind` 做真实 Zotero runtime smoke，并回读 host binding / capability manifest overlay 状态，运行 `npm run package:protection:smoke:shielded:descriptor-bind -- --repeats 3 --channel stable`
+4.3.2. 如需对 `shielded-pref-bridge` 做真实 Zotero runtime smoke，并验证 pref bridge 是否在不增加明显体感开销的前提下压缩最终 XPI 的静态 support surface，运行 `npm run package:protection:smoke:shielded:pref-bridge -- --repeats 3 --channel stable`
+4.3.3. 如需对 `shielded-surface-scrub` 做真实 Zotero runtime smoke，并验证 `bootstrap.js` 的字面值 scrub 是否继续收缩解压后静态 surface，运行 `npm run package:protection:smoke:shielded:surface-scrub -- --repeats 3 --channel stable`
 4.4. 如需审计当前导出物 raw 表面还泄露了多少高层语义锚点，运行 `npm run package:protection:audit`
 4.4.1. 如需把 `shielded-descriptor-bind` 作为额外实验变体并入同一份 raw export 审计报告，运行 `npm run package:protection:audit:descriptor-bind`
 4.4.2. 如需把 `shielded-jsconfuser-string` 作为额外实验变体并入同一份 raw export 审计报告，运行 `npm run package:protection:audit:jsconfuser:string`；若本地自动发现 `js-confuser` 失败，优先先跑 `npm run package:protection:jsconfuser:bootstrap`
+4.4.2.1. 如需把 `shielded-pref-bridge` 作为额外实验变体并入同一份审计报告，运行 `npm run package:protection:audit:pref-bridge`
+4.4.2.2. 如需把 `shielded-surface-scrub` 作为额外实验变体并入同一份审计报告，运行 `npm run package:protection:audit:surface-scrub`
 4.4.3. 如需先把本地 `js-confuser` 工具 bootstrap 到默认可发现位置，运行 `npm run package:protection:jsconfuser:bootstrap`；默认会安装到 `dist/package-protection-tools/js-confuser`
 4.5. 如需预检 `JS-Confuser` 的 `astScrambler` 非 hostile 子集，运行 `npm run package:protection:jsconfuser:preflight`；若自动发现失败，优先先跑 `npm run package:protection:jsconfuser:bootstrap`，再考虑补 `-- --tool-path /absolute/path/to/js-confuser`
 4.6. 如需预检 `JS-Confuser` 的小范围 `stringConcealing` 候选，运行 `npm run package:protection:jsconfuser:string:preflight`；若自动发现失败，再补 `-- --tool-path /absolute/path/to/js-confuser`
 4.6.1. 如需重新验证 `lightweight-js-obfuscator` 这条更后置的 Stage 3 候选，运行 `npm run package:protection:lightweight:preflight`；脚本会先自动发现本地 checkout，只有失败时才需要补 `-- --tool-path /absolute/path/to/lightweight-js-obfuscator`
 4.7. 如需在现有 `shielded` 基础上额外叠一层 `JS-Confuser` 的 targeted `stringConcealing`，运行 `npm run package:shielded:jsconfuser:string`；若自动发现失败，优先先跑 `npm run package:protection:jsconfuser:bootstrap`
+4.7.0. 如需直接导出 `pref-bridge` 变体，运行 `npm run package:shielded:pref-bridge`
+4.7.0.1. 如需直接导出 `surface-scrub` 变体，运行 `npm run package:shielded:surface-scrub`
+4.7.0.2. 如需在 `surface-scrub` 上打开第一条 default-disabled / lazy 的 Wasm digest 候选，先运行 `npm run package:protection:wasm:admission`；只有输出 `ready-for-candidate` 时，再运行 `npm run package:shielded:surface-scrub:wasm:digest` 和 `npm run package:protection:smoke -- --variant shielded-surface-scrub-wasm-digest --repeats 3 --channel stable`
 4.7.1. 如需对这个实验变体直接做 Zotero smoke A/B，运行 `npm run package:protection:smoke:shielded:jsconfuser:string -- --repeats 3 --channel stable`；若自动发现失败，优先先跑 `npm run package:protection:jsconfuser:bootstrap`
-4.7.2. 如需 fresh 打包后直接调用本地 `webcrack` 生成自动化工件，运行 `npm run package:protection:webcrack:shielded -- --channel stable`，或对实验变体运行 `npm run package:protection:webcrack:shielded:descriptor-bind -- --channel stable`、`npm run package:protection:webcrack:shielded:jsconfuser:string -- --channel stable`
+4.7.2. 如需 fresh 打包后直接调用本地 `webcrack` 生成自动化工件，运行 `npm run package:protection:webcrack:shielded -- --channel stable`，或对实验变体运行 `npm run package:protection:webcrack:shielded:descriptor-bind -- --channel stable`、`npm run package:protection:webcrack:shielded:jsconfuser:string -- --channel stable`、`npm run package:protection:webcrack:shielded:pref-bridge -- --channel stable`、`npm run package:protection:webcrack:shielded:surface-scrub -- --channel stable`
 4.7.3. 如需把 `webcrack` 自动建议评级回填到 smoke report 的 `manualScorecard.webcrackInitialResult`，运行 `npm run package:protection:webcrack:score -- --variant shielded --channel stable`
 4.7.4. 如需在保留现有 `webcrack` 结果的前提下，只补一侧 `LLM single-pass` 评分，运行 `npm run package:protection:score:llm -- --variant shielded-jsconfuser-string --channel stable --llm "parse-fail / only-loader"`
-4.7.5. 如需把 `shielded` 基线和某个实验变体的 smoke / webcrack / audit / 手工 LLM 状态收口成一份 A/B 报告，运行 `npm run package:protection:compare:descriptor-bind -- --channel stable` 或 `npm run package:protection:compare:jsconfuser:string -- --channel stable`；当手工 LLM 仍缺失时，compare 会额外显示 `inner audit proxy` 作为 advisory 证据，但不会自动替代 manual score。当前最新保守结论是：`descriptor-bind = runtime-only`；`jsconfuser-string` 虽然 `stable` 一度显示 `hardening-win`，但 `beta` 复验落到 `leaning-same`，因此当前建议 `stop-current-candidate`
-4.7.6. 如需补一份不执行 inner payload 的离线证据，直接从 XPI 解到 inner bundle 再给出保守 `proxy LLM` 评级，运行 `npm run package:protection:inner:audit:shielded -- --channel stable`、`npm run package:protection:inner:audit:descriptor-bind -- --channel stable` 或 `npm run package:protection:inner:audit:jsconfuser:string -- --channel stable`
+4.7.5. 如需把 `shielded` 基线和某个实验变体的 smoke / webcrack / audit / 手工 LLM 状态收口成一份 A/B 报告，运行 `npm run package:protection:compare:descriptor-bind -- --channel stable`、`npm run package:protection:compare:jsconfuser:string -- --channel stable`、`npm run package:protection:compare:pref-bridge -- --channel stable` 或 `npm run package:protection:compare:surface-scrub -- --channel stable`；当手工 LLM 仍缺失时，compare 会额外显示 `inner audit proxy` 作为 advisory 证据，但不会自动替代 manual score。当前最新保守结论是：`descriptor-bind = runtime-only`；`jsconfuser-string` 必须在单轮 `LLM single-pass` 和对称 guided-attack 两侧都优于 `shielded` 才能升级为 `hardening-win`；`pref-bridge` 当前更适合作为“压缩最终 XPI 静态 support surface”的低风险候选；`surface-scrub` 当前已通过 retained-candidate 评估，适合作为继续清理 `bootstrap.js` 与 package boundary 静态字面值的低风险候选，但不直接替代默认 `shielded`
+4.7.6. 如需补一份不执行 inner payload 的离线证据，直接从 XPI 解到 inner bundle 再给出保守 `proxy LLM` 评级，运行 `npm run package:protection:inner:audit:shielded -- --channel stable`、`npm run package:protection:inner:audit:descriptor-bind -- --channel stable`、`npm run package:protection:inner:audit:jsconfuser:string -- --channel stable`、`npm run package:protection:inner:audit:pref-bridge -- --channel stable` 或 `npm run package:protection:inner:audit:surface-scrub -- --channel stable`
 4.7.7. 如需把“攻击者 + AI 组合能力”记成结构化 `guided attack` 工件，运行 `npm run package:protection:score:guided -- --variant shielded --channel stable --rating "high-level-architecture" --result-tier R1 --attacker-tier A2 --ai-tier M3 --attack-method static+reference --time-bucket 30-120m --round-mode multi-round --summary "guided attack recovered lifecycle facade"`；等级说明见 [受保护打包攻击分级](docs/PACKAGE_PROTECTION_ATTACK_GRADING.md)
-4.8. 如需一次性回填完整手工评分，运行 `npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"`
+4.7.7.1. 如需把当前 fixed-profile coverage gap 直接翻成下一步命令模板，运行 `npm run package:protection:attack:plan`；它会优先列出 `current` 候选缺的 `singlePassAutomation / guidedA2M3` 证据，再列 retained experiment review 项
+4.7.8. 如需把已有 smoke 工件整理成固定性能报告，运行 `npm run package:protection:perf -- --channel stable`；当前读法固定为：`durationMs median / p95 / max` 看体感风险，`loadSubScript + prepare` 看保护链自身额外成本
+4.7.9. 如需把当前 `current / experiment / preflight / future / paper / preplan` 候选统一收成一份矩阵，运行 `npm run package:protection:matrix`；矩阵会回读已有工件，不会重跑实验，说明见 [受保护打包实验矩阵](docs/PACKAGE_PROTECTION_EXPERIMENT_MATRIX.md)
+4.7.9.1. 如需判断 Wasm 是否可以从 `preplan` 提升为 protection experiment，运行 `npm run package:protection:wasm:admission`；它只做 advisory 汇总，不进入默认 `release / agent:gate / agent:gate:release`
+4.8. 如需一次性回填完整手工评分，运行 `npm run package:protection:score -- --variant shielded --channel stable --webcrack "parse-fail / only-loader" --llm "high-level-architecture"`
+4.8.1. `package:protection:score` / `score:llm` / `webcrack:score` 当前共用同一条 package-protection workflow lock；如果 controller 在同一进程里并发录入评分，也会按串行顺序回写 smoke aggregate
 4.9. 如需生成当前手动实验链的 advisory 结论，运行 `npm run package:protection:verdict`
 5. 在 Zotero 中通过 “Install Add-on From File” 安装 `dist/<addonRef>-<addonVersion>.xpi`
 
@@ -287,24 +299,40 @@ npm run package  # 打包：创建 .xpi 发布包
 npm run package:encrypted # 手动导出受保护 XPI 分支（默认不写 release metadata）
 npm run package:shielded # 手动导出 shielded XPI 分支（主 bundle 混淆 + loader-lite 硬化 + AES 包装）
 npm run package:shielded:jsconfuser:string # 在 shielded 基础上额外跑 targeted stringConcealing；如自动发现失败，再补 -- --jsconfuser-tool-path /absolute/path/to/js-confuser
+npm run package:shielded:pref-bridge # 导出 pref-bridge 实验变体，压缩最终 XPI 中偏好设置静态 support surface
+npm run package:shielded:surface-scrub # 导出 surface-scrub 实验变体，进一步压缩 bootstrap.js 的静态字面值 surface
+npm run package:shielded:surface-scrub:wasm:digest # 在 surface-scrub 上导出第一条 default-disabled / lazy Wasm digest 实验候选
 npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable # 手动实验 plain/encrypted/shielded 控制组的安装态与 packageProtection 报告
 npm run package:protection:smoke:shielded:descriptor-bind -- --repeats 3 --channel stable # 对 descriptor-bind 实验变体做 Zotero runtime smoke，并回读 host binding / overlay 状态
 npm run package:protection:smoke:shielded:jsconfuser:string -- --repeats 3 --channel stable # 对 stringConcealing 实验变体做 Zotero smoke A/B；如自动发现失败，再补 --jsconfuser-tool-path
+npm run package:protection:smoke:shielded:pref-bridge -- --repeats 3 --channel stable # 对 pref-bridge 变体做 Zotero smoke，并回读 decode/load 指标
+npm run package:protection:smoke:shielded:surface-scrub -- --repeats 3 --channel stable # 对 surface-scrub 变体做 Zotero smoke，并验证 bootstrap static surface 是否继续收缩
 npm run package:protection:webcrack:shielded -- --channel stable # fresh 打包 shielded 后调用本地 webcrack，生成默认首轮 + fallback loader-only 工件
 npm run package:protection:webcrack:shielded:descriptor-bind -- --channel stable # 对 descriptor-bind 实验变体生成同类 webcrack 工件
 npm run package:protection:webcrack:shielded:jsconfuser:string -- --channel stable # 对 stringConcealing 实验变体生成同类 webcrack 工件；如自动发现失败，再补 --jsconfuser-tool-path
+npm run package:protection:webcrack:shielded:pref-bridge -- --channel stable # 对 pref-bridge 实验变体生成同类 webcrack 工件
+npm run package:protection:webcrack:shielded:surface-scrub -- --channel stable # 对 surface-scrub 实验变体生成同类 webcrack 工件
 npm run package:protection:webcrack:score -- --variant shielded --channel stable # 只回填 webcrack 半边评分，LLM 半边仍待人工或 controller 补齐
 npm run package:protection:audit # 审计 plain / encrypted / shielded 三个基线变体的 raw 导出物高层语义锚点
 npm run package:protection:audit:descriptor-bind # 在同一份审计报告里额外挂入 shielded-descriptor-bind 实验变体
 npm run package:protection:audit:jsconfuser:string # 在同一份审计报告里额外挂入 shielded-jsconfuser-string 实验变体；如自动发现失败，再补 -- --jsconfuser-tool-path /absolute/path/to/js-confuser
+npm run package:protection:audit:pref-bridge # 在同一份审计报告里额外挂入 shielded-pref-bridge 实验变体
+npm run package:protection:audit:surface-scrub # 在同一份审计报告里额外挂入 shielded-surface-scrub 实验变体
 npm run package:protection:compare:descriptor-bind -- --channel stable # 把 shielded vs descriptor-bind 的 smoke/webcrack/audit 收成一份 A/B compare
 npm run package:protection:compare:jsconfuser:string -- --channel stable # 把 shielded vs jsconfuser-string 的 smoke/webcrack/audit/LLM 状态收成一份 A/B compare
+npm run package:protection:compare:pref-bridge -- --channel stable # 把 shielded vs pref-bridge 的 smoke/webcrack/audit 收成一份 A/B compare
+npm run package:protection:compare:surface-scrub -- --channel stable # 把 shielded vs surface-scrub 的 smoke/webcrack/audit 收成一份 A/B compare
 npm run package:protection:jsconfuser:bootstrap # 把 js-confuser 安装到 dist/package-protection-tools/js-confuser，供后续实验自动发现
 npm run package:protection:jsconfuser:preflight # 预检 JS-Confuser astScrambler 非 hostile 子集的兼容性/体积/语义压缩；如自动发现失败，优先先跑 bootstrap
 npm run package:protection:jsconfuser:string:preflight # 预检 JS-Confuser 小范围 stringConcealing 的兼容性/体积/语义压缩；如自动发现失败，再补 -- --tool-path /absolute/path/to/js-confuser
 npm run package:protection:lightweight:preflight # 预检 lightweight-js-obfuscator 的兼容性/体积；默认先自动发现本地 checkout，失败时再补 -- --tool-path /absolute/path/to/lightweight-js-obfuscator
+npm run package:protection:inner:audit:pref-bridge -- --channel stable # 对 pref-bridge 生成不执行 payload 的离线 inner audit 工件
+npm run package:protection:inner:audit:surface-scrub -- --channel stable # 对 surface-scrub 生成不执行 payload 的离线 inner audit 工件
 npm run package:protection:score:llm -- --variant shielded-jsconfuser-string --channel stable --llm "parse-fail / only-loader" # 只补 LLM 单轮评分，保留已有 webcrack 结果
-npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture" # 回填 shielded stable 的手工评分
+npm run package:protection:score -- --variant shielded --channel stable --webcrack "parse-fail / only-loader" --llm "high-level-architecture" # 回填 shielded stable 的手工评分
+npm run package:protection:attack:plan # 把 fixed-profile coverage gap 翻成下一步命令模板，不重跑实验
+npm run package:protection:matrix # 汇总 current / experiment / preflight / future / paper / preplan 候选，不重跑实验
+npm run package:protection:wasm:admission # 判断 Wasm digest 是否可从 preplan 提升为 protection experiment
 npm run package:protection:verdict # 生成当前受保护打包链的 advisory verdict
 npm run release:metadata # 生成 dist/update.json 与 release-manifest.json
 npm run release:preflight # 校验发布产物一致性 + 发布态 clean-room 门禁，并生成 release-preflight.json
@@ -501,10 +529,13 @@ node scripts/agent-delegation.mjs close <taskId> --message "feat: 基本实现 x
 - `agent:context` 已新增统一只读上下文层：当前会输出 `dist/agent-context.{json,md}`，汇总 stable / dynamic context、decision hints 与 drift signals；本轮已新增 `runtime-compact-v1` 只读派生视图，默认只暴露 truth/action/status/drift/evidence/artifact refs + freshness/budget，并已接入 gate、Obsidian 工作台、dashboard 与 delegation runtime prompt；`agent:context:guard` 当前继续保持 warning-only
 - `ZOTERO-HOST-POLISH-WAVE-001` 已在 `2026-04-08` 收口完成：以 `config/project-validation-surfaces.json` 与现有 host action / surface smoke 为主轴的 live interaction consistency、edge-attached geometry 与 surface-local evidence 已完成模板级闭环；`ZOTERO-DOM-CONTRACT-WAVE-001` 也已完成，在这个完成基线之上追加 route-aware DOM contract advisory，不把上一轮已完成结论重新拉回 blocker
 - 已完成的 host polish baseline 验收主线仍固定为 `host-first -> live geometry / interaction consistency -> surface smoke -> surface-local evidence -> full gate`，当前只把这条完成链当作 DOM contract wave 的上游稳定基线，不重开 strict visual 争论
-- `OPTIONAL-BUNDLE-WAVE-001` 继续视为已完成基线：`react-ui` 仍保持 implemented + default-disabled，`agent-runtime` / `ai-service` 继续保持 spec-only，不把 optional bundle lane 回灌到当前 DOM contract 主线
+- `OPTIONAL-BUNDLE-WAVE-001` 继续视为已完成基线：`react-ui` 仍保持 implemented + default-disabled，`agent-runtime` / `ai-service` 继续保持 spec-only，`wasm-kernel` 已作为 `probe + digest + shadow unlock derivation` 的 `planned + default-disabled` lane 进入 registry，但不把 optional bundle lane 回灌到当前 DOM contract 主线
 - 当前已完成 wave 验收主线：`host-first -> action replay -> route-aware dom contract -> advisory summary`
-- 当前唯一 optional bundle registry 仍是 `config/optional-bundles.json`；`react-ui` 当前固定为 `ts-isolated + implemented + enabled=false`，`agent-runtime` 固定为 `ts-isolated + planned + enabled=false`，`ai-service` 固定为 `js-core + planned + enabled=false`，本轮不把它们重新拉回当前扩波主线
-- 当前模板已把 Lisianthus 抽出的 `file-state-store`、`task-runner`、`task-queue`、`zotero-file-storage`、`zotero-json-state-store` 与 `window-shell + theme-manager + host action gating` 视为已入基线的 JS-core 能力；同时把 default-disabled `react surface bridge + surface-window-mode` 收到 optional bundle 基线里；`build:react-ui` 当前继续只服务默认禁用的 demo lane + host-mounted surface bridge lane，并已由主仓 / pure-project 显式声明 `esbuild + react + react-dom` 作为 optional-lane devDependencies，不把 React/TS 依赖回灌进模板核心
+- 当前唯一 optional bundle registry 仍是 `config/optional-bundles.json`；`react-ui` 当前固定为 `ts-isolated + implemented + enabled=false`，`agent-runtime` 固定为 `ts-isolated + planned + enabled=false`，`ai-service` 固定为 `js-core + planned + enabled=false`，`wasm-kernel` 固定为 `js-core + planned + enabled=false`，本轮不把它们重新拉回当前扩波主线
+- 最新 `wasm kernel probe diagnostics` 已在 `2026-04-19` 的 live Zotero scenario 中通过：当前主线程 `rootURI + content/lib/w/...` 与 `ChromeWorker + chrome://<addonRef>/content/lib/w/...` 均可用，但仍只作为 bundle-local probe，不进入默认 `build / package / gate` 主线
+- `wasm-kernel` 当前已补 probe 级成本量化链与独立 disabled-contract 报告链：默认 probe 总览仍固定写入 `dist/wasm-kernel-smoke.json` / `dist/wasm-kernel-performance.json` / `dist/wasm-kernel-disabled-contract.json`，digest lane 现已改为并存写入 `dist/wasm-kernel-digest-smoke.json` / `dist/wasm-kernel-digest-performance.json` / `dist/wasm-kernel-digest-disabled-contract.json`，不再覆盖 probe 基线；`npm run wasm:kernel:perf` 与 `npm run wasm:kernel:disabled-contract` 都会按场景优先读取对应 smoke/perf 证据，再回退到默认 artifacts。当前已记录 source/build 资产合计 `7.96KB`，并完成 fresh live repeated smoke：probe `3/3` 通过、main-thread 中位 `1ms`、worker 中位 `3ms`；digest `3/3` 通过、main-thread 中位 `1ms`、worker 中位 `5ms`；disabled-contract 也已回到 `passed`。shadow-mode `runtime.deriveWasmKernelUnlockToken` 已落地为 bundle-local 业务 derivation 实验，并新增 `wasm kernel unlock diagnostics` 场景；当前判断继续保持 `planned + default-disabled`
+- `wasm-kernel` 当前已补固定聚合入口：`npm run wasm:kernel:matrix` 会把 probe/digest 两条 lane 的 smoke / perf / disabled-contract 收成 `dist/wasm-kernel-matrix.json` / `md`，统一给 controller 使用；当前矩阵结论固定为 `keep-planned-default-disabled`，不会自动把 lane 升成 `implemented`
+- 当前模板已把 Lisianthus 抽出的 `file-state-store`、`task-runner`、`task-queue`、`zotero-file-storage`、`zotero-json-state-store` 与 `window-shell + theme-manager + host action gating` 视为已入基线的 JS-core 能力；同时把 default-disabled `react surface bridge + surface-window-mode` 收到 optional bundle 基线里；`build:react-ui` 当前继续只服务默认禁用的 demo lane + host-mounted surface bridge lane，并已由主仓 / pure-project 显式声明 `esbuild + react + react-dom` 作为 optional-lane devDependencies，不把 React/TS 依赖回灌进模板核心；`wasm-kernel` 当前已冻结 checked-in probe 资产、`runtime.probeWasmKernel` / `runtime.deriveWasmKernelDigest` / `runtime.deriveWasmKernelUnlockToken` host action、registry validation contract 与 pure-project export 保留边界，且 default-disabled 态已改为首次 host action 调用时才惰性创建 Wasm runtime，但仍不伪装为已实现 bundle
 - 本 wave 当前 in-scope surfaces 继续写入 `config/project-validation-surfaces.json`：覆盖 `preference pane`、`context pane`、`item pane sidenav`、`reader renderToolbar`、`reader sidebar view`、`menu item`、`collection menu` 与 `menu submenu`，当前批次只补这些已声明 surface 的 polish，不新开产品 surface
 - 当前宿主可见 UI 主链已基本实现：`preference pane`、`context pane`、`item pane sidenav`、`reader renderToolbar`、`reader sidebar view`、`menu item / collection menu / menu submenu` 与窗口级 + 元素级主题 contract 已具备模板级基线、host action / surface smoke / surface-local evidence；当前批次默认转向交互一致性、贴边布局和复用细节，不把这一轮描述成“UI 已完全封板”
 - `details.runtimeSanitization` 已稳定透传到 direct E2E / monitor / gate：本轮 direct E2E 记录了 `exclusiveProjectRuntime=true`，并在启动前终止了 project-managed `watch` `zotero` / `plugin-container`；旧的 startup/RDP bring-up timeout 口径继续只保留为已收口的诊断能力

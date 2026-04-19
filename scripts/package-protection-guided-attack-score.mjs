@@ -84,8 +84,22 @@ const RATING_ORDER = Object.freeze({
   "readable-module-recovery": 2,
 });
 
+const GUIDED_TIME_BUCKET_SLUG_ALIASES = Object.freeze({
+  "<10m": "lt10m",
+  ">120m": "gt120m",
+});
+
 function normalizeVariant(value) {
   const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "pref-bridge") {
+    return "shielded-pref-bridge";
+  }
+  if (normalized === "surface-scrub") {
+    return "shielded-surface-scrub";
+  }
+  if (normalized === "surface-scrub-wasm-digest" || normalized === "wasm-digest") {
+    return "shielded-surface-scrub-wasm-digest";
+  }
   return PACKAGE_PROTECTION_SMOKE_VARIANTS.includes(normalized)
     ? normalized
     : null;
@@ -139,6 +153,31 @@ function normalizeRoundMode(value) {
 
 function normalizeResultTier(value) {
   return normalizeEnum(value, GUIDED_RESULT_TIERS);
+}
+
+function slugifyGuidedAttackValue(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return "unknown";
+  }
+  if (Object.prototype.hasOwnProperty.call(GUIDED_TIME_BUCKET_SLUG_ALIASES, normalized)) {
+    return GUIDED_TIME_BUCKET_SLUG_ALIASES[normalized];
+  }
+  return normalized
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    || "unknown";
+}
+
+export function buildPackageProtectionGuidedAttackProfileKey(input = {}) {
+  return [
+    slugifyGuidedAttackValue(input.attackerTier),
+    slugifyGuidedAttackValue(input.aiTier),
+    slugifyGuidedAttackValue(input.attackMethod),
+    slugifyGuidedAttackValue(input.roundMode),
+    slugifyGuidedAttackValue(input.timeBucket),
+  ].join("__");
 }
 
 function compareRatings(left, right) {
@@ -278,7 +317,7 @@ export function parsePackageProtectionGuidedAttackScoreArgs(argv = process.argv.
     }
   }
 
-  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string", {
+  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest", {
     category: "args",
     failedStage: "parse-args",
   });
@@ -329,6 +368,7 @@ function renderPackageProtectionGuidedAttackMarkdown(report) {
     `- 生成时间: \`${report.generatedAt}\``,
     `- Advisory: \`${report.advisory ? "yes" : "no"}\``,
     `- variant/channel: \`${report.variant}/${report.channel}\``,
+    `- profileKey: \`${report.profileKey}\``,
     `- rating: \`${report.guidedAttack.rating}\``,
     `- resultTier: \`${report.guidedAttack.resultTier}\` (${GUIDED_RESULT_LABELS[report.guidedAttack.resultTier] || "-"})`,
     `- attackerTier: \`${report.guidedAttack.attackerTier}\``,
@@ -372,8 +412,16 @@ function renderPackageProtectionGuidedAttackMarkdown(report) {
 async function persistPackageProtectionGuidedAttackReport(report, options = {}) {
   const projectRootPath = path.resolve(options.projectRootPath || projectRoot);
   const archiveDir = resolveAgentArtifactPath(projectRootPath, "package-protection-guided-attack");
-  const reportPath = path.join(archiveDir, `${report.variant}-${report.channel}.json`);
-  const reportMDPath = path.join(archiveDir, `${report.variant}-${report.channel}.md`);
+  const profileKey = String(
+    report.profileKey
+    || report.guidedAttack?.profileKey
+    || buildPackageProtectionGuidedAttackProfileKey(report.guidedAttack || {}),
+  ).trim();
+  const reportBaseName = `${report.variant}-${report.channel}-${profileKey}`;
+  const reportPath = path.join(archiveDir, `${reportBaseName}.json`);
+  const reportMDPath = path.join(archiveDir, `${reportBaseName}.md`);
+  const aliasPath = path.join(archiveDir, `${report.variant}-${report.channel}.json`);
+  const aliasMDPath = path.join(archiveDir, `${report.variant}-${report.channel}.md`);
   const aggregatePath = resolveAgentArtifactPath(projectRootPath, "package-protection-guided-attack.json");
   const aggregateMDPath = resolveAgentArtifactPath(projectRootPath, "package-protection-guided-attack.md");
   const existingAggregate = await fs.readFile(aggregatePath, "utf-8")
@@ -384,12 +432,49 @@ async function persistPackageProtectionGuidedAttackReport(report, options = {}) 
       }
       throw error;
     });
+  const existingAlias = await fs.readFile(aliasPath, "utf-8")
+    .then((content) => JSON.parse(content))
+    .catch((error) => {
+      if (error?.code === "ENOENT") {
+        return null;
+      }
+      throw error;
+    });
+  const existingAliasProfileKey = String(
+    existingAlias?.profileKey
+    || existingAlias?.guidedAttack?.profileKey
+    || "",
+  ).trim() || null;
   const previousReports = Array.isArray(existingAggregate?.reports)
-    ? existingAggregate.reports.filter((item) => `${item?.variant || ""}::${item?.channel || ""}` !== `${report.variant}::${report.channel}`)
+    ? existingAggregate.reports.filter((item) => {
+      const itemProfileKey = String(
+        item?.profileKey
+        || item?.guidedAttack?.profileKey
+        || buildPackageProtectionGuidedAttackProfileKey(item?.guidedAttack || {}),
+      ).trim();
+      return `${item?.variant || ""}::${item?.channel || ""}::${itemProfileKey}` !== `${report.variant}::${report.channel}::${profileKey}`;
+    })
     : [];
+  const normalizedPreviousReports = previousReports.map((item) => {
+    const itemProfileKey = String(
+      item?.profileKey
+      || item?.guidedAttack?.profileKey
+      || buildPackageProtectionGuidedAttackProfileKey(item?.guidedAttack || {}),
+    ).trim();
+    return {
+      ...item,
+      profileKey: item?.profileKey || itemProfileKey,
+      guidedAttack: item?.guidedAttack
+        ? {
+          ...item.guidedAttack,
+          profileKey: item.guidedAttack.profileKey || itemProfileKey,
+        }
+        : item.guidedAttack,
+    };
+  });
   const aggregate = {
     generatedAt: new Date().toISOString(),
-    reports: [report, ...previousReports]
+    reports: [report, ...normalizedPreviousReports]
       .sort((left, right) => String(right.generatedAt || "").localeCompare(String(left.generatedAt || ""))),
   };
   const aggregateMarkdown = [
@@ -402,6 +487,7 @@ async function persistPackageProtectionGuidedAttackReport(report, options = {}) 
     ...aggregate.reports.flatMap((item) => ([
       `### ${item.variant}/${item.channel}`,
       "",
+      `- profileKey: \`${item.profileKey || item.guidedAttack?.profileKey || "-"}\``,
       `- rating: \`${item.guidedAttack?.rating || "-"}\``,
       `- resultTier: \`${item.guidedAttack?.resultTier || "-"}\``,
       `- attackerTier: \`${item.guidedAttack?.attackerTier || "-"}\``,
@@ -418,16 +504,26 @@ async function persistPackageProtectionGuidedAttackReport(report, options = {}) 
 
   await fs.mkdir(resolveAgentArtifactsDir(projectRootPath), { recursive: true });
   await fs.mkdir(archiveDir, { recursive: true });
-  await Promise.all([
+  const aliasShouldUpdate = !existingAliasProfileKey || existingAliasProfileKey === profileKey;
+  const writes = [
     fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf-8"),
     fs.writeFile(reportMDPath, `${renderPackageProtectionGuidedAttackMarkdown(report)}\n`, "utf-8"),
     fs.writeFile(aggregatePath, `${JSON.stringify(aggregate, null, 2)}\n`, "utf-8"),
     fs.writeFile(aggregateMDPath, `${aggregateMarkdown}\n`, "utf-8"),
-  ]);
+  ];
+  if (aliasShouldUpdate) {
+    writes.push(fs.writeFile(aliasPath, `${JSON.stringify(report, null, 2)}\n`, "utf-8"));
+    writes.push(fs.writeFile(aliasMDPath, `${renderPackageProtectionGuidedAttackMarkdown(report)}\n`, "utf-8"));
+  }
+  await Promise.all(writes);
 
   return {
+    profileKey,
     reportPath,
     reportMDPath,
+    aliasPath,
+    aliasMDPath,
+    aliasUpdated: aliasShouldUpdate,
     aggregatePath,
     aggregateMDPath,
   };
@@ -449,8 +545,15 @@ export async function recordPackageProtectionGuidedAttack(options = {}) {
   const evidenceFiles = Array.isArray(options.evidenceFiles)
     ? options.evidenceFiles.map((item) => path.resolve(String(item || ""))).filter(Boolean)
     : [];
+  const profileKey = buildPackageProtectionGuidedAttackProfileKey({
+    attackerTier,
+    aiTier,
+    attackMethod,
+    timeBucket,
+    roundMode,
+  });
 
-  assertScript(Boolean(variant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string", {
+  assertScript(Boolean(variant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest", {
     category: "args",
     failedStage: "validate-options",
   });
@@ -534,6 +637,7 @@ export async function recordPackageProtectionGuidedAttack(options = {}) {
     advisory: true,
     variant,
     channel,
+    profileKey,
     smokeStatus: String(targetReport.status || "missing"),
     automatedStatus: String(targetReport.automatedScorecard?.status || "missing"),
     manualSinglePass: {
@@ -552,6 +656,7 @@ export async function recordPackageProtectionGuidedAttack(options = {}) {
       timeBucket,
       costBucket: timeBucket,
       roundMode,
+      profileKey,
       summary,
       notes,
       evidenceFiles: evidenceSummaries,

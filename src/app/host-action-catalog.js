@@ -1,4 +1,6 @@
 import { isOptionalBundleEnabled } from "./optional-bundles.js";
+import { HOST_ACTION_IDS } from "./host-action-ids.js";
+import { HOST_ACTION_OWNER_MODULES } from "./host-action-owner-modules.js";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -13,7 +15,7 @@ export const HOST_ACTION_STATUSES = Object.freeze({
 
 const HOST_ACTION_CATALOG = Object.freeze([
   {
-    id: "preferences.openPane",
+    id: HOST_ACTION_IDS.preferencesOpenPane,
     label: "Open Preference Pane",
     status: HOST_ACTION_STATUSES.READY,
     category: "preferences",
@@ -44,14 +46,11 @@ const HOST_ACTION_CATALOG = Object.freeze([
     evidenceTargets: [
       "preference-pane",
     ],
-    ownerModules: [
-      "src/platform/zotero-host.js",
-      "src/app/host-actions.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.hostBridge,
     executable: true,
   },
   {
-    id: "preferences.selectTab",
+    id: HOST_ACTION_IDS.preferencesSelectTab,
     label: "Select Preference Tab",
     status: HOST_ACTION_STATUSES.READY,
     category: "preferences",
@@ -76,14 +75,11 @@ const HOST_ACTION_CATALOG = Object.freeze([
     evidenceTargets: [
       "preference-pane",
     ],
-    ownerModules: [
-      "src/app/host-actions.js",
-      "src/platform/zotero-host.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.actionHostBridge,
     executable: true,
   },
   {
-    id: "preferences.setCheckbox",
+    id: HOST_ACTION_IDS.preferencesSetCheckbox,
     label: "Set Preference Checkbox",
     status: HOST_ACTION_STATUSES.READY,
     category: "preferences",
@@ -111,14 +107,11 @@ const HOST_ACTION_CATALOG = Object.freeze([
     evidenceTargets: [
       "preference-control",
     ],
-    ownerModules: [
-      "src/app/host-actions.js",
-      "src/platform/zotero-host.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.actionHostBridge,
     executable: true,
   },
   {
-    id: "preferences.setTextbox",
+    id: HOST_ACTION_IDS.preferencesSetTextbox,
     label: "Set Preference Textbox",
     status: HOST_ACTION_STATUSES.READY,
     category: "preferences",
@@ -146,14 +139,11 @@ const HOST_ACTION_CATALOG = Object.freeze([
     evidenceTargets: [
       "preference-control",
     ],
-    ownerModules: [
-      "src/app/host-actions.js",
-      "src/platform/zotero-host.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.actionHostBridge,
     executable: true,
   },
   {
-    id: "preferences.selectMenulist",
+    id: HOST_ACTION_IDS.preferencesSelectMenulist,
     label: "Select Preference Menulist",
     status: HOST_ACTION_STATUSES.READY,
     category: "preferences",
@@ -181,14 +171,11 @@ const HOST_ACTION_CATALOG = Object.freeze([
     evidenceTargets: [
       "preference-control",
     ],
-    ownerModules: [
-      "src/app/host-actions.js",
-      "src/platform/zotero-host.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.actionHostBridge,
     executable: true,
   },
   {
-    id: "contextPane.setOpen",
+    id: HOST_ACTION_IDS.contextPaneSetOpen,
     label: "Toggle Context Pane",
     status: HOST_ACTION_STATUSES.READY,
     category: "context-pane",
@@ -212,14 +199,11 @@ const HOST_ACTION_CATALOG = Object.freeze([
     evidenceTargets: [
       "context-pane",
     ],
-    ownerModules: [
-      "src/platform/zotero-host.js",
-      "src/app/host-actions.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.hostBridge,
     executable: true,
   },
   {
-    id: "itemPane.selectPane",
+    id: HOST_ACTION_IDS.itemPaneSelectPane,
     label: "Select Item Pane",
     status: HOST_ACTION_STATUSES.READY,
     category: "item-pane",
@@ -249,14 +233,11 @@ const HOST_ACTION_CATALOG = Object.freeze([
     evidenceTargets: [
       "item-pane-sidenav",
     ],
-    ownerModules: [
-      "src/platform/zotero-host.js",
-      "src/app/host-actions.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.hostBridge,
     executable: true,
   },
   {
-    id: "contextPane.selectPane",
+    id: HOST_ACTION_IDS.contextPaneSelectPane,
     label: "Select Context Pane",
     status: HOST_ACTION_STATUSES.READY,
     category: "context-pane",
@@ -291,14 +272,11 @@ const HOST_ACTION_CATALOG = Object.freeze([
     evidenceTargets: [
       "context-pane",
     ],
-    ownerModules: [
-      "src/platform/zotero-host.js",
-      "src/app/host-actions.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.hostBridge,
     executable: true,
   },
   {
-    id: "reader.open",
+    id: HOST_ACTION_IDS.readerOpen,
     label: "Open Reader",
     status: HOST_ACTION_STATUSES.READY,
     category: "reader",
@@ -320,14 +298,11 @@ const HOST_ACTION_CATALOG = Object.freeze([
     evidenceTargets: [
       "reader-window",
     ],
-    ownerModules: [
-      "src/features/reader.js",
-      "src/app/host-actions.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.readerActionBridge,
     executable: true,
   },
   {
-    id: "reader.contextPane.setOpen",
+    id: HOST_ACTION_IDS.readerContextPaneSetOpen,
     label: "Toggle Reader Context Pane",
     status: HOST_ACTION_STATUSES.READY,
     category: "reader",
@@ -352,14 +327,11 @@ const HOST_ACTION_CATALOG = Object.freeze([
     evidenceTargets: [
       "context-pane",
     ],
-    ownerModules: [
-      "src/features/reader.js",
-      "src/app/host-actions.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.readerActionBridge,
     executable: true,
   },
   {
-    id: "reader.toolbar.triggerButton",
+    id: HOST_ACTION_IDS.readerToolbarTriggerButton,
     label: "Trigger Reader Toolbar Button",
     status: HOST_ACTION_STATUSES.READY,
     category: "reader",
@@ -387,14 +359,11 @@ const HOST_ACTION_CATALOG = Object.freeze([
     evidenceTargets: [
       "render-toolbar",
     ],
-    ownerModules: [
-      "src/features/reader.js",
-      "src/app/host-actions.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.readerActionBridge,
     executable: true,
   },
   {
-    id: "reader.sidebar.selectView",
+    id: HOST_ACTION_IDS.readerSidebarSelectView,
     label: "Select Reader Sidebar View",
     status: HOST_ACTION_STATUSES.READY,
     category: "reader",
@@ -420,14 +389,11 @@ const HOST_ACTION_CATALOG = Object.freeze([
     evidenceTargets: [
       "reader-sidebar-view",
     ],
-    ownerModules: [
-      "src/features/reader.js",
-      "src/app/host-actions.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.readerActionBridge,
     executable: true,
   },
   {
-    id: "menu.show",
+    id: HOST_ACTION_IDS.menuShow,
     label: "Show Live Menu",
     status: HOST_ACTION_STATUSES.READY,
     category: "menu",
@@ -455,15 +421,11 @@ const HOST_ACTION_CATALOG = Object.freeze([
       "collection-menu",
       "menu-submenu",
     ],
-    ownerModules: [
-      "src/platform/zotero-host.js",
-      "src/features/menu-manager.js",
-      "src/app/host-actions.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.menuBridge,
     executable: true,
   },
   {
-    id: "menu.trigger",
+    id: HOST_ACTION_IDS.menuTrigger,
     label: "Trigger Live Menu",
     status: HOST_ACTION_STATUSES.READY,
     category: "menu",
@@ -489,15 +451,11 @@ const HOST_ACTION_CATALOG = Object.freeze([
       "collection-menu",
       "menu-submenu",
     ],
-    ownerModules: [
-      "src/platform/zotero-host.js",
-      "src/features/menu-manager.js",
-      "src/app/host-actions.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.menuBridge,
     executable: true,
   },
   {
-    id: "window.listMain",
+    id: HOST_ACTION_IDS.windowListMain,
     label: "List Main Windows",
     status: HOST_ACTION_STATUSES.PROBE_ONLY,
     category: "window",
@@ -516,13 +474,11 @@ const HOST_ACTION_CATALOG = Object.freeze([
       "A main window snapshot can be observed.",
     ],
     evidenceTargets: [],
-    ownerModules: [
-      "src/platform/zotero-host.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.hostOnly,
     executable: false,
   },
   {
-    id: "window.waitForPreferencesWindow",
+    id: HOST_ACTION_IDS.windowWaitForPreferencesWindow,
     label: "Wait For Preferences Window",
     status: HOST_ACTION_STATUSES.PROBE_ONLY,
     category: "window",
@@ -541,13 +497,115 @@ const HOST_ACTION_CATALOG = Object.freeze([
       "A preferences window snapshot is observable.",
     ],
     evidenceTargets: [],
-    ownerModules: [
-      "src/platform/zotero-host.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.hostOnly,
     executable: false,
   },
   {
-    id: "window.openReactDemo",
+    id: HOST_ACTION_IDS.runtimeProbeWasmKernel,
+    label: "Probe Wasm Kernel",
+    status: HOST_ACTION_STATUSES.PROBE_ONLY,
+    category: "runtime",
+    summary: "Load the checked-in plugin-private Wasm probe through rootURI, call its exported add() function, and optionally repeat the same probe through a worker.",
+    authoritativeSource: [
+      {
+        file: "docs/WASM_DEVELOPMENT_INDEX.md",
+        anchor: "rootURI 是当前插件私有 .wasm 的首选加载入口",
+      },
+      {
+        file: "addon-static/content/lib/w/wasm-probe-worker.js",
+        anchor: "INIT / PROBE",
+      },
+    ],
+    preconditions: [
+      "The addon rootURI is available for the current runtime.",
+      "The checked-in probe asset exists inside the packaged addon.",
+      "The host exposes WebAssembly support.",
+    ],
+    executionEntry: "wasmKernelProbe.runProbe()",
+    readinessAssertions: [
+      "The probe asset resolves through rootURI without falling back to remote fetches.",
+      "The module instantiates and exposes the expected add() export.",
+      "The add() export returns the expected sum on the main thread.",
+      "When worker mode is requested, the worker path returns the same sum.",
+    ],
+    evidenceTargets: [],
+    ownerModules: HOST_ACTION_OWNER_MODULES.wasmProbe,
+    executable: true,
+  },
+  {
+    id: HOST_ACTION_IDS.runtimeDeriveWasmKernelDigest,
+    label: "Derive Wasm Kernel Digest",
+    status: HOST_ACTION_STATUSES.PROBE_ONLY,
+    category: "runtime",
+    summary: "Derive a deterministic 32-bit digest through the checked-in Wasm micro-kernel and optionally cross-check the same digest path through a worker.",
+    authoritativeSource: [
+      {
+        file: "docs/WASM_DEVELOPMENT_INDEX.md",
+        anchor: "首个真实 micro-kernel 继续保持 bundle-local + default-disabled",
+      },
+      {
+        file: "addon-static/content/lib/w/probe.wasm",
+        anchor: "exports add / seed / mix / finalize",
+      },
+      {
+        file: "addon-static/content/lib/w/wasm-probe-worker.js",
+        anchor: "INIT / PROBE / DIGEST",
+      },
+    ],
+    preconditions: [
+      "The addon rootURI is available for the current runtime.",
+      "The checked-in probe asset exists inside the packaged addon.",
+      "The host exposes WebAssembly support.",
+    ],
+    executionEntry: "wasmKernelProbe.deriveDigest()",
+    readinessAssertions: [
+      "The module exposes seed / mix / finalize exports for the digest path.",
+      "The main-thread digest path returns a deterministic 32-bit value.",
+      "When worker mode is requested, the worker path returns the same digest.",
+    ],
+    evidenceTargets: [],
+    ownerModules: HOST_ACTION_OWNER_MODULES.wasmProbe,
+    executable: true,
+  },
+  {
+    id: HOST_ACTION_IDS.runtimeDeriveWasmKernelUnlockToken,
+    label: "Derive Wasm Kernel Unlock Token",
+    status: HOST_ACTION_STATUSES.PROBE_ONLY,
+    category: "runtime",
+    summary: "Derive a shadow-mode host-bound unlock token through the checked-in Wasm micro-kernel and optionally cross-check the same derivation path through a worker.",
+    authoritativeSource: [
+      {
+        file: "docs/PACKAGE_PROTECTION_HOST_WEAK_BINDING_V1.md",
+        anchor: "当前推荐位置：二阶段 unlock，不进主启动链",
+      },
+      {
+        file: "docs/WASM_DEVELOPMENT_INDEX.md",
+        anchor: "当前最合适的 Wasm 承载内容",
+      },
+      {
+        file: "addon-static/content/lib/w/wasm-probe-worker.js",
+        anchor: "INIT / PROBE / DIGEST / UNLOCK",
+      },
+    ],
+    preconditions: [
+      "The addon rootURI is available for the current runtime.",
+      "The checked-in probe asset exists inside the packaged addon.",
+      "The host exposes WebAssembly support.",
+      "A host-binding summary can be collected or supplied for shadow-mode derivation.",
+    ],
+    executionEntry: "wasmKernelProbe.deriveUnlockToken()",
+    readinessAssertions: [
+      "The module exposes seed / mix / finalize exports for the unlock derivation path.",
+      "The main-thread derivation returns deterministic stage2Digest and unlockToken values.",
+      "When worker mode is requested, the worker path returns the same stage2Digest and unlockToken.",
+      "The derivation returns activation summary data without binding the startup path to Wasm.",
+    ],
+    evidenceTargets: [],
+    ownerModules: HOST_ACTION_OWNER_MODULES.wasmProbe,
+    executable: true,
+  },
+  {
+    id: HOST_ACTION_IDS.windowOpenReactDemo,
     label: "Open React Demo Window",
     status: HOST_ACTION_STATUSES.READY,
     category: "window",
@@ -558,7 +616,7 @@ const HOST_ACTION_CATALOG = Object.freeze([
         anchor: "createWindowShellManager()",
       },
       {
-        file: "addon-static/content/react-ui/demo.xhtml",
+        file: "addon-static/content/lib/r/demo.xhtml",
         anchor: "standalone shell",
       },
     ],
@@ -575,16 +633,12 @@ const HOST_ACTION_CATALOG = Object.freeze([
     evidenceTargets: [
       "window-shell",
     ],
-    ownerModules: [
-      "src/features/react-ui-demo.js",
-      "src/utils/window-shell.js",
-      "src/app/host-actions.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.reactWindowActionBridge,
     executable: true,
     requiredBundle: "react-ui",
   },
   {
-    id: "dialog.modal.confirmation",
+    id: HOST_ACTION_IDS.dialogModalConfirmation,
     label: "Modal Confirmation Dialog",
     status: HOST_ACTION_STATUSES.MANUAL_ONLY,
     category: "dialog",
@@ -603,13 +657,11 @@ const HOST_ACTION_CATALOG = Object.freeze([
       "The dialog is known, but not auto-confirmed by default.",
     ],
     evidenceTargets: [],
-    ownerModules: [
-      "src/app/host-action-catalog.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.catalogOnly,
     executable: false,
   },
   {
-    id: "preferences.helpLink",
+    id: HOST_ACTION_IDS.preferencesHelpLink,
     label: "Preference Help Link",
     status: HOST_ACTION_STATUSES.MANUAL_ONLY,
     category: "preferences",
@@ -628,13 +680,11 @@ const HOST_ACTION_CATALOG = Object.freeze([
       "The help action is modeled, but intentionally not auto-executed.",
     ],
     evidenceTargets: [],
-    ownerModules: [
-      "src/app/host-action-catalog.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.catalogOnly,
     executable: false,
   },
   {
-    id: "menu.trigger.destructive",
+    id: HOST_ACTION_IDS.menuTriggerDestructive,
     label: "Trigger Destructive Menu",
     status: HOST_ACTION_STATUSES.UNSAFE,
     category: "menu",
@@ -653,13 +703,11 @@ const HOST_ACTION_CATALOG = Object.freeze([
       "The command is known but intentionally blocked from automatic execution.",
     ],
     evidenceTargets: [],
-    ownerModules: [
-      "src/app/host-action-catalog.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.catalogOnly,
     executable: false,
   },
   {
-    id: "window.close.withUnsavedState",
+    id: HOST_ACTION_IDS.windowCloseWithUnsavedState,
     label: "Close Window With Unsaved State",
     status: HOST_ACTION_STATUSES.UNSAFE,
     category: "window",
@@ -678,9 +726,7 @@ const HOST_ACTION_CATALOG = Object.freeze([
       "The close path is cataloged, but intentionally not automated.",
     ],
     evidenceTargets: [],
-    ownerModules: [
-      "src/app/host-action-catalog.js",
-    ],
+    ownerModules: HOST_ACTION_OWNER_MODULES.catalogOnly,
     executable: false,
   },
 ]);

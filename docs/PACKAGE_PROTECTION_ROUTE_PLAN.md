@@ -2,7 +2,9 @@
 
 > 用途：把“整体保护导出路线”收成一个可执行的阶段方案，避免后续讨论在 `encrypted / shielded / 语义减噪 / route 4 / Wasm` 之间来回跳。
 > 范围：这是策略与实验路线文档，不是 current truth；它不改变默认 `release` / `agent:gate` 主线。
-> 更新时间：2026-04-16
+> 更新时间：2026-04-19
+
+当前若需要把这些阶段和候选收成固定矩阵，请配合阅读 [PACKAGE_PROTECTION_EXPERIMENT_MATRIX.md](./PACKAGE_PROTECTION_EXPERIMENT_MATRIX.md)。
 
 ## 结论先看
 
@@ -19,6 +21,10 @@
 - 当前最稳的人工导出基线仍是 `package:encrypted`
 - 当前更高阻力分支仍是 `package:shielded`
 - 当前 `smoke -> score -> verdict` 手动收口链已经 fresh 通过，最新 advisory verdict 为 `passed`
+- 截至 `2026-04-18` 的最新 `12` 次 `stable` 冷启动测量里：
+  - `encrypted` 相对 `plain` 只增加约 `15.5ms`，约 `+1.5%`
+  - `shielded` 相对 `plain` 增加约 `696.5ms`，约 `+67.5%`
+  - `shielded-jsconfuser-string` 的保护链自身时序高于 `shielded`，但端到端冷启动差异仍落在宿主噪声可掩盖的范围
 - 下一步不该回到重 loader、`sidecar` 或 hostile runtime
 - 下一步也不该直接跳到服务端主导或 Wasm
 - **下一步最值得优先验证的是：inner bundle 在解密后暴露给 AI 的高层语义锚点，能否在 protected-only 路线下继续减噪**
@@ -73,12 +79,14 @@
 - `package:protection:smoke`
 - `package:protection:score`
 - `package:protection:verdict`
+- `package:protection:matrix`
 
 这条链回答的问题是：
 
 - 功能兼容有没有回归
 - 安装态和启动态是否稳定
 - 当前手工评分有没有达到既定威胁模型
+- 当前各候选在攻击阻力 / 性能 / 体积 / surface 成本上分别处于什么状态
 
 它**不**回答的问题是：
 
@@ -181,6 +189,7 @@
 - 最新 `package:protection:audit` 已确认：
   - `encrypted/shielded` raw export 仍保持 `0` 个 raw leakage
   - protected source proxy 只剩 `addonRef / addonVersion`
+- 最新 Stage 2 补刀已把 capability manifest limited baseline 的高层 label 改成中性 `C-xx`，并在 protected build 中去掉整行注释，避免 `Reader 摘要` 这类语义从 JSDoc 再次漏回 bundle
 - 这意味着 Stage 2 已经达到“继续压缩收益明显下降”的节点
 - 当前更合理的阶段决策不是继续追剩余两个锚点，而是把 Stage 2 先视为当前版本的可接受收口点，再决定是否启动更重的 Stage 3
 
@@ -291,6 +300,24 @@
 
 当前不把它作为 v1 主路线。
 
+当前 route5 的收口结论也已经明确：
+
+- `package:protection:wasm:admission` 已经可以稳定给出 `ready-for-candidate`
+- 第一条候选 `shielded-surface-scrub-wasm-digest` 已完成完整证据链：
+  - `smoke / webcrack / inner-audit / single-pass / guided / compare / matrix / review`
+- 这条候选当前已经证明：
+  - 不会扩大 `content/lib/w/*` 之外的 package-boundary 暴露
+  - 不会把自动化阻力从 `surface-scrub` 拉低
+  - 可以作为 `bounded Wasm lane` 保留下来
+- 但它当前同样已经证明：
+  - 还没有超过 `shielded-surface-scrub`
+  - 没有继续减少 unpacked support surface
+  - 还带来了额外 `xpi / bundle / prepare / decode` 成本
+- 因此当前 Stage 5 的 retained decision 固定为：
+  - `shielded-surface-scrub-wasm-digest` 只保留为 `retained-experiment-candidate`
+  - 它不替代 retained top candidate `shielded-surface-scrub`
+  - 若未来继续推进 Wasm，不应重复在同一条 digest 小内核上反复补同类证据，而应先定义新的、可量化的保护收益目标
+
 ## 实验矩阵
 
 ### 已固定实验
@@ -341,6 +368,16 @@
     - 对当前模板的高层语义锚点压缩达到 `7 -> 0`
     - 当前 advisory 结论可记为 `passed`
     - 当前更值得进入下一步手动 XPI / Zotero A/B 的是这条路线，而不是 `astScrambler`
+  - 但截至 `2026-04-18` 的最新 `12` 次 `stable` 冷启动测量也补齐了一个关键约束：
+    - `shielded-jsconfuser-string` 相对 `shielded` 的保护链自身成本仍然更高
+    - `loadSubScriptDurationMs` 中位数约 `+106.5ms`
+    - `prepareDurationMs` 中位数约 `+9ms`
+    - `xpiBytes` 与 `bundleBytes` 都约再增加 `32%`
+    - 端到端 `durationMs` 虽在这一轮样本里没有更慢，但这不能解释成它“本质更快”，因为分层时序已经明确显示保护链本身更重
+  - 当前 compare retained rule 也已经固定：
+    - 单轮 `LLM single-pass` 优势不足以把候选升级为 `hardening-win`
+    - 只有 guided-attack 的对称比较也优于 `shielded` 时，才允许升级
+    - 因此 `shielded-jsconfuser-string` 当前只保留为 `leaning-same / stop-current-candidate`
 - `lightweight-js-obfuscator` inner bundle A/B
   - 只在语义减噪后仍不足时再做
   - 当前已经完成 preflight，但 direct upstream 路线已被判定为“不应直接接入”
@@ -377,16 +414,32 @@
 
 才进入一次有限度的 inner bundle obfuscator A/B。
 
+### 什么时候看性能报告
+
+当前固定入口：
+
+```bash
+npm run package:protection:perf -- --channel stable
+```
+
+当前固定读法：
+
+- `durationMs median / p95 / max` 用来判断 UX 风险和尾延迟
+- `loadSubScriptDurationMs + prepareDurationMs` 用来判断保护链自身额外成本
+- 如果某个候选只是端到端 `durationMs` 更快，但 `loadSubScript + prepare` 更重，应先按 Zotero 宿主冷启动噪声处理，不把它直接视为更优 hardening 路线
+
 ## 当前 retained decision
 
 当前整体保护导出路线固定保留以下决策：
 
 1. `encrypted` 继续是最稳的低开销保护导出分支。
 2. `shielded` 继续是更高阻力的手动导出分支，但必须坚持 `loader-lite`。
-3. raw export 之外的下一轮 hardening，应优先指向 inner bundle semantics，而不是重 loader。
-4. 若未来要继续加固本地分支，允许把“宿主弱绑定二阶段 unlock”保留为独立候选，但它不替代 inner semantic scrub，也不等同于路线 4。
-5. `路线 4` 与 `Wasm` 继续保留为后续增强层，不抢当前主路线。
-6. 整条保护导出线继续保持 `advisory + manual lane`，不回写默认 `release` / `agent:gate`。
+3. `shielded-jsconfuser-string` 当前仍只保留为实验候选，不因为单轮 `stable` compare 或单轮总冷启动样本就升级为推荐路线。
+4. raw export 之外的下一轮 hardening，应优先指向 inner bundle semantics，而不是重 loader。
+5. 若未来要继续加固本地分支，允许把“宿主弱绑定二阶段 unlock”保留为独立候选，但它不替代 inner semantic scrub，也不等同于路线 4。
+6. `路线 4` 与 `Wasm` 继续保留为后续增强层，不抢当前主路线。
+7. `shielded-surface-scrub-wasm-digest` 当前只保留为有边界的 retained experiment，不升级为当前主推荐 hardening 候选。
+8. 整条保护导出线继续保持 `advisory + manual lane`，不回写默认 `release` / `agent:gate`。
 
 ## 相关文档
 

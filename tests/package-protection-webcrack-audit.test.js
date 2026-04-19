@@ -43,6 +43,30 @@ describe("Package Protection Webcrack Audit", () => {
     assert.equal(options.channel, "stable");
   });
 
+  it("should accept pref-bridge as a webcrack-only experiment variant alias", () => {
+    const options = parsePackageProtectionWebcrackAuditArgs([
+      "--variant",
+      "pref-bridge",
+      "--channel",
+      "stable",
+    ]);
+
+    assert.equal(options.variant, "shielded-pref-bridge");
+    assert.equal(options.channel, "stable");
+  });
+
+  it("should accept surface-scrub as a webcrack-only experiment variant alias", () => {
+    const options = parsePackageProtectionWebcrackAuditArgs([
+      "--variant",
+      "surface-scrub",
+      "--channel",
+      "stable",
+    ]);
+
+    assert.equal(options.variant, "shielded-surface-scrub");
+    assert.equal(options.channel, "stable");
+  });
+
   it("should require a valid variant", () => {
     assert.throws(() => parsePackageProtectionWebcrackAuditArgs([
       "--channel",

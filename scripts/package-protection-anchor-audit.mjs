@@ -10,6 +10,11 @@ import {
   BUILD_SEMANTIC_SCRUB_PROTECTED,
 } from "./build.mjs";
 import {
+  REACT_UI_DEMO_SHELL_PATH,
+  WASM_KERNEL_PROBE_PATH,
+  WASM_KERNEL_PROBE_WORKER_PATH,
+} from "../src/utils/optional-bundle-paths.js";
+import {
   resolveAgentArtifactPath,
   resolveAgentArtifactsDir,
 } from "./agent-artifacts.mjs";
@@ -41,6 +46,9 @@ export const PACKAGE_PROTECTION_AUDIT_BASE_VARIANTS = Object.freeze([
 export const PACKAGE_PROTECTION_AUDIT_EXPERIMENTAL_VARIANTS = Object.freeze([
   "descriptor-bind",
   "jsconfuser-string",
+  "pref-bridge",
+  "surface-scrub",
+  "surface-scrub-wasm-digest",
 ]);
 
 export const PACKAGE_PROTECTION_AUDIT_VARIANTS = Object.freeze([
@@ -125,6 +133,138 @@ export const PACKAGE_PROTECTION_ROUTE_AUDIT_BASE_ANCHORS = Object.freeze([
     label: "ai-service",
     needle: "ai-service",
     category: "bundle-label",
+  },
+  {
+    id: "capability-baseline-registration",
+    label: "capability id baseline-registration",
+    needle: "baseline-registration",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "capability-reader-summary",
+    label: "capability id reader-summary",
+    needle: "reader-summary",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "capability-host-actions",
+    label: "capability id host-actions",
+    needle: "host-actions",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "capability-settings-governance",
+    label: "capability id settings-governance",
+    needle: "settings-governance",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "capability-runtime-bridge-report",
+    label: "capability id runtime-bridge-report",
+    needle: "runtime-bridge-report",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "capability-label-baseline-registration",
+    label: "capability label 基线注册",
+    needle: "基线注册",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "capability-label-item-presentation",
+    label: "capability label 条目展示摘要",
+    needle: "条目展示摘要",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "capability-label-notifier-sync",
+    label: "capability label 通知器联动",
+    needle: "通知器联动",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "capability-label-reader-summary",
+    label: "capability label Reader 摘要",
+    needle: "Reader 摘要",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "capability-label-reader-annotation-roundtrip",
+    label: "capability label Reader 批注回环",
+    needle: "Reader 批注回环",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "capability-label-reader-ui-state",
+    label: "capability label Reader UI 状态",
+    needle: "Reader UI 状态",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "capability-label-reader-event-hooks",
+    label: "capability label Reader 事件桥",
+    needle: "Reader 事件桥",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "capability-label-command-nonblocking",
+    label: "capability label 无阻塞动作执行",
+    needle: "无阻塞动作执行",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "capability-label-host-actions",
+    label: "capability label 宿主动作编排",
+    needle: "宿主动作编排",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "capability-label-settings-governance",
+    label: "capability label 设置治理",
+    needle: "设置治理",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "capability-label-multi-window-mount",
+    label: "capability label 多窗口挂载",
+    needle: "多窗口挂载",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "capability-label-runtime-bridge-report",
+    label: "capability label 运行时桥接报告",
+    needle: "运行时桥接报告",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "scenario-reader-current",
+    label: "agent scenario reader-current",
+    needle: "reader-current",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "scenario-settings-snapshot",
+    label: "agent scenario settings-snapshot",
+    needle: "settings-snapshot",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "scenario-window-snapshot",
+    label: "agent scenario window-snapshot",
+    needle: "window-snapshot",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "scenario-command-no-ui",
+    label: "agent scenario command-no-ui",
+    needle: "command-no-ui",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "scenario-capability-manifest",
+    label: "agent scenario capability-manifest",
+    needle: "capability-manifest",
+    category: "inner-bundle-semantics",
   },
   {
     id: "metadata-source-sha",
@@ -216,6 +356,99 @@ export const PACKAGE_PROTECTION_ROUTE_AUDIT_BASE_ANCHORS = Object.freeze([
     needle: "Runtime Bridge",
     category: "inner-bundle-semantics",
   },
+  {
+    id: "host-action-open-pane",
+    label: "preferences.openPane",
+    needle: "preferences.openPane",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "host-action-reader-open",
+    label: "reader.open",
+    needle: "reader.open",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "host-action-runtime-probe-wasm",
+    label: "runtime.probeWasmKernel",
+    needle: "runtime.probeWasmKernel",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "host-action-runtime-digest-wasm",
+    label: "runtime.deriveWasmKernelDigest",
+    needle: "runtime.deriveWasmKernelDigest",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "host-action-window-react-demo",
+    label: "window.openReactDemo",
+    needle: "window.openReactDemo",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "host-action-catalog-authoritative-source",
+    label: "authoritativeSource",
+    needle: "authoritativeSource",
+    category: "inner-bundle-semantics",
+  },
+  {
+    id: "host-action-catalog-readiness-assertions",
+    label: "readinessAssertions",
+    needle: "readinessAssertions",
+    category: "inner-bundle-semantics",
+  },
+]);
+
+export const PACKAGE_PROTECTION_UNPACKED_SURFACE_TARGETS = Object.freeze([
+  "manifest.json",
+  "bootstrap.js",
+  "prefs.js",
+  "content/preferences.js",
+  "content/preference-pane-load-bridge.js",
+  "content/theme.js",
+  "content/preferences.xhtml",
+  REACT_UI_DEMO_SHELL_PATH,
+  WASM_KERNEL_PROBE_PATH,
+  WASM_KERNEL_PROBE_WORKER_PATH,
+  "locale/en-US/main.ftl",
+  "locale/zh-CN/main.ftl",
+  "locale/zh-TW/main.ftl",
+]);
+
+const PACKAGE_PROTECTION_UNPACKED_SURFACE_ANCHOR_IDS = new Set([
+  "addon-ref-literal",
+  "addon-name-literal",
+  "addon-version-literal",
+  "author-literal",
+  "homepage-url-literal",
+  "update-url-literal",
+  "instance-key-literal",
+  "preference-pane-root-id",
+  "tools-menu-item-id",
+  "tools-menu-style-id",
+  "command-copy-open-cleanroom-action",
+  "reader-copy-demo-summary",
+  "reader-copy-selection-snapshot",
+  "demo-copy-idle",
+  "demo-copy-ready",
+  "react-copy-command",
+  "react-copy-surface",
+  "service-label-runtime-core",
+  "service-label-host-signals",
+  "service-label-host-nonce",
+  "service-label-runtime-bridge",
+  "host-action-open-pane",
+  "host-action-runtime-probe-wasm",
+  "host-action-runtime-digest-wasm",
+  "host-action-window-react-demo",
+  "host-action-catalog-authoritative-source",
+  "host-action-catalog-readiness-assertions",
+  "bootstrap-log-prefix",
+  "bootstrap-console-bridge",
+  "bootstrap-capability-report",
+  "wasm-worker-fetch-failure",
+  "wasm-worker-instantiate",
 ]);
 
 const STATUS_LABELS = Object.freeze({
@@ -228,6 +461,9 @@ function normalizeVariant(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (normalized === "all" || !normalized) {
     return "all";
+  }
+  if (normalized === "wasm-digest") {
+    return "surface-scrub-wasm-digest";
   }
   return PACKAGE_PROTECTION_AUDIT_VARIANTS.includes(normalized)
     ? normalized
@@ -362,6 +598,12 @@ function buildVariantPackageArgs(variant) {
       return ["scripts/package.mjs", "--descriptor-bind", "--skip-release-metadata"];
     case "jsconfuser-string":
       return ["scripts/package.mjs", "--jsconfuser-string", "--skip-release-metadata"];
+    case "pref-bridge":
+      return ["scripts/package.mjs", "--pref-bridge", "--skip-release-metadata"];
+    case "surface-scrub":
+      return ["scripts/package.mjs", "--surface-scrub", "--skip-release-metadata"];
+    case "surface-scrub-wasm-digest":
+      return ["scripts/package.mjs", "--surface-scrub-wasm-digest", "--skip-release-metadata"];
     default:
       throw createScriptError("args", `unsupported package protection audit variant: ${variant}`, {
         failedStage: "build-variant-args",
@@ -382,6 +624,12 @@ export function resolvePackageProtectionAuditOutputSuffix(variant) {
       return "shielded-descriptor-bind";
     case "jsconfuser-string":
       return "shielded-jsconfuser-string";
+    case "pref-bridge":
+      return "shielded-pref-bridge";
+    case "surface-scrub":
+      return "shielded-surface-scrub";
+    case "surface-scrub-wasm-digest":
+      return "shielded-surface-scrub-wasm-digest";
     default:
       throw createScriptError("args", `unsupported package protection audit variant: ${variant}`, {
         failedStage: "resolve-output-suffix",
@@ -400,9 +648,23 @@ async function readAddonConfig(projectRootPath) {
 }
 
 function buildDynamicAnchors(config = {}) {
+  const addonName = String(config.addonName || "").trim();
   const addonRef = String(config.addonRef || "").trim();
   const addonVersion = String(config.addonVersion || "").trim();
+  const author = String(config.author || "").trim();
+  const homepage = String(config.homepage || "").trim();
+  const updateURL = String(config.updateURL || "").trim();
+  const instanceKey = String(config.instanceKey || "").trim();
   const dynamicAnchors = [];
+
+  if (addonName) {
+    dynamicAnchors.push({
+      id: "addon-name-literal",
+      label: "addonName literal",
+      needle: addonName,
+      category: "loader-metadata",
+    });
+  }
 
   if (addonRef) {
     dynamicAnchors.push({
@@ -422,9 +684,46 @@ function buildDynamicAnchors(config = {}) {
     });
   }
 
+  if (author) {
+    dynamicAnchors.push({
+      id: "author-literal",
+      label: "author literal",
+      needle: author,
+      category: "loader-metadata",
+    });
+  }
+
+  if (homepage) {
+    dynamicAnchors.push({
+      id: "homepage-url-literal",
+      label: "homepage_url literal",
+      needle: homepage,
+      category: "loader-metadata",
+    });
+  }
+
+  if (updateURL) {
+    dynamicAnchors.push({
+      id: "update-url-literal",
+      label: "update_url literal",
+      needle: updateURL,
+      category: "loader-metadata",
+    });
+  }
+
+  if (instanceKey) {
+    dynamicAnchors.push({
+      id: "instance-key-literal",
+      label: "instanceKey literal",
+      needle: instanceKey,
+      category: "loader-metadata",
+    });
+  }
+
   if (addonRef) {
     [
       ["preference-pane-id", `${addonRef}-preferences`],
+      ["preference-pane-root-id", `${addonRef}-preferences-root`],
       ["primary-action-command-id", `${addonRef}-primary-action`],
       ["reader-summary-entry-id", `${addonRef}-reader-summary`],
       ["reader-selection-command-id", `${addonRef}-reader-selection-snapshot`],
@@ -456,7 +755,42 @@ export function buildPackageProtectionAuditAnchors(config = {}) {
   return [
     ...buildDynamicAnchors(config),
     ...PACKAGE_PROTECTION_ROUTE_AUDIT_BASE_ANCHORS,
+    {
+      id: "bootstrap-log-prefix",
+      label: "bootstrap log prefix",
+      needle: "cleanroom.bootstrap",
+      category: "inner-bundle-semantics",
+    },
+    {
+      id: "bootstrap-console-bridge",
+      label: "console-bridge",
+      needle: "console-bridge",
+      category: "inner-bundle-semantics",
+    },
+    {
+      id: "bootstrap-capability-report",
+      label: "capability-report",
+      needle: "capability-report",
+      category: "inner-bundle-semantics",
+    },
+    {
+      id: "wasm-worker-fetch-failure",
+      label: "worker cannot fetch wasm bytes",
+      needle: "worker cannot fetch wasm bytes",
+      category: "inner-bundle-semantics",
+    },
+    {
+      id: "wasm-worker-instantiate",
+      label: "WebAssembly.instantiate",
+      needle: "WebAssembly.instantiate",
+      category: "inner-bundle-semantics",
+    },
   ];
+}
+
+export function buildPackageProtectionUnpackedSurfaceAnchors(config = {}) {
+  return buildPackageProtectionAuditAnchors(config)
+    .filter((anchor) => PACKAGE_PROTECTION_UNPACKED_SURFACE_ANCHOR_IDS.has(anchor?.id));
 }
 
 export function scanBundleAnchors(bundleSource, anchors = []) {
@@ -481,6 +815,42 @@ export function scanBundleAnchors(bundleSource, anchors = []) {
   };
 }
 
+export function scanPackageProtectionSurfaceFiles(files = [], anchors = []) {
+  const entries = Array.isArray(files) ? files : [];
+  const byFile = entries.map((entry) => {
+    const relativePath = String(entry?.relativePath || "").trim() || null;
+    const source = String(entry?.source || "");
+    const scan = scanBundleAnchors(source, anchors);
+    return {
+      relativePath,
+      absolutePath: String(entry?.absolutePath || "").trim() || null,
+      sizeBytes: Number(entry?.sizeBytes || Buffer.byteLength(source, "utf-8") || 0),
+      totalAnchorCount: scan.totalAnchorCount,
+      totalMatchCount: scan.totalMatchCount,
+      categoryCounts: scan.categoryCounts,
+      presentAnchors: getPresentMatches(scan.anchors).map((anchor) => ({
+        id: anchor.id,
+        label: anchor.label,
+        category: anchor.category,
+        count: anchor.count,
+      })),
+      anchors: scan.anchors,
+    };
+  });
+
+  const exposedFiles = byFile
+    .filter((entry) => entry.totalAnchorCount > 0)
+    .map((entry) => entry.relativePath)
+    .filter(Boolean);
+
+  return {
+    totalAnchorCount: byFile.reduce((sum, entry) => sum + Number(entry.totalAnchorCount || 0), 0),
+    totalMatchCount: byFile.reduce((sum, entry) => sum + Number(entry.totalMatchCount || 0), 0),
+    exposedFiles,
+    byFile,
+  };
+}
+
 function buildSourceProxyBuildEnv(mode) {
   if (mode === "protected") {
     return {
@@ -496,6 +866,7 @@ export function parsePackageProtectionAnchorAuditArgs(argv = process.argv.slice(
     variants: [...PACKAGE_PROTECTION_AUDIT_BASE_VARIANTS],
     includeDescriptorBind: false,
     includeJSConfuserString: false,
+    includePrefBridge: false,
     jsConfuserToolEntry: null,
     jsConfuserToolPath: null,
   };
@@ -509,7 +880,7 @@ export function parsePackageProtectionAnchorAuditArgs(argv = process.argv.slice(
     switch (token) {
       case "--variant": {
         const variant = normalizeVariant(argv[index + 1]);
-        assertScript(Boolean(variant), "--variant must be one of plain|encrypted|shielded|descriptor-bind|jsconfuser-string|all", {
+        assertScript(Boolean(variant), "--variant must be one of plain|encrypted|shielded|descriptor-bind|jsconfuser-string|pref-bridge|surface-scrub|surface-scrub-wasm-digest|all", {
           category: "args",
           failedStage: "parse-args",
         });
@@ -524,6 +895,21 @@ export function parsePackageProtectionAnchorAuditArgs(argv = process.argv.slice(
         break;
       case "--include-jsconfuser-string":
         options.includeJSConfuserString = true;
+        break;
+      case "--include-pref-bridge":
+        options.includePrefBridge = true;
+        break;
+      case "--include-surface-scrub":
+        options.variants = dedupeVariants([
+          ...options.variants,
+          "surface-scrub",
+        ]);
+        break;
+      case "--include-surface-scrub-wasm-digest":
+        options.variants = dedupeVariants([
+          ...options.variants,
+          "surface-scrub-wasm-digest",
+        ]);
         break;
       case "--jsconfuser-tool-path":
         options.jsConfuserToolPath = String(argv[index + 1] || "").trim() || null;
@@ -552,6 +938,13 @@ export function parsePackageProtectionAnchorAuditArgs(argv = process.argv.slice(
     options.variants = dedupeVariants([
       ...options.variants,
       "jsconfuser-string",
+    ]);
+  }
+
+  if (options.includePrefBridge) {
+    options.variants = dedupeVariants([
+      ...options.variants,
+      "pref-bridge",
     ]);
   }
 
@@ -621,6 +1014,11 @@ async function buildVariantAudit({ projectRootPath, config, variant, anchors, op
   const bundleStats = await fs.stat(bundlePath);
   const xpiStats = await fs.stat(xpiPath);
   const scan = scanBundleAnchors(source, anchors);
+  const unpackedSurfaceAnchors = buildPackageProtectionUnpackedSurfaceAnchors(config);
+  const unpackedSurfaceFiles = await readPackageProtectionSurfaceFilesFromXpi({
+    xpiPath,
+    targetFiles: PACKAGE_PROTECTION_UNPACKED_SURFACE_TARGETS,
+  });
 
   return {
     variant,
@@ -629,11 +1027,62 @@ async function buildVariantAudit({ projectRootPath, config, variant, anchors, op
     xpiPath,
     xpiSizeBytes: xpiStats.size,
     ...scan,
+    unpackedSurface: {
+      xpiPath,
+      targetFiles: PACKAGE_PROTECTION_UNPACKED_SURFACE_TARGETS.slice(),
+      ...scanPackageProtectionSurfaceFiles(unpackedSurfaceFiles, unpackedSurfaceAnchors),
+    },
   };
+}
+
+async function readPackageProtectionSurfaceFilesFromXpi({ xpiPath, targetFiles = [] } = {}) {
+  const archiveListing = execFileSync("unzip", ["-Z1", xpiPath], {
+    encoding: "utf-8",
+    maxBuffer: 32 * 1024 * 1024,
+  });
+  const archiveEntries = new Set(
+    String(archiveListing || "")
+      .split(/\r?\n/u)
+      .map((entry) => String(entry || "").trim())
+      .filter(Boolean),
+  );
+  const unpackedFiles = [];
+
+  for (const relativePath of Array.isArray(targetFiles) ? targetFiles : []) {
+    if (!archiveEntries.has(relativePath)) {
+      continue;
+    }
+
+    let source = "";
+    try {
+      source = execFileSync("unzip", ["-p", xpiPath, relativePath], {
+        encoding: "utf-8",
+        maxBuffer: 32 * 1024 * 1024,
+      });
+    } catch (error) {
+      throw wrapScriptError(error, {
+        failedStage: "scan-variant-unpacked-surface",
+        details: {
+          xpiPath,
+          relativePath,
+        },
+      });
+    }
+
+    unpackedFiles.push({
+      relativePath,
+      absolutePath: `${xpiPath}#${relativePath}`,
+      sizeBytes: Buffer.byteLength(source, "utf-8"),
+      source,
+    });
+  }
+
+  return unpackedFiles;
 }
 
 async function buildSourceProxyAudit({ projectRootPath, config, mode, anchors }) {
   const bundlePath = path.join(projectRootPath, "build", config.addonRef, "content", "scripts", `${config.addonRef}.js`);
+  const buildRootPath = path.join(projectRootPath, "build", config.addonRef);
 
   try {
     execFileSync(process.execPath, ["scripts/build.mjs"], {
@@ -656,12 +1105,46 @@ async function buildSourceProxyAudit({ projectRootPath, config, mode, anchors })
   const source = await fs.readFile(bundlePath, "utf-8");
   const bundleStats = await fs.stat(bundlePath);
   const scan = scanBundleAnchors(source, anchors);
+  const unpackedSurfaceAnchors = buildPackageProtectionUnpackedSurfaceAnchors(config);
+  const unpackedSurfaceFiles = [];
+  for (const relativePath of PACKAGE_PROTECTION_UNPACKED_SURFACE_TARGETS) {
+    const absolutePath = path.join(buildRootPath, relativePath);
+    try {
+      const [fileSource, fileStats] = await Promise.all([
+        fs.readFile(absolutePath, "utf-8"),
+        fs.stat(absolutePath),
+      ]);
+      unpackedSurfaceFiles.push({
+        relativePath,
+        absolutePath,
+        sizeBytes: Number(fileStats.size || 0),
+        source: fileSource,
+      });
+    } catch (error) {
+      if (error?.code === "ENOENT") {
+        continue;
+      }
+      throw wrapScriptError(error, {
+        failedStage: "scan-unpacked-surface",
+        details: {
+          mode,
+          relativePath,
+          absolutePath,
+        },
+      });
+    }
+  }
 
   return {
     mode,
     bundlePath,
     bundleSizeBytes: bundleStats.size,
     ...scan,
+    unpackedSurface: {
+      buildRootPath,
+      targetFiles: PACKAGE_PROTECTION_UNPACKED_SURFACE_TARGETS.slice(),
+      ...scanPackageProtectionSurfaceFiles(unpackedSurfaceFiles, unpackedSurfaceAnchors),
+    },
   };
 }
 
@@ -721,6 +1204,70 @@ export function summarizePackageProtectionSourceProxy(sourceProxyReports = []) {
       .map((anchor) => anchor.id)
       .filter((id) => !protectedPresentIds.has(id)),
     remainingAnchorIds: protectedPresent.map((anchor) => anchor.id),
+  };
+}
+
+export function summarizePackageProtectionUnpackedSurface(sourceProxyReports = []) {
+  const reportByMode = new Map(
+    (Array.isArray(sourceProxyReports) ? sourceProxyReports : [])
+      .map((report) => [String(report?.mode || "").trim(), report?.unpackedSurface || null]),
+  );
+  const plain = reportByMode.get("plain") || null;
+  const protectedReport = reportByMode.get("protected") || null;
+
+  if (!plain || !protectedReport) {
+    return {
+      present: false,
+      totalAnchorCount: 0,
+      totalMatchCount: 0,
+      exposedFiles: [],
+      byFile: [],
+      nextAction: "collect-unpacked-surface",
+      summary: "缺少 plain 或 protected 的 unpacked surface 视图，暂时无法判断静态 support surface 的减噪幅度。",
+    };
+  }
+
+  const reductionRatio = Number(plain.totalAnchorCount || 0) > 0
+    ? Number(protectedReport.totalAnchorCount || 0) / Number(plain.totalAnchorCount || 1)
+    : 0;
+  const reducedAnchorCount = Math.max(0, Number(plain.totalAnchorCount || 0) - Number(protectedReport.totalAnchorCount || 0));
+  const reducedMatchCount = Math.max(0, Number(plain.totalMatchCount || 0) - Number(protectedReport.totalMatchCount || 0));
+
+  let nextAction = "keep-surface-scrub";
+  let summary = "protected source proxy 的 unpacked support surface 已基本收敛。";
+  if (protectedReport.totalAnchorCount > 0 && reductionRatio > 0.4) {
+    nextAction = "trim-unpacked-surface";
+    summary = "protected source proxy 仍在 unpacked support surface 暴露较多描述性锚点，若未来要继续压低 AI 高层归纳速度，可再收紧静态 support surface。";
+  } else if (protectedReport.totalAnchorCount > 0) {
+    nextAction = "keep-surface-scrub-advisory";
+    summary = "protected source proxy 已明显压缩 unpacked support surface，但仍保留少量可见 support surface 锚点；当前更适合作为后续 hardening 候选，而不是立即重开主线。";
+  }
+
+  return {
+    present: true,
+    totalAnchorCount: Number(protectedReport.totalAnchorCount || 0),
+    totalMatchCount: Number(protectedReport.totalMatchCount || 0),
+    exposedFiles: Array.isArray(protectedReport.exposedFiles) ? protectedReport.exposedFiles.slice() : [],
+    byFile: Array.isArray(protectedReport.byFile) ? protectedReport.byFile : [],
+    targetFiles: Array.isArray(protectedReport.targetFiles) ? protectedReport.targetFiles.slice() : [],
+    nextAction,
+    summary,
+    plain: {
+      buildRootPath: plain.buildRootPath,
+      totalAnchorCount: Number(plain.totalAnchorCount || 0),
+      totalMatchCount: Number(plain.totalMatchCount || 0),
+      exposedFiles: Array.isArray(plain.exposedFiles) ? plain.exposedFiles.slice() : [],
+      byFile: Array.isArray(plain.byFile) ? plain.byFile : [],
+    },
+    protected: {
+      buildRootPath: protectedReport.buildRootPath,
+      totalAnchorCount: Number(protectedReport.totalAnchorCount || 0),
+      totalMatchCount: Number(protectedReport.totalMatchCount || 0),
+      exposedFiles: Array.isArray(protectedReport.exposedFiles) ? protectedReport.exposedFiles.slice() : [],
+      byFile: Array.isArray(protectedReport.byFile) ? protectedReport.byFile : [],
+    },
+    reducedAnchorCount,
+    reducedMatchCount,
   };
 }
 
@@ -818,6 +1365,252 @@ export function summarizeJSConfuserStringComparison(variantReports = []) {
   };
 }
 
+export function summarizePrefBridgeComparison(variantReports = []) {
+  const reportByVariant = new Map(
+    (Array.isArray(variantReports) ? variantReports : [])
+      .map((report) => [String(report?.variant || "").trim(), report]),
+  );
+  const shielded = reportByVariant.get("shielded") || null;
+  const prefBridge = reportByVariant.get("pref-bridge") || null;
+
+  if (!shielded || !prefBridge) {
+    return {
+      present: false,
+      shieldedPresent: Boolean(shielded),
+      prefBridgePresent: Boolean(prefBridge),
+      sameRawSurface: null,
+      rawAnchorDeltaCount: null,
+      rawMatchDeltaCount: null,
+      sameUnpackedSurface: null,
+      unpackedAnchorDeltaCount: null,
+      unpackedMatchDeltaCount: null,
+      xpiSizeDeltaBytes: null,
+      bundleSizeDeltaBytes: null,
+      interpretation: "pref-bridge 对比样本不完整，暂不生成增量结论。",
+      recommendedReading: "collect-pref-bridge-audit",
+    };
+  }
+
+  const rawAnchorDeltaCount = Number(prefBridge.totalAnchorCount || 0) - Number(shielded.totalAnchorCount || 0);
+  const rawMatchDeltaCount = Number(prefBridge.totalMatchCount || 0) - Number(shielded.totalMatchCount || 0);
+  const unpackedAnchorDeltaCount = Number(prefBridge.unpackedSurface?.totalAnchorCount || 0)
+    - Number(shielded.unpackedSurface?.totalAnchorCount || 0);
+  const unpackedMatchDeltaCount = Number(prefBridge.unpackedSurface?.totalMatchCount || 0) - Number(shielded.unpackedSurface?.totalMatchCount || 0);
+  const xpiSizeDeltaBytes = Number(prefBridge.xpiSizeBytes || 0) - Number(shielded.xpiSizeBytes || 0);
+  const bundleSizeDeltaBytes = Number(prefBridge.bundleSizeBytes || 0) - Number(shielded.bundleSizeBytes || 0);
+  const sameRawSurface = rawAnchorDeltaCount === 0 && rawMatchDeltaCount === 0;
+  const sameUnpackedSurface = unpackedAnchorDeltaCount === 0 && unpackedMatchDeltaCount === 0;
+
+  let interpretation = "pref-bridge 当前没有改变可观测静态表面。";
+  let recommendedReading = "keep-pref-bridge-advisory";
+  if (sameRawSurface && (unpackedAnchorDeltaCount < 0 || unpackedMatchDeltaCount < 0)) {
+    interpretation = "pref-bridge 没有改变 raw export 暴露面，但确实压缩了最终 XPI 的 unpacked support surface。";
+    recommendedReading = "static-support-surface-hardening";
+  } else if (!sameRawSurface) {
+    interpretation = "pref-bridge 改变了 raw export 暴露面，需要先确认这不是意外静态回归。";
+    recommendedReading = "recheck-raw-export-surface";
+  } else if (!sameUnpackedSurface) {
+    interpretation = "pref-bridge 改变了最终 XPI 的 unpacked support surface，需要结合运行时和自动化评分继续判断收益。";
+    recommendedReading = "recheck-unpacked-support-surface";
+  }
+
+  return {
+    present: true,
+    shieldedPresent: true,
+    prefBridgePresent: true,
+    sameRawSurface,
+    rawAnchorDeltaCount,
+    rawMatchDeltaCount,
+    sameUnpackedSurface,
+    unpackedAnchorDeltaCount,
+    unpackedMatchDeltaCount,
+    xpiSizeDeltaBytes,
+    bundleSizeDeltaBytes,
+    interpretation,
+    recommendedReading,
+  };
+}
+
+export function summarizeSurfaceScrubComparison(variantReports = []) {
+  const reportByVariant = new Map(
+    (Array.isArray(variantReports) ? variantReports : [])
+      .map((report) => [String(report?.variant || "").trim(), report]),
+  );
+  const shielded = reportByVariant.get("shielded") || null;
+  const surfaceScrub = reportByVariant.get("surface-scrub") || null;
+
+  if (!shielded || !surfaceScrub) {
+    return {
+      present: false,
+      shieldedPresent: Boolean(shielded),
+      surfaceScrubPresent: Boolean(surfaceScrub),
+      sameRawSurface: null,
+      rawAnchorDeltaCount: null,
+      rawMatchDeltaCount: null,
+      sameUnpackedSurface: null,
+      unpackedAnchorDeltaCount: null,
+      unpackedMatchDeltaCount: null,
+      residualExposedFiles: [],
+      residualAnchorIds: [],
+      residualFloorReached: false,
+      xpiSizeDeltaBytes: null,
+      bundleSizeDeltaBytes: null,
+      interpretation: "surface-scrub 对比样本不完整，暂不生成增量结论。",
+      recommendedReading: "collect-surface-scrub-audit",
+    };
+  }
+
+  const rawAnchorDeltaCount = Number(surfaceScrub.totalAnchorCount || 0) - Number(shielded.totalAnchorCount || 0);
+  const rawMatchDeltaCount = Number(surfaceScrub.totalMatchCount || 0) - Number(shielded.totalMatchCount || 0);
+  const unpackedAnchorDeltaCount = Number(surfaceScrub.unpackedSurface?.totalAnchorCount || 0)
+    - Number(shielded.unpackedSurface?.totalAnchorCount || 0);
+  const unpackedMatchDeltaCount = Number(surfaceScrub.unpackedSurface?.totalMatchCount || 0) - Number(shielded.unpackedSurface?.totalMatchCount || 0);
+  const xpiSizeDeltaBytes = Number(surfaceScrub.xpiSizeBytes || 0) - Number(shielded.xpiSizeBytes || 0);
+  const bundleSizeDeltaBytes = Number(surfaceScrub.bundleSizeBytes || 0) - Number(shielded.bundleSizeBytes || 0);
+  const sameRawSurface = rawAnchorDeltaCount === 0 && rawMatchDeltaCount === 0;
+  const sameUnpackedSurface = unpackedAnchorDeltaCount === 0 && unpackedMatchDeltaCount === 0;
+  const residualExposedFiles = Array.isArray(surfaceScrub.unpackedSurface?.exposedFiles)
+    ? surfaceScrub.unpackedSurface.exposedFiles.slice()
+    : [];
+  const residualAnchorIds = Array.isArray(surfaceScrub.unpackedSurface?.byFile)
+    ? surfaceScrub.unpackedSurface.byFile
+      .filter((entry) => entry?.relativePath === "manifest.json" && Number(entry?.totalAnchorCount || 0) > 0)
+      .flatMap((entry) => Array.isArray(entry?.presentAnchors) ? entry.presentAnchors.map((anchor) => anchor?.id).filter(Boolean) : [])
+    : [];
+  const residualAnchorIDSet = new Set(residualAnchorIds);
+  const residualFloorReached = residualExposedFiles.length === 1
+    && residualExposedFiles[0] === "manifest.json"
+    && residualAnchorIDSet.size > 0
+    && Array.from(residualAnchorIDSet).every((id) => id === "addon-version-literal" || id === "update-url-literal");
+
+  let interpretation = "surface-scrub 当前没有改变可观测静态表面。";
+  let recommendedReading = "keep-surface-scrub-advisory";
+  if (sameRawSurface && (unpackedAnchorDeltaCount < 0 || unpackedMatchDeltaCount < 0)) {
+    if (residualFloorReached) {
+      interpretation = "surface-scrub 没有改变 raw export 暴露面，并已把 unpacked support surface 压到 manifest 兼容性下限；当前残余只剩 addonVersion / update_url。";
+      recommendedReading = "surface-scrub-floor-reached";
+    } else {
+      interpretation = "surface-scrub 没有改变 raw export 暴露面，但继续压缩了最终 XPI 的 unpacked support surface。";
+      recommendedReading = "surface-scrub-hardening";
+    }
+  } else if (!sameRawSurface) {
+    interpretation = "surface-scrub 改变了 raw export 暴露面，需要先确认这不是新的静态回归。";
+    recommendedReading = "recheck-raw-export-surface";
+  } else if (!sameUnpackedSurface) {
+    interpretation = "surface-scrub 改变了最终 XPI 的 unpacked support surface，需要结合运行时和自动化评分继续判断收益。";
+    recommendedReading = "recheck-unpacked-support-surface";
+  }
+
+  return {
+    present: true,
+    shieldedPresent: true,
+    surfaceScrubPresent: true,
+    sameRawSurface,
+    rawAnchorDeltaCount,
+    rawMatchDeltaCount,
+    sameUnpackedSurface,
+    unpackedAnchorDeltaCount,
+    unpackedMatchDeltaCount,
+    residualExposedFiles,
+    residualAnchorIds: Array.from(residualAnchorIDSet),
+    residualFloorReached,
+    xpiSizeDeltaBytes,
+    bundleSizeDeltaBytes,
+    interpretation,
+    recommendedReading,
+  };
+}
+
+export function summarizeSurfaceScrubWasmDigestComparison(variantReports = []) {
+  const reportByVariant = new Map(
+    (Array.isArray(variantReports) ? variantReports : [])
+      .map((report) => [String(report?.variant || "").trim(), report]),
+  );
+  const surfaceScrub = reportByVariant.get("surface-scrub") || null;
+  const wasmDigest = reportByVariant.get("surface-scrub-wasm-digest") || null;
+
+  if (!surfaceScrub || !wasmDigest) {
+    return {
+      present: false,
+      surfaceScrubPresent: Boolean(surfaceScrub),
+      wasmDigestPresent: Boolean(wasmDigest),
+      sameRawSurface: null,
+      rawAnchorDeltaCount: null,
+      rawMatchDeltaCount: null,
+      sameUnpackedSurface: null,
+      unpackedAnchorDeltaCount: null,
+      unpackedMatchDeltaCount: null,
+      newExposedFiles: [],
+      unexpectedExposedFiles: [],
+      packageBoundaryWithinWasmAssets: false,
+      xpiSizeDeltaBytes: null,
+      bundleSizeDeltaBytes: null,
+      interpretation: "surface-scrub-wasm-digest 对比样本不完整，暂不生成增量结论。",
+      recommendedReading: "collect-surface-scrub-wasm-digest-audit",
+    };
+  }
+
+  const rawAnchorDeltaCount = Number(wasmDigest.totalAnchorCount || 0) - Number(surfaceScrub.totalAnchorCount || 0);
+  const rawMatchDeltaCount = Number(wasmDigest.totalMatchCount || 0) - Number(surfaceScrub.totalMatchCount || 0);
+  const unpackedAnchorDeltaCount = Number(wasmDigest.unpackedSurface?.totalAnchorCount || 0)
+    - Number(surfaceScrub.unpackedSurface?.totalAnchorCount || 0);
+  const unpackedMatchDeltaCount = Number(wasmDigest.unpackedSurface?.totalMatchCount || 0)
+    - Number(surfaceScrub.unpackedSurface?.totalMatchCount || 0);
+  const xpiSizeDeltaBytes = Number(wasmDigest.xpiSizeBytes || 0) - Number(surfaceScrub.xpiSizeBytes || 0);
+  const bundleSizeDeltaBytes = Number(wasmDigest.bundleSizeBytes || 0) - Number(surfaceScrub.bundleSizeBytes || 0);
+  const sameRawSurface = rawAnchorDeltaCount === 0 && rawMatchDeltaCount === 0;
+  const sameUnpackedSurface = unpackedAnchorDeltaCount === 0 && unpackedMatchDeltaCount === 0;
+
+  const baseFileSet = new Set(
+    Array.isArray(surfaceScrub.unpackedSurface?.byFile)
+      ? surfaceScrub.unpackedSurface.byFile.map((entry) => String(entry?.relativePath || "").trim()).filter(Boolean)
+      : [],
+  );
+  const candidateFileSet = new Set(
+    Array.isArray(wasmDigest.unpackedSurface?.byFile)
+      ? wasmDigest.unpackedSurface.byFile.map((entry) => String(entry?.relativePath || "").trim()).filter(Boolean)
+      : [],
+  );
+  const newExposedFiles = Array.from(candidateFileSet)
+    .filter((relativePath) => !baseFileSet.has(relativePath))
+    .sort((left, right) => left.localeCompare(right));
+  const unexpectedExposedFiles = newExposedFiles
+    .filter((relativePath) => !relativePath.startsWith("content/lib/w/"));
+  const packageBoundaryWithinWasmAssets = unexpectedExposedFiles.length === 0;
+
+  let interpretation = "surface-scrub-wasm-digest 当前没有扩大 surface-scrub 的 package-boundary 暴露。";
+  let recommendedReading = "keep-wasm-candidate-bounded";
+  if (!packageBoundaryWithinWasmAssets) {
+    interpretation = "surface-scrub-wasm-digest 新增了超出 content/lib/w/* 的 package-boundary 暴露，属于设计越界。";
+    recommendedReading = "stop-wasm-candidate-boundary-violation";
+  } else if (newExposedFiles.length > 0) {
+    interpretation = `surface-scrub-wasm-digest 的新增 package-boundary 暴露仅限 content/lib/w/* 资产：${newExposedFiles.join(", ")}。`;
+    recommendedReading = "bounded-wasm-asset-exposure";
+  } else if (!sameUnpackedSurface || !sameRawSurface) {
+    interpretation = "surface-scrub-wasm-digest 虽未新增越界资产，但仍改变了静态面，需要结合 compare / perf 继续复核。";
+    recommendedReading = "recheck-wasm-candidate-surface";
+  }
+
+  return {
+    present: true,
+    surfaceScrubPresent: true,
+    wasmDigestPresent: true,
+    sameRawSurface,
+    rawAnchorDeltaCount,
+    rawMatchDeltaCount,
+    sameUnpackedSurface,
+    unpackedAnchorDeltaCount,
+    unpackedMatchDeltaCount,
+    newExposedFiles,
+    unexpectedExposedFiles,
+    packageBoundaryWithinWasmAssets,
+    xpiSizeDeltaBytes,
+    bundleSizeDeltaBytes,
+    interpretation,
+    recommendedReading,
+  };
+}
+
 export function summarizePackageProtectionAnchorAudit(variantReports = [], options = {}) {
   const reportByVariant = new Map(
     (Array.isArray(variantReports) ? variantReports : [])
@@ -825,8 +1618,12 @@ export function summarizePackageProtectionAnchorAudit(variantReports = [], optio
   );
   const summary = buildAuditSummary(reportByVariant);
   const sourceProxy = summarizePackageProtectionSourceProxy(options.sourceProxyReports);
+  const unpackedSurface = summarizePackageProtectionUnpackedSurface(options.sourceProxyReports);
   const descriptorBindComparison = summarizeDescriptorBindComparison(variantReports);
   const jsConfuserStringComparison = summarizeJSConfuserStringComparison(variantReports);
+  const prefBridgeComparison = summarizePrefBridgeComparison(variantReports);
+  const surfaceScrubComparison = summarizeSurfaceScrubComparison(variantReports);
+  const surfaceScrubWasmDigestComparison = summarizeSurfaceScrubWasmDigestComparison(variantReports);
   const variantOrder = dedupeVariants(
     Array.isArray(options.variantOrder) && options.variantOrder.length > 0
       ? options.variantOrder
@@ -842,8 +1639,12 @@ export function summarizePackageProtectionAnchorAudit(variantReports = [], optio
     nextAction: summary.nextAction,
     comparison: summary.comparison,
     sourceProxy,
+    unpackedSurface,
     descriptorBindComparison,
     jsConfuserStringComparison,
+    prefBridgeComparison,
+    surfaceScrubComparison,
+    surfaceScrubWasmDigestComparison,
     variants: variantOrder.map((variant) => {
       const report = reportByVariant.get(variant);
       if (!report) {
@@ -857,6 +1658,7 @@ export function summarizePackageProtectionAnchorAudit(variantReports = [], optio
           totalAnchorCount: 0,
           totalMatchCount: 0,
           categoryCounts: {},
+          unpackedSurface: null,
           presentAnchors: [],
           anchors: [],
         };
@@ -871,6 +1673,7 @@ export function summarizePackageProtectionAnchorAudit(variantReports = [], optio
         totalAnchorCount: report.totalAnchorCount,
         totalMatchCount: report.totalMatchCount,
         categoryCounts: report.categoryCounts,
+        unpackedSurface: report.unpackedSurface || null,
         presentAnchors: getPresentMatches(report.anchors).map((anchor) => ({
           id: anchor.id,
           label: anchor.label,
@@ -952,6 +1755,56 @@ export function renderPackageProtectionAnchorAuditMarkdown(report) {
     lines.push("");
   }
 
+  if (report.prefBridgeComparison?.present) {
+    lines.push("## Pref-Bridge Comparison", "");
+    lines.push(`- sameRawSurface: \`${report.prefBridgeComparison.sameRawSurface ? "yes" : "no"}\``);
+    lines.push(`- rawAnchorDeltaCount: \`${report.prefBridgeComparison.rawAnchorDeltaCount}\``);
+    lines.push(`- rawMatchDeltaCount: \`${report.prefBridgeComparison.rawMatchDeltaCount}\``);
+    lines.push(`- sameUnpackedSurface: \`${report.prefBridgeComparison.sameUnpackedSurface ? "yes" : "no"}\``);
+    lines.push(`- unpackedAnchorDeltaCount: \`${report.prefBridgeComparison.unpackedAnchorDeltaCount}\``);
+    lines.push(`- unpackedMatchDeltaCount: \`${report.prefBridgeComparison.unpackedMatchDeltaCount}\``);
+    lines.push(`- xpiSizeDeltaBytes: \`${report.prefBridgeComparison.xpiSizeDeltaBytes}\``);
+    lines.push(`- bundleSizeDeltaBytes: \`${report.prefBridgeComparison.bundleSizeDeltaBytes}\``);
+    lines.push(`- interpretation: ${report.prefBridgeComparison.interpretation}`);
+    lines.push(`- recommendedReading: \`${report.prefBridgeComparison.recommendedReading}\``);
+    lines.push("");
+  }
+
+  if (report.surfaceScrubComparison?.present) {
+    lines.push("## surface-scrub");
+    lines.push("");
+    lines.push(`- sameRawSurface: \`${report.surfaceScrubComparison.sameRawSurface ? "yes" : "no"}\``);
+    lines.push(`- rawAnchorDeltaCount: \`${report.surfaceScrubComparison.rawAnchorDeltaCount}\``);
+    lines.push(`- rawMatchDeltaCount: \`${report.surfaceScrubComparison.rawMatchDeltaCount}\``);
+    lines.push(`- sameUnpackedSurface: \`${report.surfaceScrubComparison.sameUnpackedSurface ? "yes" : "no"}\``);
+    lines.push(`- unpackedAnchorDeltaCount: \`${report.surfaceScrubComparison.unpackedAnchorDeltaCount}\``);
+    lines.push(`- unpackedMatchDeltaCount: \`${report.surfaceScrubComparison.unpackedMatchDeltaCount}\``);
+    lines.push(`- xpiSizeDeltaBytes: \`${report.surfaceScrubComparison.xpiSizeDeltaBytes}\``);
+    lines.push(`- bundleSizeDeltaBytes: \`${report.surfaceScrubComparison.bundleSizeDeltaBytes}\``);
+    lines.push(`- interpretation: ${report.surfaceScrubComparison.interpretation}`);
+    lines.push(`- recommendedReading: \`${report.surfaceScrubComparison.recommendedReading}\``);
+    lines.push("");
+  }
+
+  if (report.surfaceScrubWasmDigestComparison?.present) {
+    lines.push("## surface-scrub-wasm-digest");
+    lines.push("");
+    lines.push(`- sameRawSurface: \`${report.surfaceScrubWasmDigestComparison.sameRawSurface ? "yes" : "no"}\``);
+    lines.push(`- rawAnchorDeltaCount: \`${report.surfaceScrubWasmDigestComparison.rawAnchorDeltaCount}\``);
+    lines.push(`- rawMatchDeltaCount: \`${report.surfaceScrubWasmDigestComparison.rawMatchDeltaCount}\``);
+    lines.push(`- sameUnpackedSurface: \`${report.surfaceScrubWasmDigestComparison.sameUnpackedSurface ? "yes" : "no"}\``);
+    lines.push(`- unpackedAnchorDeltaCount: \`${report.surfaceScrubWasmDigestComparison.unpackedAnchorDeltaCount}\``);
+    lines.push(`- unpackedMatchDeltaCount: \`${report.surfaceScrubWasmDigestComparison.unpackedMatchDeltaCount}\``);
+    lines.push(`- packageBoundaryWithinWasmAssets: \`${report.surfaceScrubWasmDigestComparison.packageBoundaryWithinWasmAssets ? "yes" : "no"}\``);
+    lines.push(`- newExposedFiles: \`${(report.surfaceScrubWasmDigestComparison.newExposedFiles || []).join(", ") || "-"}\``);
+    lines.push(`- unexpectedExposedFiles: \`${(report.surfaceScrubWasmDigestComparison.unexpectedExposedFiles || []).join(", ") || "-"}\``);
+    lines.push(`- xpiSizeDeltaBytes: \`${report.surfaceScrubWasmDigestComparison.xpiSizeDeltaBytes}\``);
+    lines.push(`- bundleSizeDeltaBytes: \`${report.surfaceScrubWasmDigestComparison.bundleSizeDeltaBytes}\``);
+    lines.push(`- interpretation: ${report.surfaceScrubWasmDigestComparison.interpretation}`);
+    lines.push(`- recommendedReading: \`${report.surfaceScrubWasmDigestComparison.recommendedReading}\``);
+    lines.push("");
+  }
+
   if (report.sourceProxy?.present) {
     lines.push("## Source Proxy Reduction", "");
     lines.push(`- plainAnchorCount: \`${report.sourceProxy.plain?.totalAnchorCount ?? 0}\``);
@@ -962,6 +1815,20 @@ export function renderPackageProtectionAnchorAuditMarkdown(report) {
     lines.push(`- reducedMatchCount: \`${report.sourceProxy.reducedMatchCount ?? 0}\``);
     lines.push(`- removedAnchorIds: \`${(report.sourceProxy.removedAnchorIds || []).join(", ") || "-"}\``);
     lines.push(`- remainingAnchorIds: \`${(report.sourceProxy.remainingAnchorIds || []).join(", ") || "-"}\``);
+    lines.push("");
+  }
+
+  if (report.unpackedSurface?.present) {
+    lines.push("## Unpacked Surface", "");
+    lines.push(`- protectedAnchorCount: \`${report.unpackedSurface.totalAnchorCount ?? 0}\``);
+    lines.push(`- protectedMatchCount: \`${report.unpackedSurface.totalMatchCount ?? 0}\``);
+    lines.push(`- plainAnchorCount: \`${report.unpackedSurface.plain?.totalAnchorCount ?? 0}\``);
+    lines.push(`- plainMatchCount: \`${report.unpackedSurface.plain?.totalMatchCount ?? 0}\``);
+    lines.push(`- reducedAnchorCount: \`${report.unpackedSurface.reducedAnchorCount ?? 0}\``);
+    lines.push(`- reducedMatchCount: \`${report.unpackedSurface.reducedMatchCount ?? 0}\``);
+    lines.push(`- exposedFiles: \`${(report.unpackedSurface.exposedFiles || []).join(", ") || "-"}\``);
+    lines.push(`- nextAction: \`${report.unpackedSurface.nextAction || "-"}\``);
+    lines.push(`- summary: ${report.unpackedSurface.summary || "-"}`);
     lines.push("");
   }
 
@@ -982,6 +1849,11 @@ export function renderPackageProtectionAnchorAuditMarkdown(report) {
     lines.push(`- totalAnchorCount: \`${variantReport.totalAnchorCount}\``);
     lines.push(`- totalMatchCount: \`${variantReport.totalMatchCount}\``);
     lines.push(`- categoryCounts: \`${JSON.stringify(variantReport.categoryCounts)}\``);
+    if (variantReport.unpackedSurface) {
+      lines.push(`- unpackedSurfaceAnchorCount: \`${variantReport.unpackedSurface.totalAnchorCount ?? 0}\``);
+      lines.push(`- unpackedSurfaceMatchCount: \`${variantReport.unpackedSurface.totalMatchCount ?? 0}\``);
+      lines.push(`- unpackedSurfaceExposedFiles: \`${(variantReport.unpackedSurface.exposedFiles || []).join(", ") || "-"}\``);
+    }
     if (variantReport.presentAnchors.length === 0) {
       lines.push("- presentAnchors: 无");
     } else {

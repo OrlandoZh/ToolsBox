@@ -2,8 +2,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, it, assert } from "./test-framework.js";
-import { parseCli } from "../scripts/zotero.mjs";
+import { createScenarioLastRunReport, main, parseCli } from "../scripts/zotero.mjs";
 import {
+  buildScenarioLastRunMarkdown,
   filterRegisteredScenarios,
   filterScenarioFiles,
   initializeScenarioRegistry,
@@ -32,6 +33,53 @@ describe("Zotero Script", () => {
       "--scenario",
       "menu surface smoke",
     ]), /only supported in scenario mode/);
+  });
+
+  it("should retain selected scenario results in the last-run artifact", () => {
+    const report = createScenarioLastRunReport({
+      result: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+        skipped: 0,
+        results: [
+          {
+            name: "wasm kernel probe diagnostics",
+            status: "passed",
+            durationMs: 7,
+            details: {
+              timingSummary: {
+                totalDurationMs: 7,
+              },
+            },
+          },
+        ],
+        failedResults: [],
+        selectedScenarios: [
+          {
+            name: "wasm kernel probe diagnostics",
+            sourceFile: "zotero-scenarios/wasm-kernel-probe.scenario.js",
+          },
+        ],
+        execution: {
+          registered: ["wasm kernel probe diagnostics"],
+          selected: ["wasm kernel probe diagnostics"],
+          completed: ["wasm kernel probe diagnostics"],
+          filtersApplied: {
+            scenario: "wasm kernel probe diagnostics",
+            scenarioFile: null,
+            listOnly: false,
+          },
+        },
+      },
+    });
+
+    assert.equal(report.total, 1);
+    assert.equal(report.passed, 1);
+    assert.equal(report.results[0]?.details?.timingSummary?.totalDurationMs, 7);
+    const markdown = buildScenarioLastRunMarkdown(report);
+    assert.ok(markdown.includes("Selected Results"));
+    assert.ok(markdown.includes("wasm kernel probe diagnostics"));
   });
 
   it("should filter scenario files and names in a stable order", () => {
@@ -123,6 +171,41 @@ describe("Zotero Script", () => {
     assert.ok(error);
     assert.equal(error.failedStage, "select-scenario-files");
     assert.equal(error.details?.scenarioFilePattern, "reader-*");
+  });
+
+  it("should short-circuit scenario mode through runScenarioMode without entering generic launch flow", async () => {
+    let runScenarioModeCalls = 0;
+    await main([
+      "scenario",
+      "--scenario",
+      "wasm kernel probe diagnostics",
+    ], {
+      buildAddonImpl() {
+        throw new Error("buildAddon should not be called for scenario mode");
+      },
+      async runScenarioModeImpl(options) {
+        runScenarioModeCalls += 1;
+        assert.equal(options.projectRootPath.endsWith("AddonTemplate4Z"), true);
+        assert.equal(options.skipPackage, false);
+        assert.equal(options.listScenarios, false);
+        assert.equal(options.scenarioPattern, "wasm kernel probe diagnostics");
+        assert.equal(options.scenarioFilePattern, null);
+        return {
+          scenarioResult: {
+            failed: 0,
+            execution: {
+              incomplete: false,
+            },
+          },
+        };
+      },
+      assertScenarioBatchPassedImpl(result) {
+        assert.equal(result.failed, 0);
+        assert.equal(result.execution.incomplete, false);
+      },
+    });
+
+    assert.equal(runScenarioModeCalls, 1);
   });
 
   it("should pass the full addon config into the scenario runtime", async () => {

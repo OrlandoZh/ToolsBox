@@ -7,7 +7,7 @@
       "enabled": false,
       "lane": "ts-isolated",
       "implementationStatus": "implemented",
-      "summary": "Standalone React/TS demo window plus a host-mounted surface bridge example. This bundle stays default-disabled so downstream projects can opt in without forcing React into the template core.",
+      "summary": "Standalone React/TS demo window plus a host-mounted surface bridge example. Its checked-in shell and built assets stay grouped under content/lib/r so downstream projects can opt in without forcing React into the template core.",
       "build": {
         "scriptName": "build:react-ui",
         "requiredPackages": [
@@ -22,9 +22,9 @@
             "summary": "Standalone demo window backed by a checked-in XHTML shell.",
             "entry": "src/react-ui/demo-window/entry.tsx",
             "stylesheet": "src/react-ui/styles/demo.css",
-            "shell": "addon-static/content/react-ui/demo.xhtml",
-            "outputScript": "content/scripts/react-ui-demo.js",
-            "outputStyle": "content/styles/react-ui-demo.css"
+            "shell": "addon-static/content/lib/r/demo.xhtml",
+            "outputScript": "content/lib/r/react-ui-demo.js",
+            "outputStyle": "content/lib/r/react-ui-demo.css"
           },
           {
             "id": "surface-bridge",
@@ -32,8 +32,8 @@
             "summary": "Host-mounted React renderer bridge for in-document surfaces loaded through loadSubScript.",
             "entry": "src/react-ui/surface-bridge/entry.tsx",
             "stylesheet": "src/react-ui/styles/surface-bridge.css",
-            "outputScript": "content/scripts/react-ui-surface-bridge.js",
-            "outputStyle": "content/styles/react-ui-surface-bridge.css",
+            "outputScript": "content/lib/r/react-ui-surface-bridge.js",
+            "outputStyle": "content/lib/r/react-ui-surface-bridge.css",
             "globalKey": "__CleanroomTemplateReactSurface__"
           }
         ]
@@ -60,6 +60,38 @@
       "summary": "Planned JS-core service lane for provider catalogs, prompt routing, and key-governed degradation that can be reused without importing the agent runtime or React UI.",
       "docs": [
         "docs/OPTIONAL_BUNDLES.md"
+      ]
+    },
+    {
+      "id": "wasm-kernel",
+      "enabled": false,
+      "lane": "js-core",
+      "implementationStatus": "planned",
+      "summary": "Probe-backed Wasm mini-kernel lane with checked-in content/lib/w assets plus bundle-local digest and shadow unlock derivation primitives, kept default-disabled until disabled-contract, build/export, and cost-quantification evidence are complete.",
+      "validation": {
+        "summary": "Keep the probe-backed Wasm lane verifiable while it remains planned: checked-in source/assets must survive build, verify, and pure-project export without promoting the lane to implemented.",
+        "requiredFiles": [
+          "addon-static/content/lib/w/probe.wasm",
+          "addon-static/content/lib/w/wasm-probe-worker.js",
+          "src/services/wasm-loader.js",
+          "src/services/wasm-worker.js",
+          "src/features/wasm-kernel-probe.js",
+          "scripts/wasm-kernel-smoke.mjs",
+          "scripts/wasm-kernel-performance-report.mjs",
+          "scripts/wasm-kernel-disabled-contract-report.mjs",
+          "scripts/wasm-kernel-matrix-report.mjs"
+        ],
+        "requiredPackageScripts": [
+          "wasm:kernel:smoke",
+          "wasm:kernel:perf",
+          "wasm:kernel:disabled-contract",
+          "wasm:kernel:matrix"
+        ]
+      },
+      "docs": [
+        "docs/OPTIONAL_BUNDLES.md",
+        "docs/WASM_DEVELOPMENT_INDEX.md",
+        "docs/WASM_KERNEL_PROMOTION_PLAN.md"
       ]
     }
   ]

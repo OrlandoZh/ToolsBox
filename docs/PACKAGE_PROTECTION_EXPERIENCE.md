@@ -1,10 +1,11 @@
 # Package Protection Experience
 
 > 历史经验页。这里只沉淀“手动受保护导出分支”在当前模板里已经验证过的经验，不定义 current truth。
-> 更新时间：2026-04-17
+> 更新时间：2026-04-19
 
 当前若需要看“整体保护导出路线接下来该怎么推进、优先 trim 哪一层”，请配合阅读 [PACKAGE_PROTECTION_ROUTE_PLAN.md](./PACKAGE_PROTECTION_ROUTE_PLAN.md)。
 如果需要统一“攻击者 + AI 组合能力”的评测标准，配合阅读 [PACKAGE_PROTECTION_ATTACK_GRADING.md](./PACKAGE_PROTECTION_ATTACK_GRADING.md)。
+如果需要把当前所有候选统一收成一个实验台账，配合阅读 [PACKAGE_PROTECTION_EXPERIMENT_MATRIX.md](./PACKAGE_PROTECTION_EXPERIMENT_MATRIX.md)。
 
 ## 适用范围
 
@@ -12,16 +13,25 @@
 
 - `npm run package:encrypted`
 - `npm run package:shielded`
+- `npm run package:shielded:pref-bridge`
+- `npm run package:shielded:surface-scrub`
+- `npm run package:shielded:surface-scrub:wasm:digest`
 - `npm run package:protection:jsconfuser:bootstrap`
 - `npm run package:protection:jsconfuser:preflight`
 - `npm run package:protection:lightweight:preflight`
-- `npm run package:protection:smoke -- --variant <plain|encrypted|shielded|shielded-descriptor-bind> --repeats 3 --channel <stable|beta>`
-- `npm run package:protection:webcrack -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta>`
-- `npm run package:protection:webcrack:score -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta>`
-- `npm run package:protection:inner:audit -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string|all> --channel <stable|beta>`
-- `npm run package:protection:score:llm -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta> --llm "<rating>"`
-- `npm run package:protection:score:guided -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta> --rating "<rating>" --result-tier <R0|R1|R2|R3|R4> --attacker-tier <A0|A1|A2|A3|A4> --ai-tier <M0|M1|M2|M3|M4> --attack-method <static-only|static+webcrack|static+reference|dynamic-hooked|runtime-rehosted> --time-bucket <<10m|10-30m|30-120m|>120m> --round-mode <single-pass|multi-round> --summary "<summary>"`
-- `npm run package:protection:compare -- --variant <shielded-descriptor-bind|shielded-jsconfuser-string> --channel <stable|beta>`
+- `npm run package:protection:smoke -- --variant <plain|encrypted|shielded|shielded-descriptor-bind|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest> --repeats 3 --channel <stable|beta>`
+- `npm run package:protection:webcrack -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest> --channel <stable|beta>`
+- `npm run package:protection:webcrack:score -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest> --channel <stable|beta>`
+- `npm run package:protection:inner:audit -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|all> --channel <stable|beta>`
+- `npm run package:protection:score:llm -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest> --channel <stable|beta> --llm "<rating>"`
+- `npm run package:protection:score:guided -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest> --channel <stable|beta> --rating "<rating>" --result-tier <R0|R1|R2|R3|R4> --attacker-tier <A0|A1|A2|A3|A4> --ai-tier <M0|M1|M2|M3|M4> --attack-method <static-only|static+webcrack|static+reference|dynamic-hooked|runtime-rehosted> --time-bucket <<10m|10-30m|30-120m|>120m> --round-mode <single-pass|multi-round> --summary "<summary>"`
+- `npm run package:protection:attack`
+- `npm run package:protection:attack:plan`
+- `npm run package:protection:review`
+- `npm run package:protection:wasm:admission`
+- `npm run package:protection:compare -- --variant <shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest> --channel <stable|beta>`
+- `npm run package:protection:perf -- --channel <stable|beta> [--variant <plain|encrypted|shielded|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest>]`
+- `npm run package:protection:matrix`
 - `npm run package:protection:score -- --variant shielded --channel stable --webcrack "<rating>" --llm "<rating>"`
 - `npm run package:protection:verdict`
 
@@ -47,12 +57,24 @@
 - `dist/package-protection-inner-audit.json`
 - `dist/package-protection-inner-audit.md`
 - `dist/package-protection-webcrack/<variant>-<channel>.md`
-- `dist/package-protection-compare/<variant>-vs-shielded-<channel>.json`
-- `dist/package-protection-compare/<variant>-vs-shielded-<channel>.md`
-- `dist/package-protection-guided-attack/<variant>-<channel>.json`
-- `dist/package-protection-guided-attack/<variant>-<channel>.md`
+- `dist/package-protection-compare/<variant>-vs-<baseVariant>-<channel>.json`
+- `dist/package-protection-compare/<variant>-vs-<baseVariant>-<channel>.md`
+- `dist/package-protection-guided-attack/<variant>-<channel>-<profileKey>.json`
+- `dist/package-protection-guided-attack/<variant>-<channel>-<profileKey>.md`
+- `dist/package-protection-guided-attack/<variant>-<channel>.json` (`legacy alias`，仅在同一画像重放或首次写入时刷新，避免不同攻击画像互相覆盖)
+- `dist/package-protection-guided-attack/<variant>-<channel>.md` (`legacy alias`)
 - `dist/package-protection-guided-attack.json`
 - `dist/package-protection-guided-attack.md`
+- `dist/package-protection-attack-report.json`
+- `dist/package-protection-attack-report.md`
+- `dist/package-protection-guided-attack-plan.json`
+- `dist/package-protection-guided-attack-plan.md`
+- `dist/package-protection-retained-review.json`
+- `dist/package-protection-retained-review.md`
+- `dist/package-protection-matrix.json`
+- `dist/package-protection-matrix.md`
+- `dist/package-protection-wasm-admission.json`
+- `dist/package-protection-wasm-admission.md`
 - `dist/package-protection-verdict.json`
 - `dist/package-protection-verdict.md`
 
@@ -61,9 +83,23 @@
 - `package:protection:webcrack` 负责生成本地 `webcrack` 自动化工件
 - `package:protection:webcrack:score` 只把 `suggestedWebcrackRating` 回填到 smoke report 的 `manualScorecard.webcrackInitialResult`
 - `package:protection:inner:audit` 只补一份离线 `proxy LLM` 证据，不会写回 `manualScorecard`
+- `package:protection:attack` 只汇总 `webcrack / single-pass LLM / guided-attack / compare` 证据，用来回答“当前自动化阻力到哪一档、最强已记录攻击画像能恢复到什么层级”
+- `package:protection:attack` 还会固定标出两条画像覆盖线：
+  - `singlePassAutomation`
+  - `guidedA2M3`
+- `package:protection:attack` 对 `current` 候选会优先提示“先补固定覆盖线证据”，再谈 `probe-candidate-hardening`；避免把“证据不足”误读成“已经适合继续 hardening A/B”
+- `package:protection:attack:plan` 只把这些 fixed-profile gap 翻译成下一步命令模板，不重跑实验、不回写评分；controller 可以直接按它给出的顺序补 `current` 缺口，再决定是否继续 review retained experiment
+- `package:protection:attack:plan` 现在还会对 retained experiment review queue 做固定排序：先按 `compare status / decision`，再按 `unpacked support surface` 收缩幅度，最后看 `xpi / prepare / decode` 成本；当前固定画像缺口补齐后，会稳定把 `shielded-surface-scrub` 排在 `shielded-pref-bridge` 之前
+- 实验候选如果已经是 `hardening-win`，但 `compare.evidence.llmSymmetryComplete` 仍未补齐，矩阵和 retained review 不再直接给 `promote-experimental-candidate`；当前统一收口为 `collect-llm-symmetry-evidence`
+- 对应地，`package:protection:attack:plan` 现在会先生成 `collect-experimental-llm-symmetry-evidence` 任务，再进入 retained experiment review；避免把“仍缺对称 single-pass LLM 证据”的候选误当成已可 promotion
+- `package:protection:review` 会把 retained review queue、top candidate 的 `compare / matrix` 结论和排序依据收成单独 advisory 工件，固定回答“当前应继续保留哪个 retained candidate、为什么”
+- `package:protection:wasm:admission` 只读取 `package-protection-matrix / retained-review / wasm-kernel-matrix / candidates registry`，回答是否允许把 Wasm 从 `preplan` 提升为显式 protection experiment；它不重跑 smoke，不改 release/gate
+- `shielded-surface-scrub-wasm-digest` 是第一条 Wasm protection candidate，固定只和 `shielded-surface-scrub` 比较；新增静态暴露只允许落在 `content/lib/w/*`，不把 Wasm 放进 startup critical path
 - `package:protection:compare` 在手工 `LLM single-pass` 尚未完成时，会把 `inner audit` 的 proxy 结果一起展示，帮助保持 A/B 结论可读；一旦手工 LLM 补齐，compare 才能正式落到 `runtime-only`、`hardening-win` 或 `leaning-same`
 - `package:protection:score` 仍负责补齐 `llmSinglePassResult`，不会被替代
-- `package:protection:score:guided` 只记录更强攻击画像，不写回 `manualScorecard`
+- `package:protection:score:guided` 只记录更强攻击画像，不写回 `manualScorecard`；同一 `variant/channel` 现在允许并存多条不同画像记录，不再互相覆盖
+- `package:protection:score` / `package:protection:score:llm` / `package:protection:webcrack:score` 当前都复用同一条 package-protection workflow lock；这样即使在同一进程里并发回填评分，也不会再把 `dist/package-protection-smoke.json` 写坏
+- 但凡刚执行过会回写 smoke 的命令，例如 `package:protection:webcrack:score` 或 `package:protection:score:llm`，后续 `package:protection:attack -> package:protection:attack:plan -> package:protection:matrix` 必须串行重跑；不要把“写 smoke”和“读汇总工件”并发在同一轮里，否则容易读到旧状态
 - `package:protection:jsconfuser:bootstrap` 负责把 `js-confuser` 安装到当前仓库默认可发现位置，解决实验链的本地工具可复跑性，不改默认 `shielded`
 
 ## 评分分层
@@ -85,7 +121,14 @@
 - `encrypted` 的执行模型是：
   `base64 decode -> AES-GCM decrypt -> TextDecoder -> new Function(...) -> bootstrapPlugin`
 - 真机对比里，`encrypted` 的首次可用时间与 plain 包几乎等价，没有表现出明显体感卡顿。
-- 当前 fresh formal smoke 中，`encrypted stable` 三次 run 全部 `readinessMode=native`、`blockingRuntimeErrorCount=0`，`medianDecodeDurationMs=4`、`medianPrepareDurationMs=30`。
+- 截至 `2026-04-18` 的最新 `stable` 冷启动测量里，`encrypted stable` 已补到 `12` 次 fresh run，全部 `readinessMode=native`、`blockingRuntimeErrorCount=0`。
+- 这一轮的关键数字是：
+  - `plain durationMs median = 1032`
+  - `encrypted durationMs median = 1047.5`
+  - 相对 `plain` 只增加 `15.5ms`，约 `+1.5%`
+  - `encrypted loadSubScriptDurationMs median = 9.5`
+  - `encrypted decodeDurationMs median = 3`
+  - `encrypted prepareDurationMs median = 19`
 - 当前更适合作为“默认手动受保护包”基线，而不是一上来就使用更重的 `shielded`。
 
 ### 2. 旧版 `shielded` 的主要问题不是 AES，而是超大 loader
@@ -116,7 +159,15 @@
 - `shielded` 主脚本当前约 `5.4MB ~ 5.7MB`
 - 真机安装 smoke 从旧版约 `9061ms` 回落到约 `7138ms`
 - 用户实际体感已确认“不像之前那版本加载卡顿”
-- 当前 fresh formal smoke 中，`shielded stable` 三次 run 全部 `readinessMode=native`、`blockingRuntimeErrorCount=0`，`medianDecodeDurationMs=24`、`medianPrepareDurationMs=77`
+- 截至 `2026-04-18` 的最新 `stable` 冷启动测量里，`shielded stable` 已补到 `12` 次 fresh run，全部 `readinessMode=native`、`blockingRuntimeErrorCount=0`
+- 这一轮更可信的性能画像是：
+  - `shielded durationMs median = 1728.5`
+  - 相对 `plain` 增加 `696.5ms`，约 `+67.5%`
+  - `shielded loadSubScriptDurationMs median = 422.5`
+  - `shielded decodeDurationMs median = 24.5`
+  - `shielded evalDurationMs median = 44`
+  - `shielded prepareDurationMs median = 84`
+- 这进一步确认了当前 `shielded` 的主要热点仍然是 loader 进入 `loadSubScript()` 之后的解析/编译段，而不是 AES decrypt 本身。
 - `shielded beta` 确认性 smoke 也保持三次 run 全部通过，`medianDecodeDurationMs=23`、`medianPrepareDurationMs=76`
 
 ### 4. 当前 `shielded` 仍能提高自动化解读成本，但不能声称“真正保密”
@@ -135,6 +186,161 @@
 - 目标：提高普通开发者、自动化工具、AI 的快速自动化解读成本
 - 非目标：对抗专业逆向人员
 - 不应把客户端包内密钥包装描述成真正的 secrets protection
+
+### 4.1 `shielded-pref-bridge` 当前更适合作为低风险静态面 hardening 候选
+
+- 截至 `2026-04-18` 的最新 `stable` smoke，`shielded-pref-bridge` 已完成 `3` 次 fresh run，全部 `readinessMode=native`、`blockingRuntimeErrorCount=0`、`decodeMethod=fromBase64`
+- 当前关键数字是：
+  - `shielded-pref-bridge durationMs median = 1796`
+  - `shielded-pref-bridge protection pipeline median = 501`
+  - 相对 `shielded` 的 `protection pipeline` 轻约 `1.1%`
+  - XPI 体积相对 `shielded` 小约 `0.4%`
+- `webcrack` 与 `inner audit` 当前都仍落在 `parse-fail / only-loader`，没有观测到自动化阻力退化
+- 当前更值得关注的增量不是 raw loader，而是最终 `XPI` 的静态 support surface：
+  - `preferences.xhtml` 里的 pref name 已从 `extensions.zotero.<prefsPrefix>.*` 压成 `extensions.zotero.<opaquePaneId>.p0..p3`
+  - 截至本轮 latest audit，`prefs.js` 也已同步压成同一组 placeholder pref key；当前 `shielded` 解包后会暴露 `bootstrap.js + prefs.js + preferences.xhtml + content/lib/r/demo.xhtml`，而 `pref-bridge` 已收缩到 `bootstrap.js + content/lib/r/demo.xhtml`
+  - `pref-bridge` 当前更像“解压后静态面 hardening”，不是新的 runtime 语义恢复路线
+- 截至当前最新 `compare / attack / matrix` 收口，`pref-bridge` 已经从“保留观察候选”提升到“优先保留的低风险 hardening 候选”：
+  - `compare = passed / hardening-win`
+  - 对称 guided-attack 仍是 `high-level-architecture / R1`
+  - `matrix` 当前已把它收为 `complete`，不再把无关 `preflight` 缺失误报成 `partial`
+- retained rule：
+  - 作为当前优先保留的手动 hardening 候选继续存在，但不替代默认 `shielded`
+  - compare 重点看 `shielded` vs `shielded-pref-bridge` 的 `unpacked support surface` 是否继续收缩
+  - 若未来继续加强，优先改 pref pane 自身的静态命名，不优先动 loader
+  - 当前 retained review 队列里，它固定排在 `shielded-surface-scrub` 之后；原因不是阻力退化，而是同样保持 `hardening-win` 时，它的 `unpacked surface` 收缩更小，且 `xpi / prepare / decode` 都高于 `shielded`
+
+### 4.2 `shielded-surface-scrub` 当前是已验证的 retained static-surface scrub 候选
+
+- 这条变体是在 `pref-bridge` 的静态 support-surface 路线之上，再把 `bootstrap.js` 中剩余的 `addonRef / instanceKey` 文字面值改写为运行时表达式，并继续清理 `content/lib/r/demo.xhtml` 这类 package-boundary 壳文件
+- 当前已验证的低风险动作有两类：
+  - `bootstrap.js` 里的 `addonRef / instanceKey` 改成运行时表达式
+  - `react-ui` demo shell 改成相对资源路径，并在 `surface-scrub` 变体下把静态 `data-addon-*` / `<title>` 收成中性文案；运行时仍通过 `documentElement` 注入真实上下文
+- 当前已验证的 manifest 边界条件：
+  - `manifest.applications.zotero.update_url` 不能删除；在 Zotero 9 temporary install 下，删掉后 `AddonManager.getInstallForFile()` 会直接落到 `error = -3 / state = 4`，连 `name / type / version` 都无法解析
+  - 因此当前 `surface-scrub` 只能继续 scrub `name / description / author / homepage_url`，但必须保留真实 `update_url`
+- 它的目标不是改 runtime 结构，而是继续压缩“解压后直接搜索就能命中的 support surface”
+- 截至当前最新 `smoke / webcrack / inner audit / compare / guided attack / attack report` 收口，这条线已经满足“保留候选”标准：
+  - `compare = passed / hardening-win`
+  - 单轮 `webcrack + LLM` 仍停在 `parse-fail / only-loader`
+  - 固定强档 `A2/M3 + static+reference + multi-round + 30-120m` 仍只到 `high-level-architecture / R1`
+  - 当前 latest anchor audit 下，`surface-scrub` 的剩余 unpacked 暴露已经收敛到 `manifest.json` 单文件；残余锚点只剩 `addonVersion literal + update_url literal`
+  - 同一轮 audit 中，`shielded` 基线的剩余静态暴露已被更准确地收敛成：`manifest.json / bootstrap.js / prefs.js / content/preferences.js / content/preference-pane-load-bridge.js / content/theme.js / content/preferences.xhtml / content/lib/r/demo.xhtml / content/lib/w/wasm-probe-worker.js / locale/*/main.ftl`
+  - 相对 `shielded`，`surface-scrub` 当前的 `unpackedAnchorDeltaCount = -14`、`unpackedMatchDeltaCount = -27`
+  - 最新 `smoke / matrix` 下，`surface-scrub` 相对 `shielded` 的 `decode / prepare` 中位数都继续小约 `1ms`，XPI 体积也继续更小；当前没有观测到新的体感级回退
+- retained rule：
+  - 继续保持 advisory-only，不替代默认 `shielded`
+  - 当前可作为优先保留的低风险静态 surface hardening 候选
+  - 当前 retained review 队列里固定排在第一位；原因是它在保持 `hardening-win` 的同时，`unpackedAnchorDeltaCount / unpackedMatchDeltaCount` 明显优于 `pref-bridge`，且 `xpi / prepare / decode` 仍低于 `shielded`
+  - 下一步如果要继续增强，优先找“既能保安装、又能减少 manifest/package-boundary 暴露”的方案，不回到删 `update_url` 这类会直接破坏 installability 的路线
+
+### 4.3 protected-only host-action semantic scrub 已验证可行
+
+- 截至 `2026-04-19`，protected build 已把 `host action` 的连续字符串 ID 抽成独立语义模块，并在 protected 分支下改成 tokenized alias：
+  - `src/app/host-action-ids.js`
+  - `src/app/host-action-ids-protected.js`
+- 同一轮还新增了 `host-action-catalog-protected.js`，只保留运行时需要的最小字段：
+  - `id`
+  - `status`
+  - `executable`
+  - `requiredBundle`
+- 这条线的目的不是改变 `runHostAction()` 的运行语义，而是继续压缩解密后 inner bundle 里最适合被 grep / 一轮 AI 直接拼高层架构的目录型文本：
+  - `preferences.openPane`
+  - `reader.open`
+  - `runtime.probeWasmKernel`
+  - `window.openReactDemo`
+  - `authoritativeSource`
+  - `readinessAssertions`
+- 当前已验证的结论是：
+  - `shielded stable` smoke 继续保持 `3/3 native`、`blockingRuntimeErrorCount=0`
+  - `shielded-surface-scrub stable` smoke 同样继续通过
+  - 最新 `anchor audit` 下，`shielded` 的 raw protected export 仍保持 `totalAnchorCount = 0`
+  - 最新 `inner audit` 下，`shielded` 与 `shielded-surface-scrub` 仍都落在 `parse-fail / only-loader`
+- retained rule：
+  - 这类“语义 ID 常量化 + protected catalog 最小化”属于值得继续复用的低风险 semantic scrub 模式
+  - 只优先用于 agent / diagnostics / catalog 这类目录型语义，不优先去改真实宿主行为或核心 UI 文案
+  - 下一步若继续推进，应优先找同类型的“高描述性目录对象”，而不是回到重 loader 或 hostile runtime
+
+### 4.4 protected capability manifest label scrub 与 protected-only comment stripping 已接通
+
+- 截至 `2026-04-19`，`capability-manifest-protected` 的 limited baseline 已不再直接保留：
+  - `基线注册`
+  - `条目展示摘要`
+  - `宿主动作编排`
+  - `运行时桥接报告`
+  - 以及同类高层 capability label
+- 当前 protected baseline 会把这些 label/category 改成中性值：
+  - label 走 `C-01 ... C-12`
+  - category 统一走 `protected`
+- 同一轮里，descriptor overlay 也已扩到可恢复 `label/category`；因此只有在 host-binding 满足、overlay 真正 applied 时，runtime 才会重新看到 richer capability label，而不是在默认 protected baseline 里明文暴露
+- 这条线的目的不是改变 capability manifest 的数量或 `id`，而是继续压缩解密后最容易被一轮 AI 当作“高层功能目录”的文本片段
+- 同时，protected build 现在还会在 bundling 阶段去掉“整行注释”：
+  - `/** ... */`
+  - `// ...`
+  - 只作用于 protected build，不改默认源码
+- 这一步的直接原因是：即使 capability label 已经做了 protected baseline，中性 label 之外，像 `Reader 摘要` 这种字样仍可能通过 JSDoc 注释重新漏回 bundle
+- 当前已验证的结论是：
+  - `tests/build.test.js`
+  - `tests/capability-manifest-protected.test.js`
+  - `tests/package-protection-lib.test.js`
+  - `tests/plugin-agent.test.js`
+  - `tests/protected-semantic-ids.test.js`
+  都已通过
+- retained rule：
+  - 这类“protected baseline label 中性化 + overlay 条件恢复 + protected-only 注释去除”属于下一批可继续复用的低风险 semantic scrub
+  - 它优先服务于 capability manifest / diagnostics 这类目录型文本，不应外溢到真实用户可见 UI 文案
+
+### 4.5 `shielded-surface-scrub-wasm-digest` 已完成第一轮完整收口，但当前只应保留为 bounded retained experiment
+
+- 这条路线的前置准入当前已经验证通过：
+  - `package:protection:wasm:admission = ready-for-candidate`
+  - 前提固定是 `package-protection-matrix = passed`
+  - `retained-review.topCandidate = shielded-surface-scrub`
+  - `surface-scrub` 的 residual floor 已收敛到 `manifest.json` 兼容性下限
+  - `wasm-kernel-matrix = passed`
+  - digest micro-kernel 目标固定锁在 `content/lib/w/*`
+- 第一条显式 Wasm protection candidate 当前已补齐完整证据链：
+  - `smoke`: `3/3 passed`
+  - `readinessMode = native`
+  - `blockingRuntimeErrorCount = 0`
+  - `decodeMethod = fromBase64`
+  - `medianDecodeDurationMs = 23`
+  - `medianPrepareDurationMs = 76`
+  - `webcrack = parse-fail / only-loader`
+  - `inner audit = parse-fail / only-loader`
+  - `single-pass LLM = parse-fail / only-loader`
+  - 固定强档 `A2/M3 + static+reference + multi-round + 30-120m = high-level-architecture / R1`
+- 当前 `compare` 的结论也已经收口为：
+  - `status = passed`
+  - `decision = hardening-win`
+  - `guidedAttackSymmetryComplete = yes`
+  - `packageBoundaryWithinWasmAssets = yes`
+  - 当前没有观测到超出 `content/lib/w/*` 的新增 package-boundary 暴露
+- 但这条线目前还**不是**更优 retained candidate，原因也已经很明确：
+  - 它相对 `shielded-surface-scrub` 没有继续减少 unpacked support surface
+  - 当前 `unpackedAnchorDeltaCount = 0`
+  - 当前 `xpiDelta = +152112`
+  - 当前 `bundleDelta = +246276`
+  - 当前 `prepareDelta = +2`
+  - 当前 `decodeDelta = +1`
+  - retained review 当前固定把它排在 `reviewRank = 3`
+- 这意味着它当前证明的是：
+  - `route5-wasm` 可以在不破坏启动链、不扩大 package boundary、不降低自动化阻力的前提下成立
+  - 但这还不足以让它超过 `shielded-surface-scrub`
+  - 它当前提供的是“bounded Wasm lane feasibility”，不是“更强 static hardening”
+- 当前独立 read-only 复核也与这条结论一致：
+  - 在 `A2/M3 static+reference multi-round` 画像下，攻击者仍只能稳定恢复高层架构
+  - 能识别它是一个 `shielded-surface-scrub` 衍生候选，并额外带有 default-disabled / lazy 的 Wasm digest micro-kernel
+  - 但还达不到 `readable-module-recovery`
+- retained rule：
+  - 当前固定保留为 `retained-experiment-candidate`
+  - 不替代默认 `shielded`
+  - 不替代 retained top candidate `shielded-surface-scrub`
+  - 如果未来继续走 Wasm protection，不应重复在同一条 digest 小内核上反复补同类证据
+  - 下一轮只有在出现新的、可量化的保护收益目标时才值得继续，例如：
+    - 新的 package-boundary 收缩
+    - 新的 attack ceiling 下压
+    - 或新的非启动关键路径 Wasm 小内核能承接更高价值的敏感语义
 
 ### 5. 元数据泄露面会显著降低 AI 的一轮解读门槛
 
@@ -201,7 +407,7 @@
 
 因此这轮更准确的人工评级应视为：
 
-- `webcrackInitialResult = high-level-architecture`
+- `webcrackInitialResult = parse-fail / only-loader`
 - `llmSinglePassResult = high-level-architecture`
 
 这说明当前方案已经达到“阻碍普通开发者、自动化工具和一轮 AI 快速直读源码”的目标，但还达不到“连高层架构都不易理解”的更高目标。若未来目标升级到后一档，应新开 hardening wave，优先处理内层 bundle 的语义暴露，而不是先回到更重的 loader 或直接重开 `sidecar`。
@@ -226,14 +432,14 @@
   - 用 plain build 对比 `anonymized + semantic scrub` 的 protected source proxy
   - 直接量化 inner bundle 里的高层语义锚点有没有下降
 
-截至 `2026-04-16` 的最新审计结果已经验证：
+截至 `2026-04-17` 的最新审计结果已经验证：
 
-- `plain.totalAnchorCount = 9`
-- `plain.totalMatchCount = 64`
+- `plain.totalAnchorCount = 32`
+- `plain.totalMatchCount = 114`
 - `protected.totalAnchorCount = 2`
-- `protected.totalMatchCount = 10`
-- `reducedAnchorCount = 7`
-- `reducedMatchCount = 54`
+- `protected.totalMatchCount = 11`
+- `reducedAnchorCount = 30`
+- `reducedMatchCount = 103`
 
 这一轮被明确打掉的锚点包括：
 
@@ -244,13 +450,31 @@
 - `capabilityManifest.successSignals`
 - `agent-runtime`
 - `ai-service`
+- `baseline-registration`
+- `reader-summary`
+- `host-actions`
+- `settings-governance`
+- `runtime-bridge-report`
+- `reader-current`
+- `settings-snapshot`
+- `window-snapshot`
+- `command-no-ui`
+- `capability-manifest`
+- `Open Cleanroom Action`
+- `Show Reader Demo Summary`
+- `Show Reader Selection Snapshot`
+- `Baseline demos ready`
+- `Runtime Core`
+- `Host Signal Collector`
+- `Host Nonce Store`
+- `Runtime Bridge`
 
 这一轮仍保留的主要锚点只剩：
 
 - `addonRef`
 - `addonVersion`
 
-这说明第二轮 `protected-only inner semantic scrub` 已经把 `optionalBundles` 与 `generatedAt` 也收掉了。到这一阶段，继续压剩余的 `addonRef / addonVersion` 收益已经明显下降，当前更合理的策略是先按既有威胁模型完成手动收口，再决定是否开启更重的 Stage 3 实验。
+这说明第二轮 `protected-only inner semantic scrub` 的后续补刀已经把 capability id、agent scenario、`ownerModules` 和 host action readiness tag 这几类高层语义一起收掉了。到这一阶段，继续压剩余的 `addonRef / addonVersion` 收益已经明显下降，当前更合理的策略是先按既有威胁模型完成手动收口，再决定是否开启更重的 Stage 3 实验。
 
 ### 9. 当前正式手动收口链已经 fresh 通过，当前 verdict 是 `passed`
 
@@ -259,7 +483,7 @@
 - `package:protection:smoke:encrypted -- --repeats 3 --channel stable`
 - `package:protection:smoke:shielded -- --repeats 3 --channel stable`
 - `package:protection:smoke:shielded -- --repeats 3 --channel beta`
-- `package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"`
+- `package:protection:score -- --variant shielded --channel stable --webcrack "parse-fail / only-loader" --llm "high-level-architecture"`
 - `package:protection:verdict`
 
 当前最新结论是：
@@ -267,7 +491,7 @@
 - `dist/package-protection-verdict.json` 的 `status = passed`
 - `nextAction = keep-current-shielded`
 - `shielded stable` 的手工评分已经正式回填为：
-  - `webcrackInitialResult = high-level-architecture`
+  - `webcrackInitialResult = parse-fail / only-loader`
   - `llmSinglePassResult = high-level-architecture`
 
 这代表：
@@ -608,10 +832,11 @@ npm run package:protection:compare:jsconfuser:string -- --channel stable
 
 ### 11. `shielded-jsconfuser-string` 已完成 stable / beta 复验，当前保守结论是 `leaning-same`
 
-截至 `2026-04-17`，这条实验线的证据已经补齐到可收口状态：
+截至 `2026-04-18`，这条实验线的证据已经补齐到可收口状态：
 
-- `stable compare` 曾给出 `status=passed`、`decision=hardening-win`
-- 但 `beta compare` 最新结果是 `status=attention`、`decision=leaning-same`、`nextAction=stop-current-candidate`
+- 早期 `stable compare` 曾因为单轮 `LLM single-pass` 优势而短暂给出 `status=passed`、`decision=hardening-win`
+- 当前 compare 规则已经收紧为：单轮 `LLM single-pass` 优势不足以升级为 `hardening-win`，必须同时看到与 `shielded` 对称的 guided-attack 证据也更优
+- 按这条更新后的规则重新回看后，`stable compare` 与 `beta compare` 的 retained decision 都应按 `leaning-same / stop-current-candidate` 处理
 - `beta` 侧 fresh `smoke`、`webcrack`、`inner audit` 与手工 `LLM single-pass` 都已补齐
 - `beta` 侧可读性结果与基线 `shielded` 相同：两边都停留在 `parse-fail / only-loader`
 - `beta` 侧性能与体积没有换来额外收益：
@@ -619,6 +844,20 @@ npm run package:protection:compare:jsconfuser:string -- --channel stable
   - `bundleBytes +2320674`
   - `medianDecodeDurationMs +5`
   - `medianPrepareDurationMs +18`
+- 截至 `2026-04-18` 的最新 `stable` 冷启动测量里，`shielded-jsconfuser-string` 也补到了 `12` 次 fresh run，结果显示：
+  - `durationMs median = 1599`
+  - `loadSubScriptDurationMs median = 529`
+  - `decodeDurationMs median = 29`
+  - `evalDurationMs median = 46`
+  - `prepareDurationMs median = 93`
+  - 相对 `shielded` 的保护链边际成本是：
+    - `loadSubScript +106.5ms`
+    - `prepare +9ms`
+    - `decode +4.5ms`
+    - `eval +2ms`
+    - `xpiBytes +1197704`
+    - `bundleBytes +1973241`
+- 需要单独强调的是：这一轮 `stable` 的端到端 `durationMs median` 虽然比 `shielded` 低 `129.5ms`，但这不能解释成 `jsconfuser-string` “本质更快”。因为它自己的 `loadSubScript / decode / prepare` 全部更高，说明保护链本身更重；端到端冷启动差异更多是 Zotero 宿主冷启动噪声盖过了这一级别的边际开销。
 
 当前更可信的 retained decision 应固定为：
 
@@ -629,6 +868,30 @@ npm run package:protection:compare:jsconfuser:string -- --channel stable
 - 这条实验线的工件顺序仍固定为：
   `smoke -> webcrack:score / manual-score -> compare`
   若中途重新跑了 `smoke`，对应 smoke report 的 `manualScorecard` 会被刷新回 `pending`，必须重新回填后再看 compare
+
+### 12. 做受保护包性能判断时，优先看 `loadSubScript + prepare`，不要只看总冷启动时间
+
+- 当前模板里，`durationMs` 适合回答“用户是否会感觉明显卡顿 / 白屏 / 假死”。
+- 但真正代表保护链自身额外成本的，仍然是：
+  - `loadSubScriptDurationMs`
+  - `decodeDurationMs`
+  - `decryptDurationMs`
+  - `evalDurationMs`
+  - `prepareDurationMs`
+- 原因很直接：Zotero 自身冷启动、profile 状态和宿主噪声会影响端到端 `durationMs`，尤其在 `shielded` 与 `shielded-jsconfuser-string` 这种差值只有 `100ms` 量级的候选对比里，容易把“更重的保护链”误读成“更快的总启动”。
+- 因此当前 retained rule 固定为：
+  - 看“是否适合继续保留某条保护路线”时，先看 `loadSubScript + prepare`
+  - 看“是否已经出现明显体感风险”时，再看 `durationMs`
+- 当前对应的固定报告入口是：
+
+```bash
+npm run package:protection:perf -- --channel stable
+```
+
+- 读取这份报告时，当前固定口径是：
+  - `durationMs median / p95 / max` 用来判断 UX 风险与尾延迟
+  - `loadSubScriptDurationMs + prepareDurationMs` 用来判断保护链自身额外成本
+  - 当某个候选表现出“总时长更快，但 `loadSubScript + prepare` 更高”时，应按宿主冷启动噪声处理，不能直接升级为更优保护路线
 
 ## Retained Recommendations
 
@@ -658,7 +921,7 @@ npm run package:protection:compare:jsconfuser:string -- --channel stable
   - Reader 官方事件类型，如 `renderToolbar`、`createViewContextMenu`
   - PreferencePanes / ItemPane / MenuManager 对齐宿主的字段与 target/type 枚举
 - 若语义减噪后人工评级仍保持 `high-level-architecture`，才进入一次有止损线的 `lightweight-js-obfuscator` 内层 bundle 实验；它不是当前主推荐路线。
-- `路线4`（轻服务能力）与 `路线5`（Wasm 小内核）当前都只作为未来 hardening 备选，不替代本地受保护导出的主线。
+- `路线4`（轻服务能力）继续作为未来 hardening 备选；`路线5`（Wasm 小内核）只有在 `package:protection:wasm:admission` 输出 `ready-for-candidate` 后，才允许以 `shielded-surface-scrub-wasm-digest` 进入 advisory experiment，不替代 `encrypted / shielded` 主线。
 
 ### 宿主弱绑定候选边界
 

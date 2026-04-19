@@ -1,3 +1,6 @@
+import { AGENT_SCENARIO_IDS } from "./agent-scenario-ids.js";
+import { CAPABILITY_IDS } from "./capability-ids.js";
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -20,11 +23,11 @@ export function createCapabilityManifest({ config } = {}) {
 
   const capabilities = [
     {
-      id: "baseline-registration",
+      id: CAPABILITY_IDS.baselineRegistration,
       label: "基线注册",
       category: "baseline",
       description: "验证默认命令、菜单、偏好设置面板、ItemPane、ItemTree、Notifier 是否已完成挂载。",
-      agentScenario: "baseline-registration",
+      agentScenario: AGENT_SCENARIO_IDS.baselineRegistration,
       zoteroScenarios: ["baseline registration diagnostics"],
       entrypoints: [
         "plugin.api.agent.collectDiagnostics()",
@@ -41,11 +44,11 @@ export function createCapabilityManifest({ config } = {}) {
       ],
     },
     {
-      id: "item-presentation",
+      id: CAPABILITY_IDS.itemPresentation,
       label: "条目展示摘要",
       category: "feature",
       description: "验证 agent 能基于真实或示例条目读取标题、类型、摘要与列展示值。",
-      agentScenario: "sample-item-pane",
+      agentScenario: AGENT_SCENARIO_IDS.sampleItemPane,
       zoteroScenarios: ["real item selection diagnostics"],
       entrypoints: [
         "plugin.api.agent.inspectItem(itemID)",
@@ -61,11 +64,11 @@ export function createCapabilityManifest({ config } = {}) {
       ],
     },
     {
-      id: "notifier-sync",
+      id: CAPABILITY_IDS.notifierSync,
       label: "通知器联动",
       category: "feature",
       description: "验证真实条目修改后，Notifier 事件能同步进入插件诊断视图。",
-      agentScenario: "notifier-preview",
+      agentScenario: AGENT_SCENARIO_IDS.notifierPreview,
       zoteroScenarios: ["real notifier follows item updates"],
       entrypoints: [
         "plugin.api.agent.collectDiagnostics()",
@@ -82,11 +85,11 @@ export function createCapabilityManifest({ config } = {}) {
       ],
     },
     {
-      id: "reader-summary",
+      id: CAPABILITY_IDS.readerSummary,
       label: "Reader 摘要",
       category: "feature",
       description: "验证真实 PDF 附件可打开，并能返回 Reader 摘要、交互快照与匹配窗口状态。",
-      agentScenario: "reader-current",
+      agentScenario: AGENT_SCENARIO_IDS.readerCurrent,
       zoteroScenarios: [
         "real reader summary on generated pdf",
         "reader interaction diagnostics",
@@ -108,11 +111,11 @@ export function createCapabilityManifest({ config } = {}) {
       ],
     },
     {
-      id: "reader-annotation-roundtrip",
+      id: CAPABILITY_IDS.readerAnnotationRoundtrip,
       label: "Reader 批注回环",
       category: "feature",
       description: "验证 agent 可通过公开 Reader API 创建、更新、删除批注，并从交互快照回读结果。",
-      agentScenario: "reader-current",
+      agentScenario: AGENT_SCENARIO_IDS.readerCurrent,
       zoteroScenarios: ["reader annotation roundtrip"],
       entrypoints: [
         "plugin.api.reader.createAnnotation(itemID, annotationData)",
@@ -131,11 +134,11 @@ export function createCapabilityManifest({ config } = {}) {
       ],
     },
     {
-      id: "reader-ui-state",
+      id: CAPABILITY_IDS.readerUIState,
       label: "Reader UI 状态",
       category: "feature",
       description: "验证 agent 可稳定读取 Reader 的侧栏、工具模式、导航能力和文本选择注解模式等宿主层 UI 状态。",
-      agentScenario: "reader-current",
+      agentScenario: AGENT_SCENARIO_IDS.readerCurrent,
       zoteroScenarios: ["reader interaction diagnostics"],
       entrypoints: [
         "plugin.api.reader.getReaderUIStateSnapshot(itemID)",
@@ -151,11 +154,11 @@ export function createCapabilityManifest({ config } = {}) {
       ],
     },
     {
-      id: "reader-event-hooks",
+      id: CAPABILITY_IDS.readerEventHooks,
       label: "Reader 事件桥",
       category: "feature",
       description: "验证 agent 可通过 Zotero Reader 官方事件 API 注册/注销事件监听器，并覆盖 `renderToolbar`、文本选择浮层与多类上下文菜单等宿主注入点。",
-      agentScenario: "reader-current",
+      agentScenario: AGENT_SCENARIO_IDS.readerCurrent,
       zoteroScenarios: [
         "reader event hook diagnostics",
         "reader fine-grained hook diagnostics",
@@ -182,11 +185,11 @@ export function createCapabilityManifest({ config } = {}) {
       ],
     },
     {
-      id: "command-nonblocking",
+      id: CAPABILITY_IDS.commandNonblocking,
       label: "无阻塞动作执行",
       category: "feature",
       description: "验证 agent 动作可以在不弹窗的情况下触发主命令路径。",
-      agentScenario: "command-no-ui",
+      agentScenario: AGENT_SCENARIO_IDS.commandNoUI,
       zoteroScenarios: ["agent action runs without blocking UI"],
       entrypoints: [
         "plugin.api.runAgentAction()",
@@ -200,11 +203,11 @@ export function createCapabilityManifest({ config } = {}) {
       ],
     },
     {
-      id: "host-actions",
+      id: CAPABILITY_IDS.hostActions,
       label: "宿主动作编排",
       category: "feature",
       description: "验证 agent 可枚举稳定的 Host Actions，并以统一结果结构执行偏好设置、右侧栏、Reader 与 live menu 宿主动作。",
-      agentScenario: "host-actions",
+      agentScenario: AGENT_SCENARIO_IDS.hostActions,
       zoteroScenarios: [
         "preference pane surface smoke",
         "preference pane control interaction",
@@ -231,11 +234,11 @@ export function createCapabilityManifest({ config } = {}) {
       ],
     },
     {
-      id: "settings-governance",
+      id: CAPABILITY_IDS.settingsGovernance,
       label: "设置治理",
       category: "governance",
       description: "验证 settings schema、校验与偏好设置面板暴露/写回是否完整。",
-      agentScenario: "settings-snapshot",
+      agentScenario: AGENT_SCENARIO_IDS.settingsSnapshot,
       zoteroScenarios: [
         "settings schema and preference pane diagnostics",
         "preference pane control interaction",
@@ -257,11 +260,11 @@ export function createCapabilityManifest({ config } = {}) {
       ],
     },
     {
-      id: "multi-window-mount",
+      id: CAPABILITY_IDS.multiWindowMount,
       label: "多窗口挂载",
       category: "runtime",
       description: "验证打开第二个 Zotero 主窗口后，插件仍能自动挂载窗口级功能。",
-      agentScenario: "window-snapshot",
+      agentScenario: AGENT_SCENARIO_IDS.windowSnapshot,
       zoteroScenarios: ["multi-window mount diagnostics"],
       entrypoints: [
         "plugin.api.host.listMainWindows()",
@@ -278,11 +281,11 @@ export function createCapabilityManifest({ config } = {}) {
       ],
     },
     {
-      id: "runtime-bridge-report",
+      id: CAPABILITY_IDS.runtimeBridgeReport,
       label: "运行时桥接报告",
       category: "runtime",
       description: "验证 bootstrap 能力白名单报告可被 agent 与开发者读取。",
-      agentScenario: "capability-manifest",
+      agentScenario: AGENT_SCENARIO_IDS.capabilityManifest,
       zoteroScenarios: [],
       entrypoints: [
         "plugin.api.runtime.getCapabilitySummary()",

@@ -53,20 +53,31 @@ npm run build
 npm run package
 npm run package:encrypted
 npm run package:shielded
+npm run package:shielded:pref-bridge
+npm run package:shielded:surface-scrub
+npm run package:shielded:surface-scrub:wasm:digest
 npm run package:shielded:descriptor-bind
 npm run package:shielded:jsconfuser:string
 npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable
 npm run package:protection:smoke:shielded:descriptor-bind -- --repeats 3 --channel stable
 npm run package:protection:smoke:shielded:jsconfuser:string -- --repeats 3 --channel stable
+npm run package:protection:smoke:shielded:pref-bridge -- --repeats 3 --channel stable
+npm run package:protection:smoke:shielded:surface-scrub -- --repeats 3 --channel stable
 npm run package:protection:webcrack:shielded -- --channel stable
 npm run package:protection:webcrack:shielded:descriptor-bind -- --channel stable
 npm run package:protection:webcrack:shielded:jsconfuser:string -- --channel stable
+npm run package:protection:webcrack:shielded:pref-bridge -- --channel stable
+npm run package:protection:webcrack:shielded:surface-scrub -- --channel stable
 npm run package:protection:webcrack:score -- --variant shielded --channel stable
 npm run package:protection:audit
 npm run package:protection:audit:descriptor-bind
 npm run package:protection:audit:jsconfuser:string
+npm run package:protection:audit:pref-bridge
+npm run package:protection:audit:surface-scrub
 npm run package:protection:compare:descriptor-bind -- --channel stable
 npm run package:protection:compare:jsconfuser:string -- --channel stable
+npm run package:protection:compare:pref-bridge -- --channel stable
+npm run package:protection:compare:surface-scrub -- --channel stable
 npm run package:protection:jsconfuser:bootstrap
 npm run package:protection:jsconfuser:preflight
 npm run package:protection:jsconfuser:string:preflight
@@ -74,9 +85,14 @@ npm run package:protection:lightweight:preflight
 npm run package:protection:inner:audit:shielded -- --channel stable
 npm run package:protection:inner:audit:descriptor-bind -- --channel stable
 npm run package:protection:inner:audit:jsconfuser:string -- --channel stable
+npm run package:protection:inner:audit:pref-bridge -- --channel stable
+npm run package:protection:inner:audit:surface-scrub -- --channel stable
 npm run package:protection:score:llm -- --variant shielded-jsconfuser-string --channel stable --llm "parse-fail / only-loader"
-npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"
+npm run package:protection:score -- --variant shielded --channel stable --webcrack "parse-fail / only-loader" --llm "high-level-architecture"
 npm run package:protection:score:guided -- --variant shielded --channel stable --rating "high-level-architecture" --result-tier R1 --attacker-tier A2 --ai-tier M3 --attack-method static+reference --time-bucket 30-120m --round-mode multi-round --summary "guided attack recovered lifecycle facade"
+npm run package:protection:attack:plan
+npm run package:protection:matrix
+npm run package:protection:wasm:admission
 npm run package:protection:verdict
 ```
 
@@ -128,6 +144,22 @@ npm run package:protection:audit:jsconfuser:string
 
 这条扩展入口同样不会改变 `plain / encrypted / shielded` 这三条基线对比的 summary / nextAction 判据，只会附加 `jsconfuser-string` 的 raw export 结果与体积增量，方便判断它的收益究竟还停留在 inner semantic suppression，还是已经反映到了 raw surface。
 如果本地自动发现 `js-confuser` 失败，再补 `-- --jsconfuser-tool-path /absolute/path/to/js-confuser`。
+
+如果你要把 `shielded-surface-scrub` 也作为额外实验变体并入同一份审计报告，执行：
+
+```bash
+npm run package:protection:audit:surface-scrub
+```
+
+这条扩展入口同样不会改变 `plain / encrypted / shielded` 这三条基线对比的 summary / nextAction 判据；它只补 `surface-scrub` 对 `bootstrap.js` 字面值与解压后 support surface 的增量证据。
+
+如果你要判断 Wasm 是否可以从 `preplan` 提升为第一条受保护打包实验候选，执行：
+
+```bash
+npm run package:protection:wasm:admission
+```
+
+只有当该报告输出 `ready-for-candidate` 时，才打开 `shielded-surface-scrub-wasm-digest`。这个候选固定只复用 default-disabled / lazy 的 digest micro-kernel，新增静态暴露只能落在 `content/lib/w/*`，不进入默认 `release / agent:gate / agent:gate:release`。
 
 如果你想先把 `js-confuser` 工具安装到当前仓库的默认可发现位置，执行：
 
@@ -215,7 +247,7 @@ npm run package:protection:compare:jsconfuser:string -- --channel stable
 它会读取现有的 smoke / webcrack / audit 工件，生成 `dist/package-protection-compare/*.json` / `md`，专门回答两类问题：
 
 - `descriptor-bind` 当前是不是只该作为 `runtime-only` 实验分支保留
-- `jsconfuser-string` 当前是否已经形成可稳定复现的 hardening 收益；截至 `2026-04-17`，`stable` compare 曾给出 `hardening-win`，但 `beta` compare 已回落到 `leaning-same`
+- `jsconfuser-string` 当前是否已经形成可稳定复现的 hardening 收益；当前 retained rule 已收紧为“单轮 `LLM single-pass` 优势不够，必须连 guided-attack 对称比较也更优，才能升级为 `hardening-win`”，因此最新保守结论按 `leaning-same / stop-current-candidate` 处理
 
 如果你已经完成了一轮外部 AI / LLM 解读，只想把 `LLM single-pass` 评级补回现有 smoke report，而不重复填写已有的 `webcrack` 结果，执行：
 
@@ -229,7 +261,7 @@ npm run package:protection:score:llm -- --variant shielded-jsconfuser-string --c
 
 ```bash
 npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable
-npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"
+npm run package:protection:score -- --variant shielded --channel stable --webcrack "parse-fail / only-loader" --llm "high-level-architecture"
 npm run package:protection:verdict
 ```
 
@@ -237,9 +269,12 @@ npm run package:protection:verdict
 
 - `package:protection:score` 只回填 `shielded stable` 的手工评分，不重新打包也不重跑 smoke
 - `package:protection:score:guided` 只记录更强的“攻击者 + AI 组合能力”证据，不会覆盖 `single-pass` 手工评分；等级定义见 [PACKAGE_PROTECTION_ATTACK_GRADING.md](./PACKAGE_PROTECTION_ATTACK_GRADING.md)
+- `package:protection:attack:plan` 会把 attack report 里的 fixed-profile coverage gap 翻成下一步命令模板，固定先补 `current` 候选，再 review retained experiment
+- `package:protection:matrix` 会把 `current / experiment / preflight / future / paper / preplan` 候选统一汇总成一份 advisory 矩阵；它只回读现有工件，不会替代 `smoke` 或 `verdict`，说明见 [PACKAGE_PROTECTION_EXPERIMENT_MATRIX.md](./PACKAGE_PROTECTION_EXPERIMENT_MATRIX.md)
 - `package:protection:verdict` 只生成 `dist/package-protection-verdict.json` / `md` 的 advisory 结论，不进入默认 release gate
 - `package:protection:webcrack` 会在 fresh 打包后提取 XPI 内主脚本，调用本地 `webcrack` CLI，并额外保留一个 `--no-deobfuscate --no-unpack` 的 fallback loader-only 工件，供 controller / subagent / 人工继续判读
 - `package:protection:webcrack:score` 只把 `webcrack` 自动建议评级回填到 `manualScorecard.webcrackInitialResult`，不会自动补 `llmSinglePassResult`
+- `package:protection:score` / `package:protection:score:llm` / `package:protection:webcrack:score` 当前共用同一条 package-protection workflow lock；如果在同一进程里并发录入评分，也会按串行顺序回写 smoke aggregate，避免把 `dist/package-protection-smoke.json` 写坏
 - `package:protection:inner:audit` 会离线提取 protected loader、拦截解密后的 inner bundle，并给出保守的 `proxy LLM` 建议评级；它只补证据，不会自动回填 `manualScorecard`
 - `package:protection:compare` 现在会附带读取 `inner audit` 结果；当手工 `LLM single-pass` 还没补齐时，它会把这份 proxy 一并写进 compare 报告，但不会自动替代 manual score
 - 当前最新保守 compare 结论是：`shielded-descriptor-bind = runtime-only`；`shielded-jsconfuser-string` 保留实验记录，但因 `beta` 复验未复现 `stable` 优势，当前按 `leaning-same / stop-current-candidate` 处理
@@ -247,6 +282,18 @@ npm run package:protection:verdict
 - `plain` 继续只是 control group；它的自动评分不是最终 protection verdict 的降级依据
 
 如果需要定位受保护包的首次加载延迟，优先读取 `packageProtection` 时序与 `decodeMethod`，而不是只看插件内核 `startupDurationMs`。当前这组时序会拆出 `loadSubScript / decode / decrypt / eval / prepare total`，便于判断性能热点是在 loader、decode 还是插件本体启动。
+
+如果需要把这类时序读成一份固定性能报告，执行：
+
+```bash
+npm run package:protection:perf -- --channel stable
+```
+
+当前读法固定为：
+
+- `durationMs median / p95 / max` 看体感风险和尾延迟
+- `loadSubScript + prepare` 看保护链自身额外成本
+- 如果某个候选只是总时长看起来更快，但 `loadSubScript + prepare` 更重，应先按 Zotero 宿主冷启动噪声处理，不要直接升级为更优路线
 
 说明：`updateURL` 在 Zotero 7/8 的实际安装链路中应视为必填。留空时，构建虽然可能完成，但 Zotero 会把生成的包判为无效。
 说明：当前仓库 `config/addon.config.json` 中落地的 Gitee `updateURL` 仅用于这个模板项目自身的远端发布验收与测试；如果你是基于模板开发自己的插件，必须先替换 `addonId`、`homepage` 和 `updateURL`，不能继续沿用模板仓库的发布地址。
@@ -982,7 +1029,7 @@ npm run package:encrypted
 npm run package:shielded
 npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable
 npm run package:protection:audit
-npm run package:protection:score -- --variant shielded --channel stable --webcrack "high-level-architecture" --llm "high-level-architecture"
+npm run package:protection:score -- --variant shielded --channel stable --webcrack "parse-fail / only-loader" --llm "high-level-architecture"
 npm run package:protection:verdict
 ```
 

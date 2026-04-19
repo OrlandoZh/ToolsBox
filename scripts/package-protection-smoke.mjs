@@ -41,6 +41,7 @@ const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const scriptStartedAt = Date.now();
 const PACKAGE_PROTECTION_BUILD_LOCK_TIMEOUT_MS = 10 * 60 * 1000;
+let packageProtectionWorkflowQueue = Promise.resolve();
 
 export const PACKAGE_PROTECTION_SMOKE_VARIANTS = Object.freeze([
   "plain",
@@ -48,6 +49,9 @@ export const PACKAGE_PROTECTION_SMOKE_VARIANTS = Object.freeze([
   "shielded",
   "shielded-descriptor-bind",
   "shielded-jsconfuser-string",
+  "shielded-pref-bridge",
+  "shielded-surface-scrub",
+  "shielded-surface-scrub-wasm-digest",
 ]);
 
 export const MANUAL_SCORECARD_LEVELS = Object.freeze([
@@ -57,28 +61,48 @@ export const MANUAL_SCORECARD_LEVELS = Object.freeze([
 ]);
 const MANUAL_SCORECARD_LEVEL_SET = new Set(MANUAL_SCORECARD_LEVELS);
 
-async function withPackageProtectionWorkflowLock(owner, fn) {
-  const previousBuildLockHeld = process.env.CLEANROOM_BUILD_LOCK_HELD;
-  return withBuildLock(owner, async () => {
-    process.env.CLEANROOM_BUILD_LOCK_HELD = "1";
-    try {
-      return await fn();
-    } finally {
-      if (previousBuildLockHeld === undefined) {
-        delete process.env.CLEANROOM_BUILD_LOCK_HELD;
-      } else {
-        process.env.CLEANROOM_BUILD_LOCK_HELD = previousBuildLockHeld;
-      }
-    }
-  }, {
-    timeoutMs: PACKAGE_PROTECTION_BUILD_LOCK_TIMEOUT_MS,
+export async function withPackageProtectionWorkflowLock(owner, fn) {
+  const waitTurn = packageProtectionWorkflowQueue.catch(() => {});
+  let releaseTurn = () => {};
+  packageProtectionWorkflowQueue = new Promise((resolve) => {
+    releaseTurn = resolve;
   });
+
+  await waitTurn;
+  const previousBuildLockHeld = process.env.CLEANROOM_BUILD_LOCK_HELD;
+  try {
+    return await withBuildLock(owner, async () => {
+      process.env.CLEANROOM_BUILD_LOCK_HELD = "1";
+      try {
+        return await fn();
+      } finally {
+        if (previousBuildLockHeld === undefined) {
+          delete process.env.CLEANROOM_BUILD_LOCK_HELD;
+        } else {
+          process.env.CLEANROOM_BUILD_LOCK_HELD = previousBuildLockHeld;
+        }
+      }
+    }, {
+      timeoutMs: PACKAGE_PROTECTION_BUILD_LOCK_TIMEOUT_MS,
+    });
+  } finally {
+    releaseTurn();
+  }
 }
 
 function normalizeVariant(variant) {
   const normalized = String(variant || "").trim().toLowerCase();
   if (normalized === "descriptor-bind") {
     return "shielded-descriptor-bind";
+  }
+  if (normalized === "pref-bridge") {
+    return "shielded-pref-bridge";
+  }
+  if (normalized === "surface-scrub") {
+    return "shielded-surface-scrub";
+  }
+  if (normalized === "surface-scrub-wasm-digest" || normalized === "wasm-digest") {
+    return "shielded-surface-scrub-wasm-digest";
   }
   return PACKAGE_PROTECTION_SMOKE_VARIANTS.includes(normalized)
     ? normalized
@@ -89,7 +113,10 @@ function isShieldedLikeVariant(variant) {
   const normalizedVariant = String(variant || "").trim().toLowerCase();
   return normalizedVariant === "shielded"
     || normalizedVariant === "shielded-descriptor-bind"
-    || normalizedVariant === "shielded-jsconfuser-string";
+    || normalizedVariant === "shielded-jsconfuser-string"
+    || normalizedVariant === "shielded-pref-bridge"
+    || normalizedVariant === "shielded-surface-scrub"
+    || normalizedVariant === "shielded-surface-scrub-wasm-digest";
 }
 
 function normalizePositiveInteger(value, fallback = 0) {
@@ -143,7 +170,7 @@ export function parsePackageProtectionSmokeArgs(argv = process.argv.slice(2)) {
     }
   }
 
-  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string", {
+  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest", {
     category: "args",
     failedStage: "parse-args",
   });
@@ -177,7 +204,7 @@ function buildChannelEnv(channel, env = process.env) {
 
 export function resolvePackageProtectionSmokePackageArgs(variant, options = {}) {
   const normalizedVariant = normalizeVariant(variant);
-  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string", {
+  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest", {
     category: "args",
     failedStage: "resolve-variant",
   });
@@ -201,12 +228,21 @@ export function resolvePackageProtectionSmokePackageArgs(variant, options = {}) 
     }
     return args;
   }
+  if (normalizedVariant === "shielded-pref-bridge") {
+    return ["--pref-bridge", "--skip-release-metadata"];
+  }
+  if (normalizedVariant === "shielded-surface-scrub") {
+    return ["--surface-scrub", "--skip-release-metadata"];
+  }
+  if (normalizedVariant === "shielded-surface-scrub-wasm-digest") {
+    return ["--surface-scrub-wasm-digest", "--skip-release-metadata"];
+  }
   return ["--shield-bundle", "--skip-release-metadata"];
 }
 
 function resolvePackageVariantOutputName(config, variant) {
   const normalizedVariant = normalizeVariant(variant);
-  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string", {
+  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest", {
     category: "args",
     failedStage: "resolve-variant",
   });
@@ -723,7 +759,7 @@ async function runSingleSmokeIteration({
   }
 }
 
-function buildInvocationSummary({ variant, channel, repeats, xpi, bundle, runs, automatedScorecard }) {
+function buildInvocationSummary({ variant, channel, repeats, xpi, bundle, runs, automatedScorecard, manualScorecard }) {
   const runList = Array.isArray(runs) ? runs : [];
   const passedRunCount = runList.filter((run) => run?.passed === true).length;
   const failedRunCount = runList.length - passedRunCount;
@@ -775,7 +811,7 @@ function buildInvocationSummary({ variant, channel, repeats, xpi, bundle, runs, 
       passed: automatedPassed,
       status: automatedPassed ? "passed" : "attention",
     },
-    manualScorecard: buildManualScorecard(),
+    manualScorecard: buildManualScorecard(manualScorecard),
     medianDecodeDurationMs: computeMedian(decodeDurations),
     medianPrepareDurationMs: computeMedian(prepareDurations),
     medianBootstrapResolveDurationMs: computeMedian(resolveDurations),
@@ -804,6 +840,7 @@ export function summarizePackageProtectionSmokeReport({
   bundle,
   runs,
   automatedScorecard,
+  manualScorecard,
 }) {
   return normalizePackageProtectionSmokeReport(buildInvocationSummary({
     variant,
@@ -813,6 +850,7 @@ export function summarizePackageProtectionSmokeReport({
     bundle,
     runs,
     automatedScorecard,
+    manualScorecard,
   }));
 }
 

@@ -4,6 +4,11 @@ import {
   getHostActionDescriptor,
   listHostActionDescriptors,
 } from "../src/app/host-action-catalog.js";
+import {
+  REACT_UI_DEMO_SHELL_PATH,
+  WASM_KERNEL_PROBE_PATH,
+  WASM_KERNEL_PROBE_WORKER_PATH,
+} from "../src/utils/optional-bundle-paths.js";
 
 function createSurfaceTarget(surfaceId, captureKind) {
   return {
@@ -827,12 +832,18 @@ function createPreferenceTabHarness() {
 describe("Host Actions", () => {
   it("should expose a stable source-driven host action catalog", () => {
     const actions = listHostActionDescriptors();
-    assert.ok(actions.length >= 13);
+    assert.ok(actions.length >= 14);
     assert.equal(getHostActionDescriptor("preferences.openPane")?.status, "ready");
     assert.equal(getHostActionDescriptor("preferences.selectTab")?.status, "ready");
     assert.equal(getHostActionDescriptor("preferences.setTextbox")?.status, "ready");
     assert.equal(getHostActionDescriptor("menu.trigger")?.executable, true);
     assert.equal(getHostActionDescriptor("reader.toolbar.triggerButton")?.executable, true);
+    assert.equal(getHostActionDescriptor("runtime.probeWasmKernel")?.status, "probe-only");
+    assert.equal(getHostActionDescriptor("runtime.probeWasmKernel")?.executable, true);
+    assert.equal(getHostActionDescriptor("runtime.deriveWasmKernelDigest")?.status, "probe-only");
+    assert.equal(getHostActionDescriptor("runtime.deriveWasmKernelDigest")?.executable, true);
+    assert.equal(getHostActionDescriptor("runtime.deriveWasmKernelUnlockToken")?.status, "probe-only");
+    assert.equal(getHostActionDescriptor("runtime.deriveWasmKernelUnlockToken")?.executable, true);
     assert.equal(getHostActionDescriptor("preferences.helpLink")?.status, "manual-only");
     assert.equal(getHostActionDescriptor("window.openReactDemo"), null);
   });
@@ -855,6 +866,368 @@ describe("Host Actions", () => {
       })?.executable,
       true,
     );
+  });
+
+  it("should run the wasm kernel probe host action without host surface dependencies", async () => {
+    let receivedPayload = null;
+    const runner = createHostActionRunner({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+      host: {},
+      reader: {},
+      menuManager: {},
+      wasmKernelProbe: {
+        async runProbe(payload = {}) {
+          receivedPayload = payload;
+          return {
+            ok: true,
+            mode: "both",
+            rootURI: "jar:file:///tmp/cleanroom.xpi!/",
+            wasmRelativePath: WASM_KERNEL_PROBE_PATH,
+            workerRelativePath: WASM_KERNEL_PROBE_WORKER_PATH,
+            mainThread: {
+              ok: true,
+              matchesExpected: true,
+              sum: 42,
+              expectedSum: 42,
+            },
+            worker: {
+              ok: true,
+              matchesExpected: true,
+              sum: 42,
+              expectedSum: 42,
+            },
+            consistentAcrossTransports: true,
+            errors: [],
+          };
+        },
+      },
+    });
+
+    const result = await runner.runHostAction("runtime.probeWasmKernel", {
+      mode: "both",
+      left: 19,
+      right: 23,
+    });
+
+    assert.deepEqual(receivedPayload, {
+      mode: "both",
+      left: 19,
+      right: 23,
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.failureKind, null);
+    assert.equal(result.readiness.ok, true);
+    assert.equal(result.observedState.mainThread.sum, 42);
+    assert.equal(result.observedState.worker.sum, 42);
+  });
+
+  it("should resolve the wasm kernel probe lazily through a getter", async () => {
+    let getterCalls = 0;
+    let receivedPayload = null;
+    const runner = createHostActionRunner({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+      host: {},
+      reader: {},
+      menuManager: {},
+      async getWasmKernelProbe() {
+        getterCalls += 1;
+        return {
+          async runProbe(payload = {}) {
+            receivedPayload = payload;
+            return {
+              ok: true,
+              mode: "main-thread",
+              mainThread: {
+                ok: true,
+                matchesExpected: true,
+                sum: 42,
+                expectedSum: 42,
+              },
+              worker: null,
+              consistentAcrossTransports: null,
+              errors: [],
+            };
+          },
+        };
+      },
+    });
+
+    assert.equal(getterCalls, 0);
+
+    const result = await runner.runHostAction("runtime.probeWasmKernel", {
+      mode: "main-thread",
+      left: 19,
+      right: 23,
+    });
+
+    assert.equal(getterCalls, 1);
+    assert.deepEqual(receivedPayload, {
+      mode: "main-thread",
+      left: 19,
+      right: 23,
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.readiness.ok, true);
+    assert.equal(result.observedState.mainThread.sum, 42);
+  });
+
+  it("should run the wasm kernel digest host action without host surface dependencies", async () => {
+    let receivedPayload = null;
+    const runner = createHostActionRunner({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+      host: {},
+      reader: {},
+      menuManager: {},
+      wasmKernelProbe: {
+        async deriveDigest(payload = {}) {
+          receivedPayload = payload;
+          return {
+            ok: true,
+            mode: "both",
+            rootURI: "jar:file:///tmp/cleanroom.xpi!/",
+            wasmRelativePath: WASM_KERNEL_PROBE_PATH,
+            workerRelativePath: WASM_KERNEL_PROBE_WORKER_PATH,
+            textLength: 12,
+            seed: null,
+            mainThread: {
+              ok: true,
+              digestUint32: 305419896,
+              digestHex: "12345678",
+            },
+            worker: {
+              ok: true,
+              digestUint32: 305419896,
+              digestHex: "12345678",
+            },
+            consistentAcrossTransports: true,
+            errors: [],
+          };
+        },
+      },
+    });
+
+    const result = await runner.runHostAction("runtime.deriveWasmKernelDigest", {
+      mode: "both",
+      text: "cleanroom",
+    });
+
+    assert.deepEqual(receivedPayload, {
+      mode: "both",
+      text: "cleanroom",
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.failureKind, null);
+    assert.equal(result.readiness.ok, true);
+    assert.equal(result.observedState.mainThread.digestHex, "12345678");
+    assert.equal(result.observedState.worker.digestHex, "12345678");
+  });
+
+  it("should resolve the wasm kernel digest host action lazily through a getter", async () => {
+    let getterCalls = 0;
+    let receivedPayload = null;
+    const runner = createHostActionRunner({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+      host: {},
+      reader: {},
+      menuManager: {},
+      async getWasmKernelProbe() {
+        getterCalls += 1;
+        return {
+          async deriveDigest(payload = {}) {
+            receivedPayload = payload;
+            return {
+              ok: true,
+              mode: "main-thread",
+              mainThread: {
+                ok: true,
+                digestUint32: 3735928559,
+                digestHex: "deadbeef",
+              },
+              worker: null,
+              consistentAcrossTransports: null,
+              errors: [],
+            };
+          },
+        };
+      },
+    });
+
+    assert.equal(getterCalls, 0);
+
+    const result = await runner.runHostAction("runtime.deriveWasmKernelDigest", {
+      mode: "main-thread",
+      text: "digest",
+    });
+
+    assert.equal(getterCalls, 1);
+    assert.deepEqual(receivedPayload, {
+      mode: "main-thread",
+      text: "digest",
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.readiness.ok, true);
+    assert.equal(result.observedState.mainThread.digestHex, "deadbeef");
+  });
+
+  it("should run the wasm kernel unlock host action with runtime host binding", async () => {
+    let receivedPayload = null;
+    const runner = createHostActionRunner({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+      host: {},
+      reader: {},
+      menuManager: {},
+      getProtectionSummary() {
+        return {
+          hostBinding: {
+            profileHash: "sha256:profile-runtime",
+            schemaBucket: "120-129",
+            zoteroVersionBucket: "9.x",
+            dbAvailable: true,
+            noncePresent: true,
+            nonceSource: "existing",
+            nonceHash: "sha256:nonce-runtime",
+          },
+        };
+      },
+      wasmKernelProbe: {
+        async deriveUnlockToken(payload = {}) {
+          receivedPayload = payload;
+          return {
+            ok: true,
+            mode: "both",
+            derivationVersion: "host-unlock-v1-shadow",
+            activationRequirements: ["profileHash", "dbAvailable", "noncePresent"],
+            activationMissing: [],
+            activationSatisfied: true,
+            shadowWouldApply: true,
+            hostBinding: payload.hostBinding,
+            mainThread: {
+              ok: true,
+              stage2DigestUint32: 305419896,
+              stage2DigestHex: "12345678",
+              unlockTokenUint32: 2271560481,
+              unlockTokenHex: "87654321",
+            },
+            worker: {
+              ok: true,
+              stage2DigestUint32: 305419896,
+              stage2DigestHex: "12345678",
+              unlockTokenUint32: 2271560481,
+              unlockTokenHex: "87654321",
+            },
+            consistentAcrossTransports: true,
+            errors: [],
+          };
+        },
+      },
+    });
+
+    const result = await runner.runHostAction("runtime.deriveWasmKernelUnlockToken", {
+      mode: "both",
+      bundleSeed: "cleanroom-stage2-shadow-seed-v1",
+    });
+
+    assert.deepEqual(receivedPayload, {
+      mode: "both",
+      bundleSeed: "cleanroom-stage2-shadow-seed-v1",
+      hostBinding: {
+        profileHash: "sha256:profile-runtime",
+        schemaBucket: "120-129",
+        zoteroVersionBucket: "9.x",
+        dbAvailable: true,
+        noncePresent: true,
+        nonceSource: "existing",
+        nonceHash: "sha256:nonce-runtime",
+      },
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.failureKind, null);
+    assert.equal(result.readiness.ok, true);
+    assert.equal(result.observedState.mainThread.stage2DigestHex, "12345678");
+    assert.equal(result.observedState.worker.unlockTokenHex, "87654321");
+  });
+
+  it("should resolve the wasm kernel unlock host action lazily through a getter", async () => {
+    let getterCalls = 0;
+    let receivedPayload = null;
+    const runner = createHostActionRunner({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+      host: {},
+      reader: {},
+      menuManager: {},
+      getProtectionSummary() {
+        return {
+          hostBinding: {
+            profileHash: "sha256:profile-shadow",
+            dbAvailable: true,
+            noncePresent: true,
+            nonceSource: "existing",
+            nonceHash: "sha256:nonce-shadow",
+          },
+        };
+      },
+      async getWasmKernelProbe() {
+        getterCalls += 1;
+        return {
+          async deriveUnlockToken(payload = {}) {
+            receivedPayload = payload;
+            return {
+              ok: true,
+              mode: "main-thread",
+              activationRequirements: ["profileHash", "dbAvailable", "noncePresent"],
+              activationMissing: [],
+              activationSatisfied: true,
+              shadowWouldApply: true,
+              mainThread: {
+                ok: true,
+                stage2DigestUint32: 3735928559,
+                stage2DigestHex: "deadbeef",
+                unlockTokenUint32: 3405691582,
+                unlockTokenHex: "cafebabe",
+              },
+              worker: null,
+              consistentAcrossTransports: null,
+              errors: [],
+            };
+          },
+        };
+      },
+    });
+
+    assert.equal(getterCalls, 0);
+
+    const result = await runner.runHostAction("runtime.deriveWasmKernelUnlockToken", {
+      mode: "main-thread",
+      overlayVersion: "descriptor-overlay-v2",
+    });
+
+    assert.equal(getterCalls, 1);
+    assert.deepEqual(receivedPayload, {
+      mode: "main-thread",
+      overlayVersion: "descriptor-overlay-v2",
+      hostBinding: {
+        profileHash: "sha256:profile-shadow",
+        dbAvailable: true,
+        noncePresent: true,
+        nonceSource: "existing",
+        nonceHash: "sha256:nonce-shadow",
+      },
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.readiness.ok, true);
+    assert.equal(result.observedState.mainThread.unlockTokenHex, "cafebabe");
   });
 
   it("should run preference pane host actions with readiness and surface evidence", async () => {
@@ -1108,7 +1481,7 @@ describe("Host Actions", () => {
         return {
           window: {
             location: {
-              href: "chrome://cleanroomtemplate/content/react-ui/demo.xhtml",
+              href: `chrome://cleanroomtemplate/${REACT_UI_DEMO_SHELL_PATH}`,
             },
           },
           ready: true,

@@ -8,6 +8,7 @@ import {
   normalizePackageProtectionSmokeReport,
   PACKAGE_PROTECTION_SMOKE_VARIANTS,
   persistPackageProtectionSmokeReport,
+  withPackageProtectionWorkflowLock,
 } from "./package-protection-smoke.mjs";
 import {
   assertScript,
@@ -24,6 +25,15 @@ const scriptStartedAt = Date.now();
 
 function normalizeVariant(value) {
   const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "pref-bridge") {
+    return "shielded-pref-bridge";
+  }
+  if (normalized === "surface-scrub") {
+    return "shielded-surface-scrub";
+  }
+  if (normalized === "surface-scrub-wasm-digest" || normalized === "wasm-digest") {
+    return "shielded-surface-scrub-wasm-digest";
+  }
   return PACKAGE_PROTECTION_SMOKE_VARIANTS.includes(normalized)
     ? normalized
     : null;
@@ -72,7 +82,7 @@ export function parsePackageProtectionWebcrackScoreArgs(argv = process.argv.slic
     }
   }
 
-  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string", {
+  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest", {
     category: "args",
     failedStage: "parse-args",
   });
@@ -112,74 +122,76 @@ async function readWebcrackSuggestedRating({ projectRootPath, variant, channel }
 }
 
 export async function recordPackageProtectionWebcrackScore(options = {}) {
-  const projectRootPath = path.resolve(options.projectRootPath || projectRoot);
-  const variant = normalizeVariant(options.variant);
-  const channel = normalizeChannel(options.channel);
-  const explicitWebcrack = normalizeManualScorecardRating(options.webcrack);
+  return withPackageProtectionWorkflowLock("package-protection-webcrack-score.mjs", async () => {
+    const projectRootPath = path.resolve(options.projectRootPath || projectRoot);
+    const variant = normalizeVariant(options.variant);
+    const channel = normalizeChannel(options.channel);
+    const explicitWebcrack = normalizeManualScorecardRating(options.webcrack);
 
-  assertScript(Boolean(variant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string", {
-    category: "args",
-    failedStage: "validate-options",
-  });
-  assertScript(Boolean(channel), "channel must be stable or beta", {
-    category: "args",
-    failedStage: "validate-options",
-  });
-
-  const aggregatePath = resolveAgentArtifactPath(projectRootPath, "package-protection-smoke.json");
-  const aggregate = await readJSONFile(aggregatePath, {
-    missingCategory: "environment",
-    invalidCategory: "validation",
-    failedStage: "read-smoke-aggregate",
-    label: "package protection smoke aggregate",
-  });
-  const reports = Array.isArray(aggregate?.reports)
-    ? aggregate.reports.map((report) => normalizePackageProtectionSmokeReport(report))
-    : [];
-  const targetReport = reports.find((report) => report.variant === variant && report.channel === channel);
-
-  assertScript(Boolean(targetReport), `Missing smoke report for ${variant}/${channel}`, {
-    category: "validation",
-    failedStage: "select-target-report",
-    details: {
-      variant,
-      channel,
-    },
-  });
-
-  const inferredWebcrack = explicitWebcrack
-    ? {
-      suggested: explicitWebcrack,
-      reportPath: null,
-    }
-    : await readWebcrackSuggestedRating({
-      projectRootPath,
-      variant,
-      channel,
+    assertScript(Boolean(variant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest", {
+      category: "args",
+      failedStage: "validate-options",
+    });
+    assertScript(Boolean(channel), "channel must be stable or beta", {
+      category: "args",
+      failedStage: "validate-options",
     });
 
-  const currentManual = targetReport.manualScorecard || buildManualScorecard();
-  const nextCompletedAt = currentManual.llmSinglePassResult
-    ? String(options.completedAt || "").trim() || new Date().toISOString()
-    : currentManual.completedAt;
-  const updatedReport = normalizePackageProtectionSmokeReport({
-    ...targetReport,
-    manualScorecard: buildManualScorecard({
-      webcrackInitialResult: inferredWebcrack.suggested,
-      llmSinglePassResult: currentManual.llmSinglePassResult,
-      status: currentManual.llmSinglePassResult ? "completed" : "pending",
-      completedAt: nextCompletedAt,
-    }),
-  });
-  const paths = await persistPackageProtectionSmokeReport(updatedReport, {
-    projectRootPath,
-  });
+    const aggregatePath = resolveAgentArtifactPath(projectRootPath, "package-protection-smoke.json");
+    const aggregate = await readJSONFile(aggregatePath, {
+      missingCategory: "environment",
+      invalidCategory: "validation",
+      failedStage: "read-smoke-aggregate",
+      label: "package protection smoke aggregate",
+    });
+    const reports = Array.isArray(aggregate?.reports)
+      ? aggregate.reports.map((report) => normalizePackageProtectionSmokeReport(report))
+      : [];
+    const targetReport = reports.find((report) => report.variant === variant && report.channel === channel);
 
-  return {
-    report: updatedReport,
-    paths,
-    webcrackReportPath: inferredWebcrack.reportPath,
-  };
+    assertScript(Boolean(targetReport), `Missing smoke report for ${variant}/${channel}`, {
+      category: "validation",
+      failedStage: "select-target-report",
+      details: {
+        variant,
+        channel,
+      },
+    });
+
+    const inferredWebcrack = explicitWebcrack
+      ? {
+        suggested: explicitWebcrack,
+        reportPath: null,
+      }
+      : await readWebcrackSuggestedRating({
+        projectRootPath,
+        variant,
+        channel,
+      });
+
+    const currentManual = targetReport.manualScorecard || buildManualScorecard();
+    const nextCompletedAt = currentManual.llmSinglePassResult
+      ? String(options.completedAt || "").trim() || new Date().toISOString()
+      : currentManual.completedAt;
+    const updatedReport = normalizePackageProtectionSmokeReport({
+      ...targetReport,
+      manualScorecard: buildManualScorecard({
+        webcrackInitialResult: inferredWebcrack.suggested,
+        llmSinglePassResult: currentManual.llmSinglePassResult,
+        status: currentManual.llmSinglePassResult ? "completed" : "pending",
+        completedAt: nextCompletedAt,
+      }),
+    });
+    const paths = await persistPackageProtectionSmokeReport(updatedReport, {
+      projectRootPath,
+    });
+
+    return {
+      report: updatedReport,
+      paths,
+      webcrackReportPath: inferredWebcrack.reportPath,
+    };
+  });
 }
 
 async function main(argv = process.argv.slice(2)) {

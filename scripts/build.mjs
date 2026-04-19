@@ -3,6 +3,12 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { createSurfaceDescriptors as createDefaultSurfaceDescriptors } from "../src/app/surface-descriptors.js";
+import { createSurfaceDescriptors as createProtectedSurfaceDescriptors } from "../src/app/surface-descriptors-protected.js";
+import {
+  REACT_UI_DEMO_SHELL_PATH,
+  WASM_KERNEL_PROBE_WORKER_PATH,
+} from "../src/utils/optional-bundle-paths.js";
 import {
   obfuscateBundleSource,
   SHIELDED_LOADER_OBFUSCATION_STAGE,
@@ -37,6 +43,12 @@ export const BUILD_MODULE_ID_MODE_ANONYMIZED = "anonymized";
 export const BUILD_SEMANTIC_SCRUB_ENV = "CLEANROOM_BUILD_SEMANTIC_SCRUB";
 export const BUILD_SEMANTIC_SCRUB_NONE = "none";
 export const BUILD_SEMANTIC_SCRUB_PROTECTED = "protected";
+export const BUILD_PREFERENCE_BINDING_MODE_ENV = "CLEANROOM_BUILD_PREFERENCE_BINDING_MODE";
+export const BUILD_PREFERENCE_BINDING_MODE_NATIVE = "native";
+export const BUILD_PREFERENCE_BINDING_MODE_BRIDGE = "bridge";
+export const BUILD_STATIC_SURFACE_MODE_ENV = "CLEANROOM_BUILD_STATIC_SURFACE_MODE";
+export const BUILD_STATIC_SURFACE_MODE_STANDARD = "standard";
+export const BUILD_STATIC_SURFACE_MODE_SCRUB = "scrub";
 
 function toPosix(filePath) {
   return filePath.split(path.sep).join("/");
@@ -56,6 +68,20 @@ export function resolveBuildSemanticScrubMode(env = process.env) {
     : BUILD_SEMANTIC_SCRUB_NONE;
 }
 
+export function resolveBuildPreferenceBindingMode(env = process.env) {
+  const rawMode = String(env?.[BUILD_PREFERENCE_BINDING_MODE_ENV] || "").trim().toLowerCase();
+  return rawMode === BUILD_PREFERENCE_BINDING_MODE_BRIDGE
+    ? BUILD_PREFERENCE_BINDING_MODE_BRIDGE
+    : BUILD_PREFERENCE_BINDING_MODE_NATIVE;
+}
+
+export function resolveBuildStaticSurfaceMode(env = process.env) {
+  const rawMode = String(env?.[BUILD_STATIC_SURFACE_MODE_ENV] || "").trim().toLowerCase();
+  return rawMode === BUILD_STATIC_SURFACE_MODE_SCRUB
+    ? BUILD_STATIC_SURFACE_MODE_SCRUB
+    : BUILD_STATIC_SURFACE_MODE_STANDARD;
+}
+
 export function createBundleModuleId(filePath, srcRootPath, mode = BUILD_MODULE_ID_MODE_PATH) {
   const relativePath = toPosix(path.relative(srcRootPath, filePath));
   if (mode !== BUILD_MODULE_ID_MODE_ANONYMIZED) {
@@ -65,12 +91,40 @@ export function createBundleModuleId(filePath, srcRootPath, mode = BUILD_MODULE_
   return `m_${crypto.createHash("sha256").update(relativePath).digest("hex").slice(0, 24)}`;
 }
 
-function resolveBuildModuleAliases(srcRootPath, semanticScrubMode = BUILD_SEMANTIC_SCRUB_NONE) {
+function resolveBuildModuleAliases(
+  srcRootPath,
+  semanticScrubMode = BUILD_SEMANTIC_SCRUB_NONE,
+  preferenceBindingMode = BUILD_PREFERENCE_BINDING_MODE_NATIVE,
+) {
   const aliases = new Map();
   if (semanticScrubMode !== BUILD_SEMANTIC_SCRUB_PROTECTED) {
     return aliases;
   }
 
+  aliases.set(
+    path.resolve(srcRootPath, "app", "agent-scenario-ids.js"),
+    path.resolve(srcRootPath, "app", "agent-scenario-ids-protected.js"),
+  );
+  aliases.set(
+    path.resolve(srcRootPath, "app", "capability-ids.js"),
+    path.resolve(srcRootPath, "app", "capability-ids-protected.js"),
+  );
+  aliases.set(
+    path.resolve(srcRootPath, "app", "host-action-ids.js"),
+    path.resolve(srcRootPath, "app", "host-action-ids-protected.js"),
+  );
+  aliases.set(
+    path.resolve(srcRootPath, "app", "host-action-owner-modules.js"),
+    path.resolve(srcRootPath, "app", "host-action-owner-modules-protected.js"),
+  );
+  aliases.set(
+    path.resolve(srcRootPath, "app", "host-action-catalog.js"),
+    path.resolve(srcRootPath, "app", "host-action-catalog-protected.js"),
+  );
+  aliases.set(
+    path.resolve(srcRootPath, "app", "host-action-readiness-ids.js"),
+    path.resolve(srcRootPath, "app", "host-action-readiness-ids-protected.js"),
+  );
   aliases.set(
     path.resolve(srcRootPath, "core", "i18n.js"),
     path.resolve(srcRootPath, "core", "i18n-protected.js"),
@@ -85,7 +139,13 @@ function resolveBuildModuleAliases(srcRootPath, semanticScrubMode = BUILD_SEMANT
   );
   aliases.set(
     path.resolve(srcRootPath, "app", "surface-descriptors.js"),
-    path.resolve(srcRootPath, "app", "surface-descriptors-protected.js"),
+    path.resolve(
+      srcRootPath,
+      "app",
+      preferenceBindingMode === BUILD_PREFERENCE_BINDING_MODE_BRIDGE
+        ? "surface-descriptors-protected-pref-bridge.js"
+        : "surface-descriptors-protected.js",
+    ),
   );
   return aliases;
 }
@@ -199,14 +259,23 @@ export function validateBuildConfig(config, filePath = configPath) {
   return config;
 }
 
-function buildManifest(config) {
+function buildManifest(
+  config,
+  staticSurfaceMode = BUILD_STATIC_SURFACE_MODE_STANDARD,
+) {
+  const useScrubbedSurface = staticSurfaceMode === BUILD_STATIC_SURFACE_MODE_SCRUB;
   const manifest = {
     manifest_version: 2,
-    name: config.addonName,
+    name: useScrubbedSurface
+      ? "Zotero Tool Package"
+      : config.addonName,
     version: config.addonVersion,
-    description: config.description,
-    homepage_url: config.homepage,
-    author: config.author,
+    description: useScrubbedSurface
+      ? "Protected Zotero add-on package."
+      : config.description,
+    author: useScrubbedSurface
+      ? "Tool Package"
+      : config.author,
     applications: {
       zotero: {
         id: config.addonId,
@@ -215,6 +284,10 @@ function buildManifest(config) {
       },
     },
   };
+
+  if (!useScrubbedSurface && config.homepage) {
+    manifest.homepage_url = config.homepage;
+  }
 
   if (config.updateURL) {
     manifest.applications.zotero.update_url = config.updateURL;
@@ -236,10 +309,57 @@ function encodePrefLine(key, value) {
   return `pref("${key}", ${String(value)});`;
 }
 
-function buildPrefs(config) {
+function buildPrefs(
+  config,
+  semanticScrubMode = BUILD_SEMANTIC_SCRUB_NONE,
+  preferenceBindingMode = BUILD_PREFERENCE_BINDING_MODE_NATIVE,
+) {
+  const prefNames = preferenceBindingMode === BUILD_PREFERENCE_BINDING_MODE_BRIDGE
+    && semanticScrubMode === BUILD_SEMANTIC_SCRUB_PROTECTED
+    ? buildPreferencePlaceholderNameMap(
+      resolveBuildSurfaceDescriptors(config, semanticScrubMode),
+    )
+    : buildPreferenceNameMap(config);
   return Object.entries(config.defaultPrefs)
-    .map(([key, value]) => encodePrefLine(`${config.prefsPrefix}.${key}`, value))
+    .map(([key, value]) => encodePrefLine(prefNames[key] || `${config.prefsPrefix}.${key}`, value))
     .join("\n");
+}
+
+export function stripProtectedSourceComments(sourceCode) {
+  const lines = String(sourceCode || "").split("\n");
+  const stripped = [];
+  let inBlockComment = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (inBlockComment) {
+      if (trimmed.includes("*/")) {
+        inBlockComment = false;
+      }
+      continue;
+    }
+
+    if (!trimmed) {
+      stripped.push(line);
+      continue;
+    }
+
+    if (trimmed.startsWith("//")) {
+      continue;
+    }
+
+    if (trimmed.startsWith("/*")) {
+      if (!trimmed.includes("*/")) {
+        inBlockComment = true;
+      }
+      continue;
+    }
+
+    stripped.push(line);
+  }
+
+  return stripped.join("\n");
 }
 
 function collectImports(sourceCode) {
@@ -357,9 +477,10 @@ export async function bundleEntry({
   optionalBundleRegistry = null,
   moduleIdMode = BUILD_MODULE_ID_MODE_PATH,
   semanticScrubMode = BUILD_SEMANTIC_SCRUB_NONE,
+  preferenceBindingMode = BUILD_PREFERENCE_BINDING_MODE_NATIVE,
 }) {
   const moduleMap = new Map();
-  const moduleAliases = resolveBuildModuleAliases(srcRootPath, semanticScrubMode);
+  const moduleAliases = resolveBuildModuleAliases(srcRootPath, semanticScrubMode, preferenceBindingMode);
   const bundledOptionalBundleRegistry = resolveOptionalBundleRegistryBuildView(
     optionalBundleRegistry,
     semanticScrubMode,
@@ -372,7 +493,10 @@ export async function bundleEntry({
     }
 
     const raw = await fs.readFile(normalizedPath, "utf-8");
-    const imports = collectImports(raw);
+    const sourceCode = semanticScrubMode === BUILD_SEMANTIC_SCRUB_PROTECTED
+      ? stripProtectedSourceComments(raw)
+      : raw;
+    const imports = collectImports(sourceCode);
 
     const rows = [];
     for (const item of imports) {
@@ -393,7 +517,7 @@ export async function bundleEntry({
 
     moduleMap.set(normalizedPath, {
       id: createBundleModuleId(normalizedPath, srcRootPath, moduleIdMode),
-      source: transformModuleSource(raw, rows),
+      source: transformModuleSource(sourceCode, rows),
     });
   }
 
@@ -443,20 +567,109 @@ ${moduleDefs}
 `;
 }
 
-function patchBootstrap(templateContent, config) {
-  return templateContent
-    .replaceAll("__ADDON_REF__", config.addonRef)
-    .replaceAll("__INSTANCE_KEY__", config.instanceKey);
+function encodeJSStringExpression(value = "") {
+  const codeUnits = Array.from(String(value || ""))
+    .map((character) => character.charCodeAt(0));
+  if (codeUnits.length === 0) {
+    return '""';
+  }
+  return `String.fromCharCode(${codeUnits.join(", ")})`;
 }
 
-function patchPreferences(templateContent, config) {
-  return templateContent.replaceAll("__PREFS_PREFIX__", config.prefsPrefix);
+function patchBootstrap(
+  templateContent,
+  config,
+  staticSurfaceMode = BUILD_STATIC_SURFACE_MODE_STANDARD,
+) {
+  const scrubbedTemplate = staticSurfaceMode === BUILD_STATIC_SURFACE_MODE_SCRUB
+    ? [
+      ["startup.cleanup.failed", "boot.cleanup.failed"],
+      ["startup.failed", "boot.start.failed"],
+      ["shutdown.failed", "boot.stop.failed"],
+      ["cleanroom.bootstrap", "tool.bootstrap"],
+      ["console-bridge", "cb"],
+      ["capability-report", "runtime-report"],
+    ].reduce((source, [from, to]) => source.replaceAll(from, to), templateContent)
+    : templateContent;
+  const addonRefValue = staticSurfaceMode === BUILD_STATIC_SURFACE_MODE_SCRUB
+    ? encodeJSStringExpression(config.addonRef)
+    : JSON.stringify(config.addonRef);
+  const instanceKeyValue = staticSurfaceMode === BUILD_STATIC_SURFACE_MODE_SCRUB
+    ? encodeJSStringExpression(config.instanceKey)
+    : JSON.stringify(config.instanceKey);
+  return scrubbedTemplate
+    .replaceAll('"__ADDON_REF__"', addonRefValue)
+    .replaceAll('"__INSTANCE_KEY__"', instanceKeyValue);
 }
 
-function patchReactUIDemoShell(templateContent, config) {
+function resolveBuildSurfaceDescriptors(config, semanticScrubMode = BUILD_SEMANTIC_SCRUB_NONE) {
+  if (semanticScrubMode === BUILD_SEMANTIC_SCRUB_PROTECTED) {
+    return createProtectedSurfaceDescriptors(config);
+  }
+  return createDefaultSurfaceDescriptors(config);
+}
+
+function buildPreferenceNameMap(config = {}) {
+  const prefsPrefix = String(config?.prefsPrefix || "").trim();
+  return {
+    enabled: `${prefsPrefix}.enabled`,
+    menuLabel: `${prefsPrefix}.menuLabel`,
+    logLevel: `${prefsPrefix}.logLevel`,
+    themeMode: `${prefsPrefix}.themeMode`,
+  };
+}
+
+function buildPreferencePlaceholderNameMap(surfaceDescriptors = null) {
+  const paneScope = String(surfaceDescriptors?.preferencePaneID || "").trim() || "crp0";
+  const prefsPrefix = `extensions.zotero.${paneScope}`;
+  return {
+    enabled: `${prefsPrefix}.p0`,
+    menuLabel: `${prefsPrefix}.p1`,
+    logLevel: `${prefsPrefix}.p2`,
+    themeMode: `${prefsPrefix}.p3`,
+  };
+}
+
+function patchPreferences(
+  templateContent,
+  config,
+  semanticScrubMode = BUILD_SEMANTIC_SCRUB_NONE,
+  preferenceBindingMode = BUILD_PREFERENCE_BINDING_MODE_NATIVE,
+) {
+  const surfaceDescriptors = resolveBuildSurfaceDescriptors(config, semanticScrubMode);
+  const prefNames = preferenceBindingMode === BUILD_PREFERENCE_BINDING_MODE_BRIDGE
+    ? buildPreferencePlaceholderNameMap(surfaceDescriptors)
+    : buildPreferenceNameMap(config);
   return templateContent
-    .replaceAll("__ADDON_REF__", escapeXHTML(config.addonRef))
-    .replaceAll("__ADDON_NAME__", escapeXHTML(config.addonName));
+    .replaceAll("__PREF_ENABLED_NAME__", prefNames.enabled)
+    .replaceAll("__PREF_MENU_LABEL_NAME__", prefNames.menuLabel)
+    .replaceAll("__PREF_LOG_LEVEL_NAME__", prefNames.logLevel)
+    .replaceAll("__PREF_THEME_MODE_NAME__", prefNames.themeMode)
+    .replaceAll("__PREFERENCE_ROOT_ID__", surfaceDescriptors.preferenceRootID);
+}
+
+function patchReactUIDemoShell(
+  templateContent,
+  config,
+  staticSurfaceMode = BUILD_STATIC_SURFACE_MODE_STANDARD,
+) {
+  const shellAddonRef = staticSurfaceMode === BUILD_STATIC_SURFACE_MODE_SCRUB
+    ? "tool"
+    : String(config?.addonRef || "").trim() || "tool";
+  const shellAddonName = staticSurfaceMode === BUILD_STATIC_SURFACE_MODE_SCRUB
+    ? "Tool"
+    : String(config?.addonName || "").trim() || "Tool";
+  const shellWindowTitle = staticSurfaceMode === BUILD_STATIC_SURFACE_MODE_SCRUB
+    ? "Tool Panel"
+    : `${shellAddonName} React UI Demo`;
+  const shellNoScript = staticSurfaceMode === BUILD_STATIC_SURFACE_MODE_SCRUB
+    ? "This panel requires JavaScript."
+    : "React UI demo requires JavaScript.";
+  return templateContent
+    .replaceAll("__SHELL_ADDON_REF__", escapeXHTML(shellAddonRef))
+    .replaceAll("__SHELL_ADDON_NAME__", escapeXHTML(shellAddonName))
+    .replaceAll("__SHELL_WINDOW_TITLE__", escapeXHTML(shellWindowTitle))
+    .replaceAll("__SHELL_NOSCRIPT__", escapeXHTML(shellNoScript));
 }
 
 const PROTECTED_STATIC_REPLACEMENTS = Object.freeze({
@@ -490,7 +703,7 @@ const PROTECTED_STATIC_REPLACEMENTS = Object.freeze({
     ["範本外掛", "工具"],
     ["外掛命令已成功執行。", "操作已完成。"],
   ]),
-  "content/react-ui/demo.xhtml": Object.freeze([
+  [REACT_UI_DEMO_SHELL_PATH]: Object.freeze([
     ["React UI Demo", "Panel"],
     ["React UI demo requires JavaScript.", "This panel requires JavaScript."],
   ]),
@@ -513,8 +726,27 @@ const PROTECTED_STATIC_SCRIPT_PATHS = Object.freeze([
   "content/theme.js",
 ]);
 
-async function obfuscateProtectedStaticScripts(buildRoot) {
-  for (const relativePath of PROTECTED_STATIC_SCRIPT_PATHS) {
+const PROTECTED_SCRUB_ONLY_STATIC_SCRIPT_PATHS = Object.freeze([
+  WASM_KERNEL_PROBE_WORKER_PATH,
+]);
+
+function resolveProtectedStaticScriptPaths(
+  staticSurfaceMode = BUILD_STATIC_SURFACE_MODE_STANDARD,
+) {
+  if (staticSurfaceMode !== BUILD_STATIC_SURFACE_MODE_SCRUB) {
+    return PROTECTED_STATIC_SCRIPT_PATHS.slice();
+  }
+  return [
+    ...PROTECTED_STATIC_SCRIPT_PATHS,
+    ...PROTECTED_SCRUB_ONLY_STATIC_SCRIPT_PATHS,
+  ];
+}
+
+async function obfuscateProtectedStaticScripts(
+  buildRoot,
+  staticSurfaceMode = BUILD_STATIC_SURFACE_MODE_STANDARD,
+) {
+  for (const relativePath of resolveProtectedStaticScriptPaths(staticSurfaceMode)) {
     const targetPath = path.join(buildRoot, relativePath);
     const source = await fs.readFile(targetPath, "utf-8");
     const obfuscated = obfuscateBundleSource(source, {
@@ -531,6 +763,7 @@ async function writeBuildReport({
   optionalBundles = [],
   moduleIdMode = BUILD_MODULE_ID_MODE_PATH,
   semanticScrubMode = BUILD_SEMANTIC_SCRUB_NONE,
+  staticSurfaceMode = BUILD_STATIC_SURFACE_MODE_STANDARD,
 }) {
   const report = {
     generatedAt: new Date().toISOString(),
@@ -541,6 +774,7 @@ async function writeBuildReport({
     optionalBundles,
     moduleIdMode,
     semanticScrubMode,
+    staticSurfaceMode,
   };
 
   await fs.writeFile(
@@ -579,6 +813,8 @@ export async function main() {
 
     const moduleIdMode = resolveBuildModuleIdMode(process.env);
     const semanticScrubMode = resolveBuildSemanticScrubMode(process.env);
+    const preferenceBindingMode = resolveBuildPreferenceBindingMode(process.env);
+    const staticSurfaceMode = resolveBuildStaticSurfaceMode(process.env);
     const buildRoot = path.join(projectRoot, "build", config.addonRef);
     const scriptsRoot = path.join(buildRoot, "content", "scripts");
 
@@ -593,7 +829,7 @@ export async function main() {
       });
     }
 
-    const manifest = buildManifest(config);
+    const manifest = buildManifest(config, staticSurfaceMode);
     try {
       await fs.writeFile(
         path.join(buildRoot, "manifest.json"),
@@ -607,7 +843,7 @@ export async function main() {
       });
     }
 
-    const prefsContent = buildPrefs(config);
+    const prefsContent = buildPrefs(config, semanticScrubMode, preferenceBindingMode);
     try {
       await fs.writeFile(path.join(buildRoot, "prefs.js"), `${prefsContent}\n`, "utf-8");
     } catch (error) {
@@ -619,7 +855,7 @@ export async function main() {
 
     try {
       const bootstrapTemplate = await fs.readFile(path.join(buildRoot, "bootstrap.js"), "utf-8");
-      const patchedBootstrap = patchBootstrap(bootstrapTemplate, config);
+      const patchedBootstrap = patchBootstrap(bootstrapTemplate, config, staticSurfaceMode);
       await fs.writeFile(path.join(buildRoot, "bootstrap.js"), patchedBootstrap, "utf-8");
     } catch (error) {
       throw wrapScriptError(error, {
@@ -631,7 +867,12 @@ export async function main() {
     const prefsTemplatePath = path.join(buildRoot, "content", "preferences.xhtml");
     try {
       const prefsTemplate = await fs.readFile(prefsTemplatePath, "utf-8");
-      const patchedPrefs = patchPreferences(prefsTemplate, config);
+      const patchedPrefs = patchPreferences(
+        prefsTemplate,
+        config,
+        semanticScrubMode,
+        preferenceBindingMode,
+      );
       await fs.writeFile(prefsTemplatePath, patchedPrefs, "utf-8");
     } catch (error) {
       throw wrapScriptError(error, {
@@ -640,10 +881,14 @@ export async function main() {
       });
     }
 
-    const reactUIDemoShellPath = path.join(buildRoot, "content", "react-ui", "demo.xhtml");
+    const reactUIDemoShellPath = path.join(buildRoot, ...REACT_UI_DEMO_SHELL_PATH.split("/"));
     try {
       const reactUIDemoShell = await fs.readFile(reactUIDemoShellPath, "utf-8");
-      const patchedReactUIDemoShell = patchReactUIDemoShell(reactUIDemoShell, config);
+      const patchedReactUIDemoShell = patchReactUIDemoShell(
+        reactUIDemoShell,
+        config,
+        staticSurfaceMode,
+      );
       await fs.writeFile(reactUIDemoShellPath, patchedReactUIDemoShell, "utf-8");
     } catch (error) {
       if (error?.code !== "ENOENT") {
@@ -665,7 +910,7 @@ export async function main() {
       }
 
       try {
-        await obfuscateProtectedStaticScripts(buildRoot);
+        await obfuscateProtectedStaticScripts(buildRoot, staticSurfaceMode);
       } catch (error) {
         throw wrapScriptError(error, {
           failedStage: "obfuscate-protected-static-scripts",
@@ -684,6 +929,7 @@ export async function main() {
         optionalBundleRegistry,
         moduleIdMode,
         semanticScrubMode,
+        preferenceBindingMode,
       });
     } catch (error) {
       throw wrapScriptError(error, {
@@ -749,6 +995,7 @@ export async function main() {
         optionalBundles: optionalBundleResults,
         moduleIdMode,
         semanticScrubMode,
+        staticSurfaceMode,
       });
     } catch (error) {
       throw wrapScriptError(error, {

@@ -5,6 +5,7 @@ function normalizeAddonRef(config = {}) {
 
 export function createSurfaceDescriptors(config = {}) {
   const addonRef = normalizeAddonRef(config);
+  const preferencePaneID = `${addonRef}-preferences`;
 
   return Object.freeze({
     serviceIDs: Object.freeze({
@@ -25,7 +26,9 @@ export function createSurfaceDescriptors(config = {}) {
       toolsMenuItemID: "cleanroom-template-menuitem",
       injectedStyleID: "cleanroom-template-style",
     }),
-    preferencePaneID: `${addonRef}-preferences`,
+    preferenceBindingMode: "native",
+    preferencePaneID,
+    preferenceRootID: `${preferencePaneID}-root`,
     primaryActionCommandID: `${addonRef}-primary-action`,
     readerSummaryCommandID: `${addonRef}-reader-summary`,
     readerSelectionCommandID: `${addonRef}-reader-selection-snapshot`,

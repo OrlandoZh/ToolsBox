@@ -136,6 +136,25 @@ function normalizeBuildContract(build, prefix) {
   };
 }
 
+function normalizeValidationContract(validation, prefix) {
+  if (!validation || typeof validation !== "object" || Array.isArray(validation)) {
+    fail(`${prefix}.validation must be an object.`);
+  }
+
+  return {
+    summary: ensureNonEmptyString(validation.summary, `${prefix}.validation.summary`),
+    requiredFiles: ensureArrayOfStrings(
+      validation.requiredFiles || [],
+      `${prefix}.validation.requiredFiles`,
+      { allowEmpty: false },
+    ),
+    requiredPackageScripts: ensureArrayOfStrings(
+      validation.requiredPackageScripts || [],
+      `${prefix}.validation.requiredPackageScripts`,
+    ),
+  };
+}
+
 function normalizeOptionalBundle(bundle, index) {
   const prefix = `optional bundles[${index}]`;
   if (!bundle || typeof bundle !== "object" || Array.isArray(bundle)) {
@@ -166,6 +185,7 @@ function normalizeOptionalBundle(bundle, index) {
     implementationStatus,
     summary: ensureNonEmptyString(bundle.summary, `${prefix}.summary`),
     build: null,
+    validation: null,
     docs: ensureArrayOfStrings(bundle.docs || [], `${prefix}.docs`),
   };
 
@@ -173,6 +193,10 @@ function normalizeOptionalBundle(bundle, index) {
     normalized.build = normalizeBuildContract(bundle.build, prefix);
   } else if (bundle.build != null) {
     normalized.build = normalizeBuildContract(bundle.build, prefix);
+  }
+
+  if (bundle.validation != null) {
+    normalized.validation = normalizeValidationContract(bundle.validation, prefix);
   }
 
   return normalized;
@@ -287,6 +311,32 @@ export function inspectOptionalBundleContracts(projectRoot, options = {}) {
         bundleId: bundle.id,
         reason: "enabled-but-not-implemented",
         message: `Optional bundle \`${bundle.id}\` is enabled but only declared as ${bundle.implementationStatus}.`,
+      });
+    }
+
+    if (bundle.validation) {
+      bundle.validation.requiredFiles.forEach((relativePath) => {
+        if (!fs.existsSync(path.join(projectRoot, relativePath))) {
+          issues.push({
+            bundleId: bundle.id,
+            reason: "missing-validation-file",
+            file: relativePath,
+            message: `Optional bundle \`${bundle.id}\` is missing required validation file: ${relativePath}`,
+          });
+        }
+      });
+
+      bundle.validation.requiredPackageScripts.forEach((scriptName) => {
+        if (typeof packageJSON?.scripts?.[scriptName] === "string") {
+          return;
+        }
+
+        issues.push({
+          bundleId: bundle.id,
+          reason: "missing-validation-script",
+          scriptName,
+          message: `Optional bundle \`${bundle.id}\` requires package.json script \`${scriptName}\` for its validation contract.`,
+        });
       });
     }
 
