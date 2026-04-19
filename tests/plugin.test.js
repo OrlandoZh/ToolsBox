@@ -12,6 +12,12 @@ function createDeferred() {
   return { promise, resolve };
 }
 
+async function flushMicrotasks(rounds = 4) {
+  for (let index = 0; index < rounds; index += 1) {
+    await Promise.resolve();
+  }
+}
+
 function createConfig() {
   return {
     addonName: "Cleanroom Template",
@@ -823,6 +829,136 @@ describe("Plugin", () => {
 
     await plugin.shutdown();
     assert.equal(closeCalls, 1);
+  });
+
+  it("should restore the protected overlay after the wasm stage2 derive gate is satisfied", async () => {
+    startupReady.initialization.resolve();
+    startupReady.unlock.resolve();
+    startupReady.uiReady.resolve();
+
+    globalThis.__CLEANROOM_TEMPLATE_RUNTIME__.packageProtection = {
+      active: true,
+      variant: "shielded-surface-scrub-wasm-stage2-derive",
+      overlayResolver() {
+        return [{
+          id: "host-actions",
+          label: "宿主动作编排",
+          category: "feature",
+          description: "stage2 overlay enabled",
+        }];
+      },
+    };
+
+    let createWasmKernelProbeCalls = 0;
+    const unlockPayloads = [];
+    const plugin = createPlugin({
+      globalScope: globalThis,
+      config: createConfig(),
+      createWasmKernelProbeImpl() {
+        createWasmKernelProbeCalls += 1;
+        return {
+          async deriveUnlockToken(payload = {}) {
+            unlockPayloads.push(payload);
+            return {
+              ok: true,
+              mode: "main-thread",
+              activationRequirements: ["profileHash", "dbAvailable", "noncePresent"],
+              activationMissing: [],
+              activationSatisfied: true,
+              shadowWouldApply: true,
+              mainThread: {
+                ok: true,
+                stage2DigestUint32: 305419896,
+                stage2DigestHex: "12345678",
+                unlockTokenUint32: 2271560481,
+                unlockTokenHex: "87654321",
+              },
+              worker: null,
+              consistentAcrossTransports: null,
+              errors: [],
+            };
+          },
+          async close() {},
+        };
+      },
+    });
+
+    await plugin.start();
+    await flushMicrotasks();
+
+    const selfCheck = plugin.api.runAgentSelfCheck();
+
+    assert.equal(createWasmKernelProbeCalls, 1);
+    assert.equal(unlockPayloads.length, 1);
+    assert.equal(unlockPayloads[0].mode, "main-thread");
+    assert.equal(unlockPayloads[0].bundleSeed, "cleanroom-stage2-shadow-seed-v1");
+    assert.equal(unlockPayloads[0].overlayVersion, "descriptor-overlay-v1");
+    assert.equal(selfCheck.capabilityManifestProtectedView, true);
+    assert.equal(selfCheck.capabilityManifestDetailLevel, "full");
+    assert.equal(selfCheck.capabilityManifestOverlayAvailable, true);
+    assert.equal(selfCheck.capabilityManifestOverlayApplied, true);
+    assert.equal(selfCheck.capabilityManifestActivationSatisfied, true);
+    assert.deepEqual(selfCheck.capabilityManifestActivationMissing, []);
+    assert.equal(
+      globalThis.__CLEANROOM_TEMPLATE_RUNTIME__.packageProtection?.stage2OverlayGate?.status,
+      "satisfied",
+    );
+
+    await plugin.shutdown();
+  });
+
+  it("should downgrade to limited protected view when the wasm stage2 derive gate does not resolve", async () => {
+    startupReady.initialization.resolve();
+    startupReady.unlock.resolve();
+    startupReady.uiReady.resolve();
+
+    globalThis.__CLEANROOM_TEMPLATE_RUNTIME__.packageProtection = {
+      active: true,
+      variant: "shielded-surface-scrub-wasm-stage2-derive",
+      overlayResolver() {
+        return [{
+          id: "host-actions",
+          label: "宿主动作编排",
+          category: "feature",
+          description: "stage2 overlay enabled",
+        }];
+      },
+    };
+
+    let createWasmKernelProbeCalls = 0;
+    const plugin = createPlugin({
+      globalScope: globalThis,
+      config: createConfig(),
+      createWasmKernelProbeImpl() {
+        createWasmKernelProbeCalls += 1;
+        return {
+          async deriveUnlockToken() {
+            throw new Error("wasm stage2 failed");
+          },
+          async close() {},
+        };
+      },
+    });
+
+    await plugin.start();
+    await flushMicrotasks();
+
+    const selfCheck = plugin.api.runAgentSelfCheck();
+    await flushMicrotasks();
+
+    assert.equal(createWasmKernelProbeCalls, 1);
+    assert.equal(selfCheck.capabilityManifestProtectedView, true);
+    assert.equal(selfCheck.capabilityManifestDetailLevel, "limited");
+    assert.equal(selfCheck.capabilityManifestOverlayAvailable, false);
+    assert.equal(selfCheck.capabilityManifestOverlayApplied, false);
+    assert.equal(selfCheck.capabilityManifestActivationSatisfied, false);
+    assert.includes(selfCheck.capabilityManifestActivationMissing, "wasmStage2OverlayGate");
+    assert.equal(
+      globalThis.__CLEANROOM_TEMPLATE_RUNTIME__.packageProtection?.stage2OverlayGate?.status,
+      "error",
+    );
+
+    await plugin.shutdown();
   });
 
   it("should enable the reader demo command when a reader tab is active", async () => {

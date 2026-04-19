@@ -59,6 +59,13 @@ describe("Package Protection Smoke", () => {
     assert.equal(options.channel, "stable");
   });
 
+  it("should accept wasm-stage2-derive as a protected overlay gate variant alias", () => {
+    const options = parsePackageProtectionSmokeArgs(["--variant", "wasm-stage2-derive"]);
+
+    assert.equal(options.variant, "shielded-surface-scrub-wasm-stage2-derive");
+    assert.equal(options.channel, "stable");
+  });
+
   it("should reject missing variants and invalid repeat counts", () => {
     assert.throws(() => parsePackageProtectionSmokeArgs([]));
     assert.throws(() => parsePackageProtectionSmokeArgs(["--variant", "plain", "--repeats", "0"]));
@@ -89,6 +96,10 @@ describe("Package Protection Smoke", () => {
     ]);
     assert.deepEqual(resolvePackageProtectionSmokePackageArgs("shielded-surface-scrub-wasm-digest"), [
       "--surface-scrub-wasm-digest",
+      "--skip-release-metadata",
+    ]);
+    assert.deepEqual(resolvePackageProtectionSmokePackageArgs("shielded-surface-scrub-wasm-stage2-derive"), [
+      "--surface-scrub-wasm-stage2-derive",
       "--skip-release-metadata",
     ]);
     assert.deepEqual(resolvePackageProtectionSmokePackageArgs("shielded-jsconfuser-string", {

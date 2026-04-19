@@ -34,6 +34,9 @@ function createBootstrapHarness(options = {}) {
 
   const chromeGlobal = {
     Zotero: {},
+    ...((options.chromeGlobal && typeof options.chromeGlobal === "object")
+      ? options.chromeGlobal
+      : {}),
   };
 
   const context = {
@@ -106,6 +109,9 @@ function createBootstrapHarness(options = {}) {
         amIAddonManagerStartup: Symbol("amIAddonManagerStartup"),
       },
     },
+    ...((options.contextGlobals && typeof options.contextGlobals === "object")
+      ? options.contextGlobals
+      : {}),
   };
 
   chromeGlobal.Zotero.debug = (message) => {
@@ -211,6 +217,48 @@ describe("Bootstrap Bridge", () => {
     );
     assert.equal(harness.debugLogs.length, 1);
     assert.deepEqual(harness.errorLogs, []);
+  });
+
+  it("should bridge wasm globals required by the optional kernel lane", async () => {
+    const fakeWebAssembly = {
+      instantiate() {},
+    };
+    function FakeWorker() {}
+    function FakeChromeWorker() {}
+
+    const harness = createBootstrapHarness({
+      contextGlobals: {
+        WebAssembly: fakeWebAssembly,
+        Worker: FakeWorker,
+        ChromeWorker: FakeChromeWorker,
+      },
+    });
+
+    let bridgedScope = null;
+    harness.context.Services.scriptloader.loadSubScript = (_scriptURI, scope) => {
+      bridgedScope = scope;
+      scope.__CLEANROOM_TEMPLATE_CONFIG__ = {
+        instanceKey: "CleanroomTemplate",
+      };
+      scope.bootstrapPlugin = async () => {
+        harness.chromeGlobal.Zotero.CleanroomTemplate = {
+          api: {},
+          async shutdown() {},
+        };
+      };
+    };
+
+    await harness.context.startup({ rootURI: "resource://cleanroom/" }, 0);
+
+    assert.equal(bridgedScope.WebAssembly, fakeWebAssembly);
+    assert.equal(bridgedScope.Worker, FakeWorker);
+    assert.equal(bridgedScope.ChromeWorker, FakeChromeWorker);
+    assert.equal(
+      harness.chromeGlobal.__CLEANROOM_TEMPLATE_RUNTIME__.capabilityReport.injected.some(
+        (entry) => entry.key === "WebAssembly" && entry.source === "global",
+      ),
+      true,
+    );
   });
 
   it("should cleanup globals and chrome handle when startup fails", async () => {

@@ -17,7 +17,7 @@
 | 任务 | 先读什么 | 什么时候再继续读 |
 |------|----------|------------------|
 | 当前主线 / 当前 blocker / 当前验收 | [CURRENT_BACKLOG.md](./CURRENT_BACKLOG.md) | 需要机器可读范围或 validation 判定时再看 `project-expansion-wave.json` / `project-validation-overrides.json` |
-| Wasm 开发 / Zotero 插件内加载 Wasm / Wasm 小内核 PoC | [WASM_DEVELOPMENT_INDEX.md](./WASM_DEVELOPMENT_INDEX.md) | 需要回到整体保护路线时再看 [PACKAGE_PROTECTION_ROUTE_PLAN.md](./PACKAGE_PROTECTION_ROUTE_PLAN.md) 与 [PACKAGE_PROTECTION_EXPERIENCE.md](./PACKAGE_PROTECTION_EXPERIENCE.md) |
+| Wasm 开发 / Zotero 插件内加载 Wasm / Wasm 小内核 PoC | [WASM_DEVELOPMENT_INDEX.md](./WASM_DEVELOPMENT_INDEX.md) | 需要回到整体保护路线时再看 [PACKAGE_PROTECTION_ROUTE_PLAN.md](./PACKAGE_PROTECTION_ROUTE_PLAN.md)、[PACKAGE_PROTECTION_EXPERIENCE.md](./PACKAGE_PROTECTION_EXPERIENCE.md) 与 [PACKAGE_PROTECTION_WASM_STAGE2_DERIVATION_PLAN.md](./PACKAGE_PROTECTION_WASM_STAGE2_DERIVATION_PLAN.md) |
 | UI 创建路线 | [UI_CREATION_PATHS.md](./UI_CREATION_PATHS.md) | 需要判断验证路线时再看 [UI_VALIDATION_PATHS.md](./UI_VALIDATION_PATHS.md) |
 | Host-visible 验收成熟度 / 手工矩阵标签 | [UI_VALIDATION_PATHS.md](./UI_VALIDATION_PATHS.md) | 需要具体 surface contract 时再看 [VALIDATION_SURFACES.md](./VALIDATION_SURFACES.md) |
 | Debug probe 编排 / 失败后自动追问策略 | [ZOTERO_DEBUG_PROBE_CONTRACT.md](./ZOTERO_DEBUG_PROBE_CONTRACT.md) | 需要看当前 runner / scenario 能力边界时再看 [ZOTERO_TESTING.md](./ZOTERO_TESTING.md) |

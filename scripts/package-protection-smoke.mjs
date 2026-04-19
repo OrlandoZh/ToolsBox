@@ -52,6 +52,7 @@ export const PACKAGE_PROTECTION_SMOKE_VARIANTS = Object.freeze([
   "shielded-pref-bridge",
   "shielded-surface-scrub",
   "shielded-surface-scrub-wasm-digest",
+  "shielded-surface-scrub-wasm-stage2-derive",
 ]);
 
 export const MANUAL_SCORECARD_LEVELS = Object.freeze([
@@ -104,6 +105,9 @@ function normalizeVariant(variant) {
   if (normalized === "surface-scrub-wasm-digest" || normalized === "wasm-digest") {
     return "shielded-surface-scrub-wasm-digest";
   }
+  if (normalized === "surface-scrub-wasm-stage2-derive" || normalized === "wasm-stage2-derive") {
+    return "shielded-surface-scrub-wasm-stage2-derive";
+  }
   return PACKAGE_PROTECTION_SMOKE_VARIANTS.includes(normalized)
     ? normalized
     : null;
@@ -116,7 +120,8 @@ function isShieldedLikeVariant(variant) {
     || normalizedVariant === "shielded-jsconfuser-string"
     || normalizedVariant === "shielded-pref-bridge"
     || normalizedVariant === "shielded-surface-scrub"
-    || normalizedVariant === "shielded-surface-scrub-wasm-digest";
+    || normalizedVariant === "shielded-surface-scrub-wasm-digest"
+    || normalizedVariant === "shielded-surface-scrub-wasm-stage2-derive";
 }
 
 function normalizePositiveInteger(value, fallback = 0) {
@@ -170,7 +175,7 @@ export function parsePackageProtectionSmokeArgs(argv = process.argv.slice(2)) {
     }
   }
 
-  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest", {
+  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive", {
     category: "args",
     failedStage: "parse-args",
   });
@@ -204,7 +209,7 @@ function buildChannelEnv(channel, env = process.env) {
 
 export function resolvePackageProtectionSmokePackageArgs(variant, options = {}) {
   const normalizedVariant = normalizeVariant(variant);
-  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest", {
+  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive", {
     category: "args",
     failedStage: "resolve-variant",
   });
@@ -237,12 +242,15 @@ export function resolvePackageProtectionSmokePackageArgs(variant, options = {}) 
   if (normalizedVariant === "shielded-surface-scrub-wasm-digest") {
     return ["--surface-scrub-wasm-digest", "--skip-release-metadata"];
   }
+  if (normalizedVariant === "shielded-surface-scrub-wasm-stage2-derive") {
+    return ["--surface-scrub-wasm-stage2-derive", "--skip-release-metadata"];
+  }
   return ["--shield-bundle", "--skip-release-metadata"];
 }
 
 function resolvePackageVariantOutputName(config, variant) {
   const normalizedVariant = normalizeVariant(variant);
-  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest", {
+  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive", {
     category: "args",
     failedStage: "resolve-variant",
   });
@@ -695,6 +703,29 @@ async function runSingleSmokeIteration({
       }
       if (capabilityManifest.detailLevel !== "full") {
         issues.push(`descriptor-bind capability manifest detailLevel 异常：${capabilityManifest.detailLevel}`);
+      }
+    }
+    if (variant === "shielded-surface-scrub-wasm-stage2-derive") {
+      if (!hostBinding.profileHashPresent) {
+        issues.push("surface-scrub-wasm-stage2-derive 未回读到 hostBinding.profileHash。");
+      }
+      if (!hostBinding.dbAvailable) {
+        issues.push("surface-scrub-wasm-stage2-derive 未回读到 hostBinding.dbAvailable=true。");
+      }
+      if (!hostBinding.noncePresent) {
+        issues.push("surface-scrub-wasm-stage2-derive 未回读到 hostBinding.noncePresent=true。");
+      }
+      if (!capabilityManifest.overlayAvailable) {
+        issues.push("surface-scrub-wasm-stage2-derive 未回读到 capabilityManifest.overlayAvailable=true。");
+      }
+      if (!capabilityManifest.overlayApplied) {
+        issues.push("surface-scrub-wasm-stage2-derive 未回读到 capabilityManifest.overlayApplied=true。");
+      }
+      if (!capabilityManifest.activationSatisfied) {
+        issues.push(`surface-scrub-wasm-stage2-derive activation 未满足：${capabilityManifest.activationMissing.join(",") || "-"}`);
+      }
+      if (capabilityManifest.detailLevel !== "full") {
+        issues.push(`surface-scrub-wasm-stage2-derive capability manifest detailLevel 异常：${capabilityManifest.detailLevel}`);
       }
     }
 

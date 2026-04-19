@@ -37,6 +37,7 @@ const PACKAGE_PROTECTION_WEBCRACK_VARIANTS = Object.freeze([
   "shielded-pref-bridge",
   "shielded-surface-scrub",
   "shielded-surface-scrub-wasm-digest",
+  "shielded-surface-scrub-wasm-stage2-derive",
 ]);
 
 const STATUS_LABELS = Object.freeze({
@@ -109,6 +110,9 @@ function normalizeVariant(value) {
   }
   if (normalized === "surface-scrub-wasm-digest" || normalized === "wasm-digest") {
     return "shielded-surface-scrub-wasm-digest";
+  }
+  if (normalized === "surface-scrub-wasm-stage2-derive" || normalized === "wasm-stage2-derive") {
+    return "shielded-surface-scrub-wasm-stage2-derive";
   }
   return PACKAGE_PROTECTION_WEBCRACK_VARIANTS.includes(normalized)
     ? normalized
@@ -237,7 +241,7 @@ function resolvePackageVariantOutputName(config, variant) {
 
 function resolvePackageProtectionWebcrackPackageArgs(variant, options = {}) {
   const normalizedVariant = normalizeVariant(variant);
-  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest", {
+  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive", {
     category: "args",
     failedStage: "resolve-variant",
   });
@@ -636,7 +640,7 @@ export function parsePackageProtectionWebcrackAuditArgs(argv = process.argv.slic
     }
   }
 
-  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest", {
+  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive", {
     category: "args",
     failedStage: "parse-args",
   });
@@ -695,7 +699,7 @@ async function createWebcrackAudit(options = {}) {
   const timeoutMs = normalizePositiveInteger(options.timeoutMs, DEFAULT_TIMEOUT_MS);
   const webcrackBin = String(options.webcrackBin || DEFAULT_WEBCRACK_BIN).trim() || DEFAULT_WEBCRACK_BIN;
 
-  assertScript(Boolean(variant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest", {
+  assertScript(Boolean(variant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive", {
     category: "args",
     failedStage: "validate-options",
   });

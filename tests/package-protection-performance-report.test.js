@@ -98,6 +98,12 @@ describe("Package Protection Performance Report", () => {
       "wasm-digest",
     ]);
     assert.deepEqual(wasmDigest.variants, ["shielded-surface-scrub-wasm-digest"]);
+
+    const wasmStage2Derive = parsePackageProtectionPerformanceArgs([
+      "--variant",
+      "wasm-stage2-derive",
+    ]);
+    assert.deepEqual(wasmStage2Derive.variants, ["shielded-surface-scrub-wasm-stage2-derive"]);
   });
 
   it("should classify experimental timing using duration for UX and pipeline for protection cost", () => {
@@ -260,5 +266,37 @@ describe("Package Protection Performance Report", () => {
     const comparison = report.comparisons.find((item) => item.id === "shielded-surface-scrub-wasm-digest-vs-shielded-surface-scrub");
     assert.equal(comparison?.baseVariant, "shielded-surface-scrub");
     assert.equal(comparison?.targetVariant, "shielded-surface-scrub-wasm-digest");
+  });
+
+  it("should compare surface-scrub-wasm-stage2-derive against surface-scrub when the stage2 candidate smoke is present", () => {
+    const surfaceScrub = buildSmokeReport({
+      variant: "shielded-surface-scrub",
+      runs: [
+        { durationMs: 1690, loadSubScriptDurationMs: 418, decodeDurationMs: 24, decryptDurationMs: 14, evalDurationMs: 42, prepareDurationMs: 78 },
+        { durationMs: 1705, loadSubScriptDurationMs: 420, decodeDurationMs: 24, decryptDurationMs: 14, evalDurationMs: 43, prepareDurationMs: 79 },
+        { durationMs: 1715, loadSubScriptDurationMs: 421, decodeDurationMs: 25, decryptDurationMs: 15, evalDurationMs: 43, prepareDurationMs: 80 },
+      ],
+    });
+    const wasmStage2Derive = buildSmokeReport({
+      variant: "shielded-surface-scrub-wasm-stage2-derive",
+      runs: [
+        { durationMs: 1696, loadSubScriptDurationMs: 419, decodeDurationMs: 24, decryptDurationMs: 14, evalDurationMs: 42, prepareDurationMs: 80 },
+        { durationMs: 1710, loadSubScriptDurationMs: 421, decodeDurationMs: 24, decryptDurationMs: 14, evalDurationMs: 43, prepareDurationMs: 81 },
+        { durationMs: 1720, loadSubScriptDurationMs: 422, decodeDurationMs: 25, decryptDurationMs: 15, evalDurationMs: 43, prepareDurationMs: 82 },
+      ],
+    });
+
+    const report = summarizePackageProtectionPerformanceReport({
+      channel: "stable",
+      variants: ["shielded-surface-scrub", "shielded-surface-scrub-wasm-stage2-derive"],
+      smokeReports: {
+        "shielded-surface-scrub": surfaceScrub,
+        "shielded-surface-scrub-wasm-stage2-derive": wasmStage2Derive,
+      },
+    });
+
+    const comparison = report.comparisons.find((item) => item.id === "shielded-surface-scrub-wasm-stage2-derive-vs-shielded-surface-scrub");
+    assert.equal(comparison?.baseVariant, "shielded-surface-scrub");
+    assert.equal(comparison?.targetVariant, "shielded-surface-scrub-wasm-stage2-derive");
   });
 });

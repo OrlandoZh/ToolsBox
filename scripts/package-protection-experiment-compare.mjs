@@ -34,6 +34,7 @@ export const PACKAGE_PROTECTION_EXPERIMENT_COMPARE_VARIANTS = Object.freeze([
   "shielded-pref-bridge",
   "shielded-surface-scrub",
   "shielded-surface-scrub-wasm-digest",
+  "shielded-surface-scrub-wasm-stage2-derive",
 ]);
 
 const STATUS_LABELS = Object.freeze({
@@ -91,6 +92,9 @@ function normalizeVariant(value) {
   if (normalized === "surface-scrub-wasm-digest" || normalized === "wasm-digest") {
     return "shielded-surface-scrub-wasm-digest";
   }
+  if (normalized === "surface-scrub-wasm-stage2-derive" || normalized === "wasm-stage2-derive") {
+    return "shielded-surface-scrub-wasm-stage2-derive";
+  }
   return PACKAGE_PROTECTION_EXPERIMENT_COMPARE_VARIANTS.includes(normalized)
     ? normalized
     : null;
@@ -98,6 +102,7 @@ function normalizeVariant(value) {
 
 export function resolvePackageProtectionExperimentCompareBaseVariant(variant) {
   return normalizeVariant(variant) === "shielded-surface-scrub-wasm-digest"
+    || normalizeVariant(variant) === "shielded-surface-scrub-wasm-stage2-derive"
     ? "shielded-surface-scrub"
     : "shielded";
 }
@@ -140,7 +145,7 @@ export function parsePackageProtectionExperimentCompareArgs(argv = process.argv.
     }
   }
 
-  assertScript(Boolean(options.variant), "--variant must be one of shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest", {
+  assertScript(Boolean(options.variant), "--variant must be one of shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive", {
     category: "args",
     failedStage: "parse-args",
   });
@@ -500,6 +505,13 @@ function summarizeAuditComparison(variant, auditReport) {
       : normalizeMissingComparison(comparison, "缺少 surface-scrub-wasm-digest 对比样本。");
   }
 
+  if (variant === "shielded-surface-scrub-wasm-stage2-derive") {
+    const comparison = auditReport.surfaceScrubWasmStage2DeriveComparison || null;
+    return comparison?.present === true
+      ? comparison
+      : normalizeMissingComparison(comparison, "缺少 surface-scrub-wasm-stage2-derive 对比样本。");
+  }
+
   const comparison = auditReport.jsConfuserStringComparison || null;
   return comparison?.present === true
     ? comparison
@@ -562,7 +574,7 @@ function buildDeltas(baseSmoke, candidateSmoke, baseWebcrack, candidateWebcrack)
   };
 }
 
-function hasBoundedWasmDigestPerfDelta(baseSmoke, candidateSmoke) {
+function hasBoundedWasmCandidatePerfDelta(baseSmoke, candidateSmoke) {
   const durationDelta = Number(candidateSmoke.medianDurationMs || 0) - Number(baseSmoke.medianDurationMs || 0);
   const prepareDelta = Number(candidateSmoke.medianPrepareDurationMs || 0) - Number(baseSmoke.medianPrepareDurationMs || 0);
   const decodeDelta = Number(candidateSmoke.medianDecodeDurationMs || 0) - Number(baseSmoke.medianDecodeDurationMs || 0);
@@ -572,6 +584,16 @@ function hasBoundedWasmDigestPerfDelta(baseSmoke, candidateSmoke) {
 }
 
 function hasDescriptorBindRuntimeSignals(candidateSmoke) {
+  return candidateSmoke.hostBindingAvailableCount > 0
+    && candidateSmoke.hostBindingDBAvailableCount > 0
+    && candidateSmoke.hostBindingNoncePresentCount > 0
+    && candidateSmoke.capabilityManifestOverlayAvailableCount > 0
+    && candidateSmoke.capabilityManifestOverlayAppliedCount > 0
+    && candidateSmoke.capabilityManifestActivationSatisfiedCount > 0
+    && Number(candidateSmoke.capabilityManifestDetailLevels.full || 0) > 0;
+}
+
+function hasWasmStage2DeriveRuntimeSignals(candidateSmoke) {
   return candidateSmoke.hostBindingAvailableCount > 0
     && candidateSmoke.hostBindingDBAvailableCount > 0
     && candidateSmoke.hostBindingNoncePresentCount > 0
@@ -986,7 +1008,7 @@ function evaluateSurfaceScrubWasmDigest({
     };
   }
 
-  if (!hasBoundedWasmDigestPerfDelta(baseSmoke, candidateSmoke)) {
+  if (!hasBoundedWasmCandidatePerfDelta(baseSmoke, candidateSmoke)) {
     return {
       status: "attention",
       decision: "regression",
@@ -1007,6 +1029,109 @@ function evaluateSurfaceScrubWasmDigest({
   };
 }
 
+function evaluateSurfaceScrubWasmStage2Derive({
+  baseSmoke,
+  candidateSmoke,
+  baseWebcrack,
+  candidateWebcrack,
+  auditComparison,
+  baseInnerAudit,
+  candidateInnerAudit,
+  baseGuidedAttack,
+  candidateGuidedAttack,
+}) {
+  if (!baseSmoke.present || !candidateSmoke.present || !baseWebcrack.present || !candidateWebcrack.present) {
+    return {
+      status: "missing",
+      decision: "missing-evidence",
+      nextAction: "rerun-missing-artifacts",
+      summary: "缺少 shielded-surface-scrub / shielded-surface-scrub-wasm-stage2-derive 的 smoke 或 webcrack 报告，无法做 A/B 比较。",
+    };
+  }
+
+  if (
+    baseSmoke.status !== "passed"
+    || candidateSmoke.status !== "passed"
+    || baseSmoke.automatedStatus !== "passed"
+    || candidateSmoke.automatedStatus !== "passed"
+  ) {
+    return {
+      status: "failed",
+      decision: "regression",
+      nextAction: "fix-runtime-regression",
+      summary: "surface-scrub-wasm-stage2-derive 的 smoke/automated 结果没有保持通过，先修复运行时回归。",
+    };
+  }
+
+  if (!hasWasmStage2DeriveRuntimeSignals(candidateSmoke)) {
+    return {
+      status: "failed",
+      decision: "regression",
+      nextAction: "fix-runtime-regression",
+      summary: "surface-scrub-wasm-stage2-derive 没有稳定回读到 overlay gate/full protected view 信号，当前先修复 runtime gate。",
+    };
+  }
+
+  const webcrackDelta = compareRatings(candidateWebcrack.rating, baseWebcrack.rating);
+  const innerDelta = compareRatings(candidateInnerAudit.rating, baseInnerAudit.rating);
+  const llmDelta = compareRatings(candidateSmoke.llmSinglePassResult, baseSmoke.llmSinglePassResult);
+  const guidedRatingDelta = compareRatings(candidateGuidedAttack.rating, baseGuidedAttack.rating);
+  const guidedResultTierDelta = compareGuidedResultTiers(candidateGuidedAttack.resultTier, baseGuidedAttack.resultTier);
+
+  if (
+    (webcrackDelta != null && webcrackDelta > 0)
+    || (innerDelta != null && innerDelta > 0)
+    || (llmDelta != null && llmDelta > 0)
+    || (guidedRatingDelta != null && guidedRatingDelta > 0)
+    || (guidedResultTierDelta != null && guidedResultTierDelta > 0)
+  ) {
+    return {
+      status: "attention",
+      decision: "regression",
+      nextAction: "stop-current-candidate",
+      summary: "surface-scrub-wasm-stage2-derive 没有保持与 surface-scrub 相同的自动化解读阻力，当前不继续推进。",
+    };
+  }
+
+  if (auditComparison.present !== true) {
+    return {
+      status: "attention",
+      decision: "missing-evidence",
+      nextAction: "collect-anchor-audit",
+      summary: "surface-scrub-wasm-stage2-derive 缺少静态暴露边界审计，当前还不能判断 Wasm 候选是否越界。",
+    };
+  }
+
+  if (auditComparison.packageBoundaryWithinWasmAssets !== true) {
+    return {
+      status: "attention",
+      decision: "regression",
+      nextAction: "stop-current-candidate",
+      summary: "surface-scrub-wasm-stage2-derive 新增 package-boundary 暴露超出了 content/lib/w/* 资产边界，按设计越界处理。",
+    };
+  }
+
+  if (!hasBoundedWasmCandidatePerfDelta(baseSmoke, candidateSmoke)) {
+    return {
+      status: "attention",
+      decision: "regression",
+      nextAction: "stop-current-candidate",
+      summary: "surface-scrub-wasm-stage2-derive 相对 surface-scrub 出现了体感级启动回退风险，当前不继续沿 protection 主线推进。",
+    };
+  }
+
+  const addedAssets = Array.isArray(auditComparison.newExposedFiles) && auditComparison.newExposedFiles.length > 0
+    ? `新增 package-boundary 暴露仅限 ${auditComparison.newExposedFiles.join(", ")}。`
+    : "当前没有观测到超出 surface-scrub 的新增 package-boundary 暴露。";
+
+  return {
+    status: "passed",
+    decision: "hardening-win",
+    nextAction: "promote-experimental-candidate",
+    summary: `surface-scrub-wasm-stage2-derive 在保持 surface-scrub 级别自动化阻力的同时，把 richer overlay 恢复收窄到 Wasm stage2 gate，且新增静态暴露仍受限于 content/lib/w/* 资产边界。${addedAssets}`,
+  };
+}
+
 export function summarizePackageProtectionExperimentCompare({
   variant,
   channel = "stable",
@@ -1024,7 +1149,7 @@ export function summarizePackageProtectionExperimentCompare({
   const normalizedVariant = normalizeVariant(variant);
   const normalizedChannel = normalizeChannel(channel) || "stable";
   const baseVariant = resolvePackageProtectionExperimentCompareBaseVariant(normalizedVariant);
-  assertScript(Boolean(normalizedVariant), "variant must be one of shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest", {
+  assertScript(Boolean(normalizedVariant), "variant must be one of shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive", {
     category: "args",
     failedStage: "summarize-compare",
   });
@@ -1085,6 +1210,18 @@ export function summarizePackageProtectionExperimentCompare({
             baseGuidedAttack,
             candidateGuidedAttack,
           })
+          : normalizedVariant === "shielded-surface-scrub-wasm-stage2-derive"
+            ? evaluateSurfaceScrubWasmStage2Derive({
+              baseSmoke,
+              candidateSmoke,
+              baseWebcrack,
+              candidateWebcrack,
+              auditComparison,
+              baseInnerAudit,
+              candidateInnerAudit,
+              baseGuidedAttack,
+              candidateGuidedAttack,
+            })
       : evaluateJSConfuserString({
         baseSmoke,
         candidateSmoke,

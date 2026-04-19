@@ -574,6 +574,12 @@ describe("Toolchain Scripts", () => {
       CLEANROOM_BUILD_PREFERENCE_BINDING_MODE: "bridge",
       CLEANROOM_BUILD_STATIC_SURFACE_MODE: "scrub",
     });
+    assert.deepEqual(resolvePackageBuildEnv({ surfaceScrubWasmStage2Derive: true, surfaceScrub: true, prefBridge: true, outputSuffix: "shielded-surface-scrub-wasm-stage2-derive" }), {
+      CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
+      CLEANROOM_BUILD_SEMANTIC_SCRUB: "protected",
+      CLEANROOM_BUILD_PREFERENCE_BINDING_MODE: "bridge",
+      CLEANROOM_BUILD_STATIC_SURFACE_MODE: "scrub",
+    });
 
     assert.deepEqual(resolvePackageZipExcludePatterns({}), []);
     assert.deepEqual(resolvePackageZipExcludePatterns({ encryptBundle: true }), ["build-report.json"]);
@@ -583,6 +589,7 @@ describe("Toolchain Scripts", () => {
     assert.deepEqual(resolvePackageZipExcludePatterns({ prefBridge: true, outputSuffix: "shielded-pref-bridge" }), ["build-report.json"]);
     assert.deepEqual(resolvePackageZipExcludePatterns({ surfaceScrub: true, outputSuffix: "shielded-surface-scrub" }), ["build-report.json"]);
     assert.deepEqual(resolvePackageZipExcludePatterns({ surfaceScrubWasmDigest: true, outputSuffix: "shielded-surface-scrub-wasm-digest" }), ["build-report.json"]);
+    assert.deepEqual(resolvePackageZipExcludePatterns({ surfaceScrubWasmStage2Derive: true, outputSuffix: "shielded-surface-scrub-wasm-stage2-derive" }), ["build-report.json"]);
 
     assert.deepEqual(buildPackageZipArgs("/tmp/demo.xpi", {}), ["-r", "/tmp/demo.xpi", "."]);
     assert.deepEqual(
@@ -631,6 +638,14 @@ describe("Toolchain Scripts", () => {
     assert.equal(wasmDigestArgs.surfaceScrub, true);
     assert.equal(wasmDigestArgs.surfaceScrubWasmDigest, true);
     assert.equal(wasmDigestArgs.outputSuffix, "shielded-surface-scrub-wasm-digest");
+
+    const wasmStage2DeriveArgs = parsePackageArgs(["--surface-scrub-wasm-stage2-derive", "--skip-release-metadata"]);
+    assert.equal(wasmStage2DeriveArgs.encryptBundle, true);
+    assert.equal(wasmStage2DeriveArgs.shieldBundle, true);
+    assert.equal(wasmStage2DeriveArgs.prefBridge, true);
+    assert.equal(wasmStage2DeriveArgs.surfaceScrub, true);
+    assert.equal(wasmStage2DeriveArgs.surfaceScrubWasmStage2Derive, true);
+    assert.equal(wasmStage2DeriveArgs.outputSuffix, "shielded-surface-scrub-wasm-stage2-derive");
 
     assert.deepEqual(resolvePackageJSConfuserToolOptions({
       jsConfuserToolPath: "/tmp/js-confuser",
@@ -965,6 +980,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(packageJSON.scripts["package:shielded:pref-bridge"], "node scripts/package.mjs --pref-bridge --skip-release-metadata");
     assert.equal(packageJSON.scripts["package:shielded:surface-scrub"], "node scripts/package.mjs --surface-scrub --skip-release-metadata");
     assert.equal(packageJSON.scripts["package:shielded:surface-scrub:wasm:digest"], "node scripts/package.mjs --surface-scrub-wasm-digest --skip-release-metadata");
+    assert.equal(packageJSON.scripts["package:shielded:surface-scrub:wasm:stage2:derive"], "node scripts/package.mjs --surface-scrub-wasm-stage2-derive --skip-release-metadata");
     assert.equal(packageJSON.scripts["package:protection:smoke"], "node scripts/package-protection-smoke.mjs");
     assert.equal(packageJSON.scripts["package:protection:smoke:plain"], "node scripts/package-protection-smoke.mjs --variant plain");
     assert.equal(packageJSON.scripts["package:protection:smoke:encrypted"], "node scripts/package-protection-smoke.mjs --variant encrypted");
@@ -973,6 +989,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(packageJSON.scripts["package:protection:smoke:shielded:jsconfuser:string"], "node scripts/package-protection-smoke.mjs --variant shielded-jsconfuser-string");
     assert.equal(packageJSON.scripts["package:protection:smoke:shielded:pref-bridge"], "node scripts/package-protection-smoke.mjs --variant shielded-pref-bridge");
     assert.equal(packageJSON.scripts["package:protection:smoke:shielded:surface-scrub"], "node scripts/package-protection-smoke.mjs --variant shielded-surface-scrub");
+    assert.equal(packageJSON.scripts["package:protection:smoke:shielded:surface-scrub:wasm:stage2:derive"], "node scripts/package-protection-smoke.mjs --variant shielded-surface-scrub-wasm-stage2-derive");
     assert.equal(packageJSON.scripts["package:protection:perf"], "node scripts/package-protection-performance-report.mjs");
     assert.equal(packageJSON.scripts["package:protection:webcrack"], "node scripts/package-protection-webcrack-audit.mjs");
     assert.equal(packageJSON.scripts["package:protection:webcrack:shielded"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded");
@@ -996,6 +1013,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(packageJSON.scripts["package:protection:compare:jsconfuser:string"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-jsconfuser-string");
     assert.equal(packageJSON.scripts["package:protection:compare:pref-bridge"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-pref-bridge");
     assert.equal(packageJSON.scripts["package:protection:compare:surface-scrub"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-surface-scrub");
+    assert.equal(packageJSON.scripts["package:protection:compare:surface-scrub:wasm:stage2:derive"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-surface-scrub-wasm-stage2-derive");
     assert.equal(packageJSON.scripts["package:protection:jsconfuser:bootstrap"], "node scripts/package-protection-jsconfuser-bootstrap.mjs");
     assert.equal(packageJSON.scripts["package:protection:jsconfuser:preflight"], "node scripts/package-protection-jsconfuser-preflight.mjs");
     assert.equal(packageJSON.scripts["package:protection:jsconfuser:string:preflight"], "node scripts/package-protection-jsconfuser-preflight.mjs --profile targeted-string-concealing");
@@ -1351,6 +1369,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(exportPackage.scripts["package:shielded:pref-bridge"], "node scripts/package.mjs --pref-bridge --skip-release-metadata");
     assert.equal(exportPackage.scripts["package:shielded:surface-scrub"], "node scripts/package.mjs --surface-scrub --skip-release-metadata");
     assert.equal(exportPackage.scripts["package:shielded:surface-scrub:wasm:digest"], "node scripts/package.mjs --surface-scrub-wasm-digest --skip-release-metadata");
+    assert.equal(exportPackage.scripts["package:shielded:surface-scrub:wasm:stage2:derive"], "node scripts/package.mjs --surface-scrub-wasm-stage2-derive --skip-release-metadata");
     assert.equal(exportPackage.scripts["package:protection:smoke"], "node scripts/package-protection-smoke.mjs");
     assert.equal(exportPackage.scripts["package:protection:smoke:plain"], "node scripts/package-protection-smoke.mjs --variant plain");
     assert.equal(exportPackage.scripts["package:protection:smoke:encrypted"], "node scripts/package-protection-smoke.mjs --variant encrypted");
@@ -1359,6 +1378,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(exportPackage.scripts["package:protection:smoke:shielded:jsconfuser:string"], "node scripts/package-protection-smoke.mjs --variant shielded-jsconfuser-string");
     assert.equal(exportPackage.scripts["package:protection:smoke:shielded:pref-bridge"], "node scripts/package-protection-smoke.mjs --variant shielded-pref-bridge");
     assert.equal(exportPackage.scripts["package:protection:smoke:shielded:surface-scrub"], "node scripts/package-protection-smoke.mjs --variant shielded-surface-scrub");
+    assert.equal(exportPackage.scripts["package:protection:smoke:shielded:surface-scrub:wasm:stage2:derive"], "node scripts/package-protection-smoke.mjs --variant shielded-surface-scrub-wasm-stage2-derive");
     assert.equal(exportPackage.scripts["package:protection:perf"], "node scripts/package-protection-performance-report.mjs");
     assert.equal(exportPackage.scripts["package:protection:webcrack"], "node scripts/package-protection-webcrack-audit.mjs");
     assert.equal(exportPackage.scripts["package:protection:webcrack:shielded"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded");
@@ -1382,6 +1402,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(exportPackage.scripts["package:protection:compare:jsconfuser:string"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-jsconfuser-string");
     assert.equal(exportPackage.scripts["package:protection:compare:pref-bridge"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-pref-bridge");
     assert.equal(exportPackage.scripts["package:protection:compare:surface-scrub"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-surface-scrub");
+    assert.equal(exportPackage.scripts["package:protection:compare:surface-scrub:wasm:stage2:derive"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-surface-scrub-wasm-stage2-derive");
     assert.equal(exportPackage.scripts["package:protection:jsconfuser:bootstrap"], "node scripts/package-protection-jsconfuser-bootstrap.mjs");
     assert.equal(exportPackage.scripts["package:protection:jsconfuser:preflight"], "node scripts/package-protection-jsconfuser-preflight.mjs");
     assert.equal(exportPackage.scripts["package:protection:jsconfuser:string:preflight"], "node scripts/package-protection-jsconfuser-preflight.mjs --profile targeted-string-concealing");
@@ -1421,11 +1442,13 @@ describe("Toolchain Scripts", () => {
     assert.ok(exportReadme.includes("package:shielded:pref-bridge"));
     assert.ok(exportReadme.includes("package:shielded:surface-scrub"));
     assert.ok(exportReadme.includes("package:shielded:surface-scrub:wasm:digest"));
+    assert.ok(exportReadme.includes("package:shielded:surface-scrub:wasm:stage2:derive"));
     assert.ok(exportReadme.includes("package:protection:smoke"));
     assert.ok(exportReadme.includes("package:protection:smoke:shielded:descriptor-bind"));
     assert.ok(exportReadme.includes("package:protection:smoke:shielded:jsconfuser:string"));
     assert.ok(exportReadme.includes("package:protection:smoke:shielded:pref-bridge"));
     assert.ok(exportReadme.includes("package:protection:smoke:shielded:surface-scrub"));
+    assert.ok(exportReadme.includes("package:protection:smoke:shielded:surface-scrub:wasm:stage2:derive"));
     assert.ok(exportReadme.includes("package:protection:perf"));
     assert.ok(exportReadme.includes("package:protection:webcrack:shielded"));
     assert.ok(exportReadme.includes("package:protection:webcrack:shielded:descriptor-bind"));
@@ -1447,6 +1470,7 @@ describe("Toolchain Scripts", () => {
     assert.ok(exportReadme.includes("package:protection:compare:jsconfuser:string"));
     assert.ok(exportReadme.includes("package:protection:compare:pref-bridge"));
     assert.ok(exportReadme.includes("package:protection:compare:surface-scrub"));
+    assert.ok(exportReadme.includes("package:protection:compare:surface-scrub:wasm:stage2:derive"));
     assert.ok(exportReadme.includes("package:protection:jsconfuser:preflight"));
     assert.ok(exportReadme.includes("package:protection:jsconfuser:string:preflight"));
     assert.ok(exportReadme.includes("package:protection:lightweight:preflight"));

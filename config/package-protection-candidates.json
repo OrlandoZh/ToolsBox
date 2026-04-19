@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-04-18",
+  "updatedAt": "2026-04-20",
   "summary": "Package protection candidate registry for the manual experiment matrix. Advisory only; does not change release/gate defaults.",
   "candidates": [
     {
@@ -252,6 +252,28 @@
       "promotionGate": "bounded-wasm-candidate-only",
       "status": "retained-experiment-candidate",
       "summary": "Explicit Wasm digest experiment on top of shielded-surface-scrub. Keep it default-disabled, lazy, advisory-only, and bounded to the content/lib/w digest micro-kernel."
+    },
+    {
+      "id": "shielded-surface-scrub-wasm-stage2-derive",
+      "class": "experiment",
+      "stage": "route5-wasm",
+      "baseVariant": "shielded-surface-scrub",
+      "executionMode": "buildable-xpi",
+      "evaluationKind": "compare",
+      "compareVariant": "shielded-surface-scrub-wasm-stage2-derive",
+      "channel": "stable",
+      "artifactCoverage": [
+        "smoke",
+        "perf",
+        "webcrack",
+        "guided-attack",
+        "compare",
+        "anchor-audit",
+        "inner-audit"
+      ],
+      "promotionGate": "stopped-inner-audit-regression",
+      "status": "stop-current-candidate",
+      "summary": "Stopped as a promotion candidate: the runtime gate works, but restoring the richer capability overlay raises inner-audit readability to high-level-architecture. Future Wasm protection work should stay on digest/unlock micro-kernel logic without returning capability overlay structure to JS."
     }
   ]
 }

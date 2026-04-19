@@ -49,6 +49,7 @@ export const PACKAGE_PROTECTION_AUDIT_EXPERIMENTAL_VARIANTS = Object.freeze([
   "pref-bridge",
   "surface-scrub",
   "surface-scrub-wasm-digest",
+  "surface-scrub-wasm-stage2-derive",
 ]);
 
 export const PACKAGE_PROTECTION_AUDIT_VARIANTS = Object.freeze([
@@ -465,6 +466,9 @@ function normalizeVariant(value) {
   if (normalized === "wasm-digest") {
     return "surface-scrub-wasm-digest";
   }
+  if (normalized === "wasm-stage2-derive") {
+    return "surface-scrub-wasm-stage2-derive";
+  }
   return PACKAGE_PROTECTION_AUDIT_VARIANTS.includes(normalized)
     ? normalized
     : null;
@@ -604,6 +608,8 @@ function buildVariantPackageArgs(variant) {
       return ["scripts/package.mjs", "--surface-scrub", "--skip-release-metadata"];
     case "surface-scrub-wasm-digest":
       return ["scripts/package.mjs", "--surface-scrub-wasm-digest", "--skip-release-metadata"];
+    case "surface-scrub-wasm-stage2-derive":
+      return ["scripts/package.mjs", "--surface-scrub-wasm-stage2-derive", "--skip-release-metadata"];
     default:
       throw createScriptError("args", `unsupported package protection audit variant: ${variant}`, {
         failedStage: "build-variant-args",
@@ -630,6 +636,8 @@ export function resolvePackageProtectionAuditOutputSuffix(variant) {
       return "shielded-surface-scrub";
     case "surface-scrub-wasm-digest":
       return "shielded-surface-scrub-wasm-digest";
+    case "surface-scrub-wasm-stage2-derive":
+      return "shielded-surface-scrub-wasm-stage2-derive";
     default:
       throw createScriptError("args", `unsupported package protection audit variant: ${variant}`, {
         failedStage: "resolve-output-suffix",
@@ -880,7 +888,7 @@ export function parsePackageProtectionAnchorAuditArgs(argv = process.argv.slice(
     switch (token) {
       case "--variant": {
         const variant = normalizeVariant(argv[index + 1]);
-        assertScript(Boolean(variant), "--variant must be one of plain|encrypted|shielded|descriptor-bind|jsconfuser-string|pref-bridge|surface-scrub|surface-scrub-wasm-digest|all", {
+        assertScript(Boolean(variant), "--variant must be one of plain|encrypted|shielded|descriptor-bind|jsconfuser-string|pref-bridge|surface-scrub|surface-scrub-wasm-digest|surface-scrub-wasm-stage2-derive|all", {
           category: "args",
           failedStage: "parse-args",
         });
@@ -909,6 +917,12 @@ export function parsePackageProtectionAnchorAuditArgs(argv = process.argv.slice(
         options.variants = dedupeVariants([
           ...options.variants,
           "surface-scrub-wasm-digest",
+        ]);
+        break;
+      case "--include-surface-scrub-wasm-stage2-derive":
+        options.variants = dedupeVariants([
+          ...options.variants,
+          "surface-scrub-wasm-stage2-derive",
         ]);
         break;
       case "--jsconfuser-tool-path":
@@ -1521,19 +1535,20 @@ export function summarizeSurfaceScrubComparison(variantReports = []) {
   };
 }
 
-export function summarizeSurfaceScrubWasmDigestComparison(variantReports = []) {
+function summarizeSurfaceScrubBoundedWasmComparison(variantReports = [], candidateVariant = "surface-scrub-wasm-digest") {
   const reportByVariant = new Map(
     (Array.isArray(variantReports) ? variantReports : [])
       .map((report) => [String(report?.variant || "").trim(), report]),
   );
   const surfaceScrub = reportByVariant.get("surface-scrub") || null;
-  const wasmDigest = reportByVariant.get("surface-scrub-wasm-digest") || null;
+  const wasmCandidate = reportByVariant.get(candidateVariant) || null;
+  const candidateLabel = String(candidateVariant || "surface-scrub-wasm-digest").trim() || "surface-scrub-wasm-digest";
 
-  if (!surfaceScrub || !wasmDigest) {
+  if (!surfaceScrub || !wasmCandidate) {
     return {
       present: false,
       surfaceScrubPresent: Boolean(surfaceScrub),
-      wasmDigestPresent: Boolean(wasmDigest),
+      wasmDigestPresent: Boolean(wasmCandidate),
       sameRawSurface: null,
       rawAnchorDeltaCount: null,
       rawMatchDeltaCount: null,
@@ -1545,19 +1560,19 @@ export function summarizeSurfaceScrubWasmDigestComparison(variantReports = []) {
       packageBoundaryWithinWasmAssets: false,
       xpiSizeDeltaBytes: null,
       bundleSizeDeltaBytes: null,
-      interpretation: "surface-scrub-wasm-digest 对比样本不完整，暂不生成增量结论。",
-      recommendedReading: "collect-surface-scrub-wasm-digest-audit",
+      interpretation: `${candidateLabel} 对比样本不完整，暂不生成增量结论。`,
+      recommendedReading: `collect-${candidateLabel}-audit`,
     };
   }
 
-  const rawAnchorDeltaCount = Number(wasmDigest.totalAnchorCount || 0) - Number(surfaceScrub.totalAnchorCount || 0);
-  const rawMatchDeltaCount = Number(wasmDigest.totalMatchCount || 0) - Number(surfaceScrub.totalMatchCount || 0);
-  const unpackedAnchorDeltaCount = Number(wasmDigest.unpackedSurface?.totalAnchorCount || 0)
+  const rawAnchorDeltaCount = Number(wasmCandidate.totalAnchorCount || 0) - Number(surfaceScrub.totalAnchorCount || 0);
+  const rawMatchDeltaCount = Number(wasmCandidate.totalMatchCount || 0) - Number(surfaceScrub.totalMatchCount || 0);
+  const unpackedAnchorDeltaCount = Number(wasmCandidate.unpackedSurface?.totalAnchorCount || 0)
     - Number(surfaceScrub.unpackedSurface?.totalAnchorCount || 0);
-  const unpackedMatchDeltaCount = Number(wasmDigest.unpackedSurface?.totalMatchCount || 0)
+  const unpackedMatchDeltaCount = Number(wasmCandidate.unpackedSurface?.totalMatchCount || 0)
     - Number(surfaceScrub.unpackedSurface?.totalMatchCount || 0);
-  const xpiSizeDeltaBytes = Number(wasmDigest.xpiSizeBytes || 0) - Number(surfaceScrub.xpiSizeBytes || 0);
-  const bundleSizeDeltaBytes = Number(wasmDigest.bundleSizeBytes || 0) - Number(surfaceScrub.bundleSizeBytes || 0);
+  const xpiSizeDeltaBytes = Number(wasmCandidate.xpiSizeBytes || 0) - Number(surfaceScrub.xpiSizeBytes || 0);
+  const bundleSizeDeltaBytes = Number(wasmCandidate.bundleSizeBytes || 0) - Number(surfaceScrub.bundleSizeBytes || 0);
   const sameRawSurface = rawAnchorDeltaCount === 0 && rawMatchDeltaCount === 0;
   const sameUnpackedSurface = unpackedAnchorDeltaCount === 0 && unpackedMatchDeltaCount === 0;
 
@@ -1567,8 +1582,8 @@ export function summarizeSurfaceScrubWasmDigestComparison(variantReports = []) {
       : [],
   );
   const candidateFileSet = new Set(
-    Array.isArray(wasmDigest.unpackedSurface?.byFile)
-      ? wasmDigest.unpackedSurface.byFile.map((entry) => String(entry?.relativePath || "").trim()).filter(Boolean)
+    Array.isArray(wasmCandidate.unpackedSurface?.byFile)
+      ? wasmCandidate.unpackedSurface.byFile.map((entry) => String(entry?.relativePath || "").trim()).filter(Boolean)
       : [],
   );
   const newExposedFiles = Array.from(candidateFileSet)
@@ -1578,16 +1593,16 @@ export function summarizeSurfaceScrubWasmDigestComparison(variantReports = []) {
     .filter((relativePath) => !relativePath.startsWith("content/lib/w/"));
   const packageBoundaryWithinWasmAssets = unexpectedExposedFiles.length === 0;
 
-  let interpretation = "surface-scrub-wasm-digest 当前没有扩大 surface-scrub 的 package-boundary 暴露。";
+  let interpretation = `${candidateLabel} 当前没有扩大 surface-scrub 的 package-boundary 暴露。`;
   let recommendedReading = "keep-wasm-candidate-bounded";
   if (!packageBoundaryWithinWasmAssets) {
-    interpretation = "surface-scrub-wasm-digest 新增了超出 content/lib/w/* 的 package-boundary 暴露，属于设计越界。";
+    interpretation = `${candidateLabel} 新增了超出 content/lib/w/* 的 package-boundary 暴露，属于设计越界。`;
     recommendedReading = "stop-wasm-candidate-boundary-violation";
   } else if (newExposedFiles.length > 0) {
-    interpretation = `surface-scrub-wasm-digest 的新增 package-boundary 暴露仅限 content/lib/w/* 资产：${newExposedFiles.join(", ")}。`;
+    interpretation = `${candidateLabel} 的新增 package-boundary 暴露仅限 content/lib/w/* 资产：${newExposedFiles.join(", ")}。`;
     recommendedReading = "bounded-wasm-asset-exposure";
   } else if (!sameUnpackedSurface || !sameRawSurface) {
-    interpretation = "surface-scrub-wasm-digest 虽未新增越界资产，但仍改变了静态面，需要结合 compare / perf 继续复核。";
+    interpretation = `${candidateLabel} 虽未新增越界资产，但仍改变了静态面，需要结合 compare / perf 继续复核。`;
     recommendedReading = "recheck-wasm-candidate-surface";
   }
 
@@ -1611,6 +1626,14 @@ export function summarizeSurfaceScrubWasmDigestComparison(variantReports = []) {
   };
 }
 
+export function summarizeSurfaceScrubWasmDigestComparison(variantReports = []) {
+  return summarizeSurfaceScrubBoundedWasmComparison(variantReports, "surface-scrub-wasm-digest");
+}
+
+export function summarizeSurfaceScrubWasmStage2DeriveComparison(variantReports = []) {
+  return summarizeSurfaceScrubBoundedWasmComparison(variantReports, "surface-scrub-wasm-stage2-derive");
+}
+
 export function summarizePackageProtectionAnchorAudit(variantReports = [], options = {}) {
   const reportByVariant = new Map(
     (Array.isArray(variantReports) ? variantReports : [])
@@ -1624,6 +1647,7 @@ export function summarizePackageProtectionAnchorAudit(variantReports = [], optio
   const prefBridgeComparison = summarizePrefBridgeComparison(variantReports);
   const surfaceScrubComparison = summarizeSurfaceScrubComparison(variantReports);
   const surfaceScrubWasmDigestComparison = summarizeSurfaceScrubWasmDigestComparison(variantReports);
+  const surfaceScrubWasmStage2DeriveComparison = summarizeSurfaceScrubWasmStage2DeriveComparison(variantReports);
   const variantOrder = dedupeVariants(
     Array.isArray(options.variantOrder) && options.variantOrder.length > 0
       ? options.variantOrder
@@ -1645,6 +1669,7 @@ export function summarizePackageProtectionAnchorAudit(variantReports = [], optio
     prefBridgeComparison,
     surfaceScrubComparison,
     surfaceScrubWasmDigestComparison,
+    surfaceScrubWasmStage2DeriveComparison,
     variants: variantOrder.map((variant) => {
       const report = reportByVariant.get(variant);
       if (!report) {
@@ -1802,6 +1827,25 @@ export function renderPackageProtectionAnchorAuditMarkdown(report) {
     lines.push(`- bundleSizeDeltaBytes: \`${report.surfaceScrubWasmDigestComparison.bundleSizeDeltaBytes}\``);
     lines.push(`- interpretation: ${report.surfaceScrubWasmDigestComparison.interpretation}`);
     lines.push(`- recommendedReading: \`${report.surfaceScrubWasmDigestComparison.recommendedReading}\``);
+    lines.push("");
+  }
+
+  if (report.surfaceScrubWasmStage2DeriveComparison?.present) {
+    lines.push("## surface-scrub-wasm-stage2-derive");
+    lines.push("");
+    lines.push(`- sameRawSurface: \`${report.surfaceScrubWasmStage2DeriveComparison.sameRawSurface ? "yes" : "no"}\``);
+    lines.push(`- rawAnchorDeltaCount: \`${report.surfaceScrubWasmStage2DeriveComparison.rawAnchorDeltaCount}\``);
+    lines.push(`- rawMatchDeltaCount: \`${report.surfaceScrubWasmStage2DeriveComparison.rawMatchDeltaCount}\``);
+    lines.push(`- sameUnpackedSurface: \`${report.surfaceScrubWasmStage2DeriveComparison.sameUnpackedSurface ? "yes" : "no"}\``);
+    lines.push(`- unpackedAnchorDeltaCount: \`${report.surfaceScrubWasmStage2DeriveComparison.unpackedAnchorDeltaCount}\``);
+    lines.push(`- unpackedMatchDeltaCount: \`${report.surfaceScrubWasmStage2DeriveComparison.unpackedMatchDeltaCount}\``);
+    lines.push(`- packageBoundaryWithinWasmAssets: \`${report.surfaceScrubWasmStage2DeriveComparison.packageBoundaryWithinWasmAssets ? "yes" : "no"}\``);
+    lines.push(`- newExposedFiles: \`${(report.surfaceScrubWasmStage2DeriveComparison.newExposedFiles || []).join(", ") || "-"}\``);
+    lines.push(`- unexpectedExposedFiles: \`${(report.surfaceScrubWasmStage2DeriveComparison.unexpectedExposedFiles || []).join(", ") || "-"}\``);
+    lines.push(`- xpiSizeDeltaBytes: \`${report.surfaceScrubWasmStage2DeriveComparison.xpiSizeDeltaBytes}\``);
+    lines.push(`- bundleSizeDeltaBytes: \`${report.surfaceScrubWasmStage2DeriveComparison.bundleSizeDeltaBytes}\``);
+    lines.push(`- interpretation: ${report.surfaceScrubWasmStage2DeriveComparison.interpretation}`);
+    lines.push(`- recommendedReading: \`${report.surfaceScrubWasmStage2DeriveComparison.recommendedReading}\``);
     lines.push("");
   }
 

@@ -38,6 +38,7 @@ function normalizeFiniteNumber(value) {
 
 function resolveCompareBaseVariant(variant) {
   return normalizeNonEmptyString(variant) === "shielded-surface-scrub-wasm-digest"
+    || normalizeNonEmptyString(variant) === "shielded-surface-scrub-wasm-stage2-derive"
     ? "shielded-surface-scrub"
     : "shielded";
 }

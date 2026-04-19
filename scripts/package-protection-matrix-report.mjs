@@ -359,6 +359,9 @@ function buildVariantPerformanceComparisonID(variant) {
   if (variant === "shielded-surface-scrub-wasm-digest") {
     return `${variant}-vs-shielded-surface-scrub`;
   }
+  if (variant === "shielded-surface-scrub-wasm-stage2-derive") {
+    return `${variant}-vs-shielded-surface-scrub`;
+  }
   if (variant === "shielded-descriptor-bind") {
     return `${variant}-vs-shielded`;
   }

@@ -190,6 +190,213 @@ describe("Package Protection Wasm Admission", () => {
     assert.equal(report.wasmLane.route5Candidate?.id, "shielded-surface-scrub-wasm-digest");
   });
 
+  it("should ignore a stopped wasm stage2 overlay candidate and keep the narrow digest lane selected", () => {
+    const report = summarizePackageProtectionWasmAdmission({
+      matrixReport: {
+        status: "passed",
+        nextAction: "keep-current-shielded",
+        summary: "matrix ok",
+      },
+      retainedReviewReport: {
+        status: "passed",
+        nextAction: "keep-top-candidate",
+        topCandidate: {
+          id: "shielded-surface-scrub",
+          variant: "shielded-surface-scrub",
+          channel: "stable",
+          compareStatus: "passed",
+          compareDecision: "hardening-win",
+          signals: {
+            residualFloorReached: true,
+            residualExposedFiles: ["manifest.json"],
+            residualAnchorIds: ["addon-version-literal", "update-url-literal"],
+          },
+        },
+      },
+      wasmMatrixReport: {
+        status: "passed",
+        nextAction: "keep-planned-default-disabled",
+        summary: "wasm matrix ok",
+        registry: {
+          bundle: {
+            id: "wasm-kernel",
+            implementationStatus: "planned",
+            enabled: false,
+          },
+        },
+        scenarios: [
+          {
+            key: "digest",
+            status: "passed",
+          },
+        ],
+      },
+      registry: {
+        schemaVersion: 1,
+        updatedAt: "2026-04-20",
+        candidates: [
+          {
+            id: "shielded-surface-scrub-wasm-stage2-derive",
+            class: "experiment",
+            stage: "route5-wasm",
+            baseVariant: "shielded-surface-scrub",
+            compareVariant: "shielded-surface-scrub-wasm-stage2-derive",
+            status: "stop-current-candidate",
+            summary: "stopped overlay recovery candidate",
+          },
+          {
+            id: "shielded-surface-scrub-wasm-digest",
+            class: "experiment",
+            stage: "route5-wasm",
+            baseVariant: "shielded-surface-scrub",
+            compareVariant: "shielded-surface-scrub-wasm-digest",
+            status: "retained-experiment-candidate",
+            summary: "digest candidate",
+          },
+        ],
+      },
+    });
+
+    assert.equal(report.status, "ready-for-candidate");
+    assert.equal(report.wasmLane.route5Candidate?.id, "shielded-surface-scrub-wasm-digest");
+    assert.equal(report.wasmLane.route5Candidate?.status, "retained-experiment-candidate");
+  });
+
+  it("should not admit an active full-overlay stage2 wasm candidate", () => {
+    const report = summarizePackageProtectionWasmAdmission({
+      matrixReport: {
+        status: "passed",
+        nextAction: "keep-current-shielded",
+        summary: "matrix ok",
+      },
+      retainedReviewReport: {
+        status: "passed",
+        nextAction: "keep-top-candidate",
+        topCandidate: {
+          id: "shielded-surface-scrub",
+          variant: "shielded-surface-scrub",
+          channel: "stable",
+          compareStatus: "passed",
+          compareDecision: "hardening-win",
+          signals: {
+            residualFloorReached: true,
+            residualExposedFiles: ["manifest.json"],
+            residualAnchorIds: ["addon-version-literal", "update-url-literal"],
+          },
+        },
+      },
+      wasmMatrixReport: {
+        status: "passed",
+        nextAction: "keep-planned-default-disabled",
+        summary: "wasm matrix ok",
+        registry: {
+          bundle: {
+            id: "wasm-kernel",
+            implementationStatus: "planned",
+            enabled: false,
+          },
+        },
+        scenarios: [
+          {
+            key: "digest",
+            status: "passed",
+          },
+        ],
+      },
+      registry: {
+        schemaVersion: 1,
+        updatedAt: "2026-04-20",
+        candidates: [
+          {
+            id: "shielded-surface-scrub-wasm-stage2-derive",
+            class: "experiment",
+            stage: "route5-wasm",
+            baseVariant: "shielded-surface-scrub",
+            compareVariant: "shielded-surface-scrub-wasm-stage2-derive",
+            status: "retained-experiment-candidate",
+            summary: "full capability overlay recovery candidate",
+          },
+        ],
+      },
+    });
+
+    assert.equal(report.status, "attention");
+    assert.equal(report.nextAction, "refresh-wasm-matrix");
+    assert.equal(report.verdict.wasmLaneReady, false);
+    assert.equal(report.wasmLane.route5Candidate, null);
+  });
+
+  it("should prefer the narrow digest lane even if a stage2 overlay candidate is accidentally active", () => {
+    const report = summarizePackageProtectionWasmAdmission({
+      matrixReport: {
+        status: "passed",
+        nextAction: "keep-current-shielded",
+        summary: "matrix ok",
+      },
+      retainedReviewReport: {
+        status: "passed",
+        nextAction: "keep-top-candidate",
+        topCandidate: {
+          id: "shielded-surface-scrub",
+          variant: "shielded-surface-scrub",
+          channel: "stable",
+          compareStatus: "passed",
+          compareDecision: "hardening-win",
+          signals: {
+            residualFloorReached: true,
+            residualExposedFiles: ["manifest.json"],
+            residualAnchorIds: ["addon-version-literal", "update-url-literal"],
+          },
+        },
+      },
+      wasmMatrixReport: {
+        status: "passed",
+        nextAction: "keep-planned-default-disabled",
+        summary: "wasm matrix ok",
+        registry: {
+          bundle: {
+            id: "wasm-kernel",
+            implementationStatus: "planned",
+            enabled: false,
+          },
+        },
+        scenarios: [
+          {
+            key: "digest",
+            status: "passed",
+          },
+        ],
+      },
+      registry: {
+        schemaVersion: 1,
+        updatedAt: "2026-04-20",
+        candidates: [
+          {
+            id: "shielded-surface-scrub-wasm-stage2-derive",
+            class: "experiment",
+            stage: "route5-wasm",
+            baseVariant: "shielded-surface-scrub",
+            compareVariant: "shielded-surface-scrub-wasm-stage2-derive",
+            status: "retained-experiment-candidate",
+            summary: "full capability overlay recovery candidate",
+          },
+          {
+            id: "shielded-surface-scrub-wasm-digest",
+            class: "experiment",
+            stage: "route5-wasm",
+            baseVariant: "shielded-surface-scrub",
+            compareVariant: "shielded-surface-scrub-wasm-digest",
+            status: "retained-experiment-candidate",
+            summary: "digest unlock micro-kernel candidate",
+          },
+        ],
+      },
+    });
+
+    assert.equal(report.status, "ready-for-candidate");
+    assert.equal(report.wasmLane.route5Candidate?.id, "shielded-surface-scrub-wasm-digest");
+  });
+
   it("should persist wasm admission artifacts", async () => {
     const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "package-protection-wasm-admission-"));
     try {

@@ -130,6 +130,7 @@ function buildExportPackageJSON(sourcePackage, optionalBundleRegistry = null) {
     "package:shielded:pref-bridge": "node scripts/package.mjs --pref-bridge --skip-release-metadata",
     "package:shielded:surface-scrub": "node scripts/package.mjs --surface-scrub --skip-release-metadata",
     "package:shielded:surface-scrub:wasm:digest": "node scripts/package.mjs --surface-scrub-wasm-digest --skip-release-metadata",
+    "package:shielded:surface-scrub:wasm:stage2:derive": "node scripts/package.mjs --surface-scrub-wasm-stage2-derive --skip-release-metadata",
     "package:protection:smoke": "node scripts/package-protection-smoke.mjs",
     "package:protection:smoke:plain": "node scripts/package-protection-smoke.mjs --variant plain",
     "package:protection:smoke:encrypted": "node scripts/package-protection-smoke.mjs --variant encrypted",
@@ -138,6 +139,7 @@ function buildExportPackageJSON(sourcePackage, optionalBundleRegistry = null) {
     "package:protection:smoke:shielded:jsconfuser:string": "node scripts/package-protection-smoke.mjs --variant shielded-jsconfuser-string",
     "package:protection:smoke:shielded:pref-bridge": "node scripts/package-protection-smoke.mjs --variant shielded-pref-bridge",
     "package:protection:smoke:shielded:surface-scrub": "node scripts/package-protection-smoke.mjs --variant shielded-surface-scrub",
+    "package:protection:smoke:shielded:surface-scrub:wasm:stage2:derive": "node scripts/package-protection-smoke.mjs --variant shielded-surface-scrub-wasm-stage2-derive",
     "package:protection:perf": "node scripts/package-protection-performance-report.mjs",
     "package:protection:webcrack": "node scripts/package-protection-webcrack-audit.mjs",
     "package:protection:webcrack:shielded": "node scripts/package-protection-webcrack-audit.mjs --variant shielded",
@@ -161,6 +163,7 @@ function buildExportPackageJSON(sourcePackage, optionalBundleRegistry = null) {
     "package:protection:compare:jsconfuser:string": "node scripts/package-protection-experiment-compare.mjs --variant shielded-jsconfuser-string",
     "package:protection:compare:pref-bridge": "node scripts/package-protection-experiment-compare.mjs --variant shielded-pref-bridge",
     "package:protection:compare:surface-scrub": "node scripts/package-protection-experiment-compare.mjs --variant shielded-surface-scrub",
+    "package:protection:compare:surface-scrub:wasm:stage2:derive": "node scripts/package-protection-experiment-compare.mjs --variant shielded-surface-scrub-wasm-stage2-derive",
     "package:protection:jsconfuser:bootstrap": "node scripts/package-protection-jsconfuser-bootstrap.mjs",
     "package:protection:jsconfuser:preflight": "node scripts/package-protection-jsconfuser-preflight.mjs",
     "package:protection:jsconfuser:string:preflight": "node scripts/package-protection-jsconfuser-preflight.mjs --profile targeted-string-concealing",
@@ -309,11 +312,13 @@ npm run package:shielded:jsconfuser:string # 如自动发现失败，再补 -- -
 npm run package:shielded:pref-bridge
 npm run package:shielded:surface-scrub
 npm run package:shielded:surface-scrub:wasm:digest
+npm run package:shielded:surface-scrub:wasm:stage2:derive
 npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable
 npm run package:protection:smoke:shielded:descriptor-bind -- --repeats 3 --channel stable
 npm run package:protection:smoke:shielded:jsconfuser:string -- --repeats 3 --channel stable # 如自动发现失败，再补 --jsconfuser-tool-path
 npm run package:protection:smoke:shielded:pref-bridge -- --repeats 3 --channel stable
 npm run package:protection:smoke:shielded:surface-scrub -- --repeats 3 --channel stable
+npm run package:protection:smoke:shielded:surface-scrub:wasm:stage2:derive -- --repeats 3 --channel stable
 npm run package:protection:perf -- --channel stable
 npm run package:protection:webcrack:shielded -- --channel stable
 npm run package:protection:webcrack:shielded:descriptor-bind -- --channel stable
@@ -335,6 +340,7 @@ npm run package:protection:compare:descriptor-bind -- --channel stable
 npm run package:protection:compare:jsconfuser:string -- --channel stable
 npm run package:protection:compare:pref-bridge -- --channel stable
 npm run package:protection:compare:surface-scrub -- --channel stable
+npm run package:protection:compare:surface-scrub:wasm:stage2:derive -- --channel stable
 npm run package:protection:jsconfuser:bootstrap # 把 js-confuser 安装到 dist/package-protection-tools/js-confuser，供后续实验自动发现
 npm run package:protection:jsconfuser:preflight # 如自动发现失败，优先先跑 bootstrap，再补 -- --tool-path /absolute/path/to/js-confuser
 npm run package:protection:jsconfuser:string:preflight # 如自动发现失败，再补 -- --tool-path /absolute/path/to/js-confuser

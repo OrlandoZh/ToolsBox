@@ -13,6 +13,7 @@ import {
   SHIELDED_PREF_BRIDGE_PACKAGE_VARIANT,
   SHIELDED_SURFACE_SCRUB_PACKAGE_VARIANT,
   SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT,
+  SHIELDED_SURFACE_SCRUB_WASM_STAGE2_DERIVE_PACKAGE_VARIANT,
 } from "../scripts/package-protection-lib.mjs";
 
 const originalFromBase64Descriptor = Object.getOwnPropertyDescriptor(globalThis.Uint8Array, "fromBase64");
@@ -335,6 +336,52 @@ describe("Package Protection Lib", () => {
       SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT,
     );
     assert.equal(typeof scope.__CLEANROOM_TEMPLATE_RUNTIME__?.packageProtection?.overlayResolver, "undefined");
+  });
+
+  it("should expose an encrypted overlay resolver for the surface-scrub-wasm-stage2-derive experiment variant", async () => {
+    const sourceCode = `
+      (function (__global) {
+        "use strict";
+        async function bootstrapPlugin() {
+          return "ready";
+        }
+        __global.bootstrapPlugin = bootstrapPlugin;
+      })(this);
+    `;
+    const descriptorOverlay = [{
+      id: "host-actions",
+      label: "宿主动作编排",
+      category: "feature",
+      description: "stage2 derive overlay description",
+      entrypoints: ["plugin.api.agent.runHostAction(actionId, payload)"],
+      ownedBy: ["src/app/host-actions.js"],
+      successSignals: ["Host actions return readiness details"],
+    }];
+
+    const { loaderSource, metadata } = protectBundleSource(sourceCode, {
+      addonRef: "demo-addon",
+      addonVersion: "0.0.1",
+      variant: SHIELDED_SURFACE_SCRUB_WASM_STAGE2_DERIVE_PACKAGE_VARIANT,
+      descriptorOverlay,
+    });
+
+    const scope = createLoaderScope();
+    const loadProtectedBundle = new Function(`${loaderSource}\nreturn this.bootstrapPlugin;`);
+    const bootstrap = loadProtectedBundle.call(scope);
+    const result = await bootstrap.call(scope);
+    const runtime = scope.__CLEANROOM_TEMPLATE_RUNTIME__;
+
+    assert.equal(result, "ready");
+    assert.equal(metadata.variant, SHIELDED_SURFACE_SCRUB_WASM_STAGE2_DERIVE_PACKAGE_VARIANT);
+    assert.equal(metadata.descriptorOverlayPresent, true);
+    assert.equal(metadata.descriptorOverlayEntryCount, 1);
+    assert.equal(scope.__CLEANROOM_PACKAGE_VARIANT__, SHIELDED_SURFACE_SCRUB_WASM_STAGE2_DERIVE_PACKAGE_VARIANT);
+    assert.equal(runtime?.packageProtection?.variant, SHIELDED_SURFACE_SCRUB_WASM_STAGE2_DERIVE_PACKAGE_VARIANT);
+    assert.equal(typeof runtime?.packageProtection?.overlayResolver, "function");
+    assert.deepEqual(runtime.packageProtection.overlayResolver(), descriptorOverlay);
+    assert.equal(loaderSource.includes("stage2 derive overlay description"), false);
+    assert.equal(loaderSource.includes("宿主动作编排"), false);
+    assert.equal(loaderSource.includes("runHostAction"), false);
   });
 
   it("should derive a minimal descriptor overlay from the source capability manifest", () => {

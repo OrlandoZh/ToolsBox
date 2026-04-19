@@ -31,8 +31,20 @@ import { createOptionalBundleRuntime } from "./optional-bundles.js";
 import { createRuntimeCapabilityState } from "./runtime-capabilities.js";
 import { createHostActionRunner } from "./host-actions.js";
 import { createSurfaceDescriptors } from "./surface-descriptors.js";
+import {
+  createCapabilityManifest as createSourceCapabilityManifest,
+  getCapabilityManifestView as getSourceCapabilityManifestView,
+} from "./capability-manifest.js";
+import {
+  createCapabilityManifest as createProtectedCapabilityManifest,
+  getCapabilityManifestView as getProtectedCapabilityManifestView,
+} from "./capability-manifest-protected.js";
 import { createReactUIDemoLauncher } from "../features/react-ui-demo.js";
 import { createWasmKernelProbe } from "../features/wasm-kernel-probe.js";
+
+const WASM_STAGE2_DERIVE_PACKAGE_VARIANT = "shielded-surface-scrub-wasm-stage2-derive";
+const WASM_STAGE2_DERIVE_BUNDLE_SEED = "cleanroom-stage2-shadow-seed-v1";
+const WASM_STAGE2_DERIVE_OVERLAY_VERSION = "descriptor-overlay-v1";
 
 function normalizeLogLevel(input, fallback = "info") {
   const candidate = String(input || "").trim().toLowerCase();
@@ -82,6 +94,9 @@ function clonePackageProtectionSummary(summary = null) {
   const hostBinding = summary && typeof summary === "object"
     ? summary.hostBinding
     : null;
+  const stage2OverlayGate = summary && typeof summary === "object"
+    ? summary.stage2OverlayGate
+    : null;
 
   if (!summary || typeof summary !== "object") {
     return {
@@ -96,6 +111,7 @@ function clonePackageProtectionSummary(summary = null) {
       bootstrapResolveDurationMs: 0,
       bootstrapCallCount: 0,
       hostBinding: cloneHostBindingSummary(hostBinding),
+      stage2OverlayGate: cloneStage2OverlayGateSummary(stage2OverlayGate),
     };
   }
 
@@ -115,6 +131,7 @@ function clonePackageProtectionSummary(summary = null) {
     bootstrapResolveDurationMs: Number(summary.bootstrapResolveDurationMs || 0),
     bootstrapCallCount: Number(summary.bootstrapCallCount || 0),
     hostBinding: cloneHostBindingSummary(hostBinding),
+    stage2OverlayGate: cloneStage2OverlayGateSummary(stage2OverlayGate),
   };
 }
 
@@ -123,6 +140,29 @@ function cloneCapabilityManifestOverlay(overlay = null) {
     return null;
   }
   return JSON.parse(JSON.stringify(overlay));
+}
+
+function cloneStage2OverlayGateSummary(summary = null) {
+  return {
+    mode: typeof summary?.mode === "string" && summary.mode.trim()
+      ? summary.mode.trim()
+      : null,
+    status: typeof summary?.status === "string" && summary.status.trim()
+      ? summary.status.trim()
+      : "idle",
+    satisfied: Boolean(summary?.satisfied),
+    activationSatisfied: Boolean(summary?.activationSatisfied),
+    activationMissing: Array.isArray(summary?.activationMissing)
+      ? summary.activationMissing.map((item) => String(item || "").trim()).filter(Boolean)
+      : [],
+    consistentAcrossTransports: typeof summary?.consistentAcrossTransports === "boolean"
+      ? summary.consistentAcrossTransports
+      : null,
+    attempted: Boolean(summary?.attempted),
+    failureReason: typeof summary?.failureReason === "string" && summary.failureReason.trim()
+      ? summary.failureReason.trim()
+      : null,
+  };
 }
 
 function isCapabilityManifestOverlayReady(hostBinding = null) {
@@ -370,6 +410,139 @@ export function createPlugin({
     return runtime.hostBinding;
   }
 
+  let wasmStage2OverlayGatePromise = null;
+
+  function getRuntimePackageProtection() {
+    if (!runtime.packageProtection || typeof runtime.packageProtection !== "object") {
+      runtime.packageProtection = {};
+    }
+    return runtime.packageProtection;
+  }
+
+  function getStage2OverlayGateState() {
+    const packageProtection = getRuntimePackageProtection();
+    packageProtection.stage2OverlayGate = cloneStage2OverlayGateSummary(packageProtection.stage2OverlayGate);
+    return packageProtection.stage2OverlayGate;
+  }
+
+  function shouldUseWasmStage2OverlayGate() {
+    const packageProtection = runtime?.packageProtection && typeof runtime.packageProtection === "object"
+      ? runtime.packageProtection
+      : null;
+    return String(packageProtection?.variant || "").trim() === WASM_STAGE2_DERIVE_PACKAGE_VARIANT
+      && typeof packageProtection?.overlayResolver === "function";
+  }
+
+  function scheduleWasmStage2OverlayGate() {
+    if (!shouldUseWasmStage2OverlayGate()) {
+      return null;
+    }
+
+    const gate = getStage2OverlayGateState();
+    const activationMissing = isCapabilityManifestOverlayReady(runtime?.hostBinding)
+      ? []
+      : ["profileHash", "dbAvailable", "noncePresent"].filter((key) => {
+          if (key === "profileHash") {
+            return !(typeof runtime?.hostBinding?.profileHash === "string" && runtime.hostBinding.profileHash.trim());
+          }
+          if (key === "dbAvailable") {
+            return !runtime?.hostBinding?.dbAvailable;
+          }
+          return !runtime?.hostBinding?.noncePresent;
+        });
+
+    if (gate.satisfied) {
+      return wasmStage2OverlayGatePromise;
+    }
+
+    if (activationMissing.length > 0) {
+      runtime.packageProtection.stage2OverlayGate = {
+        ...gate,
+        mode: "wasm-stage2-derive",
+        status: "waiting-host-binding",
+        satisfied: false,
+        activationSatisfied: false,
+        activationMissing,
+        failureReason: null,
+      };
+      return null;
+    }
+
+    if (wasmStage2OverlayGatePromise) {
+      return wasmStage2OverlayGatePromise;
+    }
+
+    runtime.packageProtection.stage2OverlayGate = {
+      ...gate,
+      mode: "wasm-stage2-derive",
+      status: "pending",
+      satisfied: false,
+      activationSatisfied: false,
+      activationMissing: ["wasmStage2OverlayGate"],
+      attempted: true,
+      failureReason: null,
+    };
+
+    const hostBinding = cloneHostBindingSummary(runtime?.hostBinding);
+    wasmStage2OverlayGatePromise = Promise.resolve().then(async () => {
+      try {
+        const result = await getWasmKernelProbe().deriveUnlockToken({
+          mode: "main-thread",
+          bundleSeed: WASM_STAGE2_DERIVE_BUNDLE_SEED,
+          overlayVersion: WASM_STAGE2_DERIVE_OVERLAY_VERSION,
+          hostBinding,
+        });
+        const nextGate = getStage2OverlayGateState();
+        const activationSatisfied = result?.activationSatisfied === true;
+        const satisfied = result?.ok === true
+          && activationSatisfied
+          && result?.mainThread?.ok === true;
+        runtime.packageProtection.stage2OverlayGate = {
+          ...nextGate,
+          mode: "wasm-stage2-derive",
+          status: satisfied
+            ? "satisfied"
+            : (activationSatisfied ? "limited" : "activation-missing"),
+          satisfied,
+          activationSatisfied,
+          activationMissing: Array.isArray(result?.activationMissing)
+            ? result.activationMissing.map((item) => String(item || "").trim()).filter(Boolean)
+            : ["wasmStage2OverlayGate"],
+          consistentAcrossTransports: typeof result?.consistentAcrossTransports === "boolean"
+            ? result.consistentAcrossTransports
+            : null,
+          attempted: true,
+          failureReason: satisfied
+            ? null
+            : (Array.isArray(result?.errors) && result.errors.length > 0
+                ? String(result.errors[0]?.message || "").trim() || null
+                : null),
+        };
+        return satisfied;
+      } catch (error) {
+        const nextGate = getStage2OverlayGateState();
+        runtime.packageProtection.stage2OverlayGate = {
+          ...nextGate,
+          mode: "wasm-stage2-derive",
+          status: "error",
+          satisfied: false,
+          activationSatisfied: false,
+          activationMissing: ["wasmStage2OverlayGate"],
+          attempted: true,
+          failureReason: String(error?.message || error),
+        };
+        logger.warn("packageProtection.stage2OverlayGate", {
+          message: String(error?.message || error),
+        });
+        return false;
+      } finally {
+        wasmStage2OverlayGatePromise = null;
+      }
+    });
+
+    return wasmStage2OverlayGatePromise;
+  }
+
   function getProtectionSummary() {
     const packageProtection = runtime?.packageProtection && typeof runtime.packageProtection === "object"
       ? runtime.packageProtection
@@ -384,12 +557,23 @@ export function createPlugin({
     const packageProtection = runtime?.packageProtection && typeof runtime.packageProtection === "object"
       ? runtime.packageProtection
       : null;
+    if (!packageProtection) {
+      return null;
+    }
+
+    if (shouldUseWasmStage2OverlayGate()) {
+      void scheduleWasmStage2OverlayGate();
+      if (getStage2OverlayGateState().satisfied !== true) {
+        return null;
+      }
+    }
+
     const currentOverlay = cloneCapabilityManifestOverlay(packageProtection?.capabilityManifestOverlay);
     if (currentOverlay) {
       return currentOverlay;
     }
 
-    if (!packageProtection || !isCapabilityManifestOverlayReady(runtime?.hostBinding)) {
+    if (!isCapabilityManifestOverlayReady(runtime?.hostBinding)) {
       return null;
     }
 
@@ -416,6 +600,26 @@ export function createPlugin({
     }
   }
 
+  function shouldUseProtectedCapabilityManifest(protectionSummary = null) {
+    return Boolean(protectionSummary?.active);
+  }
+
+  function createCapabilityManifest(options = {}) {
+    const protectionSummary = options?.protectionSummary || getProtectionSummary();
+    if (shouldUseProtectedCapabilityManifest(protectionSummary)) {
+      return createProtectedCapabilityManifest(options);
+    }
+    return createSourceCapabilityManifest(options);
+  }
+
+  function getCapabilityManifestView(options = {}) {
+    const protectionSummary = options?.protectionSummary || getProtectionSummary();
+    if (shouldUseProtectedCapabilityManifest(protectionSummary)) {
+      return getProtectedCapabilityManifestView(options);
+    }
+    return getSourceCapabilityManifestView(options);
+  }
+
   servicesHub.register({
     id: surfaceDescriptors.serviceIDs.runtimeCore,
     label: surfaceDescriptors.serviceLabels.runtimeCore,
@@ -440,12 +644,15 @@ export function createPlugin({
     },
     async start() {
       syncRuntimeHostBinding(await hostSignals.init());
+      void scheduleWasmStage2OverlayGate();
     },
     async stop() {
       syncRuntimeHostBinding(hostSignals.getSummary());
+      void scheduleWasmStage2OverlayGate();
     },
     healthCheck() {
       const summary = syncRuntimeHostBinding(hostSignals.getSummary());
+      void scheduleWasmStage2OverlayGate();
       return {
         ok: true,
         status: summary.available
@@ -466,12 +673,15 @@ export function createPlugin({
     },
     async start() {
       syncRuntimeHostBinding(await nonceStore.init());
+      void scheduleWasmStage2OverlayGate();
     },
     async stop() {
       syncRuntimeHostBinding(nonceStore.getSummary());
+      void scheduleWasmStage2OverlayGate();
     },
     healthCheck() {
       const summary = syncRuntimeHostBinding(nonceStore.getSummary());
+      void scheduleWasmStage2OverlayGate();
       return {
         ok: true,
         status: summary.dbAvailable && summary.noncePresent
@@ -984,6 +1194,8 @@ export function createPlugin({
     getLifecycleSummary: () => cloneLifecycleTelemetrySummary(lifecycleTelemetrySummary),
     getProtectionSummary,
     getCapabilityManifestOverlay,
+    createCapabilityManifest,
+    getCapabilityManifestView,
     surfaceDescriptors,
   });
 

@@ -20,11 +20,13 @@
    看当前受保护打包支线已经验证过什么、哪些结论已冻结。
 3. [WASM_KERNEL_PROMOTION_PLAN.md](./WASM_KERNEL_PROMOTION_PLAN.md)
    看 `wasm-kernel` 什么时候才允许进入主线仓库的 optional bundle 基线。
-4. [addon-static/bootstrap.js](../addon-static/bootstrap.js)
+4. [PACKAGE_PROTECTION_WASM_STAGE2_DERIVATION_PLAN.md](./PACKAGE_PROTECTION_WASM_STAGE2_DERIVATION_PLAN.md)
+   看 Wasm 与受保护打包交叉时，哪些内容适合进 Wasm、哪些内容必须继续留在 JS，以及如何保持 update-safe / startup-non-blocking。
+5. [addon-static/bootstrap.js](../addon-static/bootstrap.js)
    看当前仓库真实宿主启动链：`rootURI`、`registerChrome()`、`loadSubScript()`、`bootstrapPlugin()`。
-5. [scripts/build.mjs](../scripts/build.mjs)
+6. [scripts/build.mjs](../scripts/build.mjs)
    看当前 manifest/build 形态，尤其是 `manifest_version` 和 `applications.zotero` 兼容声明。
-6. [config/addon.config.json](../config/addon.config.json)
+7. [config/addon.config.json](../config/addon.config.json)
    看当前仓库仍声明到哪个 Zotero 版本。
 
 ## 当前冻结判断
@@ -81,12 +83,14 @@
 - entitlement / unlock 判定
 - 小型校验/变换内核
 - 输入输出边界清晰的少量算法逻辑
+- 不暴露 capability overlay 的 digest / unlock micro-kernel
 
 当前不应优先尝试的内容：
 
 - 整个 `bootstrapPlugin` 主链 Wasm 化
 - 大量 Zotero 宿主交互逻辑搬入 Wasm
 - 用 Wasm 替换现有 `shielded` 外层 loader
+- 用 Wasm 解锁后把完整 capability overlay、entrypoints、ownedBy、successSignals 重新带回 JS
 
 ## 本地索引
 
@@ -96,6 +100,7 @@
 |------|------|------|
 | 当前保护路线定位 | [PACKAGE_PROTECTION_ROUTE_PLAN.md](./PACKAGE_PROTECTION_ROUTE_PLAN.md) | 确认 Wasm 当前只是后续增强层 |
 | 已验证经验 | [PACKAGE_PROTECTION_EXPERIENCE.md](./PACKAGE_PROTECTION_EXPERIENCE.md) | 读取 package protection 当前实验结论 |
+| Wasm stage2 派生设计 | [PACKAGE_PROTECTION_WASM_STAGE2_DERIVATION_PLAN.md](./PACKAGE_PROTECTION_WASM_STAGE2_DERIVATION_PLAN.md) | 看哪些二阶段逻辑适合进 Wasm，哪些必须保持 update-safe / startup-safe |
 | 宿主启动链 | [addon-static/bootstrap.js](../addon-static/bootstrap.js) | 看 `rootURI`、`registerChrome()`、`loadSubScript()` |
 | 当前构建形态 | [scripts/build.mjs](../scripts/build.mjs) | 看 `manifest_version`、manifest 生成方式 |
 | 当前兼容声明 | [config/addon.config.json](../config/addon.config.json) | 看当前仓库兼容声明仍是 `8.*`；这和“官方正式发行线已是 Zotero 9”是两个概念 |
@@ -110,6 +115,7 @@
 | Wasm matrix 报告 | [scripts/wasm-kernel-matrix-report.mjs](../scripts/wasm-kernel-matrix-report.mjs) | 汇总 probe/digest 的 smoke/perf/disabled-contract，固定输出 controller-facing promotion evidence summary；shadow unlock 仍走独立场景证据 |
 | Wasm promotion 蓝图 | [WASM_KERNEL_PROMOTION_PLAN.md](./WASM_KERNEL_PROMOTION_PLAN.md) | 看是否、何时、以什么条件进入 optional bundle registry |
 | 宿主信号/弱绑定边界 | [PACKAGE_PROTECTION_HOST_WEAK_BINDING_V1.md](./PACKAGE_PROTECTION_HOST_WEAK_BINDING_V1.md) | 避免把 Wasm 和本地弱绑定混成一路 |
+| Wasm 二阶段派生设计 | [PACKAGE_PROTECTION_WASM_STAGE2_DERIVATION_PLAN.md](./PACKAGE_PROTECTION_WASM_STAGE2_DERIVATION_PLAN.md) | 把反静态分析、二阶段 unlock、overlay gate 与更新/启动边界放到同一设计视图里 |
 
 ### B. 官方外部索引
 

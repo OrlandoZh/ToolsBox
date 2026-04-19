@@ -78,11 +78,40 @@ function hasManifestOnlyResidualFloor(topCandidate = null) {
     && residualAnchorIds.every((id) => allowedResidualAnchors.has(id));
 }
 
+function isStoppedCandidate(candidate = null) {
+  const status = normalizeNonEmptyString(candidate?.status) || "";
+  return status === "stop-current-candidate"
+    || status === "stopped"
+    || status === "stopped-candidate";
+}
+
+function isNarrowWasmAdmissionCandidate(candidate = null) {
+  if (!candidate || isStoppedCandidate(candidate)) {
+    return false;
+  }
+  if (candidate.id === "shielded-surface-scrub-wasm-stage2-derive") {
+    return false;
+  }
+
+  const id = normalizeNonEmptyString(candidate.id);
+  const summary = String(candidate.summary || "").toLowerCase();
+  const promotionGate = normalizeNonEmptyString(candidate.promotionGate);
+  return id === "shielded-surface-scrub-wasm-digest"
+    || id === "wasm-mini-kernel-preplan"
+    || promotionGate === "bounded-wasm-candidate-only"
+    || summary.includes("digest")
+    || summary.includes("unlock")
+    || summary.includes("micro-kernel")
+    || summary.includes("compact");
+}
+
 function selectRoute5WasmCandidate(registry = null) {
   const candidates = Array.isArray(registry?.candidates) ? registry.candidates : [];
-  return candidates.find((candidate) => candidate.id === "shielded-surface-scrub-wasm-digest")
-    || candidates.find((candidate) => candidate.id === "wasm-mini-kernel-preplan")
-    || candidates.find((candidate) => candidate.stage === "route5-wasm")
+  const route5Candidates = candidates.filter((candidate) => candidate.stage === "route5-wasm");
+  const narrowCandidates = route5Candidates.filter((candidate) => isNarrowWasmAdmissionCandidate(candidate));
+  return narrowCandidates.find((candidate) => candidate.id === "shielded-surface-scrub-wasm-digest")
+    || narrowCandidates.find((candidate) => candidate.id === "wasm-mini-kernel-preplan")
+    || narrowCandidates[0]
     || null;
 }
 
@@ -200,6 +229,7 @@ export function summarizePackageProtectionWasmAdmission({
     && wasmLane.matrixPassed
     && wasmLane.planned
     && wasmLane.defaultDisabled
+    && Boolean(wasmLane.route5Candidate)
     && wasmLane.digestTargetLocked;
 
   let status = "not-ready";

@@ -11,6 +11,7 @@ import {
   summarizePrefBridgeComparison,
   summarizeSurfaceScrubComparison,
   summarizeSurfaceScrubWasmDigestComparison,
+  summarizeSurfaceScrubWasmStage2DeriveComparison,
   summarizePackageProtectionSourceProxy,
   summarizePackageProtectionUnpackedSurface,
 } from "../scripts/package-protection-anchor-audit.mjs";
@@ -53,11 +54,13 @@ describe("Package Protection Anchor Audit", () => {
     const prefBridgeOptions = parsePackageProtectionAnchorAuditArgs(["--include-pref-bridge"]);
     const surfaceScrubOptions = parsePackageProtectionAnchorAuditArgs(["--include-surface-scrub"]);
     const wasmDigestOptions = parsePackageProtectionAnchorAuditArgs(["--include-surface-scrub-wasm-digest"]);
+    const wasmStage2DeriveOptions = parsePackageProtectionAnchorAuditArgs(["--include-surface-scrub-wasm-stage2-derive"]);
     const singleDescriptorBindOptions = parsePackageProtectionAnchorAuditArgs(["--variant", "descriptor-bind"]);
     const singleJSConfuserStringOptions = parsePackageProtectionAnchorAuditArgs(["--variant", "jsconfuser-string"]);
     const singlePrefBridgeOptions = parsePackageProtectionAnchorAuditArgs(["--variant", "pref-bridge"]);
     const singleSurfaceScrubOptions = parsePackageProtectionAnchorAuditArgs(["--variant", "surface-scrub"]);
     const singleWasmDigestOptions = parsePackageProtectionAnchorAuditArgs(["--variant", "wasm-digest"]);
+    const singleWasmStage2DeriveOptions = parsePackageProtectionAnchorAuditArgs(["--variant", "wasm-stage2-derive"]);
 
     assert.deepEqual(allOptions.variants, ["plain", "encrypted", "shielded"]);
     assert.deepEqual(shieldedOptions.variants, ["shielded"]);
@@ -66,11 +69,13 @@ describe("Package Protection Anchor Audit", () => {
     assert.deepEqual(prefBridgeOptions.variants, ["plain", "encrypted", "shielded", "pref-bridge"]);
     assert.deepEqual(surfaceScrubOptions.variants, ["plain", "encrypted", "shielded", "surface-scrub"]);
     assert.deepEqual(wasmDigestOptions.variants, ["plain", "encrypted", "shielded", "surface-scrub-wasm-digest"]);
+    assert.deepEqual(wasmStage2DeriveOptions.variants, ["plain", "encrypted", "shielded", "surface-scrub-wasm-stage2-derive"]);
     assert.deepEqual(singleDescriptorBindOptions.variants, ["descriptor-bind"]);
     assert.deepEqual(singleJSConfuserStringOptions.variants, ["jsconfuser-string"]);
     assert.deepEqual(singlePrefBridgeOptions.variants, ["pref-bridge"]);
     assert.deepEqual(singleSurfaceScrubOptions.variants, ["surface-scrub"]);
     assert.deepEqual(singleWasmDigestOptions.variants, ["surface-scrub-wasm-digest"]);
+    assert.deepEqual(singleWasmStage2DeriveOptions.variants, ["surface-scrub-wasm-stage2-derive"]);
   });
 
   it("should build dynamic anchors from addon config", () => {
@@ -135,6 +140,7 @@ describe("Package Protection Anchor Audit", () => {
     assert.equal(resolvePackageProtectionAuditOutputSuffix("pref-bridge"), "shielded-pref-bridge");
     assert.equal(resolvePackageProtectionAuditOutputSuffix("surface-scrub"), "shielded-surface-scrub");
     assert.equal(resolvePackageProtectionAuditOutputSuffix("surface-scrub-wasm-digest"), "shielded-surface-scrub-wasm-digest");
+    assert.equal(resolvePackageProtectionAuditOutputSuffix("surface-scrub-wasm-stage2-derive"), "shielded-surface-scrub-wasm-stage2-derive");
   });
 
   it("should include the react-ui demo shell in unpacked surface targets", () => {
@@ -188,6 +194,58 @@ describe("Package Protection Anchor Audit", () => {
     const comparison = summarizeSurfaceScrubWasmDigestComparison([
       buildVariantReport("surface-scrub", "/* protected raw loader */", anchors, surfaceScrubSurface),
       buildVariantReport("surface-scrub-wasm-digest", "/* protected raw loader */", anchors, wasmDigestSurface),
+    ]);
+
+    assert.equal(comparison.present, true);
+    assert.equal(comparison.packageBoundaryWithinWasmAssets, true);
+    assert.deepEqual(comparison.newExposedFiles, [WASM_KERNEL_PROBE_PATH]);
+    assert.deepEqual(comparison.unexpectedExposedFiles, []);
+  });
+
+  it("should summarize a wasm stage2 derive comparison as bounded when new files stay under content/lib/w", () => {
+    const anchors = buildPackageProtectionAuditAnchors({
+      addonRef: "demo-addon",
+      addonVersion: "1.2.3",
+      updateURL: "https://example.com/update.json",
+    });
+    const surfaceAnchors = buildPackageProtectionUnpackedSurfaceAnchors({
+      addonRef: "demo-addon",
+      addonVersion: "1.2.3",
+      updateURL: "https://example.com/update.json",
+    });
+    const surfaceScrubSurface = scanPackageProtectionSurfaceFiles([
+      {
+        relativePath: "manifest.json",
+        absolutePath: "/tmp/surface-scrub/manifest.json",
+        source: "1.2.3 https://example.com/update.json",
+      },
+      {
+        relativePath: WASM_KERNEL_PROBE_WORKER_PATH,
+        absolutePath: `/tmp/surface-scrub/${WASM_KERNEL_PROBE_WORKER_PATH}`,
+        source: "worker cannot fetch wasm bytes WebAssembly.instantiate",
+      },
+    ], surfaceAnchors);
+    const wasmStage2DeriveSurface = scanPackageProtectionSurfaceFiles([
+      {
+        relativePath: "manifest.json",
+        absolutePath: "/tmp/wasm-stage2-derive/manifest.json",
+        source: "1.2.3 https://example.com/update.json",
+      },
+      {
+        relativePath: WASM_KERNEL_PROBE_PATH,
+        absolutePath: `/tmp/wasm-stage2-derive/${WASM_KERNEL_PROBE_PATH}`,
+        source: "",
+      },
+      {
+        relativePath: WASM_KERNEL_PROBE_WORKER_PATH,
+        absolutePath: `/tmp/wasm-stage2-derive/${WASM_KERNEL_PROBE_WORKER_PATH}`,
+        source: "worker cannot fetch wasm bytes WebAssembly.instantiate",
+      },
+    ], surfaceAnchors);
+
+    const comparison = summarizeSurfaceScrubWasmStage2DeriveComparison([
+      buildVariantReport("surface-scrub", "/* protected raw loader */", anchors, surfaceScrubSurface),
+      buildVariantReport("surface-scrub-wasm-stage2-derive", "/* protected raw loader */", anchors, wasmStage2DeriveSurface),
     ]);
 
     assert.equal(comparison.present, true);

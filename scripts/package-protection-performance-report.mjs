@@ -57,6 +57,9 @@ function normalizeVariant(value) {
   if (normalized === "surface-scrub-wasm-digest" || normalized === "wasm-digest") {
     return "shielded-surface-scrub-wasm-digest";
   }
+  if (normalized === "surface-scrub-wasm-stage2-derive" || normalized === "wasm-stage2-derive") {
+    return "shielded-surface-scrub-wasm-stage2-derive";
+  }
   return PACKAGE_PROTECTION_SMOKE_VARIANTS.includes(normalized)
     ? normalized
     : null;
@@ -107,7 +110,7 @@ export function parsePackageProtectionPerformanceArgs(argv = process.argv.slice(
   if (options.variants.length === 0) {
     options.variants = DEFAULT_PACKAGE_PROTECTION_PERFORMANCE_VARIANTS.slice();
   }
-  assertScript(options.variants.every(Boolean), "--variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest", {
+  assertScript(options.variants.every(Boolean), "--variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive", {
     category: "args",
     failedStage: "parse-args",
   });
@@ -471,6 +474,7 @@ export function summarizePackageProtectionPerformanceReport({
     buildComparison(variantMap.shielded, variantMap["shielded-pref-bridge"]),
     buildComparison(variantMap.shielded, variantMap["shielded-surface-scrub"]),
     buildComparison(variantMap["shielded-surface-scrub"], variantMap["shielded-surface-scrub-wasm-digest"]),
+    buildComparison(variantMap["shielded-surface-scrub"], variantMap["shielded-surface-scrub-wasm-stage2-derive"]),
     buildComparison(variantMap.shielded, variantMap["shielded-jsconfuser-string"]),
   ].filter(Boolean);
   const missingVariants = variantSummaries.filter((item) => !item.present).map((item) => item.variant);

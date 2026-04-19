@@ -22,6 +22,8 @@ const HOST_BINDING_REQUIREMENTS = Object.freeze([
   "dbAvailable",
   "noncePresent",
 ]);
+const WASM_STAGE2_GATE_REQUIREMENT = "wasmStage2OverlayGate";
+const WASM_STAGE2_DERIVE_VARIANT = "shielded-surface-scrub-wasm-stage2-derive";
 
 const PROTECTED_CAPABILITY_CATEGORY = buildToken(["protected"]);
 
@@ -103,6 +105,16 @@ function getHostBinding(protectionSummary = null) {
     : null;
 }
 
+function getStage2OverlayGate(protectionSummary = null) {
+  return protectionSummary?.stage2OverlayGate && typeof protectionSummary.stage2OverlayGate === "object"
+    ? protectionSummary.stage2OverlayGate
+    : null;
+}
+
+function requiresWasmStage2OverlayGate(protectionSummary = null) {
+  return String(protectionSummary?.variant || "").trim() === WASM_STAGE2_DERIVE_VARIANT;
+}
+
 function resolveOverlayActivation(protectionSummary = null) {
   const hostBinding = getHostBinding(protectionSummary);
   const missing = [];
@@ -117,8 +129,17 @@ function resolveOverlayActivation(protectionSummary = null) {
     missing.push("noncePresent");
   }
 
+  if (requiresWasmStage2OverlayGate(protectionSummary)) {
+    const gate = getStage2OverlayGate(protectionSummary);
+    if (gate?.satisfied !== true) {
+      missing.push(WASM_STAGE2_GATE_REQUIREMENT);
+    }
+  }
+
   return {
-    requirements: HOST_BINDING_REQUIREMENTS.slice(),
+    requirements: requiresWasmStage2OverlayGate(protectionSummary)
+      ? [...HOST_BINDING_REQUIREMENTS, WASM_STAGE2_GATE_REQUIREMENT]
+      : HOST_BINDING_REQUIREMENTS.slice(),
     missing,
     satisfied: missing.length === 0,
   };

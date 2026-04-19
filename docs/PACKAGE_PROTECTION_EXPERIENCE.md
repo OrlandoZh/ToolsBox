@@ -310,6 +310,17 @@
   - `inner audit = parse-fail / only-loader`
   - `single-pass LLM = parse-fail / only-loader`
   - 固定强档 `A2/M3 + static+reference + multi-round + 30-120m = high-level-architecture / R1`
+- `2026-04-20` 窄微内核方向复测结果继续支持这条结论：
+  - `shielded-surface-scrub` 与 `shielded-surface-scrub-wasm-digest` 同轮 stable smoke 均为 `3/3 passed`
+  - 二者均为 `readinessMode=native`、`blockingRuntimeErrorCount=0`、`decodeMethod=fromBase64`
+  - 二者 median `decodeDurationMs = 24`
+  - 二者 median `prepareDurationMs = 74`
+  - 性能报告中 `protectionPipelineDurationMs` 从 `490ms` 到 `489ms`，可视为无实质差异
+  - `durationMs` 从 `1721ms` 到 `1457ms`，这更可能是 Zotero 冷启动噪声，不应解释成 Wasm 带来启动加速
+  - smoke/perf 口径下 `xpiBytes` 增加 `12,777`，`bundleBytes` 增加 `18,424`
+  - webcrack 仍为 `parse-fail / only-loader`
+  - inner audit 仍为 `parse-fail / only-loader`
+  - compare 仍为 `hardening-win`，但 retained review 仍把 `shielded-surface-scrub` 作为 top candidate
 - 当前 `compare` 的结论也已经收口为：
   - `status = passed`
   - `decision = hardening-win`
@@ -319,10 +330,10 @@
 - 但这条线目前还**不是**更优 retained candidate，原因也已经很明确：
   - 它相对 `shielded-surface-scrub` 没有继续减少 unpacked support surface
   - 当前 `unpackedAnchorDeltaCount = 0`
-  - 当前 `xpiDelta = +152112`
-  - 当前 `bundleDelta = +246276`
-  - 当前 `prepareDelta = +2`
-  - 当前 `decodeDelta = +1`
+  - 同轮 smoke/perf 口径下，当前 `xpiDelta = +12777`
+  - 同轮 smoke/perf 口径下，当前 `bundleDelta = +18424`
+  - 当前 `prepareDelta = 0`
+  - 当前 `decodeDelta = 0`
   - retained review 当前固定把它排在 `reviewRank = 3`
 - 这意味着它当前证明的是：
   - `route5-wasm` 可以在不破坏启动链、不扩大 package boundary、不降低自动化阻力的前提下成立
@@ -341,6 +352,28 @@
     - 新的 package-boundary 收缩
     - 新的 attack ceiling 下压
     - 或新的非启动关键路径 Wasm 小内核能承接更高价值的敏感语义
+
+### 4.6 Wasm stage2 不能再以“恢复完整 overlay”为目标
+
+`shielded-surface-scrub-wasm-stage2-derive` 的实验已经给出一个明确反例：
+
+- 工程层面可行：
+  - bootstrap 桥接 `WebAssembly / Worker / ChromeWorker` 后，runtime smoke 可以通过
+  - `readinessMode = native`
+  - `blockingRuntimeErrorCount = 0`
+  - package boundary 没有观察到超出 `content/lib/w/*` 的新增静态暴露
+- 保护层面不值得继续：
+  - stage2 解锁后恢复了 `12` 条 capability overlay 条目
+  - inner audit 从 `parse-fail / only-loader` 退到 `high-level-architecture`
+  - 这正好把 AI 最容易归纳的高层架构信息重新带回 JS 层
+
+因此当前固定经验是：
+
+- `shielded-surface-scrub-wasm-stage2-derive` 只保留为 stopped candidate / regression reference
+- admission 不应再选择“完整 overlay 恢复”类 Wasm 候选
+- 后续 Wasm 只能承接 `digest / unlockToken / compactGate / diagnosticDigest` 这类微内核输出
+- Wasm 输出不得包含完整 capability overlay、entrypoints、ownedBy、successSignals、用户可读能力标签或模块目录
+- 成功标准不是“Wasm 能不能解锁更多信息”，而是“Wasm 是否能在不增加 JS 可读高层信息的前提下，让静态直读更难”
 
 ### 5. 元数据泄露面会显著降低 AI 的一轮解读门槛
 

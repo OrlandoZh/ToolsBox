@@ -39,6 +39,7 @@ import {
   SHIELDED_PREF_BRIDGE_PACKAGE_VARIANT,
   SHIELDED_SURFACE_SCRUB_PACKAGE_VARIANT,
   SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT,
+  SHIELDED_SURFACE_SCRUB_WASM_STAGE2_DERIVE_PACKAGE_VARIANT,
   protectBuildBundle,
 } from "./package-protection-lib.mjs";
 import {
@@ -86,6 +87,7 @@ export function parsePackageArgs(argv = process.argv.slice(2)) {
     prefBridge: false,
     surfaceScrub: false,
     surfaceScrubWasmDigest: false,
+    surfaceScrubWasmStage2Derive: false,
     shieldBundle: false,
     outputSuffix: "",
     writeReleaseMetadata: true,
@@ -128,6 +130,13 @@ export function parsePackageArgs(argv = process.argv.slice(2)) {
         break;
       case "--surface-scrub-wasm-digest":
         options.surfaceScrubWasmDigest = true;
+        options.surfaceScrub = true;
+        options.prefBridge = true;
+        options.shieldBundle = true;
+        options.encryptBundle = true;
+        break;
+      case "--surface-scrub-wasm-stage2-derive":
+        options.surfaceScrubWasmStage2Derive = true;
         options.surfaceScrub = true;
         options.prefBridge = true;
         options.shieldBundle = true;
@@ -219,6 +228,8 @@ export function parsePackageArgs(argv = process.argv.slice(2)) {
   if (options.shieldBundle && !options.outputSuffix) {
     options.outputSuffix = options.descriptorBind
       ? SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT
+      : options.surfaceScrubWasmStage2Derive
+        ? SHIELDED_SURFACE_SCRUB_WASM_STAGE2_DERIVE_PACKAGE_VARIANT
       : options.surfaceScrubWasmDigest
         ? SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT
         : options.surfaceScrub
@@ -253,6 +264,9 @@ export function parsePackageArgs(argv = process.argv.slice(2)) {
 export function resolvePackageProtectedVariant(options = {}) {
   if (options.descriptorBind) {
     return SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT;
+  }
+  if (options.surfaceScrubWasmStage2Derive) {
+    return SHIELDED_SURFACE_SCRUB_WASM_STAGE2_DERIVE_PACKAGE_VARIANT;
   }
   if (options.surfaceScrubWasmDigest) {
     return SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT;
@@ -405,7 +419,7 @@ export async function main(argv = process.argv.slice(2)) {
     let obfuscatedBundleMeta = null;
     let obfuscatedLoaderMeta = null;
     let jsConfuserTransformMeta = null;
-    const descriptorOverlay = options.descriptorBind
+    const descriptorOverlay = options.descriptorBind || options.surfaceScrubWasmStage2Derive
       ? createCapabilityManifestDescriptorOverlay({ config })
       : null;
     if (options.jsConfuserString) {

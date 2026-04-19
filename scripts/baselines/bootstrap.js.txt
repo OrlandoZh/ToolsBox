@@ -200,6 +200,36 @@ function _getOptionalCapabilityRules(chromeGlobal) {
       },
     },
     {
+      key: "WebAssembly",
+      source: "global",
+      resolve() {
+        if (typeof WebAssembly !== "undefined") {
+          return WebAssembly;
+        }
+        return chromeGlobal.WebAssembly;
+      },
+    },
+    {
+      key: "Worker",
+      source: "global",
+      resolve() {
+        if (typeof Worker !== "undefined") {
+          return Worker;
+        }
+        return chromeGlobal.Worker;
+      },
+    },
+    {
+      key: "ChromeWorker",
+      source: "global",
+      resolve() {
+        if (typeof ChromeWorker !== "undefined") {
+          return ChromeWorker;
+        }
+        return chromeGlobal.ChromeWorker;
+      },
+    },
+    {
       key: "URL",
       source: "global",
       resolve() {

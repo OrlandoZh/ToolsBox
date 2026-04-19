@@ -120,4 +120,82 @@ describe("Protected Capability Manifest", () => {
     assert.deepEqual(hostActions.successSignals, descriptorOverlay[0].successSignals);
     assert.equal(Object.prototype.hasOwnProperty.call(hostActions, "ignoredField"), false);
   });
+
+  it("should keep limited protected view for the wasm stage2 derive variant until the overlay gate is satisfied", () => {
+    const descriptorOverlay = [{
+      id: "host-actions",
+      label: "宿主动作编排",
+      category: "feature",
+      description: "验证 wasm stage2 derive gate。",
+      entrypoints: ["plugin.api.agent.runHostAction(actionId, payload)"],
+      ownedBy: ["src/app/host-actions.js"],
+      successSignals: ["Host actions return readiness details"],
+    }];
+    const protectionSummary = {
+      variant: "shielded-surface-scrub-wasm-stage2-derive",
+      hostBinding: {
+        profileHash: "sha256:profile",
+        dbAvailable: true,
+        noncePresent: true,
+      },
+      stage2OverlayGate: {
+        mode: "wasm-stage2-derive",
+        status: "pending",
+        satisfied: false,
+        activationSatisfied: false,
+        activationMissing: ["wasmStage2OverlayGate"],
+      },
+    };
+
+    const view = getCapabilityManifestView({ descriptorOverlay, protectionSummary });
+    const manifest = createCapabilityManifest({ descriptorOverlay, protectionSummary });
+    const hostActions = findCapabilityById(manifest, "host-actions");
+
+    assert.equal(view.overlayAvailable, true);
+    assert.equal(view.overlayApplied, false);
+    assert.equal(view.detailLevel, "limited");
+    assert.includes(view.activationMissing, "wasmStage2OverlayGate");
+    assert.equal(hostActions.label, "C-09");
+    assert.equal(hostActions.category, "protected");
+    assert.equal(hostActions.description, "受保护导出不附带该能力的详细说明。");
+  });
+
+  it("should allow the wasm stage2 derive variant to restore full overlay after the gate is satisfied", () => {
+    const descriptorOverlay = [{
+      id: "host-actions",
+      label: "宿主动作编排",
+      category: "feature",
+      description: "验证 wasm stage2 derive gate。",
+      entrypoints: ["plugin.api.agent.runHostAction(actionId, payload)"],
+      ownedBy: ["src/app/host-actions.js"],
+      successSignals: ["Host actions return readiness details"],
+    }];
+    const protectionSummary = {
+      variant: "shielded-surface-scrub-wasm-stage2-derive",
+      hostBinding: {
+        profileHash: "sha256:profile",
+        dbAvailable: true,
+        noncePresent: true,
+      },
+      stage2OverlayGate: {
+        mode: "wasm-stage2-derive",
+        status: "satisfied",
+        satisfied: true,
+        activationSatisfied: true,
+        activationMissing: [],
+      },
+    };
+
+    const view = getCapabilityManifestView({ descriptorOverlay, protectionSummary });
+    const manifest = createCapabilityManifest({ descriptorOverlay, protectionSummary });
+    const hostActions = findCapabilityById(manifest, "host-actions");
+
+    assert.equal(view.detailLevel, "full");
+    assert.equal(view.overlayApplied, true);
+    assert.equal(view.activationSatisfied, true);
+    assert.deepEqual(view.activationMissing, []);
+    assert.equal(hostActions.label, "宿主动作编排");
+    assert.equal(hostActions.description, "验证 wasm stage2 derive gate。");
+    assert.deepEqual(hostActions.entrypoints, ["plugin.api.agent.runHostAction(actionId, payload)"]);
+  });
 });

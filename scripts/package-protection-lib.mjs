@@ -14,6 +14,7 @@ export const SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT = "shielded-jsconfuser-s
 export const SHIELDED_PREF_BRIDGE_PACKAGE_VARIANT = "shielded-pref-bridge";
 export const SHIELDED_SURFACE_SCRUB_PACKAGE_VARIANT = "shielded-surface-scrub";
 export const SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT = "shielded-surface-scrub-wasm-digest";
+export const SHIELDED_SURFACE_SCRUB_WASM_STAGE2_DERIVE_PACKAGE_VARIANT = "shielded-surface-scrub-wasm-stage2-derive";
 export const ENCRYPTED_BUNDLE_MARKER = "__CLEANROOM_ENCRYPTED_BUNDLE__";
 export const SHIELDED_BUNDLE_MARKER = "__CLEANROOM_SHIELDED_BUNDLE__";
 
@@ -24,7 +25,8 @@ function isShieldedProtectedVariant(variant) {
     || normalizedVariant === SHIELDED_JSCONFUSER_STRING_PACKAGE_VARIANT
     || normalizedVariant === SHIELDED_PREF_BRIDGE_PACKAGE_VARIANT
     || normalizedVariant === SHIELDED_SURFACE_SCRUB_PACKAGE_VARIANT
-    || normalizedVariant === SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT;
+    || normalizedVariant === SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT
+    || normalizedVariant === SHIELDED_SURFACE_SCRUB_WASM_STAGE2_DERIVE_PACKAGE_VARIANT;
 }
 
 function resolveProtectedBundleVariant(variant) {
@@ -43,6 +45,9 @@ function resolveProtectedBundleVariant(variant) {
   }
   if (normalizedVariant === SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT) {
     return SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT;
+  }
+  if (normalizedVariant === SHIELDED_SURFACE_SCRUB_WASM_STAGE2_DERIVE_PACKAGE_VARIANT) {
+    return SHIELDED_SURFACE_SCRUB_WASM_STAGE2_DERIVE_PACKAGE_VARIANT;
   }
   return isShieldedProtectedVariant(normalizedVariant)
     ? SHIELDED_PACKAGE_VARIANT

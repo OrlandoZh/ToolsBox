@@ -258,6 +258,18 @@ describe("Package Protection Experiment Compare", () => {
     assert.equal(options.channel, "stable");
   });
 
+  it("should parse wasm-stage2-derive as an experimental variant alias", () => {
+    const options = parsePackageProtectionExperimentCompareArgs([
+      "--variant",
+      "wasm-stage2-derive",
+      "--channel",
+      "stable",
+    ]);
+
+    assert.equal(options.variant, "shielded-surface-scrub-wasm-stage2-derive");
+    assert.equal(options.channel, "stable");
+  });
+
   it("should resolve surface-scrub as the compare base for the wasm digest candidate", () => {
     assert.equal(
       resolvePackageProtectionExperimentCompareBaseVariant("shielded-surface-scrub-wasm-digest"),
@@ -265,6 +277,10 @@ describe("Package Protection Experiment Compare", () => {
     );
     assert.equal(
       resolvePackageProtectionExperimentCompareBaseVariant("wasm-digest"),
+      "shielded-surface-scrub",
+    );
+    assert.equal(
+      resolvePackageProtectionExperimentCompareBaseVariant("shielded-surface-scrub-wasm-stage2-derive"),
       "shielded-surface-scrub",
     );
     assert.equal(
@@ -738,6 +754,90 @@ describe("Package Protection Experiment Compare", () => {
     assert.deepEqual(report.auditComparison.newExposedFiles, ["content/lib/w/probe.wasm"]);
     assert.equal(report.deltas.decodeDurationMs, 7);
     assert.equal(report.summary.includes("content/lib/w/*"), true);
+  });
+
+  it("should promote surface-scrub-wasm-stage2-derive when it keeps resistance and restores the protected overlay through the wasm gate", () => {
+    const report = summarizePackageProtectionExperimentCompare({
+      variant: "shielded-surface-scrub-wasm-stage2-derive",
+      channel: "stable",
+      baseSmokeReport: buildSmokeReport({
+        variant: "shielded-surface-scrub",
+        llmSinglePassResult: "high-level-architecture",
+        decodeDurationMs: 24,
+        prepareDurationMs: 79,
+      }),
+      candidateSmokeReport: buildSmokeReport({
+        variant: "shielded-surface-scrub-wasm-stage2-derive",
+        llmSinglePassResult: "high-level-architecture",
+        xpiBytes: 2090,
+        bundleBytes: 6120,
+        decodeDurationMs: 31,
+        prepareDurationMs: 84,
+        hostBinding: {
+          available: true,
+          profileHash: "abc123",
+          dbAvailable: true,
+          noncePresent: true,
+          nonceSource: "created",
+        },
+        capabilityManifest: {
+          detailLevel: "full",
+          overlayAvailable: true,
+          overlayApplied: true,
+          activationSatisfied: true,
+          activationMissing: [],
+        },
+      }),
+      baseWebcrackReport: buildWebcrackReport({
+        variant: "shielded-surface-scrub",
+        rating: "parse-fail / only-loader",
+      }),
+      candidateWebcrackReport: buildWebcrackReport({
+        variant: "shielded-surface-scrub-wasm-stage2-derive",
+        rating: "parse-fail / only-loader",
+      }),
+      baseInnerAuditReport: buildInnerAuditReport({
+        variant: "shielded-surface-scrub",
+        rating: "parse-fail / only-loader",
+      }),
+      candidateInnerAuditReport: buildInnerAuditReport({
+        variant: "shielded-surface-scrub-wasm-stage2-derive",
+        rating: "parse-fail / only-loader",
+      }),
+      baseGuidedAttackReport: buildGuidedAttackReport({
+        variant: "shielded-surface-scrub",
+        rating: "high-level-architecture",
+        resultTier: "R1",
+      }),
+      candidateGuidedAttackReport: buildGuidedAttackReport({
+        variant: "shielded-surface-scrub-wasm-stage2-derive",
+        rating: "high-level-architecture",
+        resultTier: "R1",
+      }),
+      auditReport: {
+        surfaceScrubWasmStage2DeriveComparison: {
+          present: true,
+          sameRawSurface: false,
+          rawAnchorDeltaCount: 1,
+          rawMatchDeltaCount: 2,
+          sameUnpackedSurface: false,
+          unpackedAnchorDeltaCount: 0,
+          unpackedMatchDeltaCount: 0,
+          packageBoundaryWithinWasmAssets: true,
+          newExposedFiles: ["content/lib/w/probe.wasm"],
+          unexpectedExposedFiles: [],
+          interpretation: "surface-scrub-wasm-stage2-derive 的新增 package-boundary 暴露仅限 content/lib/w/probe.wasm。",
+        },
+      },
+    });
+
+    assert.equal(report.baseVariant, "shielded-surface-scrub");
+    assert.equal(report.status, "passed");
+    assert.equal(report.decision, "hardening-win");
+    assert.equal(report.nextAction, "promote-experimental-candidate");
+    assert.equal(report.auditComparison.packageBoundaryWithinWasmAssets, true);
+    assert.deepEqual(report.auditComparison.newExposedFiles, ["content/lib/w/probe.wasm"]);
+    assert.equal(report.summary.includes("Wasm stage2 gate"), true);
   });
 
   it("should avoid claiming semantic compression when jsconfuser preflight failed", () => {
