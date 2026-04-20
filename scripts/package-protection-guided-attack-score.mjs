@@ -103,6 +103,9 @@ function normalizeVariant(value) {
   if (normalized === "surface-scrub-wasm-stage2-derive" || normalized === "wasm-stage2-derive") {
     return "shielded-surface-scrub-wasm-stage2-derive";
   }
+  if (normalized === "surface-scrub-wasm-entitlement-legacy" || normalized === "wasm-entitlement-legacy") {
+    return "shielded-surface-scrub-wasm-entitlement-legacy";
+  }
   return PACKAGE_PROTECTION_SMOKE_VARIANTS.includes(normalized)
     ? normalized
     : null;
@@ -320,7 +323,7 @@ export function parsePackageProtectionGuidedAttackScoreArgs(argv = process.argv.
     }
   }
 
-  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive", {
+  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive|shielded-surface-scrub-wasm-entitlement-legacy", {
     category: "args",
     failedStage: "parse-args",
   });
@@ -556,7 +559,7 @@ export async function recordPackageProtectionGuidedAttack(options = {}) {
     roundMode,
   });
 
-  assertScript(Boolean(variant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive", {
+  assertScript(Boolean(variant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive|shielded-surface-scrub-wasm-entitlement-legacy", {
     category: "args",
     failedStage: "validate-options",
   });

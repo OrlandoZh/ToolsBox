@@ -21,6 +21,8 @@ describe("Surface Descriptors", () => {
     assert.equal(descriptors.demoNotifierID, "cleanroomtemplate-activity");
     assert.equal(descriptors.serviceIDs.runtimeCore, "cleanroomtemplate.runtime-core");
     assert.equal(descriptors.serviceLabels.runtimeCore, "Runtime Core");
+    assert.equal(descriptors.serviceIDs.controlPlane, "cleanroomtemplate.control-plane");
+    assert.equal(descriptors.serviceLabels.controlPlane, "Package Control Plane");
     assert.equal(descriptors.serviceLabels.reactUIDemo, "Optional React UI Demo");
     assert.equal(descriptors.preferenceBindingMode, "native");
   });
@@ -48,7 +50,8 @@ describe("Surface Descriptors", () => {
     assert.equal(descriptors.serviceIDs.runtimeCore.includes("runtime-core"), false);
     assert.equal(descriptors.serviceIDs.hostSignals.includes("host-signals"), false);
     assert.equal(descriptors.serviceLabels.runtimeCore, "Service 0");
-    assert.equal(descriptors.serviceLabels.reactUIDemo, "Service 4");
+    assert.equal(descriptors.serviceLabels.controlPlane, "Service 3");
+    assert.equal(descriptors.serviceLabels.reactUIDemo, "Service 5");
     assert.equal(descriptors.preferenceBindingMode, "native");
   });
 

@@ -222,7 +222,8 @@ describe("Package Protection Guided Attack Plan", () => {
     assert.equal(report.tasks[0].candidateId, "encrypted");
     assert.equal(report.tasks[0].kind, "collect-single-pass-automation-evidence");
     assert.ok(report.tasks[0].commands.includes("npm run package:protection:webcrack -- --variant encrypted --channel stable"));
-    assert.ok(report.tasks[0].commands.includes("npm run package:protection:score:llm -- --variant encrypted --channel stable --llm \"<rating>\""));
+    assert.ok(report.tasks[0].commands.includes("npm run package:protection:opencode -- --variant encrypted --channel stable"));
+    assert.ok(report.tasks[0].commands.includes("npm run package:protection:opencode:score -- --variant encrypted --channel stable"));
     assert.equal(report.tasks[1].kind, "collect-guided-a2-m3-evidence");
     assert.ok(report.tasks[1].commands[0].includes("--attacker-tier A2 --ai-tier M3"));
     assert.equal(report.tasks[2].candidateId, "shielded-pref-bridge");
@@ -597,7 +598,8 @@ describe("Package Protection Guided Attack Plan", () => {
     assert.equal(report.tasks[0].kind, "collect-experimental-llm-symmetry-evidence");
     assert.equal(report.tasks[0].candidateId, "shielded-surface-scrub");
     assert.equal(report.tasks[0].reviewRank, 1);
-    assert.ok(report.tasks[0].commands.includes('npm run package:protection:score:llm -- --variant shielded-surface-scrub --channel stable --llm "<rating>"'));
+    assert.ok(report.tasks[0].commands.includes("npm run package:protection:opencode -- --variant shielded-surface-scrub --channel stable"));
+    assert.ok(report.tasks[0].commands.includes("npm run package:protection:opencode:score -- --variant shielded-surface-scrub --channel stable"));
   });
 
   it("should persist guided attack plan artifacts", async () => {

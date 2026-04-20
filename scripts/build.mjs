@@ -49,6 +49,11 @@ export const BUILD_PREFERENCE_BINDING_MODE_BRIDGE = "bridge";
 export const BUILD_STATIC_SURFACE_MODE_ENV = "CLEANROOM_BUILD_STATIC_SURFACE_MODE";
 export const BUILD_STATIC_SURFACE_MODE_STANDARD = "standard";
 export const BUILD_STATIC_SURFACE_MODE_SCRUB = "scrub";
+export const BUILD_ROUTE4_LEGACY_ENABLED_ENV = "CLEANROOM_BUILD_ROUTE4_LEGACY_ENABLED";
+export const ROUTE4_LEGACY_ENDPOINT_ENV = "CLEANROOM_ROUTE4_LEGACY_ENDPOINT";
+export const ROUTE4_LEGACY_SECRET_ENV = "CLEANROOM_ROUTE4_LEGACY_SECRET";
+export const ROUTE4_LEGACY_IDENTITY_KIND_ENV = "CLEANROOM_ROUTE4_IDENTITY_KIND";
+export const ROUTE4_LEGACY_CACHE_TTL_MS_ENV = "CLEANROOM_ROUTE4_LEGACY_CACHE_TTL_MS";
 
 function toPosix(filePath) {
   return filePath.split(path.sep).join("/");
@@ -80,6 +85,46 @@ export function resolveBuildStaticSurfaceMode(env = process.env) {
   return rawMode === BUILD_STATIC_SURFACE_MODE_SCRUB
     ? BUILD_STATIC_SURFACE_MODE_SCRUB
     : BUILD_STATIC_SURFACE_MODE_STANDARD;
+}
+
+function normalizeBuildString(value) {
+  const normalized = String(value || "").trim();
+  return normalized || null;
+}
+
+function normalizeBuildNumber(value, fallback, { min = 0 } = {}) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.max(min, numeric) : fallback;
+}
+
+export function resolveBuildRoute4LegacyConfig(env = process.env) {
+  const enabled = String(env?.[BUILD_ROUTE4_LEGACY_ENABLED_ENV] || "").trim() === "1";
+  if (!enabled) {
+    return null;
+  }
+
+  return {
+    enabled: true,
+    endpoint: normalizeBuildString(env?.[ROUTE4_LEGACY_ENDPOINT_ENV]),
+    secret: normalizeBuildString(env?.[ROUTE4_LEGACY_SECRET_ENV]),
+    identityKind: normalizeBuildString(env?.[ROUTE4_LEGACY_IDENTITY_KIND_ENV]) || "zotero-user-id",
+    cacheTTLMS: normalizeBuildNumber(env?.[ROUTE4_LEGACY_CACHE_TTL_MS_ENV], 86400000, { min: 1 }),
+  };
+}
+
+function attachRoute4LegacyConfig(config, route4LegacyConfig = null) {
+  if (!route4LegacyConfig) {
+    return config;
+  }
+  return {
+    ...config,
+    packageProtectionControlPlane: {
+      ...(config.packageProtectionControlPlane && typeof config.packageProtectionControlPlane === "object"
+        ? config.packageProtectionControlPlane
+        : {}),
+      route4Legacy: route4LegacyConfig,
+    },
+  };
 }
 
 export function createBundleModuleId(filePath, srcRootPath, mode = BUILD_MODULE_ID_MODE_PATH) {
@@ -794,14 +839,15 @@ export async function main() {
       });
     }
 
-    const config = await readJSONFile(configPath, {
+    const baseConfig = await readJSONFile(configPath, {
       missingCategory: "environment",
       invalidCategory: "validation",
       missingStage: "read-config",
       invalidStage: "read-config",
       label: "config/addon.config.json",
     });
-    validateBuildConfig(config, configPath);
+    validateBuildConfig(baseConfig, configPath);
+    const config = attachRoute4LegacyConfig(baseConfig, resolveBuildRoute4LegacyConfig(process.env));
     let optionalBundleRegistry = null;
     try {
       optionalBundleRegistry = loadOptionalBundleRegistry(projectRoot).registry;

@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it, assert } from "./test-framework.js";
@@ -152,6 +153,73 @@ function computeExpectedUnlockDerivation({
   };
 }
 
+function base64UTF8(value) {
+  return Buffer.from(String(value || ""), "utf-8").toString("base64");
+}
+
+function hmacMD5(value, key) {
+  return crypto.createHmac("md5", key).update(String(value || ""), "utf-8").digest("hex");
+}
+
+function buildLegacyHostBindingInput(hostBinding = null) {
+  const normalizedHostBinding = normalizeUnlockHostBinding(hostBinding);
+  return [
+    `signalVersion=${Number(normalizedHostBinding.signalVersion || 1)}`,
+    `profileHash=${normalizedHostBinding.profileHash || "-"}`,
+    `schemaBucket=${normalizedHostBinding.schemaBucket || "-"}`,
+    `zoteroVersionBucket=${normalizedHostBinding.zoteroVersionBucket || "-"}`,
+    `profileBasenameBucket=${normalizedHostBinding.profileBasenameBucket || "-"}`,
+    `dataDirHash=${normalizedHostBinding.dataDirHash || "-"}`,
+    `dbAvailable=${normalizedHostBinding.dbAvailable ? "1" : "0"}`,
+    `noncePresent=${normalizedHostBinding.noncePresent ? "1" : "0"}`,
+    `nonceMaterial=${buildUnlockNonceMaterial(normalizedHostBinding)}`,
+  ].join("\n");
+}
+
+function computeExpectedLegacyEntitlement({
+  identityValue = "42",
+  identityKind = "zotero-user-id",
+  legacySecret = "legacy-secret",
+  hostBinding = null,
+  responsePayload = null,
+  seed = 0x811c9dc5,
+} = {}) {
+  const encodedSecret = base64UTF8(legacySecret);
+  const serial = hmacMD5(identityValue, encodedSecret);
+  const responseToken = hmacMD5(base64UTF8(identityValue), encodedSecret);
+  const hostBindingDigest = computeExpectedDigest(`legacy-host\n${buildLegacyHostBindingInput(hostBinding)}`, seed);
+  const canonicalInput = [
+    "derivationVersion=legacy-entitlement-v0",
+    "protocol=relationgraph-hmac-md5-link",
+    `identityKind=${identityKind}`,
+    `identityValue=${identityValue}`,
+    `serial=${serial}`,
+    `hostBindingDigest=${hostBindingDigest.digestHex}`,
+  ].join("\n");
+  const requestDigest = computeExpectedDigest(`legacy-request\n${canonicalInput}`, hostBindingDigest.digestUint32);
+  const compactGate = computeExpectedDigest(`legacy-compact\n${requestDigest.digestHex}\n${responseToken}`, requestDigest.digestUint32);
+  const observedToken = responsePayload && typeof responsePayload === "object"
+    ? responsePayload.link || responsePayload.value || responsePayload.result || responsePayload.data || null
+    : responsePayload;
+  const gateSatisfied = observedToken === responseToken;
+  const validationDigest = computeExpectedDigest([
+    "legacy-response",
+    `cacheFingerprint=lg0-${requestDigest.digestHex}-${hostBindingDigest.digestHex}`,
+    `gate=${gateSatisfied ? "1" : "0"}`,
+    `responseTokenPresent=${observedToken ? "1" : "0"}`,
+  ].join("\n"), Number.parseInt(compactGate.digestHex, 16) >>> 0);
+  return {
+    serial,
+    responseToken,
+    cacheFingerprint: `lg0-${requestDigest.digestHex}-${hostBindingDigest.digestHex}`,
+    hostBindingDigestHex: hostBindingDigest.digestHex,
+    requestDigestHex: requestDigest.digestHex,
+    compactGateHex: compactGate.digestHex,
+    gateSatisfied,
+    validationDigestHex: validationDigest.digestHex,
+  };
+}
+
 function assertTimingSnapshot(timing, label) {
   assert.equal(typeof timing?.initDurationMs, "number", `${label}.initDurationMs should be numeric`);
   assert.equal(typeof timing?.invokeDurationMs, "number", `${label}.invokeDurationMs should be numeric`);
@@ -258,6 +326,79 @@ class FakeProbeWorker {
               stage2DigestHex: expected.stage2Digest.digestHex,
               unlockTokenUint32: expected.unlockToken.digestUint32,
               unlockTokenHex: expected.unlockToken.digestHex,
+              wasmURL: chromeWasmProbeURL,
+              workerURL: this.url,
+              bytesLength: wasmProbeBytesLength,
+              exportNames: EXPECTED_WASM_EXPORTS,
+            },
+          },
+        });
+        return;
+      }
+
+      if (message.type === "LEGACY_ENTITLEMENT_REQUEST") {
+        const expected = computeExpectedLegacyEntitlement({
+          identityKind: message.payload?.identityKind,
+          identityValue: message.payload?.identityValue,
+          legacySecret: message.payload?.legacySecret,
+          hostBinding: message.payload?.hostBinding,
+          seed: message.payload?.seed === null || message.payload?.seed === undefined
+            ? 0x811c9dc5
+            : Number(message.payload.seed),
+        });
+        this.onmessage?.({
+          data: {
+            type: "LEGACY_ENTITLEMENT_REQUEST_RESULT",
+            requestID: message.requestID,
+            ok: true,
+            payload: {
+              mode: "legacy-backend-v0",
+              protocol: "relationgraph-hmac-md5-link",
+              derivationVersion: "legacy-entitlement-v0",
+              requestFields: {
+                username: String(message.payload?.identityValue || ""),
+                serial: expected.serial,
+              },
+              cacheFingerprint: expected.cacheFingerprint,
+              hostBindingDigest: expected.hostBindingDigestHex,
+              requestDigestHex: expected.requestDigestHex,
+              compactGateHex: expected.compactGateHex,
+              wasmURL: chromeWasmProbeURL,
+              workerURL: this.url,
+              bytesLength: wasmProbeBytesLength,
+              exportNames: EXPECTED_WASM_EXPORTS,
+            },
+          },
+        });
+        return;
+      }
+
+      if (message.type === "LEGACY_ENTITLEMENT_RESPONSE") {
+        const expected = computeExpectedLegacyEntitlement({
+          identityKind: message.payload?.identityKind,
+          identityValue: message.payload?.identityValue,
+          legacySecret: message.payload?.legacySecret,
+          hostBinding: message.payload?.hostBinding,
+          responsePayload: message.payload?.responsePayload,
+          seed: message.payload?.seed === null || message.payload?.seed === undefined
+            ? 0x811c9dc5
+            : Number(message.payload.seed),
+        });
+        this.onmessage?.({
+          data: {
+            type: "LEGACY_ENTITLEMENT_RESPONSE_RESULT",
+            requestID: message.requestID,
+            ok: true,
+            payload: {
+              mode: "legacy-backend-v0",
+              protocol: "relationgraph-hmac-md5-link",
+              derivationVersion: "legacy-entitlement-v0",
+              gateSatisfied: expected.gateSatisfied,
+              compactGateHex: expected.compactGateHex,
+              validationDigestHex: expected.validationDigestHex,
+              cacheFingerprint: expected.cacheFingerprint,
+              hostBindingDigest: expected.hostBindingDigestHex,
+              failureKind: expected.gateSatisfied ? null : "gate-mismatch",
               wasmURL: chromeWasmProbeURL,
               workerURL: this.url,
               bytesLength: wasmProbeBytesLength,
@@ -545,5 +686,113 @@ describe("Wasm Kernel Probe", () => {
     assertTimingSnapshot(result.mainThread.timing, "mainThread.timing");
     assertTimingSnapshot(result.worker.timing, "worker.timing");
     assertTimingSnapshot(result.timingSummary, "timingSummary");
+  });
+
+  it("should prepare legacy entitlement request fields on the main thread", async () => {
+    const probe = createWasmKernelProbe({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+      rootURI: "jar:file:///tmp/cleanroom.xpi!/",
+      fetchImpl: async () => {
+        return {
+          ok: true,
+          async arrayBuffer() {
+            return toArrayBuffer(wasmProbeBytes);
+          },
+        };
+      },
+      WorkerCtor: FakeProbeWorker,
+    });
+    const hostBinding = {
+      profileHash: "sha256:profile-route4",
+      schemaBucket: "120-129",
+      zoteroVersionBucket: "9.x",
+      dbAvailable: true,
+      noncePresent: true,
+      nonceSource: "existing",
+      nonceHash: "sha256:nonce-route4",
+    };
+    const expected = computeExpectedLegacyEntitlement({
+      identityValue: "42",
+      legacySecret: "legacy-secret",
+      hostBinding,
+    });
+
+    const result = await probe.prepareLegacyEntitlementRequest({
+      mode: "main-thread",
+      identityKind: "zotero-user-id",
+      identityValue: "42",
+      legacySecret: "legacy-secret",
+      hostBinding,
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.requestFields.username, "42");
+    assert.equal(result.requestFields.serial, expected.serial);
+    assert.equal(result.cacheFingerprint, expected.cacheFingerprint);
+    assert.equal(result.hostBindingDigest, expected.hostBindingDigestHex);
+    assert.equal(result.compactGateHex, expected.compactGateHex);
+    assertTimingSnapshot(result.timing, "legacyRequest.timing");
+  });
+
+  it("should cross-check legacy entitlement response evaluation across transports", async () => {
+    const probe = createWasmKernelProbe({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+      rootURI: "jar:file:///tmp/cleanroom.xpi!/",
+      fetchImpl: async () => {
+        return {
+          ok: true,
+          async arrayBuffer() {
+            return toArrayBuffer(wasmProbeBytes);
+          },
+        };
+      },
+      WorkerCtor: FakeProbeWorker,
+    });
+    const hostBinding = {
+      profileHash: "sha256:profile-route4",
+      schemaBucket: "120-129",
+      zoteroVersionBucket: "9.x",
+      dbAvailable: true,
+      noncePresent: true,
+      nonceSource: "existing",
+      nonceHash: "sha256:nonce-route4",
+    };
+    const requestExpected = computeExpectedLegacyEntitlement({
+      identityValue: "42",
+      legacySecret: "legacy-secret",
+      hostBinding,
+    });
+    const responsePayload = {
+      link: requestExpected.responseToken,
+    };
+    const expected = computeExpectedLegacyEntitlement({
+      identityValue: "42",
+      legacySecret: "legacy-secret",
+      hostBinding,
+      responsePayload,
+    });
+    const result = await probe.evaluateLegacyEntitlementResponse({
+      mode: "both",
+      identityKind: "zotero-user-id",
+      identityValue: "42",
+      legacySecret: "legacy-secret",
+      hostBinding,
+      responsePayload,
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.consistentAcrossTransports, true);
+    assert.equal(result.mainThread.gateSatisfied, true);
+    assert.equal(result.worker.gateSatisfied, true);
+    assert.equal(result.mainThread.validationDigestHex, expected.validationDigestHex);
+    assert.equal(result.worker.validationDigestHex, expected.validationDigestHex);
+    assert.equal(result.mainThread.compactGateHex, expected.compactGateHex);
+    assert.equal(result.worker.workerURL, chromeWasmProbeWorkerURL);
+    assertTimingSnapshot(result.mainThread.timing, "legacyEval.mainThread.timing");
+    assertTimingSnapshot(result.worker.timing, "legacyEval.worker.timing");
   });
 });

@@ -10,6 +10,9 @@ import {
   resolveWasmAssetURL,
 } from "./wasm-loader.js";
 import { createWasmWorkerController } from "./wasm-worker.js";
+import { createEntitlementIdentityProvider } from "./entitlement-identity-provider.js";
+import { createEntitlementLegacyAdapter } from "./entitlement-legacy-adapter.js";
+import { createEntitlementControlPlane } from "./entitlement-control-plane.js";
 
 export { createServiceRegistry };
 export { createFileStateStore };
@@ -22,3 +25,6 @@ export { createWasmWorkerController };
 export { fetchWasmBytes };
 export { instantiateWasmModule };
 export { resolveWasmAssetURL };
+export { createEntitlementIdentityProvider };
+export { createEntitlementLegacyAdapter };
+export { createEntitlementControlPlane };

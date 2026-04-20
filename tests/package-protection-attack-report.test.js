@@ -423,6 +423,100 @@ describe("Package Protection Attack Report", () => {
     assert.equal(report.candidates[0].recommendedAction, "collect-a2-m3-guided-evidence");
   });
 
+  it("should include control candidates in the attack report without affecting the main verdict", () => {
+    const report = summarizePackageProtectionAttackReport({
+      registry: {
+        schemaVersion: 1,
+        candidates: [
+          {
+            id: "plain",
+            class: "control",
+            stage: "stage0",
+            executionMode: "buildable-xpi",
+            evaluationKind: "variant",
+            variant: "plain",
+            channel: "stable",
+            artifactCoverage: ["smoke", "perf", "anchor-audit"],
+            promotionGate: "control-only",
+            status: "control",
+            summary: "plain control",
+          },
+          {
+            id: "shielded",
+            class: "current",
+            stage: "stage0",
+            executionMode: "buildable-xpi",
+            evaluationKind: "variant",
+            variant: "shielded",
+            channel: "stable",
+            artifactCoverage: ["smoke", "webcrack", "guided-attack"],
+            promotionGate: "keep-current-shielded",
+            status: "current-primary",
+            summary: "shielded current",
+          },
+        ],
+      },
+      smokeAggregate: {
+        reports: [
+          buildSmokeReport({
+            variant: "plain",
+            webcrackInitialResult: "parse-fail / only-loader",
+            llmSinglePassResult: "readable-module-recovery",
+          }),
+          buildSmokeReport({
+            variant: "shielded",
+            webcrackInitialResult: "parse-fail / only-loader",
+            llmSinglePassResult: "high-level-architecture",
+          }),
+        ],
+      },
+      guidedAggregateReport: {
+        reports: [
+          {
+            generatedAt: "2026-04-18T01:00:00.000Z",
+            variant: "shielded",
+            channel: "stable",
+            guidedAttack: {
+              rating: "high-level-architecture",
+              resultTier: "R1",
+              attackerTier: "A2",
+              aiTier: "M3",
+              attackMethod: "static+reference",
+              timeBucket: "30-120m",
+              roundMode: "multi-round",
+            },
+            comparison: {
+              relation: "same-as-single-pass-llm",
+            },
+            nextAction: "keep-current-shielded",
+          },
+        ],
+      },
+      webcrackReports: {
+        "plain:stable": {
+          suggestedWebcrackRating: "parse-fail / only-loader",
+          summary: "loader only",
+        },
+        "shielded:stable": {
+          suggestedWebcrackRating: "parse-fail / only-loader",
+          summary: "loader only",
+        },
+      },
+    });
+
+    assert.equal(report.status, "passed");
+    assert.equal(report.nextAction, "keep-current-shielded");
+
+    const plain = report.candidates.find((candidate) => candidate.id === "plain");
+    assert.ok(plain);
+    assert.equal(plain.class, "control");
+    assert.equal(plain.profileCoverage.singlePassAutomation.complete, true);
+    assert.equal(plain.profileCoverage.singlePassAutomation.rating, "readable-module-recovery");
+    assert.equal(plain.attack.webcrackRating, "parse-fail / only-loader");
+    assert.equal(plain.attack.llmSinglePassRating, "readable-module-recovery");
+    assert.equal(plain.recommendedAction, "control-only");
+  });
+
   it("should persist attack report artifacts", async () => {
     const projectRootPath = fs.mkdtempSync(path.join(os.tmpdir(), "package-protection-attack-"));
     try {

@@ -605,6 +605,37 @@ const HOST_ACTION_CATALOG = Object.freeze([
     executable: true,
   },
   {
+    id: HOST_ACTION_IDS.runtimeResolveLegacyEntitlementGate,
+    label: "Resolve Legacy Entitlement Gate",
+    status: HOST_ACTION_STATUSES.PROBE_ONLY,
+    category: "runtime",
+    summary: "Resolve the advisory-only route4 legacy control-plane gate through the configured adapter, cache, HTTP bridge, and Wasm micro-kernel without changing any user-visible surface.",
+    authoritativeSource: [
+      {
+        file: "docs/PACKAGE_PROTECTION_ROUTE4_LEGACY_BACKEND_PLAN.md",
+        anchor: "v0 legacy-backend quick apply",
+      },
+      {
+        file: "src/services/entitlement-control-plane.js",
+        anchor: "createEntitlementControlPlane()",
+      },
+    ],
+    preconditions: [
+      "The route4 legacy control plane is present in the current package variant.",
+      "The configured adapter can prepare request fields and evaluate the response through the Wasm micro-kernel.",
+      "Network or cache failures downgrade to diagnostics instead of blocking startup.",
+    ],
+    executionEntry: "entitlementControlPlane.resolve()",
+    readinessAssertions: [
+      "The host action returns a sanitized controlPlane summary.",
+      "No endpoint, secret, or raw response is echoed in observed state.",
+      "The result is advisory-only and does not bind preference, menu, reader, pane, or bootstrap behavior.",
+    ],
+    evidenceTargets: [],
+    ownerModules: HOST_ACTION_OWNER_MODULES.wasmProbe,
+    executable: true,
+  },
+  {
     id: HOST_ACTION_IDS.windowOpenReactDemo,
     label: "Open React Demo Window",
     status: HOST_ACTION_STATUSES.READY,

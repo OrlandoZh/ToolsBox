@@ -101,6 +101,14 @@ describe("Package Protection Manual Score", () => {
     assert.equal(options.channel, "stable");
     assert.equal(options.webcrack, "high-level-architecture");
     assert.equal(options.llm, "parse-fail / only-loader");
+
+    const route4Options = parsePackageProtectionManualScoreArgs([
+      "--variant", "wasm-entitlement-legacy",
+      "--channel", "stable",
+      "--webcrack", "high-level-architecture",
+      "--llm", "high-level-architecture",
+    ]);
+    assert.equal(route4Options.variant, "shielded-surface-scrub-wasm-entitlement-legacy");
   });
 
   it("should reject invalid ratings and missing fields", () => {

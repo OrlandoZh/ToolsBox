@@ -580,6 +580,27 @@ describe("Toolchain Scripts", () => {
       CLEANROOM_BUILD_PREFERENCE_BINDING_MODE: "bridge",
       CLEANROOM_BUILD_STATIC_SURFACE_MODE: "scrub",
     });
+    assert.deepEqual(resolvePackageBuildEnv(
+      { surfaceScrubWasmEntitlementLegacy: true, surfaceScrub: true, prefBridge: true, outputSuffix: "shielded-surface-scrub-wasm-entitlement-legacy" },
+      {
+        CLEANROOM_ROUTE4_LEGACY_ENDPOINT: "https://example.invalid/legacy",
+        CLEANROOM_ROUTE4_LEGACY_SECRET: "legacy-secret",
+      },
+    ), {
+      CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
+      CLEANROOM_BUILD_SEMANTIC_SCRUB: "protected",
+      CLEANROOM_BUILD_PREFERENCE_BINDING_MODE: "bridge",
+      CLEANROOM_BUILD_STATIC_SURFACE_MODE: "scrub",
+      CLEANROOM_BUILD_ROUTE4_LEGACY_ENABLED: "1",
+      CLEANROOM_ROUTE4_LEGACY_ENDPOINT: "https://example.invalid/legacy",
+      CLEANROOM_ROUTE4_LEGACY_SECRET: "legacy-secret",
+      CLEANROOM_ROUTE4_IDENTITY_KIND: "zotero-user-id",
+      CLEANROOM_ROUTE4_LEGACY_CACHE_TTL_MS: "86400000",
+    });
+    assert.throws(() => resolvePackageBuildEnv(
+      { surfaceScrubWasmEntitlementLegacy: true, surfaceScrub: true, prefBridge: true, outputSuffix: "shielded-surface-scrub-wasm-entitlement-legacy" },
+      {},
+    ));
 
     assert.deepEqual(resolvePackageZipExcludePatterns({}), []);
     assert.deepEqual(resolvePackageZipExcludePatterns({ encryptBundle: true }), ["build-report.json"]);
@@ -590,6 +611,7 @@ describe("Toolchain Scripts", () => {
     assert.deepEqual(resolvePackageZipExcludePatterns({ surfaceScrub: true, outputSuffix: "shielded-surface-scrub" }), ["build-report.json"]);
     assert.deepEqual(resolvePackageZipExcludePatterns({ surfaceScrubWasmDigest: true, outputSuffix: "shielded-surface-scrub-wasm-digest" }), ["build-report.json"]);
     assert.deepEqual(resolvePackageZipExcludePatterns({ surfaceScrubWasmStage2Derive: true, outputSuffix: "shielded-surface-scrub-wasm-stage2-derive" }), ["build-report.json"]);
+    assert.deepEqual(resolvePackageZipExcludePatterns({ surfaceScrubWasmEntitlementLegacy: true, outputSuffix: "shielded-surface-scrub-wasm-entitlement-legacy" }), ["build-report.json"]);
 
     assert.deepEqual(buildPackageZipArgs("/tmp/demo.xpi", {}), ["-r", "/tmp/demo.xpi", "."]);
     assert.deepEqual(
@@ -646,6 +668,14 @@ describe("Toolchain Scripts", () => {
     assert.equal(wasmStage2DeriveArgs.surfaceScrub, true);
     assert.equal(wasmStage2DeriveArgs.surfaceScrubWasmStage2Derive, true);
     assert.equal(wasmStage2DeriveArgs.outputSuffix, "shielded-surface-scrub-wasm-stage2-derive");
+
+    const wasmEntitlementLegacyArgs = parsePackageArgs(["--surface-scrub-wasm-entitlement-legacy", "--skip-release-metadata"]);
+    assert.equal(wasmEntitlementLegacyArgs.encryptBundle, true);
+    assert.equal(wasmEntitlementLegacyArgs.shieldBundle, true);
+    assert.equal(wasmEntitlementLegacyArgs.prefBridge, true);
+    assert.equal(wasmEntitlementLegacyArgs.surfaceScrub, true);
+    assert.equal(wasmEntitlementLegacyArgs.surfaceScrubWasmEntitlementLegacy, true);
+    assert.equal(wasmEntitlementLegacyArgs.outputSuffix, "shielded-surface-scrub-wasm-entitlement-legacy");
 
     assert.deepEqual(resolvePackageJSConfuserToolOptions({
       jsConfuserToolPath: "/tmp/js-confuser",
@@ -981,6 +1011,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(packageJSON.scripts["package:shielded:surface-scrub"], "node scripts/package.mjs --surface-scrub --skip-release-metadata");
     assert.equal(packageJSON.scripts["package:shielded:surface-scrub:wasm:digest"], "node scripts/package.mjs --surface-scrub-wasm-digest --skip-release-metadata");
     assert.equal(packageJSON.scripts["package:shielded:surface-scrub:wasm:stage2:derive"], "node scripts/package.mjs --surface-scrub-wasm-stage2-derive --skip-release-metadata");
+    assert.equal(packageJSON.scripts["package:shielded:surface-scrub:wasm:entitlement:legacy"], "node scripts/package.mjs --surface-scrub-wasm-entitlement-legacy --skip-release-metadata");
     assert.equal(packageJSON.scripts["package:protection:smoke"], "node scripts/package-protection-smoke.mjs");
     assert.equal(packageJSON.scripts["package:protection:smoke:plain"], "node scripts/package-protection-smoke.mjs --variant plain");
     assert.equal(packageJSON.scripts["package:protection:smoke:encrypted"], "node scripts/package-protection-smoke.mjs --variant encrypted");
@@ -990,6 +1021,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(packageJSON.scripts["package:protection:smoke:shielded:pref-bridge"], "node scripts/package-protection-smoke.mjs --variant shielded-pref-bridge");
     assert.equal(packageJSON.scripts["package:protection:smoke:shielded:surface-scrub"], "node scripts/package-protection-smoke.mjs --variant shielded-surface-scrub");
     assert.equal(packageJSON.scripts["package:protection:smoke:shielded:surface-scrub:wasm:stage2:derive"], "node scripts/package-protection-smoke.mjs --variant shielded-surface-scrub-wasm-stage2-derive");
+    assert.equal(packageJSON.scripts["package:protection:smoke:shielded:surface-scrub:wasm:entitlement:legacy"], "node scripts/package-protection-smoke.mjs --variant shielded-surface-scrub-wasm-entitlement-legacy");
     assert.equal(packageJSON.scripts["package:protection:perf"], "node scripts/package-protection-performance-report.mjs");
     assert.equal(packageJSON.scripts["package:protection:webcrack"], "node scripts/package-protection-webcrack-audit.mjs");
     assert.equal(packageJSON.scripts["package:protection:webcrack:shielded"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded");
@@ -998,6 +1030,8 @@ describe("Toolchain Scripts", () => {
     assert.equal(packageJSON.scripts["package:protection:webcrack:shielded:pref-bridge"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded-pref-bridge");
     assert.equal(packageJSON.scripts["package:protection:webcrack:shielded:surface-scrub"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded-surface-scrub");
     assert.equal(packageJSON.scripts["package:protection:webcrack:score"], "node scripts/package-protection-webcrack-score.mjs");
+    assert.equal(packageJSON.scripts["package:protection:opencode"], "node scripts/package-protection-opencode-analysis.mjs");
+    assert.equal(packageJSON.scripts["package:protection:opencode:score"], "node scripts/package-protection-opencode-score.mjs");
     assert.equal(packageJSON.scripts["package:protection:audit"], "node scripts/package-protection-anchor-audit.mjs");
     assert.equal(packageJSON.scripts["package:protection:audit:descriptor-bind"], "node scripts/package-protection-anchor-audit.mjs --include-descriptor-bind");
     assert.equal(packageJSON.scripts["package:protection:audit:jsconfuser:string"], "node scripts/package-protection-anchor-audit.mjs --include-jsconfuser-string");
@@ -1015,6 +1049,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(packageJSON.scripts["package:protection:compare:pref-bridge"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-pref-bridge");
     assert.equal(packageJSON.scripts["package:protection:compare:surface-scrub"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-surface-scrub");
     assert.equal(packageJSON.scripts["package:protection:compare:surface-scrub:wasm:stage2:derive"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-surface-scrub-wasm-stage2-derive");
+    assert.equal(packageJSON.scripts["package:protection:compare:surface-scrub:wasm:entitlement:legacy"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-surface-scrub-wasm-entitlement-legacy");
     assert.equal(packageJSON.scripts["package:protection:jsconfuser:bootstrap"], "node scripts/package-protection-jsconfuser-bootstrap.mjs");
     assert.equal(packageJSON.scripts["package:protection:jsconfuser:preflight"], "node scripts/package-protection-jsconfuser-preflight.mjs");
     assert.equal(packageJSON.scripts["package:protection:jsconfuser:string:preflight"], "node scripts/package-protection-jsconfuser-preflight.mjs --profile targeted-string-concealing");
@@ -1334,6 +1369,8 @@ describe("Toolchain Scripts", () => {
     assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "package-protection-smoke.mjs")));
     assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "package-protection-webcrack-audit.mjs")));
     assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "package-protection-webcrack-score.mjs")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "package-protection-opencode-analysis.mjs")));
+    assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "package-protection-opencode-score.mjs")));
     assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "package-protection-manual-score.mjs")));
     assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "package-protection-verdict.mjs")));
     assert.ok(fs.existsSync(path.join(exportRoot, "scripts", "package-protection-wasm-admission.mjs")));
@@ -1371,6 +1408,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(exportPackage.scripts["package:shielded:surface-scrub"], "node scripts/package.mjs --surface-scrub --skip-release-metadata");
     assert.equal(exportPackage.scripts["package:shielded:surface-scrub:wasm:digest"], "node scripts/package.mjs --surface-scrub-wasm-digest --skip-release-metadata");
     assert.equal(exportPackage.scripts["package:shielded:surface-scrub:wasm:stage2:derive"], "node scripts/package.mjs --surface-scrub-wasm-stage2-derive --skip-release-metadata");
+    assert.equal(exportPackage.scripts["package:shielded:surface-scrub:wasm:entitlement:legacy"], "node scripts/package.mjs --surface-scrub-wasm-entitlement-legacy --skip-release-metadata");
     assert.equal(exportPackage.scripts["package:protection:smoke"], "node scripts/package-protection-smoke.mjs");
     assert.equal(exportPackage.scripts["package:protection:smoke:plain"], "node scripts/package-protection-smoke.mjs --variant plain");
     assert.equal(exportPackage.scripts["package:protection:smoke:encrypted"], "node scripts/package-protection-smoke.mjs --variant encrypted");
@@ -1380,6 +1418,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(exportPackage.scripts["package:protection:smoke:shielded:pref-bridge"], "node scripts/package-protection-smoke.mjs --variant shielded-pref-bridge");
     assert.equal(exportPackage.scripts["package:protection:smoke:shielded:surface-scrub"], "node scripts/package-protection-smoke.mjs --variant shielded-surface-scrub");
     assert.equal(exportPackage.scripts["package:protection:smoke:shielded:surface-scrub:wasm:stage2:derive"], "node scripts/package-protection-smoke.mjs --variant shielded-surface-scrub-wasm-stage2-derive");
+    assert.equal(exportPackage.scripts["package:protection:smoke:shielded:surface-scrub:wasm:entitlement:legacy"], "node scripts/package-protection-smoke.mjs --variant shielded-surface-scrub-wasm-entitlement-legacy");
     assert.equal(exportPackage.scripts["package:protection:perf"], "node scripts/package-protection-performance-report.mjs");
     assert.equal(exportPackage.scripts["package:protection:webcrack"], "node scripts/package-protection-webcrack-audit.mjs");
     assert.equal(exportPackage.scripts["package:protection:webcrack:shielded"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded");
@@ -1388,6 +1427,8 @@ describe("Toolchain Scripts", () => {
     assert.equal(exportPackage.scripts["package:protection:webcrack:shielded:pref-bridge"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded-pref-bridge");
     assert.equal(exportPackage.scripts["package:protection:webcrack:shielded:surface-scrub"], "node scripts/package-protection-webcrack-audit.mjs --variant shielded-surface-scrub");
     assert.equal(exportPackage.scripts["package:protection:webcrack:score"], "node scripts/package-protection-webcrack-score.mjs");
+    assert.equal(exportPackage.scripts["package:protection:opencode"], "node scripts/package-protection-opencode-analysis.mjs");
+    assert.equal(exportPackage.scripts["package:protection:opencode:score"], "node scripts/package-protection-opencode-score.mjs");
     assert.equal(exportPackage.scripts["package:protection:audit"], "node scripts/package-protection-anchor-audit.mjs");
     assert.equal(exportPackage.scripts["package:protection:audit:descriptor-bind"], "node scripts/package-protection-anchor-audit.mjs --include-descriptor-bind");
     assert.equal(exportPackage.scripts["package:protection:audit:jsconfuser:string"], "node scripts/package-protection-anchor-audit.mjs --include-jsconfuser-string");
@@ -1405,6 +1446,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(exportPackage.scripts["package:protection:compare:pref-bridge"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-pref-bridge");
     assert.equal(exportPackage.scripts["package:protection:compare:surface-scrub"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-surface-scrub");
     assert.equal(exportPackage.scripts["package:protection:compare:surface-scrub:wasm:stage2:derive"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-surface-scrub-wasm-stage2-derive");
+    assert.equal(exportPackage.scripts["package:protection:compare:surface-scrub:wasm:entitlement:legacy"], "node scripts/package-protection-experiment-compare.mjs --variant shielded-surface-scrub-wasm-entitlement-legacy");
     assert.equal(exportPackage.scripts["package:protection:jsconfuser:bootstrap"], "node scripts/package-protection-jsconfuser-bootstrap.mjs");
     assert.equal(exportPackage.scripts["package:protection:jsconfuser:preflight"], "node scripts/package-protection-jsconfuser-preflight.mjs");
     assert.equal(exportPackage.scripts["package:protection:jsconfuser:string:preflight"], "node scripts/package-protection-jsconfuser-preflight.mjs --profile targeted-string-concealing");
@@ -1458,6 +1500,8 @@ describe("Toolchain Scripts", () => {
     assert.ok(exportReadme.includes("package:protection:webcrack:shielded:pref-bridge"));
     assert.ok(exportReadme.includes("package:protection:webcrack:shielded:surface-scrub"));
     assert.ok(exportReadme.includes("package:protection:webcrack:score"));
+    assert.ok(exportReadme.includes("package:protection:opencode"));
+    assert.ok(exportReadme.includes("package:protection:opencode:score"));
     assert.ok(exportReadme.includes("package:protection:audit"));
     assert.ok(exportReadme.includes("package:protection:audit:descriptor-bind"));
     assert.ok(exportReadme.includes("package:protection:audit:jsconfuser:string"));

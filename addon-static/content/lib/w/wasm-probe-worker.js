@@ -4,6 +4,8 @@
   const DEFAULT_UNLOCK_BUNDLE_SEED = "cleanroom-stage2-shadow-seed-v1";
   const DEFAULT_UNLOCK_OVERLAY_VERSION = "descriptor-overlay-v1";
   const DEFAULT_UNLOCK_DERIVATION_VERSION = "host-unlock-v1-shadow";
+  const DEFAULT_LEGACY_ENTITLEMENT_PROTOCOL = "relationgraph-hmac-md5-link";
+  const DEFAULT_LEGACY_ENTITLEMENT_VERSION = "legacy-entitlement-v0";
   const HOST_UNLOCK_REQUIREMENTS = Object.freeze([
     "profileHash",
     "dbAvailable",
@@ -251,6 +253,228 @@
     ].join("\n");
   }
 
+  function base64EncodeBytes(bytes) {
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let output = "";
+    for (let index = 0; index < bytes.length; index += 3) {
+      const first = bytes[index];
+      const second = index + 1 < bytes.length ? bytes[index + 1] : 0;
+      const third = index + 2 < bytes.length ? bytes[index + 2] : 0;
+      const triple = (first << 16) | (second << 8) | third;
+      output += alphabet[(triple >> 18) & 0x3f];
+      output += alphabet[(triple >> 12) & 0x3f];
+      output += index + 1 < bytes.length ? alphabet[(triple >> 6) & 0x3f] : "=";
+      output += index + 2 < bytes.length ? alphabet[triple & 0x3f] : "=";
+    }
+    return output;
+  }
+
+  function base64EncodeUTF8(text) {
+    return base64EncodeBytes(encodeUTF8(text));
+  }
+
+  function leftRotate32(value, shift) {
+    const uint32 = toUint32(value);
+    return toUint32((uint32 << shift) | (uint32 >>> (32 - shift)));
+  }
+
+  const MD5_SHIFT_AMOUNTS = Object.freeze([
+    7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+    5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+    4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+    6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+  ]);
+  const MD5_TABLE = Object.freeze(Array.from({ length: 64 }, function buildMD5Table(_entry, index) {
+    return toUint32(Math.floor(Math.abs(Math.sin(index + 1)) * 0x100000000));
+  }));
+
+  function md5Bytes(bytes) {
+    const input = bytes instanceof Uint8Array ? bytes : Uint8Array.from(bytes || []);
+    const paddedLength = ((((input.length + 8) >> 6) + 1) << 6);
+    const buffer = new Uint8Array(paddedLength);
+    buffer.set(input);
+    buffer[input.length] = 0x80;
+    const bitLength = BigInt(input.length) * 8n;
+    for (let index = 0; index < 8; index += 1) {
+      buffer[paddedLength - 8 + index] = Number((bitLength >> BigInt(index * 8)) & 0xffn);
+    }
+
+    let a0 = 0x67452301;
+    let b0 = 0xefcdab89;
+    let c0 = 0x98badcfe;
+    let d0 = 0x10325476;
+
+    for (let offset = 0; offset < paddedLength; offset += 64) {
+      const words = [];
+      for (let index = 0; index < 16; index += 1) {
+        const position = offset + index * 4;
+        words[index] = toUint32(
+          buffer[position]
+          | (buffer[position + 1] << 8)
+          | (buffer[position + 2] << 16)
+          | (buffer[position + 3] << 24)
+        );
+      }
+      let a = a0;
+      let b = b0;
+      let c = c0;
+      let d = d0;
+      for (let index = 0; index < 64; index += 1) {
+        let f = 0;
+        let g = 0;
+        if (index < 16) {
+          f = (b & c) | ((~b) & d);
+          g = index;
+        } else if (index < 32) {
+          f = (d & b) | ((~d) & c);
+          g = (5 * index + 1) % 16;
+        } else if (index < 48) {
+          f = b ^ c ^ d;
+          g = (3 * index + 5) % 16;
+        } else {
+          f = c ^ (b | (~d));
+          g = (7 * index) % 16;
+        }
+        const nextD = d;
+        d = c;
+        c = b;
+        b = toUint32(b + leftRotate32(toUint32(a + f + MD5_TABLE[index] + words[g]), MD5_SHIFT_AMOUNTS[index]));
+        a = nextD;
+      }
+      a0 = toUint32(a0 + a);
+      b0 = toUint32(b0 + b);
+      c0 = toUint32(c0 + c);
+      d0 = toUint32(d0 + d);
+    }
+
+    const output = new Uint8Array(16);
+    [a0, b0, c0, d0].forEach(function writeWord(word, index) {
+      const position = index * 4;
+      output[position] = word & 0xff;
+      output[position + 1] = (word >>> 8) & 0xff;
+      output[position + 2] = (word >>> 16) & 0xff;
+      output[position + 3] = (word >>> 24) & 0xff;
+    });
+    return output;
+  }
+
+  function bytesToHex(bytes) {
+    return Array.from(bytes || [], function toHex(byte) {
+      return Number(byte).toString(16).padStart(2, "0");
+    }).join("");
+  }
+
+  function hmacMD5Hex(message, key) {
+    let keyBytes = encodeUTF8(key);
+    if (keyBytes.byteLength > 64) {
+      keyBytes = md5Bytes(keyBytes);
+    }
+    const normalizedKey = new Uint8Array(64);
+    normalizedKey.set(keyBytes);
+    const outer = new Uint8Array(64);
+    const inner = new Uint8Array(64);
+    for (let index = 0; index < 64; index += 1) {
+      outer[index] = normalizedKey[index] ^ 0x5c;
+      inner[index] = normalizedKey[index] ^ 0x36;
+    }
+    const messageBytes = encodeUTF8(message);
+    const innerPayload = new Uint8Array(inner.length + messageBytes.length);
+    innerPayload.set(inner);
+    innerPayload.set(messageBytes, inner.length);
+    const innerDigest = md5Bytes(innerPayload);
+    const outerPayload = new Uint8Array(outer.length + innerDigest.length);
+    outerPayload.set(outer);
+    outerPayload.set(innerDigest, outer.length);
+    return bytesToHex(md5Bytes(outerPayload));
+  }
+
+  function normalizeLegacyProtocol(value) {
+    return normalizeOptionalString(value) || DEFAULT_LEGACY_ENTITLEMENT_PROTOCOL;
+  }
+
+  function buildLegacyHostBindingInput(hostBinding) {
+    const normalizedHostBinding = normalizeUnlockHostBinding(hostBinding);
+    return [
+      `signalVersion=${Number(normalizedHostBinding.signalVersion || 1)}`,
+      `profileHash=${normalizedHostBinding.profileHash || "-"}`,
+      `schemaBucket=${normalizedHostBinding.schemaBucket || "-"}`,
+      `zoteroVersionBucket=${normalizedHostBinding.zoteroVersionBucket || "-"}`,
+      `profileBasenameBucket=${normalizedHostBinding.profileBasenameBucket || "-"}`,
+      `dataDirHash=${normalizedHostBinding.dataDirHash || "-"}`,
+      `dbAvailable=${normalizedHostBinding.dbAvailable ? "1" : "0"}`,
+      `noncePresent=${normalizedHostBinding.noncePresent ? "1" : "0"}`,
+      `nonceMaterial=${buildUnlockNonceMaterial(normalizedHostBinding)}`,
+    ].join("\n");
+  }
+
+  function readLegacyResponseToken(responsePayload) {
+    let payload = responsePayload;
+    if (typeof payload === "string") {
+      try {
+        payload = JSON.parse(payload);
+      } catch {
+        return normalizeOptionalString(payload);
+      }
+    }
+    if (!payload || typeof payload !== "object") {
+      return normalizeOptionalString(payload);
+    }
+    return normalizeOptionalString(payload.link)
+      || normalizeOptionalString(payload.value)
+      || normalizeOptionalString(payload.result)
+      || normalizeOptionalString(payload.data);
+  }
+
+  function computeLegacyRequest(digestExports, payload) {
+    const identityValue = normalizeOptionalString(payload.identityValue);
+    const legacySecret = normalizeOptionalString(payload.legacySecret);
+    if (!identityValue) {
+      throw new Error("legacy entitlement identity is unavailable");
+    }
+    if (!legacySecret) {
+      throw new Error("legacy entitlement secret is unavailable");
+    }
+    const protocol = normalizeLegacyProtocol(payload.protocol);
+    const hostBinding = normalizeUnlockHostBinding(payload.hostBinding);
+    const encodedSecret = base64EncodeUTF8(legacySecret);
+    const serial = hmacMD5Hex(identityValue, encodedSecret);
+    const expectedResponseToken = hmacMD5Hex(base64EncodeUTF8(identityValue), encodedSecret);
+    const hostBindingDigest = computeDigestFromExports(digestExports, {
+      text: `legacy-host\n${buildLegacyHostBindingInput(hostBinding)}`,
+      seed: Object.prototype.hasOwnProperty.call(payload, "seed") ? payload.seed : null,
+    });
+    const canonicalInput = [
+      `derivationVersion=${DEFAULT_LEGACY_ENTITLEMENT_VERSION}`,
+      `protocol=${protocol}`,
+      `identityKind=${normalizeOptionalString(payload.identityKind) || "zotero-user-id"}`,
+      `identityValue=${identityValue}`,
+      `serial=${serial}`,
+      `hostBindingDigest=${hostBindingDigest.digestHex}`,
+    ].join("\n");
+    const requestDigest = computeDigestFromExports(digestExports, {
+      text: `legacy-request\n${canonicalInput}`,
+      seed: hostBindingDigest.digestUint32,
+    });
+    const compactGate = computeDigestFromExports(digestExports, {
+      text: `legacy-compact\n${requestDigest.digestHex}\n${expectedResponseToken}`,
+      seed: requestDigest.digestUint32,
+    });
+    return {
+      mode: "legacy-backend-v0",
+      protocol,
+      derivationVersion: DEFAULT_LEGACY_ENTITLEMENT_VERSION,
+      requestFields: {
+        username: identityValue,
+        serial,
+      },
+      cacheFingerprint: `lg0-${requestDigest.digestHex}-${hostBindingDigest.digestHex}`,
+      hostBindingDigest: hostBindingDigest.digestHex,
+      requestDigestHex: requestDigest.digestHex,
+      compactGateHex: compactGate.digestHex,
+      expectedResponseToken,
+    };
+  }
+
   async function fetchBytesViaXHR(url) {
     const buffer = await new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -434,6 +658,76 @@
     });
   }
 
+  function runLegacyEntitlementRequest(data) {
+    if (!probeState.instance) {
+      throw new Error("worker probe is not initialized");
+    }
+    const digestExports = requireDigestExports();
+    const payload = data && typeof data.payload === "object" ? data.payload : {};
+    const derived = computeLegacyRequest(digestExports, payload);
+
+    scope.postMessage({
+      type: "LEGACY_ENTITLEMENT_REQUEST_RESULT",
+      requestID: data.requestID,
+      ok: true,
+      payload: {
+        mode: derived.mode,
+        protocol: derived.protocol,
+        derivationVersion: derived.derivationVersion,
+        requestFields: derived.requestFields,
+        cacheFingerprint: derived.cacheFingerprint,
+        hostBindingDigest: derived.hostBindingDigest,
+        requestDigestHex: derived.requestDigestHex,
+        compactGateHex: derived.compactGateHex,
+        wasmURL: probeState.wasmURL,
+        workerURL: resolveWorkerURL(),
+        bytesLength: probeState.bytesLength,
+        exportNames: probeState.exportNames,
+      },
+    });
+  }
+
+  function runLegacyEntitlementResponse(data) {
+    if (!probeState.instance) {
+      throw new Error("worker probe is not initialized");
+    }
+    const digestExports = requireDigestExports();
+    const payload = data && typeof data.payload === "object" ? data.payload : {};
+    const prepared = computeLegacyRequest(digestExports, payload);
+    const responseToken = readLegacyResponseToken(payload.responsePayload);
+    const gateSatisfied = Boolean(responseToken && responseToken === prepared.expectedResponseToken);
+    const validationDigest = computeDigestFromExports(digestExports, {
+      text: [
+        "legacy-response",
+        `cacheFingerprint=${prepared.cacheFingerprint}`,
+        `gate=${gateSatisfied ? "1" : "0"}`,
+        `responseTokenPresent=${responseToken ? "1" : "0"}`,
+      ].join("\n"),
+      seed: Number.parseInt(prepared.compactGateHex, 16) >>> 0,
+    });
+
+    scope.postMessage({
+      type: "LEGACY_ENTITLEMENT_RESPONSE_RESULT",
+      requestID: data.requestID,
+      ok: true,
+      payload: {
+        mode: prepared.mode,
+        protocol: prepared.protocol,
+        derivationVersion: prepared.derivationVersion,
+        gateSatisfied,
+        compactGateHex: prepared.compactGateHex,
+        validationDigestHex: validationDigest.digestHex,
+        cacheFingerprint: prepared.cacheFingerprint,
+        hostBindingDigest: prepared.hostBindingDigest,
+        failureKind: gateSatisfied ? null : "gate-mismatch",
+        wasmURL: probeState.wasmURL,
+        workerURL: resolveWorkerURL(),
+        bytesLength: probeState.bytesLength,
+        exportNames: probeState.exportNames,
+      },
+    });
+  }
+
   scope.onmessage = async function onmessage(event) {
     const data = event && typeof event === "object" && "data" in event
       ? event.data
@@ -461,6 +755,16 @@
 
       if (data.type === "UNLOCK") {
         runUnlock(data);
+        return;
+      }
+
+      if (data.type === "LEGACY_ENTITLEMENT_REQUEST") {
+        runLegacyEntitlementRequest(data);
+        return;
+      }
+
+      if (data.type === "LEGACY_ENTITLEMENT_RESPONSE") {
+        runLegacyEntitlementResponse(data);
         return;
       }
 

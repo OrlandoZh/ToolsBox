@@ -293,6 +293,16 @@
 - 服务端签发短时 token / ticket / feature policy
 - 客户端只缓存低频控制面
 - 本地载体优先级遵循 [ROUTE4_LOCAL_STORAGE_DECISION.md](./ROUTE4_LOCAL_STORAGE_DECISION.md)
+- 若当前阶段必须先复用现有后端而不改协议，只允许走 `legacy-backend quick apply` 形态：
+  - 作为显式 optional variant
+  - `default-disabled + manual-only + second-stage only`
+  - 客户端只把 legacy 协议语义、host binding 混合和紧凑 gate 判定收进 Wasm 微内核
+  - 不把整插件启动绑定到远端 gate
+- 长期蓝图仍固定为：
+  - 服务端签发短时 signed ticket
+  - 客户端 Wasm 只保留公钥、验签和 compact gate
+  - 不把共享 secret 长期留在客户端
+- 具体边界见 [PACKAGE_PROTECTION_ROUTE4_LEGACY_BACKEND_PLAN.md](./PACKAGE_PROTECTION_ROUTE4_LEGACY_BACKEND_PLAN.md)
 
 ### Stage 5：Wasm 小内核
 

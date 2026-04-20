@@ -86,6 +86,7 @@ describe("Protected Semantic ID Modules", () => {
     assert.equal(protectedById.get(PLAIN_HOST_ACTION_IDS.runtimeProbeWasmKernel)?.executable, plainById.get(PLAIN_HOST_ACTION_IDS.runtimeProbeWasmKernel)?.executable);
     assert.equal(protectedById.get(PLAIN_HOST_ACTION_IDS.runtimeDeriveWasmKernelDigest)?.executable, plainById.get(PLAIN_HOST_ACTION_IDS.runtimeDeriveWasmKernelDigest)?.executable);
     assert.equal(protectedById.get(PLAIN_HOST_ACTION_IDS.runtimeDeriveWasmKernelUnlockToken)?.executable, plainById.get(PLAIN_HOST_ACTION_IDS.runtimeDeriveWasmKernelUnlockToken)?.executable);
+    assert.equal(protectedById.get(PLAIN_HOST_ACTION_IDS.runtimeResolveLegacyEntitlementGate)?.executable, plainById.get(PLAIN_HOST_ACTION_IDS.runtimeResolveLegacyEntitlementGate)?.executable);
     assert.equal(protectedReactDemo?.requiredBundle, "react-ui");
     assert.equal(Object.prototype.hasOwnProperty.call(protectedById.get(PLAIN_HOST_ACTION_IDS.preferencesOpenPane), "label"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(protectedById.get(PLAIN_HOST_ACTION_IDS.preferencesOpenPane), "summary"), false);
@@ -152,6 +153,7 @@ describe("Protected Semantic ID Modules", () => {
       "runtime.probeWasmKernel",
       "runtime.deriveWasmKernelDigest",
       "runtime.deriveWasmKernelUnlockToken",
+      "runtime.resolveLegacyEntitlementGate",
       "window.openReactDemo",
       "menu.trigger.destructive",
     ].forEach((anchor) => {
@@ -166,6 +168,7 @@ describe("Protected Semantic ID Modules", () => {
       "runtime.probeWasmKernel",
       "runtime.deriveWasmKernelDigest",
       "runtime.deriveWasmKernelUnlockToken",
+      "runtime.resolveLegacyEntitlementGate",
       "window.openReactDemo",
     ].forEach((anchor) => {
       assert.equal(protectedHostActionCatalogSource.includes(anchor), false);

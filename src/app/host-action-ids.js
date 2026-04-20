@@ -18,6 +18,7 @@ export const HOST_ACTION_IDS = Object.freeze({
   runtimeProbeWasmKernel: "runtime.probeWasmKernel",
   runtimeDeriveWasmKernelDigest: "runtime.deriveWasmKernelDigest",
   runtimeDeriveWasmKernelUnlockToken: "runtime.deriveWasmKernelUnlockToken",
+  runtimeResolveLegacyEntitlementGate: "runtime.resolveLegacyEntitlementGate",
   windowOpenReactDemo: "window.openReactDemo",
   dialogModalConfirmation: "dialog.modal.confirmation",
   preferencesHelpLink: "preferences.helpLink",

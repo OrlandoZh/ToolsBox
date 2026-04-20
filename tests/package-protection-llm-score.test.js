@@ -106,6 +106,13 @@ describe("Package Protection LLM Score", () => {
     assert.equal(options.variant, "shielded-jsconfuser-string");
     assert.equal(options.channel, "stable");
     assert.equal(options.llm, "high-level-architecture");
+
+    const route4Options = parsePackageProtectionLLMScoreArgs([
+      "--variant", "wasm-entitlement-legacy",
+      "--channel", "stable",
+      "--llm", "high-level-architecture",
+    ]);
+    assert.equal(route4Options.variant, "shielded-surface-scrub-wasm-entitlement-legacy");
   });
 
   it("should reject invalid ratings and missing fields", () => {

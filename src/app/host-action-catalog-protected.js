@@ -32,6 +32,7 @@ const HOST_ACTION_CATALOG = Object.freeze([
   { id: HOST_ACTION_IDS.runtimeProbeWasmKernel, status: HOST_ACTION_STATUSES.PROBE_ONLY, executable: true },
   { id: HOST_ACTION_IDS.runtimeDeriveWasmKernelDigest, status: HOST_ACTION_STATUSES.PROBE_ONLY, executable: true },
   { id: HOST_ACTION_IDS.runtimeDeriveWasmKernelUnlockToken, status: HOST_ACTION_STATUSES.PROBE_ONLY, executable: true },
+  { id: HOST_ACTION_IDS.runtimeResolveLegacyEntitlementGate, status: HOST_ACTION_STATUSES.PROBE_ONLY, executable: true },
   {
     id: HOST_ACTION_IDS.windowOpenReactDemo,
     status: HOST_ACTION_STATUSES.READY,

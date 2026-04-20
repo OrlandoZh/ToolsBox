@@ -141,7 +141,8 @@ function buildSinglePassCommands({ variant, channel, webcrackMissing, llmMissing
   }
 
   if (llmMissing) {
-    commands.push(`npm run package:protection:score:llm -- --variant ${variant} --channel ${channel} --llm "<rating>"`);
+    commands.push(`npm run package:protection:opencode -- --variant ${variant} --channel ${channel}`);
+    commands.push(`npm run package:protection:opencode:score -- --variant ${variant} --channel ${channel}`);
   }
 
   return commands;
@@ -163,7 +164,8 @@ function buildCompareCommands({ variant, channel }) {
 
 function buildExperimentLLMSymmetryCommands({ variant, channel }) {
   return [
-    `npm run package:protection:score:llm -- --variant ${variant} --channel ${channel} --llm "<rating>"`,
+    `npm run package:protection:opencode -- --variant ${variant} --channel ${channel}`,
+    `npm run package:protection:opencode:score -- --variant ${variant} --channel ${channel}`,
     `npm run package:protection:compare -- --variant ${variant} --channel ${channel}`,
     "npm run package:protection:attack",
     "npm run package:protection:matrix",

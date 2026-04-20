@@ -62,6 +62,18 @@ describe("Package Protection Inner Audit", () => {
     assert.equal(options.channel, "stable");
   });
 
+  it("should accept wasm-entitlement-legacy as an inner-audit experiment variant alias", () => {
+    const options = parsePackageProtectionInnerAuditArgs([
+      "--variant",
+      "wasm-entitlement-legacy",
+      "--channel",
+      "stable",
+    ]);
+
+    assert.equal(options.variant, "shielded-surface-scrub-wasm-entitlement-legacy");
+    assert.equal(options.channel, "stable");
+  });
+
   it("should capture decrypted inner source and descriptor overlay without executing payload", async () => {
     const loaderSource = buildLoaderSource(`
 globalThis.__INNER_EXECUTED__ = true;

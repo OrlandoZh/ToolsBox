@@ -104,6 +104,12 @@ describe("Package Protection Performance Report", () => {
       "wasm-stage2-derive",
     ]);
     assert.deepEqual(wasmStage2Derive.variants, ["shielded-surface-scrub-wasm-stage2-derive"]);
+
+    const wasmEntitlementLegacy = parsePackageProtectionPerformanceArgs([
+      "--variant",
+      "wasm-entitlement-legacy",
+    ]);
+    assert.deepEqual(wasmEntitlementLegacy.variants, ["shielded-surface-scrub-wasm-entitlement-legacy"]);
   });
 
   it("should classify experimental timing using duration for UX and pipeline for protection cost", () => {

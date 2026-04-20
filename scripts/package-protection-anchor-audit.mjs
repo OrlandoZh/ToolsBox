@@ -50,6 +50,7 @@ export const PACKAGE_PROTECTION_AUDIT_EXPERIMENTAL_VARIANTS = Object.freeze([
   "surface-scrub",
   "surface-scrub-wasm-digest",
   "surface-scrub-wasm-stage2-derive",
+  "surface-scrub-wasm-entitlement-legacy",
 ]);
 
 export const PACKAGE_PROTECTION_AUDIT_VARIANTS = Object.freeze([
@@ -469,6 +470,9 @@ function normalizeVariant(value) {
   if (normalized === "wasm-stage2-derive") {
     return "surface-scrub-wasm-stage2-derive";
   }
+  if (normalized === "wasm-entitlement-legacy") {
+    return "surface-scrub-wasm-entitlement-legacy";
+  }
   return PACKAGE_PROTECTION_AUDIT_VARIANTS.includes(normalized)
     ? normalized
     : null;
@@ -610,6 +614,8 @@ function buildVariantPackageArgs(variant) {
       return ["scripts/package.mjs", "--surface-scrub-wasm-digest", "--skip-release-metadata"];
     case "surface-scrub-wasm-stage2-derive":
       return ["scripts/package.mjs", "--surface-scrub-wasm-stage2-derive", "--skip-release-metadata"];
+    case "surface-scrub-wasm-entitlement-legacy":
+      return ["scripts/package.mjs", "--surface-scrub-wasm-entitlement-legacy", "--skip-release-metadata"];
     default:
       throw createScriptError("args", `unsupported package protection audit variant: ${variant}`, {
         failedStage: "build-variant-args",
@@ -638,6 +644,8 @@ export function resolvePackageProtectionAuditOutputSuffix(variant) {
       return "shielded-surface-scrub-wasm-digest";
     case "surface-scrub-wasm-stage2-derive":
       return "shielded-surface-scrub-wasm-stage2-derive";
+    case "surface-scrub-wasm-entitlement-legacy":
+      return "shielded-surface-scrub-wasm-entitlement-legacy";
     default:
       throw createScriptError("args", `unsupported package protection audit variant: ${variant}`, {
         failedStage: "resolve-output-suffix",
@@ -888,7 +896,7 @@ export function parsePackageProtectionAnchorAuditArgs(argv = process.argv.slice(
     switch (token) {
       case "--variant": {
         const variant = normalizeVariant(argv[index + 1]);
-        assertScript(Boolean(variant), "--variant must be one of plain|encrypted|shielded|descriptor-bind|jsconfuser-string|pref-bridge|surface-scrub|surface-scrub-wasm-digest|surface-scrub-wasm-stage2-derive|all", {
+        assertScript(Boolean(variant), "--variant must be one of plain|encrypted|shielded|descriptor-bind|jsconfuser-string|pref-bridge|surface-scrub|surface-scrub-wasm-digest|surface-scrub-wasm-stage2-derive|surface-scrub-wasm-entitlement-legacy|all", {
           category: "args",
           failedStage: "parse-args",
         });
@@ -923,6 +931,12 @@ export function parsePackageProtectionAnchorAuditArgs(argv = process.argv.slice(
         options.variants = dedupeVariants([
           ...options.variants,
           "surface-scrub-wasm-stage2-derive",
+        ]);
+        break;
+      case "--include-surface-scrub-wasm-entitlement-legacy":
+        options.variants = dedupeVariants([
+          ...options.variants,
+          "surface-scrub-wasm-entitlement-legacy",
         ]);
         break;
       case "--jsconfuser-tool-path":
@@ -1634,6 +1648,10 @@ export function summarizeSurfaceScrubWasmStage2DeriveComparison(variantReports =
   return summarizeSurfaceScrubBoundedWasmComparison(variantReports, "surface-scrub-wasm-stage2-derive");
 }
 
+export function summarizeSurfaceScrubWasmEntitlementLegacyComparison(variantReports = []) {
+  return summarizeSurfaceScrubBoundedWasmComparison(variantReports, "surface-scrub-wasm-entitlement-legacy");
+}
+
 export function summarizePackageProtectionAnchorAudit(variantReports = [], options = {}) {
   const reportByVariant = new Map(
     (Array.isArray(variantReports) ? variantReports : [])
@@ -1648,6 +1666,7 @@ export function summarizePackageProtectionAnchorAudit(variantReports = [], optio
   const surfaceScrubComparison = summarizeSurfaceScrubComparison(variantReports);
   const surfaceScrubWasmDigestComparison = summarizeSurfaceScrubWasmDigestComparison(variantReports);
   const surfaceScrubWasmStage2DeriveComparison = summarizeSurfaceScrubWasmStage2DeriveComparison(variantReports);
+  const surfaceScrubWasmEntitlementLegacyComparison = summarizeSurfaceScrubWasmEntitlementLegacyComparison(variantReports);
   const variantOrder = dedupeVariants(
     Array.isArray(options.variantOrder) && options.variantOrder.length > 0
       ? options.variantOrder
@@ -1670,6 +1689,7 @@ export function summarizePackageProtectionAnchorAudit(variantReports = [], optio
     surfaceScrubComparison,
     surfaceScrubWasmDigestComparison,
     surfaceScrubWasmStage2DeriveComparison,
+    surfaceScrubWasmEntitlementLegacyComparison,
     variants: variantOrder.map((variant) => {
       const report = reportByVariant.get(variant);
       if (!report) {
@@ -1846,6 +1866,25 @@ export function renderPackageProtectionAnchorAuditMarkdown(report) {
     lines.push(`- bundleSizeDeltaBytes: \`${report.surfaceScrubWasmStage2DeriveComparison.bundleSizeDeltaBytes}\``);
     lines.push(`- interpretation: ${report.surfaceScrubWasmStage2DeriveComparison.interpretation}`);
     lines.push(`- recommendedReading: \`${report.surfaceScrubWasmStage2DeriveComparison.recommendedReading}\``);
+    lines.push("");
+  }
+
+  if (report.surfaceScrubWasmEntitlementLegacyComparison?.present) {
+    lines.push("## surface-scrub-wasm-entitlement-legacy");
+    lines.push("");
+    lines.push(`- sameRawSurface: \`${report.surfaceScrubWasmEntitlementLegacyComparison.sameRawSurface ? "yes" : "no"}\``);
+    lines.push(`- rawAnchorDeltaCount: \`${report.surfaceScrubWasmEntitlementLegacyComparison.rawAnchorDeltaCount}\``);
+    lines.push(`- rawMatchDeltaCount: \`${report.surfaceScrubWasmEntitlementLegacyComparison.rawMatchDeltaCount}\``);
+    lines.push(`- sameUnpackedSurface: \`${report.surfaceScrubWasmEntitlementLegacyComparison.sameUnpackedSurface ? "yes" : "no"}\``);
+    lines.push(`- unpackedAnchorDeltaCount: \`${report.surfaceScrubWasmEntitlementLegacyComparison.unpackedAnchorDeltaCount}\``);
+    lines.push(`- unpackedMatchDeltaCount: \`${report.surfaceScrubWasmEntitlementLegacyComparison.unpackedMatchDeltaCount}\``);
+    lines.push(`- packageBoundaryWithinWasmAssets: \`${report.surfaceScrubWasmEntitlementLegacyComparison.packageBoundaryWithinWasmAssets ? "yes" : "no"}\``);
+    lines.push(`- newExposedFiles: \`${(report.surfaceScrubWasmEntitlementLegacyComparison.newExposedFiles || []).join(", ") || "-"}\``);
+    lines.push(`- unexpectedExposedFiles: \`${(report.surfaceScrubWasmEntitlementLegacyComparison.unexpectedExposedFiles || []).join(", ") || "-"}\``);
+    lines.push(`- xpiSizeDeltaBytes: \`${report.surfaceScrubWasmEntitlementLegacyComparison.xpiSizeDeltaBytes}\``);
+    lines.push(`- bundleSizeDeltaBytes: \`${report.surfaceScrubWasmEntitlementLegacyComparison.bundleSizeDeltaBytes}\``);
+    lines.push(`- interpretation: ${report.surfaceScrubWasmEntitlementLegacyComparison.interpretation}`);
+    lines.push(`- recommendedReading: \`${report.surfaceScrubWasmEntitlementLegacyComparison.recommendedReading}\``);
     lines.push("");
   }
 

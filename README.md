@@ -89,7 +89,9 @@
 4.7.1. 如需对这个实验变体直接做 Zotero smoke A/B，运行 `npm run package:protection:smoke:shielded:jsconfuser:string -- --repeats 3 --channel stable`；若自动发现失败，优先先跑 `npm run package:protection:jsconfuser:bootstrap`
 4.7.2. 如需 fresh 打包后直接调用本地 `webcrack` 生成自动化工件，运行 `npm run package:protection:webcrack:shielded -- --channel stable`，或对实验变体运行 `npm run package:protection:webcrack:shielded:descriptor-bind -- --channel stable`、`npm run package:protection:webcrack:shielded:jsconfuser:string -- --channel stable`、`npm run package:protection:webcrack:shielded:pref-bridge -- --channel stable`、`npm run package:protection:webcrack:shielded:surface-scrub -- --channel stable`
 4.7.3. 如需把 `webcrack` 自动建议评级回填到 smoke report 的 `manualScorecard.webcrackInitialResult`，运行 `npm run package:protection:webcrack:score -- --variant shielded --channel stable`
-4.7.4. 如需在保留现有 `webcrack` 结果的前提下，只补一侧 `LLM single-pass` 评分，运行 `npm run package:protection:score:llm -- --variant shielded-jsconfuser-string --channel stable --llm "parse-fail / only-loader"`
+4.7.4. 如需用统一模型口径生成默认 `single-pass` 静态分析工件，运行 `npm run package:protection:opencode -- --variant shielded --channel stable`；这条 lane 只在当前环境已安装并允许调用 `opencode run` 时启用
+4.7.4.1. 如需把 `opencode` 的 `suggestedLLMRating` 回填到 smoke report 的 `manualScorecard.llmSinglePassResult`，运行 `npm run package:protection:opencode:score -- --variant shielded --channel stable`
+4.7.4.2. 如需手工覆盖或当前环境没有 `opencode`，再使用 `npm run package:protection:score:llm -- --variant shielded-jsconfuser-string --channel stable --llm "parse-fail / only-loader"`
 4.7.5. 如需把 `shielded` 基线和某个实验变体的 smoke / webcrack / audit / 手工 LLM 状态收口成一份 A/B 报告，运行 `npm run package:protection:compare:descriptor-bind -- --channel stable`、`npm run package:protection:compare:jsconfuser:string -- --channel stable`、`npm run package:protection:compare:pref-bridge -- --channel stable` 或 `npm run package:protection:compare:surface-scrub -- --channel stable`；当手工 LLM 仍缺失时，compare 会额外显示 `inner audit proxy` 作为 advisory 证据，但不会自动替代 manual score。当前最新保守结论是：`descriptor-bind = runtime-only`；`jsconfuser-string` 必须在单轮 `LLM single-pass` 和对称 guided-attack 两侧都优于 `shielded` 才能升级为 `hardening-win`；`pref-bridge` 当前更适合作为“压缩最终 XPI 静态 support surface”的低风险候选；`surface-scrub` 当前已通过 retained-candidate 评估，适合作为继续清理 `bootstrap.js` 与 package boundary 静态字面值的低风险候选，但不直接替代默认 `shielded`
 4.7.6. 如需补一份不执行 inner payload 的离线证据，直接从 XPI 解到 inner bundle 再给出保守 `proxy LLM` 评级，运行 `npm run package:protection:inner:audit:shielded -- --channel stable`、`npm run package:protection:inner:audit:descriptor-bind -- --channel stable`、`npm run package:protection:inner:audit:jsconfuser:string -- --channel stable`、`npm run package:protection:inner:audit:pref-bridge -- --channel stable` 或 `npm run package:protection:inner:audit:surface-scrub -- --channel stable`
 4.7.7. 如需把“攻击者 + AI 组合能力”记成结构化 `guided attack` 工件，运行 `npm run package:protection:score:guided -- --variant shielded --channel stable --rating "high-level-architecture" --result-tier R1 --attacker-tier A2 --ai-tier M3 --attack-method static+reference --time-bucket 30-120m --round-mode multi-round --summary "guided attack recovered lifecycle facade"`；等级说明见 [受保护打包攻击分级](docs/PACKAGE_PROTECTION_ATTACK_GRADING.md)
@@ -98,7 +100,7 @@
 4.7.9. 如需把当前 `current / experiment / preflight / future / paper / preplan` 候选统一收成一份矩阵，运行 `npm run package:protection:matrix`；矩阵会回读已有工件，不会重跑实验，说明见 [受保护打包实验矩阵](docs/PACKAGE_PROTECTION_EXPERIMENT_MATRIX.md)
 4.7.9.1. 如需判断 Wasm 是否可以从 `preplan` 提升为 protection experiment，运行 `npm run package:protection:wasm:admission`；它只做 advisory 汇总，不进入默认 `release / agent:gate / agent:gate:release`
 4.8. 如需一次性回填完整手工评分，运行 `npm run package:protection:score -- --variant shielded --channel stable --webcrack "parse-fail / only-loader" --llm "high-level-architecture"`
-4.8.1. `package:protection:score` / `score:llm` / `webcrack:score` 当前共用同一条 package-protection workflow lock；如果 controller 在同一进程里并发录入评分，也会按串行顺序回写 smoke aggregate
+4.8.1. `package:protection:score` / `opencode:score` / `score:llm` / `webcrack:score` 当前共用同一条 package-protection workflow lock；如果 controller 在同一进程里并发录入评分，也会按串行顺序回写 smoke aggregate
 4.9. 如需生成当前手动实验链的 advisory 结论，运行 `npm run package:protection:verdict`
 5. 在 Zotero 中通过 “Install Add-on From File” 安装 `dist/<addonRef>-<addonVersion>.xpi`
 
@@ -302,17 +304,21 @@ npm run package:shielded:jsconfuser:string # 在 shielded 基础上额外跑 tar
 npm run package:shielded:pref-bridge # 导出 pref-bridge 实验变体，压缩最终 XPI 中偏好设置静态 support surface
 npm run package:shielded:surface-scrub # 导出 surface-scrub 实验变体，进一步压缩 bootstrap.js 的静态字面值 surface
 npm run package:shielded:surface-scrub:wasm:digest # 在 surface-scrub 上导出第一条 default-disabled / lazy Wasm digest 实验候选
+CLEANROOM_ROUTE4_LEGACY_ENDPOINT=https://example.invalid/legacy CLEANROOM_ROUTE4_LEGACY_SECRET=legacy-secret npm run package:shielded:surface-scrub:wasm:entitlement:legacy # route4 legacy backend v0；advisory-only，缺 env 会 fail fast
 npm run package:protection:smoke -- --variant shielded --repeats 3 --channel stable # 手动实验 plain/encrypted/shielded 控制组的安装态与 packageProtection 报告
 npm run package:protection:smoke:shielded:descriptor-bind -- --repeats 3 --channel stable # 对 descriptor-bind 实验变体做 Zotero runtime smoke，并回读 host binding / overlay 状态
 npm run package:protection:smoke:shielded:jsconfuser:string -- --repeats 3 --channel stable # 对 stringConcealing 实验变体做 Zotero smoke A/B；如自动发现失败，再补 --jsconfuser-tool-path
 npm run package:protection:smoke:shielded:pref-bridge -- --repeats 3 --channel stable # 对 pref-bridge 变体做 Zotero smoke，并回读 decode/load 指标
 npm run package:protection:smoke:shielded:surface-scrub -- --repeats 3 --channel stable # 对 surface-scrub 变体做 Zotero smoke，并验证 bootstrap static surface 是否继续收缩
+CLEANROOM_ROUTE4_LEGACY_ENDPOINT=https://example.invalid/legacy CLEANROOM_ROUTE4_LEGACY_SECRET=legacy-secret npm run package:protection:smoke -- --variant shielded-surface-scrub-wasm-entitlement-legacy --repeats 3 --channel stable # 对 route4 legacy v0 做 smoke，验证 controlPlane 降级不阻断
 npm run package:protection:webcrack:shielded -- --channel stable # fresh 打包 shielded 后调用本地 webcrack，生成默认首轮 + fallback loader-only 工件
 npm run package:protection:webcrack:shielded:descriptor-bind -- --channel stable # 对 descriptor-bind 实验变体生成同类 webcrack 工件
 npm run package:protection:webcrack:shielded:jsconfuser:string -- --channel stable # 对 stringConcealing 实验变体生成同类 webcrack 工件；如自动发现失败，再补 --jsconfuser-tool-path
 npm run package:protection:webcrack:shielded:pref-bridge -- --channel stable # 对 pref-bridge 实验变体生成同类 webcrack 工件
 npm run package:protection:webcrack:shielded:surface-scrub -- --channel stable # 对 surface-scrub 实验变体生成同类 webcrack 工件
 npm run package:protection:webcrack:score -- --variant shielded --channel stable # 只回填 webcrack 半边评分，LLM 半边仍待人工或 controller 补齐
+npm run package:protection:opencode -- --variant shielded --channel stable # 当前环境已安装并允许调用 opencode run 时，生成默认 single-pass 静态分析工件
+npm run package:protection:opencode:score -- --variant shielded --channel stable # 把 suggestedLLMRating 回填到 llmSinglePassResult
 npm run package:protection:audit # 审计 plain / encrypted / shielded 三个基线变体的 raw 导出物高层语义锚点
 npm run package:protection:audit:descriptor-bind # 在同一份审计报告里额外挂入 shielded-descriptor-bind 实验变体
 npm run package:protection:audit:jsconfuser:string # 在同一份审计报告里额外挂入 shielded-jsconfuser-string 实验变体；如自动发现失败，再补 -- --jsconfuser-tool-path /absolute/path/to/js-confuser
@@ -328,7 +334,7 @@ npm run package:protection:jsconfuser:string:preflight # 预检 JS-Confuser 小�
 npm run package:protection:lightweight:preflight # 预检 lightweight-js-obfuscator 的兼容性/体积；默认先自动发现本地 checkout，失败时再补 -- --tool-path /absolute/path/to/lightweight-js-obfuscator
 npm run package:protection:inner:audit:pref-bridge -- --channel stable # 对 pref-bridge 生成不执行 payload 的离线 inner audit 工件
 npm run package:protection:inner:audit:surface-scrub -- --channel stable # 对 surface-scrub 生成不执行 payload 的离线 inner audit 工件
-npm run package:protection:score:llm -- --variant shielded-jsconfuser-string --channel stable --llm "parse-fail / only-loader" # 只补 LLM 单轮评分，保留已有 webcrack 结果
+npm run package:protection:score:llm -- --variant shielded-jsconfuser-string --channel stable --llm "parse-fail / only-loader" # 手工 fallback；只在 opencode lane 不可用或需要人工覆盖时使用
 npm run package:protection:score -- --variant shielded --channel stable --webcrack "parse-fail / only-loader" --llm "high-level-architecture" # 回填 shielded stable 的手工评分
 npm run package:protection:attack:plan # 把 fixed-profile coverage gap 翻成下一步命令模板，不重跑实验
 npm run package:protection:matrix # 汇总 current / experiment / preflight / future / paper / preplan 候选，不重跑实验

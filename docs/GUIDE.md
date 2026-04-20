@@ -63,12 +63,15 @@ npm run package:protection:smoke:shielded:descriptor-bind -- --repeats 3 --chann
 npm run package:protection:smoke:shielded:jsconfuser:string -- --repeats 3 --channel stable
 npm run package:protection:smoke:shielded:pref-bridge -- --repeats 3 --channel stable
 npm run package:protection:smoke:shielded:surface-scrub -- --repeats 3 --channel stable
+CLEANROOM_ROUTE4_LEGACY_ENDPOINT=https://example.invalid/legacy CLEANROOM_ROUTE4_LEGACY_SECRET=legacy-secret npm run package:protection:smoke -- --variant shielded-surface-scrub-wasm-entitlement-legacy --repeats 3 --channel stable
 npm run package:protection:webcrack:shielded -- --channel stable
 npm run package:protection:webcrack:shielded:descriptor-bind -- --channel stable
 npm run package:protection:webcrack:shielded:jsconfuser:string -- --channel stable
 npm run package:protection:webcrack:shielded:pref-bridge -- --channel stable
 npm run package:protection:webcrack:shielded:surface-scrub -- --channel stable
 npm run package:protection:webcrack:score -- --variant shielded --channel stable
+npm run package:protection:opencode -- --variant shielded --channel stable
+npm run package:protection:opencode:score -- --variant shielded --channel stable
 npm run package:protection:audit
 npm run package:protection:audit:descriptor-bind
 npm run package:protection:audit:jsconfuser:string
@@ -249,13 +252,18 @@ npm run package:protection:compare:jsconfuser:string -- --channel stable
 - `descriptor-bind` 当前是不是只该作为 `runtime-only` 实验分支保留
 - `jsconfuser-string` 当前是否已经形成可稳定复现的 hardening 收益；当前 retained rule 已收紧为“单轮 `LLM single-pass` 优势不够，必须连 guided-attack 对称比较也更优，才能升级为 `hardening-win`”，因此最新保守结论按 `leaning-same / stop-current-candidate` 处理
 
-如果你已经完成了一轮外部 AI / LLM 解读，只想把 `LLM single-pass` 评级补回现有 smoke report，而不重复填写已有的 `webcrack` 结果，执行：
+如果你想用统一模型口径补默认 `single-pass` 证据，优先执行：
+
+```bash
+npm run package:protection:opencode -- --variant shielded-jsconfuser-string --channel stable
+npm run package:protection:opencode:score -- --variant shielded-jsconfuser-string --channel stable
+```
+
+这条链会保留当前 `manualScorecard.webcrackInitialResult`，只更新 `llmSinglePassResult`。如果当前环境没有 `opencode` 或你需要人工覆盖，再退回：
 
 ```bash
 npm run package:protection:score:llm -- --variant shielded-jsconfuser-string --channel stable --llm "parse-fail / only-loader"
 ```
-
-这条命令会保留当前 `manualScorecard.webcrackInitialResult`，只更新 `llmSinglePassResult`。如果当前还没有 webcrack 评分，它也能先记下 LLM 结果，但 `manualScorecard.status` 会继续保持 `pending`。
 
 当前正式手动收口链路固定为：
 
@@ -274,11 +282,14 @@ npm run package:protection:verdict
 - `package:protection:verdict` 只生成 `dist/package-protection-verdict.json` / `md` 的 advisory 结论，不进入默认 release gate
 - `package:protection:webcrack` 会在 fresh 打包后提取 XPI 内主脚本，调用本地 `webcrack` CLI，并额外保留一个 `--no-deobfuscate --no-unpack` 的 fallback loader-only 工件，供 controller / subagent / 人工继续判读
 - `package:protection:webcrack:score` 只把 `webcrack` 自动建议评级回填到 `manualScorecard.webcrackInitialResult`，不会自动补 `llmSinglePassResult`
-- `package:protection:score` / `package:protection:score:llm` / `package:protection:webcrack:score` 当前共用同一条 package-protection workflow lock；如果在同一进程里并发录入评分，也会按串行顺序回写 smoke aggregate，避免把 `dist/package-protection-smoke.json` 写坏
+- `package:protection:opencode` 是当前默认 scripted `single-pass` 静态分析 lane；只在当前环境已安装并允许调用 `opencode run` 时启用
+- `package:protection:opencode:score` 只把 `suggestedLLMRating` 回填到 `manualScorecard.llmSinglePassResult`
+- `package:protection:score` / `package:protection:opencode:score` / `package:protection:score:llm` / `package:protection:webcrack:score` 当前共用同一条 package-protection workflow lock；如果在同一进程里并发录入评分，也会按串行顺序回写 smoke aggregate，避免把 `dist/package-protection-smoke.json` 写坏
+- `package:protection:score:llm` 继续保留，但只作为手工 fallback
 - `package:protection:inner:audit` 会离线提取 protected loader、拦截解密后的 inner bundle，并给出保守的 `proxy LLM` 建议评级；它只补证据，不会自动回填 `manualScorecard`
 - `package:protection:compare` 现在会附带读取 `inner audit` 结果；当手工 `LLM single-pass` 还没补齐时，它会把这份 proxy 一并写进 compare 报告，但不会自动替代 manual score
 - 当前最新保守 compare 结论是：`shielded-descriptor-bind = runtime-only`；`shielded-jsconfuser-string` 保留实验记录，但因 `beta` 复验未复现 `stable` 优势，当前按 `leaning-same / stop-current-candidate` 处理
-- 若你对实验变体重新跑了 `smoke`，对应 smoke report 的 `manualScorecard` 会被重置回 `pending`；此时要先重新执行 `package:protection:webcrack:score` 或 `package:protection:score` / `package:protection:score:llm`，再跑 compare
+- 若你对实验变体重新跑了 `smoke`，对应 smoke report 的 `manualScorecard` 会被重置回 `pending`；此时要先重新执行 `package:protection:webcrack:score` 或 `package:protection:opencode:score` / `package:protection:score` / `package:protection:score:llm`，再跑 compare
 - `plain` 继续只是 control group；它的自动评分不是最终 protection verdict 的降级依据
 
 如果需要定位受保护包的首次加载延迟，优先读取 `packageProtection` 时序与 `decodeMethod`，而不是只看插件内核 `startupDurationMs`。当前这组时序会拆出 `loadSubScript / decode / decrypt / eval / prepare total`，便于判断性能热点是在 loader、decode 还是插件本体启动。

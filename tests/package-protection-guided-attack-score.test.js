@@ -120,6 +120,20 @@ describe("Package Protection Guided Attack Score", () => {
     assert.equal(options.roundMode, "multi-round");
     assert.equal(options.summary, "Recovered lifecycle facade");
     assert.equal(options.evidenceFiles.length, 2);
+
+    const route4Options = parsePackageProtectionGuidedAttackScoreArgs([
+      "--variant", "wasm-entitlement-legacy",
+      "--channel", "stable",
+      "--rating", "high-level-architecture",
+      "--result-tier", "R1",
+      "--attacker-tier", "A2",
+      "--ai-tier", "M3",
+      "--attack-method", "static+reference",
+      "--time-bucket", "30-120m",
+      "--round-mode", "multi-round",
+      "--summary", "Recovered legacy entitlement facade",
+    ]);
+    assert.equal(route4Options.variant, "shielded-surface-scrub-wasm-entitlement-legacy");
   });
 
   it("should accept legacy attack-path and cost-bucket aliases", () => {

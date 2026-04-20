@@ -40,6 +40,7 @@ export const PACKAGE_PROTECTION_INNER_AUDIT_VARIANTS = Object.freeze([
   "shielded-surface-scrub",
   "shielded-surface-scrub-wasm-digest",
   "shielded-surface-scrub-wasm-stage2-derive",
+  "shielded-surface-scrub-wasm-entitlement-legacy",
 ]);
 
 export const PACKAGE_PROTECTION_PROXY_LLM_LEVELS = Object.freeze([
@@ -146,6 +147,9 @@ function normalizeVariant(value) {
   }
   if (normalized === "surface-scrub-wasm-stage2-derive" || normalized === "wasm-stage2-derive") {
     return "shielded-surface-scrub-wasm-stage2-derive";
+  }
+  if (normalized === "surface-scrub-wasm-entitlement-legacy" || normalized === "wasm-entitlement-legacy") {
+    return "shielded-surface-scrub-wasm-entitlement-legacy";
   }
   return PACKAGE_PROTECTION_INNER_AUDIT_VARIANTS.includes(normalized)
     ? normalized
@@ -322,7 +326,7 @@ export function parsePackageProtectionInnerAuditArgs(argv = process.argv.slice(2
     }
   }
 
-  assertScript(Boolean(options.variant), "--variant must be one of shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive|all", {
+  assertScript(Boolean(options.variant), "--variant must be one of shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive|shielded-surface-scrub-wasm-entitlement-legacy|all", {
     category: "args",
     failedStage: "parse-args",
   });
@@ -665,7 +669,7 @@ export async function createPackageProtectionInnerAudit(options = {}) {
   const projectRootPath = path.resolve(options.projectRootPath || projectRoot);
   const normalizedChannel = normalizeChannel(options.channel) || "stable";
   const selectedVariants = listSelectedVariants(options.variant);
-  assertScript(selectedVariants.every(Boolean), "variant must be one of shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive|all", {
+  assertScript(selectedVariants.every(Boolean), "variant must be one of shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive|shielded-surface-scrub-wasm-entitlement-legacy|all", {
     category: "args",
     failedStage: "validate-options",
   });

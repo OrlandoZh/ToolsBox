@@ -4,11 +4,16 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import {
   BUILD_MODULE_ID_MODE_ANONYMIZED,
+  BUILD_ROUTE4_LEGACY_ENABLED_ENV,
   BUILD_MODULE_ID_MODE_ENV,
   BUILD_PREFERENCE_BINDING_MODE_BRIDGE,
   BUILD_PREFERENCE_BINDING_MODE_ENV,
   BUILD_SEMANTIC_SCRUB_ENV,
   BUILD_SEMANTIC_SCRUB_PROTECTED,
+  ROUTE4_LEGACY_CACHE_TTL_MS_ENV,
+  ROUTE4_LEGACY_ENDPOINT_ENV,
+  ROUTE4_LEGACY_IDENTITY_KIND_ENV,
+  ROUTE4_LEGACY_SECRET_ENV,
   BUILD_STATIC_SURFACE_MODE_ENV,
   BUILD_STATIC_SURFACE_MODE_SCRUB,
 } from "./build.mjs";
@@ -40,6 +45,7 @@ import {
   SHIELDED_SURFACE_SCRUB_PACKAGE_VARIANT,
   SHIELDED_SURFACE_SCRUB_WASM_DIGEST_PACKAGE_VARIANT,
   SHIELDED_SURFACE_SCRUB_WASM_STAGE2_DERIVE_PACKAGE_VARIANT,
+  SHIELDED_SURFACE_SCRUB_WASM_ENTITLEMENT_LEGACY_PACKAGE_VARIANT,
   protectBuildBundle,
 } from "./package-protection-lib.mjs";
 import {
@@ -88,6 +94,7 @@ export function parsePackageArgs(argv = process.argv.slice(2)) {
     surfaceScrub: false,
     surfaceScrubWasmDigest: false,
     surfaceScrubWasmStage2Derive: false,
+    surfaceScrubWasmEntitlementLegacy: false,
     shieldBundle: false,
     outputSuffix: "",
     writeReleaseMetadata: true,
@@ -137,6 +144,13 @@ export function parsePackageArgs(argv = process.argv.slice(2)) {
         break;
       case "--surface-scrub-wasm-stage2-derive":
         options.surfaceScrubWasmStage2Derive = true;
+        options.surfaceScrub = true;
+        options.prefBridge = true;
+        options.shieldBundle = true;
+        options.encryptBundle = true;
+        break;
+      case "--surface-scrub-wasm-entitlement-legacy":
+        options.surfaceScrubWasmEntitlementLegacy = true;
         options.surfaceScrub = true;
         options.prefBridge = true;
         options.shieldBundle = true;
@@ -228,6 +242,8 @@ export function parsePackageArgs(argv = process.argv.slice(2)) {
   if (options.shieldBundle && !options.outputSuffix) {
     options.outputSuffix = options.descriptorBind
       ? SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT
+      : options.surfaceScrubWasmEntitlementLegacy
+        ? SHIELDED_SURFACE_SCRUB_WASM_ENTITLEMENT_LEGACY_PACKAGE_VARIANT
       : options.surfaceScrubWasmStage2Derive
         ? SHIELDED_SURFACE_SCRUB_WASM_STAGE2_DERIVE_PACKAGE_VARIANT
       : options.surfaceScrubWasmDigest
@@ -265,6 +281,9 @@ export function resolvePackageProtectedVariant(options = {}) {
   if (options.descriptorBind) {
     return SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT;
   }
+  if (options.surfaceScrubWasmEntitlementLegacy) {
+    return SHIELDED_SURFACE_SCRUB_WASM_ENTITLEMENT_LEGACY_PACKAGE_VARIANT;
+  }
   if (options.surfaceScrubWasmStage2Derive) {
     return SHIELDED_SURFACE_SCRUB_WASM_STAGE2_DERIVE_PACKAGE_VARIANT;
   }
@@ -293,19 +312,60 @@ function buildOutputName(config, options = {}) {
     : `${config.addonRef}-${config.addonVersion}.xpi`;
 }
 
-export function resolvePackageBuildEnv(options = {}) {
+function normalizeEnvString(value) {
+  const normalized = String(value || "").trim();
+  return normalized || null;
+}
+
+function resolveRoute4LegacyBuildEnv(options = {}, env = process.env) {
+  if (!options.surfaceScrubWasmEntitlementLegacy) {
+    return {};
+  }
+
+  const endpoint = normalizeEnvString(env[ROUTE4_LEGACY_ENDPOINT_ENV]);
+  const secret = normalizeEnvString(env[ROUTE4_LEGACY_SECRET_ENV]);
+  if (!endpoint) {
+    throw createScriptError("environment", `${ROUTE4_LEGACY_ENDPOINT_ENV} is required for ${SHIELDED_SURFACE_SCRUB_WASM_ENTITLEMENT_LEGACY_PACKAGE_VARIANT}`, {
+      failedStage: "resolve-route4-legacy-env",
+      details: {
+        variant: SHIELDED_SURFACE_SCRUB_WASM_ENTITLEMENT_LEGACY_PACKAGE_VARIANT,
+        missingEnv: ROUTE4_LEGACY_ENDPOINT_ENV,
+      },
+    });
+  }
+  if (!secret) {
+    throw createScriptError("environment", `${ROUTE4_LEGACY_SECRET_ENV} is required for ${SHIELDED_SURFACE_SCRUB_WASM_ENTITLEMENT_LEGACY_PACKAGE_VARIANT}`, {
+      failedStage: "resolve-route4-legacy-env",
+      details: {
+        variant: SHIELDED_SURFACE_SCRUB_WASM_ENTITLEMENT_LEGACY_PACKAGE_VARIANT,
+        missingEnv: ROUTE4_LEGACY_SECRET_ENV,
+      },
+    });
+  }
+
+  return {
+    [BUILD_ROUTE4_LEGACY_ENABLED_ENV]: "1",
+    [ROUTE4_LEGACY_ENDPOINT_ENV]: endpoint,
+    [ROUTE4_LEGACY_SECRET_ENV]: secret,
+    [ROUTE4_LEGACY_IDENTITY_KIND_ENV]: normalizeEnvString(env[ROUTE4_LEGACY_IDENTITY_KIND_ENV]) || "zotero-user-id",
+    [ROUTE4_LEGACY_CACHE_TTL_MS_ENV]: normalizeEnvString(env[ROUTE4_LEGACY_CACHE_TTL_MS_ENV]) || "86400000",
+  };
+}
+
+export function resolvePackageBuildEnv(options = {}, env = process.env) {
   if (options.encryptBundle || options.shieldBundle || options.outputSuffix) {
-    const env = {
+    const buildEnv = {
       [BUILD_MODULE_ID_MODE_ENV]: BUILD_MODULE_ID_MODE_ANONYMIZED,
       [BUILD_SEMANTIC_SCRUB_ENV]: BUILD_SEMANTIC_SCRUB_PROTECTED,
     };
     if (options.prefBridge) {
-      env[BUILD_PREFERENCE_BINDING_MODE_ENV] = BUILD_PREFERENCE_BINDING_MODE_BRIDGE;
+      buildEnv[BUILD_PREFERENCE_BINDING_MODE_ENV] = BUILD_PREFERENCE_BINDING_MODE_BRIDGE;
     }
     if (options.surfaceScrub) {
-      env[BUILD_STATIC_SURFACE_MODE_ENV] = BUILD_STATIC_SURFACE_MODE_SCRUB;
+      buildEnv[BUILD_STATIC_SURFACE_MODE_ENV] = BUILD_STATIC_SURFACE_MODE_SCRUB;
     }
-    return env;
+    Object.assign(buildEnv, resolveRoute4LegacyBuildEnv(options, env));
+    return buildEnv;
   }
 
   return {};

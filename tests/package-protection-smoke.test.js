@@ -66,6 +66,13 @@ describe("Package Protection Smoke", () => {
     assert.equal(options.channel, "stable");
   });
 
+  it("should accept wasm-entitlement-legacy as a route4 control-plane variant alias", () => {
+    const options = parsePackageProtectionSmokeArgs(["--variant", "wasm-entitlement-legacy"]);
+
+    assert.equal(options.variant, "shielded-surface-scrub-wasm-entitlement-legacy");
+    assert.equal(options.channel, "stable");
+  });
+
   it("should reject missing variants and invalid repeat counts", () => {
     assert.throws(() => parsePackageProtectionSmokeArgs([]));
     assert.throws(() => parsePackageProtectionSmokeArgs(["--variant", "plain", "--repeats", "0"]));
@@ -100,6 +107,10 @@ describe("Package Protection Smoke", () => {
     ]);
     assert.deepEqual(resolvePackageProtectionSmokePackageArgs("shielded-surface-scrub-wasm-stage2-derive"), [
       "--surface-scrub-wasm-stage2-derive",
+      "--skip-release-metadata",
+    ]);
+    assert.deepEqual(resolvePackageProtectionSmokePackageArgs("shielded-surface-scrub-wasm-entitlement-legacy"), [
+      "--surface-scrub-wasm-entitlement-legacy",
       "--skip-release-metadata",
     ]);
     assert.deepEqual(resolvePackageProtectionSmokePackageArgs("shielded-jsconfuser-string", {

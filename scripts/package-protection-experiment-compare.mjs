@@ -35,6 +35,7 @@ export const PACKAGE_PROTECTION_EXPERIMENT_COMPARE_VARIANTS = Object.freeze([
   "shielded-surface-scrub",
   "shielded-surface-scrub-wasm-digest",
   "shielded-surface-scrub-wasm-stage2-derive",
+  "shielded-surface-scrub-wasm-entitlement-legacy",
 ]);
 
 const STATUS_LABELS = Object.freeze({
@@ -95,6 +96,9 @@ function normalizeVariant(value) {
   if (normalized === "surface-scrub-wasm-stage2-derive" || normalized === "wasm-stage2-derive") {
     return "shielded-surface-scrub-wasm-stage2-derive";
   }
+  if (normalized === "surface-scrub-wasm-entitlement-legacy" || normalized === "wasm-entitlement-legacy") {
+    return "shielded-surface-scrub-wasm-entitlement-legacy";
+  }
   return PACKAGE_PROTECTION_EXPERIMENT_COMPARE_VARIANTS.includes(normalized)
     ? normalized
     : null;
@@ -103,6 +107,7 @@ function normalizeVariant(value) {
 export function resolvePackageProtectionExperimentCompareBaseVariant(variant) {
   return normalizeVariant(variant) === "shielded-surface-scrub-wasm-digest"
     || normalizeVariant(variant) === "shielded-surface-scrub-wasm-stage2-derive"
+    || normalizeVariant(variant) === "shielded-surface-scrub-wasm-entitlement-legacy"
     ? "shielded-surface-scrub"
     : "shielded";
 }
@@ -145,7 +150,7 @@ export function parsePackageProtectionExperimentCompareArgs(argv = process.argv.
     }
   }
 
-  assertScript(Boolean(options.variant), "--variant must be one of shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive", {
+  assertScript(Boolean(options.variant), "--variant must be one of shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive|shielded-surface-scrub-wasm-entitlement-legacy", {
     category: "args",
     failedStage: "parse-args",
   });
@@ -510,6 +515,13 @@ function summarizeAuditComparison(variant, auditReport) {
     return comparison?.present === true
       ? comparison
       : normalizeMissingComparison(comparison, "缺少 surface-scrub-wasm-stage2-derive 对比样本。");
+  }
+
+  if (variant === "shielded-surface-scrub-wasm-entitlement-legacy") {
+    const comparison = auditReport.surfaceScrubWasmEntitlementLegacyComparison || null;
+    return comparison?.present === true
+      ? comparison
+      : normalizeMissingComparison(comparison, "缺少 surface-scrub-wasm-entitlement-legacy 对比样本。");
   }
 
   const comparison = auditReport.jsConfuserStringComparison || null;
@@ -1132,6 +1144,96 @@ function evaluateSurfaceScrubWasmStage2Derive({
   };
 }
 
+function evaluateSurfaceScrubWasmEntitlementLegacy({
+  baseSmoke,
+  candidateSmoke,
+  baseWebcrack,
+  candidateWebcrack,
+  auditComparison,
+  baseInnerAudit,
+  candidateInnerAudit,
+  baseGuidedAttack,
+  candidateGuidedAttack,
+}) {
+  if (!baseSmoke.present || !candidateSmoke.present || !baseWebcrack.present || !candidateWebcrack.present) {
+    return {
+      status: "missing",
+      decision: "missing-evidence",
+      nextAction: "rerun-missing-artifacts",
+      summary: "缺少 shielded-surface-scrub / shielded-surface-scrub-wasm-entitlement-legacy 的 smoke 或 webcrack 报告，无法做 A/B 比较。",
+    };
+  }
+
+  if (
+    baseSmoke.status !== "passed"
+    || candidateSmoke.status !== "passed"
+    || baseSmoke.automatedStatus !== "passed"
+    || candidateSmoke.automatedStatus !== "passed"
+  ) {
+    return {
+      status: "failed",
+      decision: "regression",
+      nextAction: "fix-runtime-regression",
+      summary: "surface-scrub-wasm-entitlement-legacy 的 smoke/automated 结果没有保持通过，先修复运行时回归。",
+    };
+  }
+
+  const webcrackDelta = compareRatings(candidateWebcrack.rating, baseWebcrack.rating);
+  const innerDelta = compareRatings(candidateInnerAudit.rating, baseInnerAudit.rating);
+  const llmDelta = compareRatings(candidateSmoke.llmSinglePassResult, baseSmoke.llmSinglePassResult);
+  const guidedRatingDelta = compareRatings(candidateGuidedAttack.rating, baseGuidedAttack.rating);
+  const guidedResultTierDelta = compareGuidedResultTiers(candidateGuidedAttack.resultTier, baseGuidedAttack.resultTier);
+
+  if (
+    (webcrackDelta != null && webcrackDelta > 0)
+    || (innerDelta != null && innerDelta > 0)
+    || (llmDelta != null && llmDelta > 0)
+    || (guidedRatingDelta != null && guidedRatingDelta > 0)
+    || (guidedResultTierDelta != null && guidedResultTierDelta > 0)
+  ) {
+    return {
+      status: "attention",
+      decision: "regression",
+      nextAction: "stop-current-candidate",
+      summary: "surface-scrub-wasm-entitlement-legacy 没有保持与 surface-scrub 相同的自动化解读阻力，当前不继续推进。",
+    };
+  }
+
+  if (auditComparison.present !== true) {
+    return {
+      status: "attention",
+      decision: "missing-evidence",
+      nextAction: "collect-anchor-audit",
+      summary: "surface-scrub-wasm-entitlement-legacy 缺少静态暴露边界审计，当前还不能判断 Wasm/control-plane 候选是否越界。",
+    };
+  }
+
+  if (auditComparison.packageBoundaryWithinWasmAssets !== true) {
+    return {
+      status: "attention",
+      decision: "regression",
+      nextAction: "stop-current-candidate",
+      summary: "surface-scrub-wasm-entitlement-legacy 新增 package-boundary 暴露超出了 content/lib/w/* 资产边界，按设计越界处理。",
+    };
+  }
+
+  if (!hasBoundedWasmCandidatePerfDelta(baseSmoke, candidateSmoke)) {
+    return {
+      status: "attention",
+      decision: "regression",
+      nextAction: "stop-current-candidate",
+      summary: "surface-scrub-wasm-entitlement-legacy 相对 surface-scrub 出现了体感级启动回退风险，当前不继续沿 protection 主线推进。",
+    };
+  }
+
+  return {
+    status: "passed",
+    decision: "hardening-win",
+    nextAction: "promote-experimental-candidate",
+    summary: "surface-scrub-wasm-entitlement-legacy 保持了与 surface-scrub 相同的自动化解读阻力，并把 route4 legacy control-plane 继续限制在 advisory-only、content/lib/w/* 边界内。",
+  };
+}
+
 export function summarizePackageProtectionExperimentCompare({
   variant,
   channel = "stable",
@@ -1149,7 +1251,7 @@ export function summarizePackageProtectionExperimentCompare({
   const normalizedVariant = normalizeVariant(variant);
   const normalizedChannel = normalizeChannel(channel) || "stable";
   const baseVariant = resolvePackageProtectionExperimentCompareBaseVariant(normalizedVariant);
-  assertScript(Boolean(normalizedVariant), "variant must be one of shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive", {
+  assertScript(Boolean(normalizedVariant), "variant must be one of shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive|shielded-surface-scrub-wasm-entitlement-legacy", {
     category: "args",
     failedStage: "summarize-compare",
   });
@@ -1222,6 +1324,18 @@ export function summarizePackageProtectionExperimentCompare({
               baseGuidedAttack,
               candidateGuidedAttack,
             })
+            : normalizedVariant === "shielded-surface-scrub-wasm-entitlement-legacy"
+              ? evaluateSurfaceScrubWasmEntitlementLegacy({
+                baseSmoke,
+                candidateSmoke,
+                baseWebcrack,
+                candidateWebcrack,
+                auditComparison,
+                baseInnerAudit,
+                candidateInnerAudit,
+                baseGuidedAttack,
+                candidateGuidedAttack,
+              })
       : evaluateJSConfuserString({
         baseSmoke,
         candidateSmoke,

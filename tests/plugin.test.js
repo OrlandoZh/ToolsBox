@@ -561,7 +561,7 @@ describe("Plugin", () => {
     assert.includes(notifierScenario.lastNotifierEvent, "item:refresh #88");
     const diagnostics = plugin.api.agent.collectDiagnostics();
     assert.includes(diagnostics.lastNotifierEvent, "#88");
-    assert.equal(diagnostics.serviceTotal, 5);
+    assert.equal(diagnostics.serviceTotal, 6);
     assert.equal(diagnostics.serviceHealthyCount, 4);
     assert.equal(diagnostics.serviceUnhealthyCount, 0);
     assert.equal(diagnostics.serviceHealthOK, true);
@@ -605,6 +605,13 @@ describe("Plugin", () => {
           && entry.health?.status === "ready";
       }),
     );
+    assert.ok(
+      diagnostics.services.some((entry) => {
+        return entry.id === "cleanroomtemplate.control-plane"
+          && entry.enabled === false
+          && entry.health?.status === "disabled";
+      }),
+    );
     assert.equal(diagnostics.runtimeBridgeStatus, "healthy");
     assert.equal(diagnostics.runtimeInjectedCapabilityCount, 4);
     assert.ok(diagnostics.capabilityCount >= 11);
@@ -636,6 +643,9 @@ describe("Plugin", () => {
     assert.equal(protectionSummary.hostBinding.noncePresent, true);
     assert.equal(protectionSummary.hostBinding.nonceSource, "created");
     assert.typeOf(protectionSummary.hostBinding.nonceHash, "string");
+    assert.equal(protectionSummary.controlPlane.mode, "legacy-backend-v0");
+    assert.equal(protectionSummary.controlPlane.configured, false);
+    assert.equal(protectionSummary.controlPlane.status, "disabled");
 
     await plugin.shutdown();
 

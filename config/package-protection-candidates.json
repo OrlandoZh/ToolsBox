@@ -274,6 +274,31 @@
       "promotionGate": "stopped-inner-audit-regression",
       "status": "stop-current-candidate",
       "summary": "Stopped as a promotion candidate: the runtime gate works, but restoring the richer capability overlay raises inner-audit readability to high-level-architecture. Future Wasm protection work should stay on digest/unlock micro-kernel logic without returning capability overlay structure to JS."
+    },
+    {
+      "id": "shielded-surface-scrub-wasm-entitlement-legacy",
+      "class": "experiment",
+      "stage": "route4-light-service",
+      "baseVariant": "shielded-surface-scrub",
+      "executionMode": "buildable-xpi",
+      "evaluationKind": "compare",
+      "compareVariant": "shielded-surface-scrub-wasm-entitlement-legacy",
+      "channel": "stable",
+      "artifactCoverage": [
+        "smoke",
+        "perf",
+        "webcrack",
+        "opencode",
+        "guided-attack",
+        "compare",
+        "anchor-audit",
+        "inner-audit",
+        "matrix",
+        "review"
+      ],
+      "promotionGate": "legacy-backend-quick-apply-only",
+      "status": "route4-v0-experiment-candidate",
+      "summary": "Advisory-only v0 route4 experiment on top of shielded-surface-scrub. Keep it default-disabled, second-stage only, startup-non-blocking, and bounded to the existing content/lib/w Wasm lane."
     }
   ]
 }

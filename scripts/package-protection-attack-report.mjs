@@ -648,6 +648,7 @@ export function summarizePackageProtectionAttackReport({
     candidate.artifactCoverage.includes("webcrack")
     || candidate.artifactCoverage.includes("guided-attack")
     || candidate.evaluationKind === "compare"
+    || candidate.class === "control"
     || candidate.id === "shielded"
     || candidate.id === "encrypted"
   ));

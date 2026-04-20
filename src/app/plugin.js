@@ -19,9 +19,15 @@ import { createThemeManager } from "../features/theme-manager.js";
 import { createZoteroHost } from "../platform/zotero-host.js";
 import { createZoteroHostSignals } from "../platform/zotero-host-signals.js";
 import { createZoteroPluginNonceStore } from "../platform/zotero-plugin-nonce-store.js";
+import { createZoteroEntitlementCacheStore } from "../platform/zotero-entitlement-cache-store.js";
 import { createDialogBuilder } from "../utils/dialog.js";
 import { createProgressNotifier } from "../utils/progress-window.js";
-import { createServiceRegistry } from "../services/index.js";
+import {
+  createEntitlementControlPlane,
+  createEntitlementIdentityProvider,
+  createEntitlementLegacyAdapter,
+  createServiceRegistry,
+} from "../services/index.js";
 import { createPluginKernel } from "./kernel.js";
 import { createPluginAPI } from "./plugin-api.js";
 import { createPluginAgent } from "./plugin-agent.js";
@@ -43,8 +49,10 @@ import { createReactUIDemoLauncher } from "../features/react-ui-demo.js";
 import { createWasmKernelProbe } from "../features/wasm-kernel-probe.js";
 
 const WASM_STAGE2_DERIVE_PACKAGE_VARIANT = "shielded-surface-scrub-wasm-stage2-derive";
+const ROUTE4_LEGACY_PACKAGE_VARIANT = "shielded-surface-scrub-wasm-entitlement-legacy";
 const WASM_STAGE2_DERIVE_BUNDLE_SEED = "cleanroom-stage2-shadow-seed-v1";
 const WASM_STAGE2_DERIVE_OVERLAY_VERSION = "descriptor-overlay-v1";
+const DEFAULT_ROUTE4_IDENTITY_KIND = "zotero-user-id";
 
 function normalizeLogLevel(input, fallback = "info") {
   const candidate = String(input || "").trim().toLowerCase();
@@ -97,6 +105,9 @@ function clonePackageProtectionSummary(summary = null) {
   const stage2OverlayGate = summary && typeof summary === "object"
     ? summary.stage2OverlayGate
     : null;
+  const controlPlane = summary && typeof summary === "object"
+    ? summary.controlPlane
+    : null;
 
   if (!summary || typeof summary !== "object") {
     return {
@@ -112,6 +123,7 @@ function clonePackageProtectionSummary(summary = null) {
       bootstrapCallCount: 0,
       hostBinding: cloneHostBindingSummary(hostBinding),
       stage2OverlayGate: cloneStage2OverlayGateSummary(stage2OverlayGate),
+      controlPlane: cloneControlPlaneSummary(controlPlane),
     };
   }
 
@@ -132,6 +144,7 @@ function clonePackageProtectionSummary(summary = null) {
     bootstrapCallCount: Number(summary.bootstrapCallCount || 0),
     hostBinding: cloneHostBindingSummary(hostBinding),
     stage2OverlayGate: cloneStage2OverlayGateSummary(stage2OverlayGate),
+    controlPlane: cloneControlPlaneSummary(controlPlane),
   };
 }
 
@@ -161,6 +174,39 @@ function cloneStage2OverlayGateSummary(summary = null) {
     attempted: Boolean(summary?.attempted),
     failureReason: typeof summary?.failureReason === "string" && summary.failureReason.trim()
       ? summary.failureReason.trim()
+      : null,
+  };
+}
+
+function cloneControlPlaneSummary(summary = null) {
+  return {
+    mode: typeof summary?.mode === "string" && summary.mode.trim()
+      ? summary.mode.trim()
+      : "legacy-backend-v0",
+    configured: Boolean(summary?.configured),
+    status: typeof summary?.status === "string" && summary.status.trim()
+      ? summary.status.trim()
+      : "disabled",
+    identityKind: typeof summary?.identityKind === "string" && summary.identityKind.trim()
+      ? summary.identityKind.trim()
+      : DEFAULT_ROUTE4_IDENTITY_KIND,
+    cacheAvailable: Boolean(summary?.cacheAvailable),
+    cacheFresh: Boolean(summary?.cacheFresh),
+    validationSource: typeof summary?.validationSource === "string" && summary.validationSource.trim()
+      ? summary.validationSource.trim()
+      : "none",
+    gateSatisfied: Boolean(summary?.gateSatisfied),
+    compactGateHex: typeof summary?.compactGateHex === "string" && summary.compactGateHex.trim()
+      ? summary.compactGateHex.trim()
+      : null,
+    lastValidatedAt: typeof summary?.lastValidatedAt === "string" && summary.lastValidatedAt.trim()
+      ? summary.lastValidatedAt.trim()
+      : null,
+    expiresAt: typeof summary?.expiresAt === "string" && summary.expiresAt.trim()
+      ? summary.expiresAt.trim()
+      : null,
+    failureKind: typeof summary?.failureKind === "string" && summary.failureKind.trim()
+      ? summary.failureKind.trim()
       : null,
   };
 }
@@ -344,6 +390,34 @@ function mergeHostBindingSummary(base = null, patch = null) {
   return merged;
 }
 
+function resolveRoute4LegacyConfig(config = {}, runtime = {}) {
+  const packageProtection = runtime?.packageProtection && typeof runtime.packageProtection === "object"
+    ? runtime.packageProtection
+    : {};
+  const route4Config = config?.packageProtectionControlPlane?.route4Legacy
+    && typeof config.packageProtectionControlPlane.route4Legacy === "object"
+    ? config.packageProtectionControlPlane.route4Legacy
+    : {};
+  const packageVariant = typeof packageProtection?.variant === "string" && packageProtection.variant.trim()
+    ? packageProtection.variant.trim()
+    : null;
+  const enabled = route4Config.enabled === true && packageVariant === ROUTE4_LEGACY_PACKAGE_VARIANT;
+  return {
+    enabled,
+    endpoint: typeof route4Config.endpoint === "string" && route4Config.endpoint.trim()
+      ? route4Config.endpoint.trim()
+      : null,
+    secret: typeof route4Config.secret === "string" && route4Config.secret.trim()
+      ? route4Config.secret.trim()
+      : null,
+    identityKind: typeof route4Config.identityKind === "string" && route4Config.identityKind.trim()
+      ? route4Config.identityKind.trim()
+      : DEFAULT_ROUTE4_IDENTITY_KIND,
+    cacheTTLMS: Number(route4Config.cacheTTLMS || 86400000),
+    timeoutMs: Number(route4Config.timeoutMs || 8000),
+  };
+}
+
 export function createPlugin({
   globalScope,
   config,
@@ -403,6 +477,22 @@ export function createPlugin({
     addonRef: config.addonRef,
     logger,
   });
+  const entitlementCacheStore = createZoteroEntitlementCacheStore({
+    zotero,
+    addonRef: config.addonRef,
+    logger,
+  });
+  const route4LegacyConfig = resolveRoute4LegacyConfig(config, runtime);
+  const entitlementIdentityProvider = createEntitlementIdentityProvider({
+    kind: route4LegacyConfig.identityKind,
+    zotero,
+  });
+  const entitlementLegacyAdapter = createEntitlementLegacyAdapter({
+    endpoint: route4LegacyConfig.endpoint,
+    secret: route4LegacyConfig.secret,
+    timeoutMs: route4LegacyConfig.timeoutMs,
+  });
+  let entitlementControlPlane = null;
   runtime.hostBinding = cloneHostBindingSummary(runtime.hostBinding);
 
   function syncRuntimeHostBinding(summary) {
@@ -550,6 +640,7 @@ export function createPlugin({
     return clonePackageProtectionSummary({
       ...packageProtection,
       hostBinding: runtime?.hostBinding || hostSignals.getSummary(),
+      controlPlane: entitlementControlPlane?.getSummary?.(),
     });
   }
 
@@ -746,6 +837,37 @@ export function createPlugin({
     }
     return wasmKernelProbe;
   }
+
+  entitlementControlPlane = createEntitlementControlPlane({
+    config: route4LegacyConfig,
+    http,
+    identityProvider: entitlementIdentityProvider,
+    adapter: entitlementLegacyAdapter,
+    cacheStore: entitlementCacheStore,
+    getHostBinding: () => cloneHostBindingSummary(runtime?.hostBinding),
+    getWasmKernelProbe,
+    logger,
+  });
+
+  servicesHub.register({
+    id: surfaceDescriptors.serviceIDs.controlPlane,
+    label: surfaceDescriptors.serviceLabels.controlPlane,
+    enabledWhen() {
+      return entitlementControlPlane.isConfigured();
+    },
+    async start() {
+      void entitlementControlPlane.scheduleResolve();
+    },
+    async stop() {},
+    healthCheck() {
+      const summary = entitlementControlPlane.getSummary();
+      return {
+        ok: true,
+        status: summary.status,
+        details: summary,
+      };
+    },
+  });
 
   servicesHub.register({
     id: surfaceDescriptors.serviceIDs.reactUIDemo,
@@ -1160,6 +1282,7 @@ export function createPlugin({
     bundleRuntime,
     openReactDemoWindow: reactUIDemo.openDemoWindow,
     getWasmKernelProbe,
+    controlPlane: entitlementControlPlane,
     getProtectionSummary,
     surfaceDescriptors,
   });

@@ -844,6 +844,8 @@ describe("Host Actions", () => {
     assert.equal(getHostActionDescriptor("runtime.deriveWasmKernelDigest")?.executable, true);
     assert.equal(getHostActionDescriptor("runtime.deriveWasmKernelUnlockToken")?.status, "probe-only");
     assert.equal(getHostActionDescriptor("runtime.deriveWasmKernelUnlockToken")?.executable, true);
+    assert.equal(getHostActionDescriptor("runtime.resolveLegacyEntitlementGate")?.status, "probe-only");
+    assert.equal(getHostActionDescriptor("runtime.resolveLegacyEntitlementGate")?.executable, true);
     assert.equal(getHostActionDescriptor("preferences.helpLink")?.status, "manual-only");
     assert.equal(getHostActionDescriptor("window.openReactDemo"), null);
   });
@@ -1228,6 +1230,51 @@ describe("Host Actions", () => {
     assert.equal(result.ok, true);
     assert.equal(result.readiness.ok, true);
     assert.equal(result.observedState.mainThread.unlockTokenHex, "cafebabe");
+  });
+
+  it("should resolve the advisory legacy entitlement gate through the control-plane host action", async () => {
+    let resolveCalls = 0;
+    const runner = createHostActionRunner({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+      host: {},
+      reader: {},
+      menuManager: {},
+      controlPlane: {
+        async resolve(payload = {}) {
+          resolveCalls += 1;
+          assert.deepEqual(payload, {
+            forceRefresh: true,
+          });
+          return {
+            mode: "legacy-backend-v0",
+            configured: true,
+            status: "validated",
+            identityKind: "zotero-user-id",
+            cacheAvailable: true,
+            cacheFresh: true,
+            validationSource: "fresh-network",
+            gateSatisfied: true,
+            compactGateHex: "1234abcd",
+            lastValidatedAt: "2026-04-20T00:00:00.000Z",
+            expiresAt: "2026-04-21T00:00:00.000Z",
+            failureKind: null,
+          };
+        },
+      },
+    });
+
+    const result = await runner.runHostAction("runtime.resolveLegacyEntitlementGate", {
+      forceRefresh: true,
+    });
+
+    assert.equal(resolveCalls, 1);
+    assert.equal(result.ok, true);
+    assert.equal(result.failureKind, null);
+    assert.equal(result.readiness.ok, true);
+    assert.equal(result.observedState.status, "validated");
+    assert.equal(result.observedState.compactGateHex, "1234abcd");
   });
 
   it("should run preference pane host actions with readiness and surface evidence", async () => {

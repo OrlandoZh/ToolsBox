@@ -53,6 +53,7 @@ export const PACKAGE_PROTECTION_SMOKE_VARIANTS = Object.freeze([
   "shielded-surface-scrub",
   "shielded-surface-scrub-wasm-digest",
   "shielded-surface-scrub-wasm-stage2-derive",
+  "shielded-surface-scrub-wasm-entitlement-legacy",
 ]);
 
 export const MANUAL_SCORECARD_LEVELS = Object.freeze([
@@ -108,6 +109,9 @@ function normalizeVariant(variant) {
   if (normalized === "surface-scrub-wasm-stage2-derive" || normalized === "wasm-stage2-derive") {
     return "shielded-surface-scrub-wasm-stage2-derive";
   }
+  if (normalized === "surface-scrub-wasm-entitlement-legacy" || normalized === "wasm-entitlement-legacy") {
+    return "shielded-surface-scrub-wasm-entitlement-legacy";
+  }
   return PACKAGE_PROTECTION_SMOKE_VARIANTS.includes(normalized)
     ? normalized
     : null;
@@ -121,7 +125,8 @@ function isShieldedLikeVariant(variant) {
     || normalizedVariant === "shielded-pref-bridge"
     || normalizedVariant === "shielded-surface-scrub"
     || normalizedVariant === "shielded-surface-scrub-wasm-digest"
-    || normalizedVariant === "shielded-surface-scrub-wasm-stage2-derive";
+    || normalizedVariant === "shielded-surface-scrub-wasm-stage2-derive"
+    || normalizedVariant === "shielded-surface-scrub-wasm-entitlement-legacy";
 }
 
 function normalizePositiveInteger(value, fallback = 0) {
@@ -175,7 +180,7 @@ export function parsePackageProtectionSmokeArgs(argv = process.argv.slice(2)) {
     }
   }
 
-  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive", {
+  assertScript(Boolean(options.variant), "--variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive|shielded-surface-scrub-wasm-entitlement-legacy", {
     category: "args",
     failedStage: "parse-args",
   });
@@ -209,7 +214,7 @@ function buildChannelEnv(channel, env = process.env) {
 
 export function resolvePackageProtectionSmokePackageArgs(variant, options = {}) {
   const normalizedVariant = normalizeVariant(variant);
-  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive", {
+  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive|shielded-surface-scrub-wasm-entitlement-legacy", {
     category: "args",
     failedStage: "resolve-variant",
   });
@@ -245,12 +250,15 @@ export function resolvePackageProtectionSmokePackageArgs(variant, options = {}) 
   if (normalizedVariant === "shielded-surface-scrub-wasm-stage2-derive") {
     return ["--surface-scrub-wasm-stage2-derive", "--skip-release-metadata"];
   }
+  if (normalizedVariant === "shielded-surface-scrub-wasm-entitlement-legacy") {
+    return ["--surface-scrub-wasm-entitlement-legacy", "--skip-release-metadata"];
+  }
   return ["--shield-bundle", "--skip-release-metadata"];
 }
 
 function resolvePackageVariantOutputName(config, variant) {
   const normalizedVariant = normalizeVariant(variant);
-  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive", {
+  assertScript(Boolean(normalizedVariant), "variant must be one of plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-stage2-derive|shielded-surface-scrub-wasm-entitlement-legacy", {
     category: "args",
     failedStage: "resolve-variant",
   });
@@ -513,6 +521,33 @@ function normalizeHostBindingProbe({ packageProtection = null, selfCheck = null 
   };
 }
 
+function normalizeControlPlaneProbe(controlPlane = null) {
+  const summary = controlPlane && typeof controlPlane === "object"
+    ? controlPlane
+    : null;
+  if (!summary) {
+    return null;
+  }
+  const normalizeString = (value) => {
+    const normalized = String(value || "").trim();
+    return normalized || null;
+  };
+  return {
+    mode: normalizeString(summary.mode),
+    configured: summary.configured === true,
+    status: normalizeString(summary.status),
+    identityKind: normalizeString(summary.identityKind),
+    cacheAvailable: summary.cacheAvailable === true,
+    cacheFresh: summary.cacheFresh === true,
+    validationSource: normalizeString(summary.validationSource),
+    gateSatisfied: summary.gateSatisfied === true,
+    compactGateHex: normalizeString(summary.compactGateHex),
+    lastValidatedAt: normalizeString(summary.lastValidatedAt),
+    expiresAt: normalizeString(summary.expiresAt),
+    failureKind: normalizeString(summary.failureKind),
+  };
+}
+
 function normalizeCapabilityManifestProbe(selfCheck = null) {
   return {
     variant: typeof selfCheck?.capabilityManifestVariant === "string" && selfCheck.capabilityManifestVariant.trim()
@@ -728,6 +763,26 @@ async function runSingleSmokeIteration({
         issues.push(`surface-scrub-wasm-stage2-derive capability manifest detailLevel 异常：${capabilityManifest.detailLevel}`);
       }
     }
+    if (variant === "shielded-surface-scrub-wasm-entitlement-legacy") {
+      const controlPlane = packageProtection?.controlPlane && typeof packageProtection.controlPlane === "object"
+        ? packageProtection.controlPlane
+        : null;
+      if (controlPlane?.mode !== "legacy-backend-v0") {
+        issues.push(`surface-scrub-wasm-entitlement-legacy controlPlane.mode 异常：${controlPlane?.mode || "-"}`);
+      }
+      if (controlPlane?.configured !== true) {
+        issues.push("surface-scrub-wasm-entitlement-legacy 未回读到 controlPlane.configured=true。");
+      }
+      if (controlPlane?.status === "disabled") {
+        issues.push("surface-scrub-wasm-entitlement-legacy controlPlane.status 不应为 disabled。");
+      }
+      if (capabilityManifest.overlayApplied) {
+        issues.push("surface-scrub-wasm-entitlement-legacy 不应恢复 capability overlay。");
+      }
+      if (capabilityManifest.detailLevel === "full") {
+        issues.push("surface-scrub-wasm-entitlement-legacy 不应恢复 full capability manifest。");
+      }
+    }
 
     const passed = issues.length === 0;
     return {
@@ -768,6 +823,7 @@ async function runSingleSmokeIteration({
           prepareDurationMs: Number(packageProtection.prepareDurationMs || 0),
           bootstrapResolveDurationMs: Number(packageProtection.bootstrapResolveDurationMs || 0),
           bootstrapCallCount: Number(packageProtection.bootstrapCallCount || 0),
+          controlPlane: normalizeControlPlaneProbe(packageProtection.controlPlane),
         }
         : null,
       hostBinding,
@@ -948,6 +1004,12 @@ export function renderPackageProtectionSmokeMarkdown(report) {
     lines.push(`- packageProtection decodeMethod: \`${run.packageProtection?.decodeMethod || "-"}\``);
     lines.push(`- packageProtection decode: \`${run.packageProtection?.decodeDurationMs ?? 0}ms\``);
     lines.push(`- packageProtection prepare: \`${run.packageProtection?.prepareDurationMs ?? 0}ms\``);
+    if (run.packageProtection?.controlPlane) {
+      lines.push(`- controlPlane mode: \`${run.packageProtection.controlPlane.mode || "-"}\``);
+      lines.push(`- controlPlane status: \`${run.packageProtection.controlPlane.status || "-"}\``);
+      lines.push(`- controlPlane validationSource: \`${run.packageProtection.controlPlane.validationSource || "-"}\``);
+      lines.push(`- controlPlane gateSatisfied: \`${run.packageProtection.controlPlane.gateSatisfied ? "yes" : "no"}\``);
+    }
     lines.push(`- hostBinding available: \`${run.hostBinding?.available ? "yes" : "no"}\``);
     lines.push(`- hostBinding profileHash: \`${run.hostBinding?.profileHashPresent ? "yes" : "no"}\``);
     lines.push(`- hostBinding dbAvailable: \`${run.hostBinding?.dbAvailable ? "yes" : "no"}\``);

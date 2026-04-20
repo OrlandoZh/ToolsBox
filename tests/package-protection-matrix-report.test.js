@@ -754,6 +754,80 @@ describe("Package Protection Matrix Report", () => {
     assert.equal(report.candidates[0].signals.unpackedSurfaceAnchorCount, 16);
   });
 
+  it("should surface control-group single-pass evidence from the attack report when present", () => {
+    const report = summarizePackageProtectionMatrixReport({
+      registry: {
+        schemaVersion: 1,
+        candidates: [
+          {
+            id: "plain",
+            class: "control",
+            stage: "stage0",
+            executionMode: "buildable-xpi",
+            evaluationKind: "variant",
+            variant: "plain",
+            channel: "stable",
+            artifactCoverage: ["smoke", "perf", "anchor-audit"],
+            promotionGate: "control-only",
+            status: "control",
+            summary: "plain control",
+          },
+        ],
+      },
+      smokeAggregate: {
+        reports: [
+          buildSmokeReport({
+            variant: "plain",
+            llmSinglePassResult: "readable-module-recovery",
+          }),
+        ],
+      },
+      attackReport: {
+        candidates: [
+          {
+            id: "plain",
+            variant: "plain",
+            channel: "stable",
+            evidenceStatus: "complete",
+            recommendedAction: "control-only",
+            resistanceLabel: "single-pass-readable-module-risk",
+            summary: "plain control is fully readable under single-pass analysis",
+            profileCoverage: {
+              singlePassAutomation: {
+                complete: true,
+                rating: "readable-module-recovery",
+              },
+              guidedA2M3: {
+                meetsTarget: false,
+              },
+            },
+          },
+        ],
+      },
+      anchorAuditReport: {
+        comparison: {
+          plainCandidateAnchorCount: 30,
+        },
+      },
+      guidedReports: {},
+      webcrackReports: {
+        "plain:stable": {
+          suggestedWebcrackRating: "parse-fail / only-loader",
+          summary: "loader only",
+        },
+      },
+    });
+
+    assert.equal(report.candidates.length, 1);
+    const plain = report.candidates[0];
+    assert.equal(plain.id, "plain");
+    assert.equal(plain.signals.manualSinglePass, "readable-module-recovery");
+    assert.equal(plain.signals.webcrackRating, "parse-fail / only-loader");
+    assert.equal(plain.signals.attackSinglePassComplete, true);
+    assert.equal(plain.signals.attackSinglePassRating, "readable-module-recovery");
+    assert.equal(plain.recommendedAction, "control-only");
+  });
+
   it("should persist matrix artifacts", async () => {
     const projectRootPath = fs.mkdtempSync(path.join(os.tmpdir(), "package-protection-matrix-"));
     try {

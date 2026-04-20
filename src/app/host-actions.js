@@ -1476,6 +1476,7 @@ export function createHostActionRunner({
   openReactDemoWindow,
   wasmKernelProbe,
   getWasmKernelProbe,
+  controlPlane,
   getProtectionSummary,
   surfaceDescriptors = null,
 }) {
@@ -3531,6 +3532,51 @@ export function createHostActionRunner({
     }
   }
 
+  async function runRuntimeResolveLegacyEntitlementGate(actionId, payload = {}) {
+    const preconditions = [
+      createCheck("controlPlane.available", typeof controlPlane?.resolve === "function"),
+    ];
+    if (preconditions.some((entry) => entry.ok === false)) {
+      return buildFailureResult(actionId, {
+        preconditions,
+        failureKind: "precondition-failed",
+      });
+    }
+
+    try {
+      const observedState = await controlPlane.resolve({
+        forceRefresh: payload?.forceRefresh === true,
+      });
+      return buildResult({
+        actionId,
+        preconditions,
+        observedState,
+        readinessChecks: [
+          createCheck("summary-present", observedState && typeof observedState === "object"),
+          createCheck("summary-sanitized", !("endpoint" in observedState) && !("secret" in observedState) && !("rawResponse" in observedState)),
+          createCheck("non-blocking-status", [
+            "disabled",
+            "idle",
+            "pending",
+            "validated",
+            "cache-hit",
+            "degraded",
+            "error",
+          ].includes(String(observedState?.status || ""))),
+        ],
+        failureKind: observedState?.status === "error" ? "control-plane-error" : null,
+      });
+    } catch (error) {
+      return buildFailureResult(actionId, {
+        preconditions,
+        observedState: {
+          message: String(error?.message || error),
+        },
+        failureKind: "action-failed",
+      });
+    }
+  }
+
   async function runHostAction(actionId, payload = {}) {
     const descriptor = getHostActionDescriptor(actionId, {
       bundleRuntime,
@@ -3584,6 +3630,8 @@ export function createHostActionRunner({
         return await runRuntimeDeriveWasmKernelDigest(actionId, payload);
       case HOST_ACTION_IDS.runtimeDeriveWasmKernelUnlockToken:
         return await runRuntimeDeriveWasmKernelUnlockToken(actionId, payload);
+      case HOST_ACTION_IDS.runtimeResolveLegacyEntitlementGate:
+        return await runRuntimeResolveLegacyEntitlementGate(actionId, payload);
       case HOST_ACTION_IDS.windowOpenReactDemo:
         return await runWindowOpenReactDemo(actionId, payload);
       default:

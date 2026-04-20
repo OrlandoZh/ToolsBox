@@ -19,12 +19,14 @@
 - `npm run package:protection:jsconfuser:bootstrap`
 - `npm run package:protection:jsconfuser:preflight`
 - `npm run package:protection:lightweight:preflight`
-- `npm run package:protection:smoke -- --variant <plain|encrypted|shielded|shielded-descriptor-bind|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest> --repeats 3 --channel <stable|beta>`
-- `npm run package:protection:webcrack -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest> --channel <stable|beta>`
-- `npm run package:protection:webcrack:score -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest> --channel <stable|beta>`
-- `npm run package:protection:inner:audit -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|all> --channel <stable|beta>`
-- `npm run package:protection:score:llm -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest> --channel <stable|beta> --llm "<rating>"`
-- `npm run package:protection:score:guided -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest> --channel <stable|beta> --rating "<rating>" --result-tier <R0|R1|R2|R3|R4> --attacker-tier <A0|A1|A2|A3|A4> --ai-tier <M0|M1|M2|M3|M4> --attack-method <static-only|static+webcrack|static+reference|dynamic-hooked|runtime-rehosted> --time-bucket <<10m|10-30m|30-120m|>120m> --round-mode <single-pass|multi-round> --summary "<summary>"`
+- `npm run package:protection:smoke -- --variant <plain|encrypted|shielded|shielded-descriptor-bind|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-entitlement-legacy> --repeats 3 --channel <stable|beta>`
+- `npm run package:protection:webcrack -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-entitlement-legacy> --channel <stable|beta>`
+- `npm run package:protection:webcrack:score -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-entitlement-legacy> --channel <stable|beta>`
+- `npm run package:protection:opencode -- --variant <plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-entitlement-legacy> --channel <stable|beta>`
+- `npm run package:protection:opencode:score -- --variant <plain|encrypted|shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-entitlement-legacy> --channel <stable|beta>`
+- `npm run package:protection:inner:audit -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-entitlement-legacy|all> --channel <stable|beta>`
+- `npm run package:protection:score:llm -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-entitlement-legacy> --channel <stable|beta> --llm "<rating>"` (`manual fallback only`)
+- `npm run package:protection:score:guided -- --variant <shielded|shielded-descriptor-bind|shielded-jsconfuser-string|shielded-pref-bridge|shielded-surface-scrub|shielded-surface-scrub-wasm-digest|shielded-surface-scrub-wasm-entitlement-legacy> --channel <stable|beta> --rating "<rating>" --result-tier <R0|R1|R2|R3|R4> --attacker-tier <A0|A1|A2|A3|A4> --ai-tier <M0|M1|M2|M3|M4> --attack-method <static-only|static+webcrack|static+reference|dynamic-hooked|runtime-rehosted> --time-bucket <<10m|10-30m|30-120m|>120m> --round-mode <single-pass|multi-round> --summary "<summary>"`
 - `npm run package:protection:attack`
 - `npm run package:protection:attack:plan`
 - `npm run package:protection:strategy`
@@ -41,7 +43,7 @@
 当前正式手动收口链路固定为：
 
 - `package:protection:smoke -> package:protection:score -> package:protection:verdict`
-- 实验变体若已先录入 `webcrack`，可走 `package:protection:webcrack:score -> package:protection:score:llm -> package:protection:compare`
+- 实验变体若已先录入 `webcrack`，可走 `package:protection:webcrack:score -> package:protection:opencode -> package:protection:opencode:score -> package:protection:compare`
 - `plain` 固定只作为 control group 展示，不作为 protection failure 判据
 - `shielded stable` 的手工评分若落到 `readable-module-recovery`，只会把 verdict 降到 `attention` 并建议未来 hardening wave；当前不直接重开 `sidecar`
 
@@ -58,6 +60,8 @@
 - `dist/package-protection-inner-audit.json`
 - `dist/package-protection-inner-audit.md`
 - `dist/package-protection-webcrack/<variant>-<channel>.md`
+- `dist/package-protection-opencode/<variant>-<channel>.json`
+- `dist/package-protection-opencode/<variant>-<channel>.md`
 - `dist/package-protection-compare/<variant>-vs-<baseVariant>-<channel>.json`
 - `dist/package-protection-compare/<variant>-vs-<baseVariant>-<channel>.md`
 - `dist/package-protection-guided-attack/<variant>-<channel>-<profileKey>.json`
@@ -83,7 +87,10 @@
 
 - `package:protection:webcrack` 负责生成本地 `webcrack` 自动化工件
 - `package:protection:webcrack:score` 只把 `suggestedWebcrackRating` 回填到 smoke report 的 `manualScorecard.webcrackInitialResult`
+- `package:protection:opencode` 负责生成默认 scripted single-pass 静态分析工件；只在当前环境已安装并允许调用 `opencode run` 时启用
+- `package:protection:opencode:score` 只把 `suggestedLLMRating` 回填到 smoke report 的 `manualScorecard.llmSinglePassResult`
 - `package:protection:inner:audit` 只补一份离线 `proxy LLM` 证据，不会写回 `manualScorecard`
+- `package:protection:score:llm` 继续保留，但只作为手工 fallback，不再是默认 scripted lane
 - `package:protection:attack` 只汇总 `webcrack / single-pass LLM / guided-attack / compare` 证据，用来回答“当前自动化阻力到哪一档、最强已记录攻击画像能恢复到什么层级”
 - `package:protection:attack` 还会固定标出两条画像覆盖线：
   - `singlePassAutomation`
@@ -100,8 +107,8 @@
 - `package:protection:compare` 在手工 `LLM single-pass` 尚未完成时，会把 `inner audit` 的 proxy 结果一起展示，帮助保持 A/B 结论可读；一旦手工 LLM 补齐，compare 才能正式落到 `runtime-only`、`hardening-win` 或 `leaning-same`
 - `package:protection:score` 仍负责补齐 `llmSinglePassResult`，不会被替代
 - `package:protection:score:guided` 只记录更强攻击画像，不写回 `manualScorecard`；同一 `variant/channel` 现在允许并存多条不同画像记录，不再互相覆盖
-- `package:protection:score` / `package:protection:score:llm` / `package:protection:webcrack:score` 当前都复用同一条 package-protection workflow lock；这样即使在同一进程里并发回填评分，也不会再把 `dist/package-protection-smoke.json` 写坏
-- 但凡刚执行过会回写 smoke 的命令，例如 `package:protection:webcrack:score` 或 `package:protection:score:llm`，后续 `package:protection:attack -> package:protection:attack:plan -> package:protection:matrix` 必须串行重跑；不要把“写 smoke”和“读汇总工件”并发在同一轮里，否则容易读到旧状态
+- `package:protection:score` / `package:protection:opencode:score` / `package:protection:score:llm` / `package:protection:webcrack:score` 当前都复用同一条 package-protection workflow lock；这样即使在同一进程里并发回填评分，也不会再把 `dist/package-protection-smoke.json` 写坏
+- 但凡刚执行过会回写 smoke 的命令，例如 `package:protection:webcrack:score`、`package:protection:opencode:score` 或 `package:protection:score:llm`，后续 `package:protection:attack -> package:protection:attack:plan -> package:protection:matrix` 必须串行重跑；不要把“写 smoke”和“读汇总工件”并发在同一轮里，否则容易读到旧状态
 - `package:protection:jsconfuser:bootstrap` 负责把 `js-confuser` 安装到当前仓库默认可发现位置，解决实验链的本地工具可复跑性，不改默认 `shielded`
 
 ## 评分分层
@@ -901,7 +908,7 @@ npm run package:protection:compare:jsconfuser:string -- --channel stable
 - 这条路线继续保留为实验记录即可，不替代当前正式收口链中的默认 `shielded stable`
 - 当前若继续推进“抗一轮 AI 高层架构归纳”，优先做 inner semantic scrub / protected-only 语义减噪，而不是继续给 `jsconfuser-string` 扩面
 - 这条实验线的工件顺序仍固定为：
-  `smoke -> webcrack:score / manual-score -> compare`
+  `smoke -> webcrack:score -> opencode:score / manual-score -> compare`
   若中途重新跑了 `smoke`，对应 smoke report 的 `manualScorecard` 会被刷新回 `pending`，必须重新回填后再看 compare
 
 ### 12. 做受保护包性能判断时，优先看 `loadSubScript + prepare`，不要只看总冷启动时间
@@ -926,7 +933,43 @@ npm run package:protection:perf -- --channel stable
 - 读取这份报告时，当前固定口径是：
   - `durationMs median / p95 / max` 用来判断 UX 风险与尾延迟
   - `loadSubScriptDurationMs + prepareDurationMs` 用来判断保护链自身额外成本
-  - 当某个候选表现出“总时长更快，但 `loadSubScript + prepare` 更高”时，应按宿主冷启动噪声处理，不能直接升级为更优保护路线
+- 当某个候选表现出“总时长更快，但 `loadSubScript + prepare` 更高”时，应按宿主冷启动噪声处理，不能直接升级为更优保护路线
+
+### 13. `route4 legacy backend v0` 已完成 quick-apply A/B，当前只保留为 advisory experiment
+
+截至 `2026-04-20`，`shielded-surface-scrub-wasm-entitlement-legacy` 已按 `surface-scrub` 对照完成第一轮 fresh A/B：
+
+- `shielded-surface-scrub stable smoke`：`3/3 passed`，`readinessMode=native`，`blockingRuntimeErrorCount=0`
+- `shielded-surface-scrub-wasm-entitlement-legacy stable smoke`：`3/3 passed`，`readinessMode=native`，`blockingRuntimeErrorCount=0`
+- v0 在 fake/local backend 环境下的 `controlPlane` 固定降级为 `degraded / identity-unavailable`，没有阻断 `bootstrapPlugin` 或安装态 smoke
+- `webcrack` 对两边的建议评级均为 `parse-fail / only-loader`
+- `anchor-audit` 显示 v0 没有扩大 `surface-scrub` 的 package-boundary 暴露：
+  - `sameRawSurface = true`
+  - `sameUnpackedSurface = true`
+  - `newExposedFiles = []`
+  - `unexpectedExposedFiles = []`
+  - `packageBoundaryWithinWasmAssets = true`
+- `compare` 对 v0 给出 `status=passed`、`decision=hardening-win`，含义是“作为实验候选成立”，不是“升级为当前主线”
+
+当前性能 / 体积成本相对 `shielded-surface-scrub` 可接受：
+
+- `durationMs median`: `1678 -> 1745`，`+67ms / +4.0%`
+- `prepareDurationMs median`: `91 -> 91`，无变化
+- `protectionPipeline median`: `595 -> 584`，`-11ms / -1.85%`
+- `xpiBytes`: `+32434`，约 `+0.77%`
+- `bundleBytes`: `+55666`，约 `+0.81%`
+
+这轮需要保留两个边界判断：
+
+- v0 当前仍是 `Wasm lane facade`，不是完整 legacy 协议已经进入 `.wasm` binary；现有 `probe.wasm` 只提供 digest primitives，legacy glue / HMAC-MD5 兼容逻辑仍在 protected JS facade / worker wrapper 中
+- opencode scripted single-pass 本轮只成功产出 `shielded-surface-scrub` 报告，评级为 `high-level-architecture`；v0 报告在串行重跑、无 build lock 竞争时仍达到 `300000ms` 超时，因此本轮不把 opencode 作为 v0 promotion 的阻断证据
+
+当前 retained decision 固定为：
+
+- v0 可以作为 `route4` quick-apply experiment 继续保留
+- v0 不接真实产品 gate，不接 UI，不进入默认 `release / agent:gate / agent:gate:release`
+- 当前主线仍保持 `shielded`，retained top 仍保持 `shielded-surface-scrub`
+- 若后续要把 route4 做成长期能力，优先升级到 signed ticket + public-key verify，并补真实 Wasm 源码链，把 HMAC / ticket verify / compact gate 迁入 Wasm export
 
 ## Retained Recommendations
 
