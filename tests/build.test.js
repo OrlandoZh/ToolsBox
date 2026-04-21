@@ -23,11 +23,13 @@ import {
   BUILD_STATIC_SURFACE_MODE_ENV,
   BUILD_STATIC_SURFACE_MODE_SCRUB,
   BUILD_STATIC_SURFACE_MODE_STANDARD,
+  createBuildConfigExpression,
   createBundleModuleId,
   resolveBuildModuleIdMode,
   resolveBuildPreferenceBindingMode,
   resolveBuildSemanticScrubMode,
   resolveBuildStaticSurfaceMode,
+  scrubProtectedSourceLiterals,
   stripProtectedSourceComments,
 } from "../scripts/build.mjs";
 import { createSurfaceDescriptors as createProtectedSurfaceDescriptors } from "../src/app/surface-descriptors-protected.js";
@@ -138,6 +140,63 @@ describe("Build Artifacts", () => {
     assert.equal(stripped.includes("https://example.com/reader-summary"), true);
   });
 
+  it("should encode protected build config strings without changing runtime values", () => {
+    const config = {
+      addonRef: "cleanroomtemplate",
+      addonName: "Zotero Cleanroom Template",
+      addonVersion: "0.1.0",
+      updateURL: "https://example.com/downloads/cleanroomtemplate/update.json",
+      defaultPrefs: {
+        enabled: true,
+        menuLabel: "",
+      },
+      optional: ["agent-runtime", "ai-service"],
+    };
+
+    const standardExpression = createBuildConfigExpression(config);
+    const protectedExpression = createBuildConfigExpression(config, BUILD_SEMANTIC_SCRUB_PROTECTED);
+    const decoded = Function(`return ${protectedExpression};`)();
+
+    assert.equal(standardExpression.includes("cleanroomtemplate"), true);
+    assert.equal(protectedExpression.includes("cleanroomtemplate"), false);
+    assert.equal(protectedExpression.includes("Zotero Cleanroom Template"), false);
+    assert.equal(protectedExpression.includes("agent-runtime"), false);
+    assert.deepEqual(decoded, config);
+  });
+
+  it("should scrub protected-only diagnostic literals from selected source files", () => {
+    const readerSource = [
+      'debug("reader.openReader.success", {});',
+      'error("reader.openByURI.failed", {});',
+    ].join("\n");
+    const mainSource = 'const event = "cleanroom.bootstrap.startup.failed";';
+    const wasmLoaderSource = 'throw new Error("WebAssembly.instantiate is required");';
+
+    const scrubbedReader = scrubProtectedSourceLiterals(
+      readerSource,
+      path.join(projectRoot, "src", "features", "reader.js"),
+      path.join(projectRoot, "src"),
+    );
+    const scrubbedMain = scrubProtectedSourceLiterals(
+      mainSource,
+      path.join(projectRoot, "src", "main.js"),
+      path.join(projectRoot, "src"),
+    );
+    const scrubbedWasmLoader = scrubProtectedSourceLiterals(
+      wasmLoaderSource,
+      path.join(projectRoot, "src", "services", "wasm-loader.js"),
+      path.join(projectRoot, "src"),
+    );
+
+    assert.equal(scrubbedReader.includes("reader.open"), false);
+    assert.equal(scrubbedReader.includes("reader.r0.success"), true);
+    assert.equal(scrubbedReader.includes("reader.r1.failed"), true);
+    assert.equal(scrubbedMain.includes("cleanroom.bootstrap"), false);
+    assert.equal(scrubbedMain.includes("tool.bootstrap.startup.failed"), true);
+    assert.equal(scrubbedWasmLoader.includes("WebAssembly.instantiate"), false);
+    assert.equal(scrubbedWasmLoader.includes("wasm instantiate unavailable"), true);
+  });
+
   it("should generate manifest with non-empty zotero update_url", () => {
     execFileSync("node", ["scripts/build.mjs"], {
       cwd: projectRoot,
@@ -225,6 +284,12 @@ describe("Build Artifacts", () => {
 
     assert.equal(report.moduleIdMode, "anonymized");
     assert.equal(report.semanticScrubMode, "protected");
+    assert.equal(bundleSource.includes(config.addonName), false);
+    assert.equal(bundleSource.includes(config.addonVersion), false);
+    assert.equal(bundleSource.includes(config.author), false);
+    assert.equal(bundleSource.includes(config.homepage), false);
+    assert.equal(bundleSource.includes(config.updateURL), false);
+    assert.equal(bundleSource.includes(config.prefsPrefix), false);
     assert.equal(bundleSource.includes("plugin.api.agent."), false);
     assert.equal(bundleSource.includes("entrypoints"), false);
     assert.equal(bundleSource.includes("ownedBy"), false);
@@ -267,6 +332,9 @@ describe("Build Artifacts", () => {
     assert.equal(bundleSource.includes("runtime.deriveWasmKernelDigest"), false);
     assert.equal(bundleSource.includes("runtime.deriveWasmKernelUnlockToken"), false);
     assert.equal(bundleSource.includes("window.openReactDemo"), false);
+    assert.equal(bundleSource.includes("reader.open"), false);
+    assert.equal(bundleSource.includes("cleanroom.bootstrap"), false);
+    assert.equal(bundleSource.includes("WebAssembly.instantiate"), false);
     assert.equal(bundleSource.includes("Open Preference Pane"), false);
     assert.equal(bundleSource.includes("authoritativeSource"), false);
     assert.equal(bundleSource.includes("readinessAssertions"), false);

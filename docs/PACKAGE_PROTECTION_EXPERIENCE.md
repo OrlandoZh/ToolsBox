@@ -971,6 +971,36 @@ npm run package:protection:perf -- --channel stable
 - 当前主线仍保持 `shielded`，retained top 仍保持 `shielded-surface-scrub`
 - 若后续要把 route4 做成长期能力，优先升级到 signed ticket + public-key verify，并补真实 Wasm 源码链，把 HMAC / ticket verify / compact gate 迁入 Wasm export
 
+### 14. protected-only inner semantic scrub 补刀：配置字符串编码 + 诊断锚点中性化
+
+截至 `2026-04-21`，继续沿 `protected-only` 方向做了一轮低风险补刀：
+
+- `__CLEANROOM_TEMPLATE_CONFIG__` 在 protected source proxy 中不再以明文 JSON 输出字符串值，而是用 `String.fromCharCode(...)` 形式恢复运行时值
+- 这只影响 `CLEANROOM_BUILD_SEMANTIC_SCRUB=protected` 的受保护构建，不改默认源码、默认 build、默认 release / gate
+- protected-only 诊断字面量同步中性化：
+  - `reader.openReader` / `reader.openByURI` 日志锚点
+  - `cleanroom.bootstrap` / `console-bridge` / `capability-report` bootstrap 诊断锚点
+  - `WebAssembly.instantiate` 的 loader 错误文案锚点
+- 运行时值仍按原配置恢复，因此不改变插件 ID、prefs、updateURL 或用户可见行为
+
+本轮复核结果：
+
+- `package:protection:inner:audit -- --variant shielded-surface-scrub --channel stable`
+  - `status = passed`
+  - `proxyLLM = parse-fail / only-loader`
+  - `anchors = []`
+  - `moduleRecoveryAnchors = []`
+- `package:protection:audit:surface-scrub`
+  - protected source proxy 从上一轮 `totalAnchorCount=10 / totalMatchCount=31` 收敛到 `totalAnchorCount=2 / totalMatchCount=2`
+  - 剩余锚点只剩 `addonRef literal` 与 `instanceKey literal`
+  - 当前这两个剩余锚点来自 React surface bridge 的默认 global key / style id，属于 optional React surface 兼容锚点，不是 capability / host-action / lifecycle 这类高层架构目录
+
+当前 retained decision 固定为：
+
+- 这类“protected config string encoding + diagnostic literal scrub”属于低风险可保留模式
+- 当前 inner semantic scrub 已基本触达低成本收益上限；继续压剩余 React surface key 需要同时处理 optional React build artifact 的 global key contract，收益低于风险
+- 下一步若还要提升抗一轮 AI 高层归纳能力，应优先做完整候选 A/B（例如 lightweight / JS-Confuser 非 hostile 子集），而不是继续零散改默认 key
+
 ## Retained Recommendations
 
 ### 当前分支选择建议
@@ -987,8 +1017,8 @@ npm run package:protection:perf -- --channel stable
 
 ### 当前后续策略基线
 
-- 下一轮若继续提高“抗一轮 AI 高层架构归纳”能力，优先开 `protected-only` 的内层 bundle 语义减噪波次，不先回到重 loader、`sidecar` 或更激进的运行时对抗。
-- 第一批优先处理模板自有的高层语义锚点：
+- protected-only 的内层 bundle 语义减噪已经完成两轮补刀，当前只剩低价值 optional React surface key 锚点；不要再为了这类锚点重开 loader、`sidecar` 或 hostile runtime。
+- 已处理并应继续保持回归守卫的模板自有高层语义锚点：
   - `plugin.api.agent.*` 能力面
   - `capabilityManifest` 中的 `id / label / description / entrypoints / ownedBy / successSignals`
   - `plugin-agent` 的结构化自检 / 遥测字段
@@ -998,7 +1028,7 @@ npm run package:protection:perf -- --channel stable
   - Zotero / Services / ChromeUtils / TextDecoder / crypto
   - Reader 官方事件类型，如 `renderToolbar`、`createViewContextMenu`
   - PreferencePanes / ItemPane / MenuManager 对齐宿主的字段与 target/type 枚举
-- 若语义减噪后人工评级仍保持 `high-level-architecture`，才进入一次有止损线的 `lightweight-js-obfuscator` 内层 bundle 实验；它不是当前主推荐路线。
+- 若补完语义减噪后人工评级仍保持 `high-level-architecture`，才进入一次有止损线的 `lightweight-js-obfuscator` / JS-Confuser 非 hostile 子集实验；它不是当前主推荐路线。
 - `路线4`（轻服务能力）继续作为未来 hardening 备选；`路线5`（Wasm 小内核）只有在 `package:protection:wasm:admission` 输出 `ready-for-candidate` 后，才允许以 `shielded-surface-scrub-wasm-digest` 进入 advisory experiment，不替代 `encrypted / shielded` 主线。
 
 ### 宿主弱绑定候选边界
