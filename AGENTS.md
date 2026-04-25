@@ -30,6 +30,16 @@
 - 模板审计只认 bundle registry 中的 matcher label 与治理意图，不要求项目逐字复读模板原句
 - 如果项目保留 `framework:governance:check` / `framework:bundle:audit`，就必须同时保留并同步本地 `config/framework-backfill-bundles.json` mirror
 
+## Karpathy-Style Agent Discipline
+
+本节吸收 [`andrej-karpathy-skills`](https://github.com/forrestchang/andrej-karpathy-skills) 的通用 coding-agent 指导思想，只作为执行纪律；它不维护第二份 project truth，也不覆盖本文件已有的 truth / scope / validation / delegation / release 规则。
+
+- 编码前先澄清：不要替用户静默选择有风险的解释；如果歧义会影响 correctness、scope 或验收路径，先说清假设、权衡与需要确认的问题
+- 简单优先：只实现当前目标需要的最小方案，不为单次需求新增抽象、配置化、弹性层或 speculative feature；如果局部修复能解决，不用大重写替代
+- 手术式改动：只触碰与本轮目标直接相关的文件和行；不顺手重构、格式化、删除无关代码或清理历史遗留；只清理本轮改动自己制造的 unused import / orphan
+- 目标驱动执行：把任务转成可验证目标，先定义 acceptance criteria、约束与 verification path，再循环到证据闭环；没有实际跑过或拿到的验证，不得声称已验证
+- 任务分级执行：小任务保持轻量直接，大任务先读 truth、拆 scope、定 owner、定验收；不要把简单请求流程化，也不要把高风险任务当 one-liner 处理
+
 ## Delegation Protocol
 
 - 中大型任务默认先由 controller 读 truth、拆阶段、划 scope、再决定是否委托；不要一进仓库就直接并发改业务文件

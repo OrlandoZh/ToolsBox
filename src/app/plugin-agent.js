@@ -41,6 +41,7 @@ export function createPluginAgent({
   runtimeInfo,
   getLifecycleSummary = null,
   getProtectionSummary = null,
+  getReviewWorkbenchSummary = null,
   getCapabilityManifestOverlay = null,
   createCapabilityManifest = createCapabilityManifestFactory,
   findCapabilityById = findCapabilityByIdFromManifest,
@@ -275,6 +276,21 @@ export function createPluginAgent({
     const hostBinding = packageProtection?.hostBinding && typeof packageProtection.hostBinding === "object"
       ? packageProtection.hostBinding
       : createDefaultHostBindingSummary();
+    const reviewWorkbench = typeof getReviewWorkbenchSummary === "function"
+      ? getReviewWorkbenchSummary()
+      : {
+        enabled: false,
+        sessionReady: false,
+        annotationCount: 0,
+        planCount: 0,
+        lastError: null,
+        staleStageCount: 0,
+        activeStage: null,
+        windowOpen: false,
+        acceptanceStatus: "unavailable",
+        externalBlockers: [],
+        lastLifecycleScenario: null,
+      };
     const capabilityManifestView = getCurrentCapabilityManifestView();
     return {
       enabled: Boolean(prefs.get("enabled")),
@@ -415,6 +431,41 @@ export function createPluginAgent({
       runtimeMissingRequiredCapabilities: Array.isArray(runtimeSummary.missingRequired)
         ? runtimeSummary.missingRequired.slice()
         : [],
+      reviewWorkbenchEnabled: Boolean(reviewWorkbench?.enabled),
+      reviewWorkbenchSessionReady: Boolean(reviewWorkbench?.sessionReady),
+      reviewWorkbenchAnnotationCount: Number(reviewWorkbench?.annotationCount || 0),
+      reviewWorkbenchPlanCount: Number(reviewWorkbench?.planCount || 0),
+      reviewWorkbenchStaleStageCount: Number(reviewWorkbench?.staleStageCount || 0),
+      reviewWorkbenchActiveStage: typeof reviewWorkbench?.activeStage === "string"
+        && reviewWorkbench.activeStage.trim()
+        ? reviewWorkbench.activeStage.trim()
+        : null,
+      reviewWorkbenchWindowOpen: Boolean(reviewWorkbench?.windowOpen),
+      reviewWorkbenchLastError: typeof reviewWorkbench?.lastError === "string"
+        && reviewWorkbench.lastError.trim()
+        ? reviewWorkbench.lastError.trim()
+        : null,
+      reviewWorkbenchAcceptanceStatus: typeof reviewWorkbench?.acceptanceStatus === "string"
+        && reviewWorkbench.acceptanceStatus.trim()
+        ? reviewWorkbench.acceptanceStatus.trim()
+        : (reviewWorkbench?.enabled ? "passed" : "unavailable"),
+      reviewWorkbenchExternalBlockers: Array.isArray(reviewWorkbench?.externalBlockers)
+        ? reviewWorkbench.externalBlockers.map((item) => String(item || "").trim()).filter(Boolean)
+        : [],
+      reviewWorkbenchLastLifecycleScenario: reviewWorkbench?.lastLifecycleScenario
+        && typeof reviewWorkbench.lastLifecycleScenario === "object"
+        ? {
+          status: typeof reviewWorkbench.lastLifecycleScenario.status === "string"
+            ? reviewWorkbench.lastLifecycleScenario.status
+            : "unknown",
+          generatedAt: typeof reviewWorkbench.lastLifecycleScenario.generatedAt === "string"
+            ? reviewWorkbench.lastLifecycleScenario.generatedAt
+            : null,
+          scenarioName: typeof reviewWorkbench.lastLifecycleScenario.scenarioName === "string"
+            ? reviewWorkbench.lastLifecycleScenario.scenarioName
+            : null,
+        }
+        : null,
     };
   }
 
@@ -497,6 +548,9 @@ export function createPluginAgent({
       paneIDs: preferencePanes.getAllPanes(),
       packageProtection: typeof getProtectionSummary === "function"
         ? getProtectionSummary()
+        : null,
+      reviewWorkbench: typeof getReviewWorkbenchSummary === "function"
+        ? getReviewWorkbenchSummary()
         : null,
       hostActions: typeof listHostActions === "function"
         ? listHostActions()

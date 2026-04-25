@@ -47,6 +47,8 @@ import {
 } from "./capability-manifest-protected.js";
 import { createReactUIDemoLauncher } from "../features/react-ui-demo.js";
 import { createWasmKernelProbe } from "../features/wasm-kernel-probe.js";
+import { createAgentReviewWorkbench } from "../features/agent-review-workbench.js";
+import { createReviewWorkbenchRuntimeProvider } from "./review-workbench-runtime-provider.js";
 
 const WASM_STAGE2_DERIVE_PACKAGE_VARIANT = "shielded-surface-scrub-wasm-stage2-derive";
 const ROUTE4_LEGACY_PACKAGE_VARIANT = "shielded-surface-scrub-wasm-entitlement-legacy";
@@ -1286,6 +1288,16 @@ export function createPlugin({
     getProtectionSummary,
     surfaceDescriptors,
   });
+  const reviewWorkbenchRuntimeProvider = createReviewWorkbenchRuntimeProvider({
+    config,
+    globalScope,
+    runtime,
+    runtimeInfo,
+    getPrefsEnabled: () => Boolean(prefs.get("enabled")),
+    listHostActions: hostActions.listHostActions,
+    getHostActionExecutions: hostActions.getRecentExecutionSummaries,
+  });
+  let reviewWorkbench = null;
 
   const agent = createPluginAgent({
     config,
@@ -1316,10 +1328,60 @@ export function createPlugin({
     runtimeInfo,
     getLifecycleSummary: () => cloneLifecycleTelemetrySummary(lifecycleTelemetrySummary),
     getProtectionSummary,
+    getReviewWorkbenchSummary: () => reviewWorkbench?.getDiagnostics?.() || {
+      enabled: false,
+      sessionReady: false,
+      annotationCount: 0,
+      planCount: 0,
+      lastError: null,
+      staleStageCount: 0,
+      activeStage: null,
+      windowOpen: false,
+      acceptanceStatus: "unavailable",
+      externalBlockers: [],
+      lastLifecycleScenario: null,
+    },
     getCapabilityManifestOverlay,
     createCapabilityManifest,
     getCapabilityManifestView,
     surfaceDescriptors,
+  });
+
+  reviewWorkbench = createAgentReviewWorkbench({
+    config,
+    logger,
+    host,
+    themeManager,
+    globalScope,
+    isAvailable() {
+      return Boolean(prefs.get("enabled")) && reviewWorkbenchRuntimeProvider.isAvailable();
+    },
+    getAvailability() {
+      const providerAvailability = reviewWorkbenchRuntimeProvider.getAvailability();
+      if (!providerAvailability.available) {
+        return providerAvailability;
+      }
+      if (!prefs.get("enabled")) {
+        return {
+          available: false,
+          reason: "plugin-disabled",
+          summary: "Agent Review Workbench is disabled because the plugin is not enabled.",
+        };
+      }
+      return {
+        available: true,
+        reason: null,
+        summary: "Agent Review Workbench is available in the current dev runtime.",
+      };
+    },
+    listHostActions: hostActions.listHostActions,
+    getScopeSnapshot: reviewWorkbenchRuntimeProvider.getScopeSnapshot,
+    getRouteSnapshot: reviewWorkbenchRuntimeProvider.getRouteSnapshot,
+    getHostActionStageSummary: reviewWorkbenchRuntimeProvider.getHostActionStageSummary,
+    getEvidenceSummary: reviewWorkbenchRuntimeProvider.getEvidenceSummary,
+    getPatchPlanSummary: reviewWorkbenchRuntimeProvider.getPatchPlanSummary,
+    getGateSummary: reviewWorkbenchRuntimeProvider.getGateSummary,
+    collectAgentDiagnostics: agent.collectAgentDiagnostics,
   });
 
   const featureComposer = createFeatureComposer({
@@ -1351,6 +1413,8 @@ export function createPlugin({
     demoNotifierID,
     updateDemoNotifierState,
     bundleRuntime,
+    openAgentReviewWorkbench: reviewWorkbench.open,
+    isAgentReviewWorkbenchAvailable: reviewWorkbench.isAvailable,
     openReactDemoWindow: reactUIDemo.openDemoWindow,
     surfaceDescriptors,
     presentReactSurface: reactUIDemo.presentSurface,
@@ -1377,6 +1441,7 @@ export function createPlugin({
       });
     },
     stopServices: async () => {
+      await reviewWorkbench.shutdown();
       if (typeof wasmKernelProbe?.close === "function") {
         await wasmKernelProbe.close();
       }
@@ -1427,6 +1492,7 @@ export function createPlugin({
     inspectItemPresentation: agent.inspectItemPresentation,
     listHostActions: hostActions.listHostActions,
     runHostAction: hostActions.runHostAction,
+    reviewWorkbench,
     getProtectionSummary,
   });
 

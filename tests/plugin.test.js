@@ -382,7 +382,7 @@ describe("Plugin", () => {
     await startPromise;
 
     assert.equal(preferenceRegistrations.length, 1);
-    assert.equal(promptRegistrations.length, 3);
+    assert.equal(promptRegistrations.length, 4);
     assert.equal(menuRegistrations.length, 2);
     assert.equal(itemPaneSections.length, 1);
     assert.equal(itemPaneRows.length, 1);
@@ -430,6 +430,8 @@ describe("Plugin", () => {
     assert.equal(promptRegistrations[1][0].when(), false);
     assert.equal(promptRegistrations[2][0].id, "cleanroomtemplate-reader-selection-snapshot");
     assert.equal(promptRegistrations[2][0].when(), false);
+    assert.equal(promptRegistrations[3][0].id, "agent.reviewWorkbench.open");
+    assert.equal(promptRegistrations[3][0].when(), true);
 
     assert.equal(menuRegistrations[0].pluginID, "cleanroom-template@example.com");
     assert.equal(menuRegistrations[0].target, "main/library/item");
@@ -455,7 +457,7 @@ describe("Plugin", () => {
     assert.ok(plugin.api.runtime);
     assert.ok(plugin.api.serviceRegistry);
     assert.equal(plugin.api.preferencePanes.getPaneCount(), 1);
-    assert.equal(plugin.api.commandPalette.getCommandCount(), 3);
+    assert.equal(plugin.api.commandPalette.getCommandCount(), 4);
     assert.equal(plugin.api.menuManager.getMenuCount(), 2);
     assert.typeOf(plugin.api.menuManager.registerItemMenuItem, "function");
     assert.typeOf(plugin.api.menuManager.registerItemPaneInfoRowMenuItem, "function");
@@ -468,6 +470,11 @@ describe("Plugin", () => {
     assert.typeOf(plugin.api.agent.inspectItem, "function");
     assert.typeOf(plugin.api.agent.describeReader, "function");
     assert.typeOf(plugin.api.agent.inspectReader, "function");
+    assert.typeOf(plugin.api.agent.reviewWorkbench.getSnapshot, "function");
+    assert.typeOf(plugin.api.agent.reviewWorkbench.createAnnotation, "function");
+    assert.typeOf(plugin.api.agent.reviewWorkbench.updateAnnotation, "function");
+    assert.typeOf(plugin.api.agent.reviewWorkbench.generatePlan, "function");
+    assert.typeOf(plugin.api.agent.reviewWorkbench.refreshStep, "function");
     assert.typeOf(plugin.api.reader.getReaderUIStateSnapshot, "function");
     assert.typeOf(plugin.api.reader.registerViewContextMenuItem, "function");
     assert.typeOf(plugin.api.reader.registerAnnotationContextMenuItem, "function");
@@ -621,7 +628,16 @@ describe("Plugin", () => {
     assert.ok(diagnostics.readerEventProbeTypeCount >= 7);
     assert.equal(diagnostics.readerEventSyntheticFallbackAvailable, true);
     assert.equal(diagnostics.readerEventReport.syntheticFallbackAvailable, true);
+    assert.equal(diagnostics.reviewWorkbenchEnabled, true);
+    assert.equal(diagnostics.reviewWorkbenchSessionReady, false);
+    assert.equal(diagnostics.reviewWorkbenchAnnotationCount, 0);
+    assert.equal(diagnostics.reviewWorkbenchPlanCount, 0);
+    assert.equal(diagnostics.reviewWorkbenchWindowOpen, false);
+    assert.equal(diagnostics.reviewWorkbenchAcceptanceStatus, "passed");
+    assert.deepEqual(diagnostics.reviewWorkbenchExternalBlockers, []);
+    assert.equal(diagnostics.reviewWorkbenchLastLifecycleScenario, null);
     assert.ok(diagnostics.commandIDs.includes("cleanroomtemplate-reader-selection-snapshot"));
+    assert.ok(diagnostics.commandIDs.includes("agent.reviewWorkbench.open"));
     assert.typeOf(plugin.api.getMainWindow, "function");
 
     const settingsSnapshot = plugin.api.agent.runScenario("settings-snapshot");

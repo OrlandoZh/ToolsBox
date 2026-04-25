@@ -1,6 +1,6 @@
 # 当前剩余任务清单
 
-**更新时间**: `2026-04-19`
+**更新时间**: `2026-04-22`
 
 本文档只回答一个问题：
 
@@ -47,6 +47,10 @@
   - 手工命令入口：`npm run agent:ui:design -- run product-ui-design-update --goal "<你的设计目标>"`
   - 当前只允许子 agent 创建 / 更新 `obsidian/agent-workbench/20-当前Zotero插件-产品整体 UI 设计与更新流程.excalidraw.md`
   - UI 设计呈现固定为 Obsidian Excalidraw；不覆盖默认 `07~11` 自动概念图，也不替代 `10-模板协作-人工指令窗口.md`
+- Codex Computer Use 真机验证可选支线
+  - 手工命令入口：`npm run agent:computer-use:validate -- --user-requested --target "<可见验证目标>"`
+  - 当前只在用户明确要求后生成 / 记录 `dist/agent-computer-use-validation.{json,md}`，默认不进入 `check`、`agent:zotero:e2e`、`agent:gate`、`agent:gate:release` 或 `agent:pipeline`
+  - 该支线只作为 optional evidence，不替代 `watch -> e2e -> monitor -> gate` 主链，也不会自动升级 current truth 或新增 gate blocker
 
 当前主要后续方向集中在：
 
@@ -56,7 +60,13 @@
    - 当前不再把 host-visible polish 视为开发态 blocker；后续只在新增宿主 surface、truth 变化或 fresh rerun 再次出现新 blocker kind 时重开
 2. 当前唯一未收口主线：远端发布编排与远端 `updateURL` 闭环验证
    - release-only follow-up 固定为 `ENG-HIGH-104 / ENG-LOW-211~213`
-3. 已收口 hardening wave：`ZOTERO-DOM-CONTRACT-WAVE-001`
+3. 当前 active 扩展 wave：`AGENT-REVIEW-WORKBENCH-WAVE-001`
+   - 范围固定为 `dev-only review workbench`、`JSON state store`、`workbench command registration / trigger semantics`、`route-aware validation summary` 与 `workbench acceptance telemetry`
+   - UI 路线固定为 `standalone window`；V1 只做结构化批注、deterministic plan builder 与验证导航，不接真实 AI provider、不启用 React lane、不执行任意源码 patch
+   - 当前 validation decision 固定为 `visual-recommended`：先收口 `window lifecycle + functional smoke + JSON API`，视觉证据作为补证而非主阻断
+   - 本轮 hardening 收口点固定为 shell lost-tracking 时的 live-window reuse/close fallback、host action execution summary allowlist 脱敏、standalone shell 中文审查文案、monitor/gate 的 `reviewWorkbench` acceptance / external blocker 分离，以及 “plugin-local fallback command ≠ host-visible command palette entry” 的触发语义收紧
+   - 该工作台不是产品内用户功能，也不是 current truth 本身；它只消费 current truth / evidence 的 compact snapshot 作为交互式审查层
+4. 已收口 hardening wave：`ZOTERO-DOM-CONTRACT-WAVE-001`
    - 范围固定为 `preference pane / item pane / reader`
    - 验收主线为 `host-first -> action replay -> route-aware dom contract -> advisory summary`
    - 产物固定写入 `domContractReport`，由 `agent:zotero:e2e -> agent:monitor / dashboard / gate` 展示 route 级结构化操作日志；v1 保持 advisory + non-blocking
@@ -255,6 +265,11 @@
 - 当前真实完成度仍约为 `99%`；`ENG-HIGH-103` 的启动诊断 + runtime 清理 + `pre-capture settle`、`READER-HIGH-124 / READER-LOW-261~263` 的 capture / freshness 收口、`READER-HIGH-125` 的 library-only 根因边界冻结、以及 `READER-HIGH-126` 的 library host-noise 修复继续保留为历史契约 / review artifact；`2026-04-08` fresh `watch -> e2e -> monitor -> gate` 已把当前开发态重新拉回 `stable / ready`
 - `HOST-HIGH-201 / HOST-LOW-301~303` 已在 `2026-04-08T01:26:26.211Z` 的 fresh compare 模式 `agent:zotero:e2e` 与 `2026-04-08T01:29:27.786Z` 的 `agent:gate` 中收口：当前 `preference pane`、`context pane`、`item pane sidenav`、`reader renderToolbar / sidebar view`、`menu item / collection menu / dynamic submenu` 的 live geometry、surface-local evidence 与基线比对均已通过，不再作为开发态 blocker
 - 当前唯一未收口主线已切到 release-only 的 `ENG-HIGH-104 / ENG-LOW-211~213`：继续沿 `release:plan -> release:upload 计划壳 -> 手动远端上传 -> release:preflight --verify-remote -> release:prepare -> release:matrix -> agent:gate:release` 推进远端发布编排与远端 `updateURL` 闭环验证，不回写插件 runtime 或 host-visible polish 主线
+- 当前 active 扩展 wave 已切换为 `AGENT-REVIEW-WORKBENCH-WAVE-001`：新增 dev-only `Agent Review Workbench`，以 `standalone window + plain JS/HTML` 路线承接 `scope -> route -> hostAction -> evidence -> patchPlan -> gate` 六阶段 structured snapshot、字段级批注、deterministic plan builder、验证导航与 workbench-specific acceptance telemetry；该工作台只消费 compact current-truth / evidence snapshot，不把自己升级成新的 truth source
+- `AGENT-REVIEW-WORKBENCH-WAVE-001` 的 v1 边界已冻结：不接真实 AI provider、不启用 React optional lane、不提升为产品内用户功能、不自动应用任意源码 patch；若批注指向源码修复，仍只允许链接到现有白名单 patch/autofix 机制或落回 `manual-investigation`
+- 当前该 wave 的 validation decision 固定为 `visual-recommended`：优先证明 command entry、window reuse/focus、close cleanup、profile-local JSON state store、annotation CRUD、deterministic plan mapping 与 diagnostics summary 已闭环；standalone window 截图只作为补证，不替代功能验收
+- 本轮 `AGENT-REVIEW-WORKBENCH-WAVE-001` 收口继续限定在 workbench 自身工程质量：已把 shell manager 丢失 active window 时的 live-window reuse/focus/close/shutdown fallback、host action `observedStateSummary` allowlist 摘要、standalone shell 中文审查文案、以及 monitor/gate 中 `reviewWorkbench.windowLifecycle/snapshotProvider/annotationCrud/planBuilder` acceptance 与旧 `watch` / Reader visual blocker externalization 接入当前验收口径
+- Codex Computer Use 真机验证已作为 default-disabled optional validation lane 建立：`config/codex-computer-use-validation.json` 固定 `enabledByDefault=false`、`gateEffect=non-blocking`、`requiresExplicitUserRequest=true`，手动入口为 `npm run agent:computer-use:validate -- --user-requested --target "<目标>"`；它只生成 / 记录 `dist/agent-computer-use-validation.{json,md}`，不进入 `check`、`agent:zotero:e2e`、`agent:zotero:loop`、`agent:gate`、`agent:gate:release` 或 `agent:pipeline`
 - `ZOTERO-DOM-CONTRACT-WAVE-001` 已收口完成：覆盖 `preference pane / item pane / reader` 三条既有宿主面，新增 `domContractReport` route-aware 摘要接入 `agent:zotero:e2e -> agent:monitor / dashboard / gate`，三条 route 均通过；当前保持 advisory + non-blocking，不重开旧的 host-polish blocker
 - 当前 `preference pane` 窄宽度 hardening 与右侧 host-visible surface capture 链已全部对齐：以 Zotero 偏好设置宿主窗口最小尺寸 `800x600` 为 host boundary，当前接受“geometry ready + root width observed + no horizontal overflow”的稳定证据，不再把短暂的 geometry settle 超时单独抬成 blocker
 - latest live rerun 现已刷新到 `2026-04-08T01:24:38.171Z` 的 `agent:zotero:e2e:update-baseline` 与 `2026-04-08T01:26:26.211Z` 的 fresh compare 模式 `agent:zotero:e2e`：本轮在确认 host-visible polish 行为链稳定后，受控刷新了一次 surface-local baseline；`restart` 与 `hot-reload` 两轮均通过，`tests/scenarios` 保持 `0` 失败，`visualEvidenceFailingItemCount` 已回到 `0`
@@ -296,9 +311,9 @@
 {
   "schemaVersion": 1,
   "activeBatchId": "ENG-HIGH-104",
-  "currentWaveName": "ZOTERO-DOM-CONTRACT-WAVE-001",
-  "acceptanceTrack": "host-first -> action replay -> route-aware dom contract -> advisory summary",
-  "waveStatus": "completed"
+  "currentWaveName": "AGENT-REVIEW-WORKBENCH-WAVE-001",
+  "acceptanceTrack": "functional-first -> window lifecycle -> structured annotation -> deterministic plan -> workbench acceptance telemetry -> gate summary",
+  "waveStatus": "active"
 }
 <!-- CURRENT-TRUTH-META:END -->
 
@@ -545,9 +560,10 @@
 2. 如只需快速定向当前项目态，可优先读取 `dist/agent-context.json` 的 `runtimeCompact`；一旦涉及 truth、wave、validation 或 scope 判定，立即回到 `docs/CURRENT_BACKLOG.md` 与 mirror
 3. 如需收口正式文档 truth，先改 CURRENT truth，再运行 `node scripts/docs-sync-current-truth.mjs`，不要手改四个镜像 marker block
 4. `HOST-HIGH-201 / HOST-LOW-301~303` 已收口完成：host-visible polish 继续保留为 completed baseline，不再作为 active batch
-5. 当前 active `ZOTERO-DOM-CONTRACT-WAVE-001` 只覆盖 `preference pane / item pane / reader`：继续把 `domContractReport` 写进 `agent:zotero:e2e -> agent:monitor / dashboard / gate`，并保持 advisory + non-blocking，不把 route 级 DOM contract 失败单独抬成 blocker
-6. 当前唯一未收口主线仍是 `ENG-HIGH-104 / ENG-LOW-211~213`：沿现有 `release:plan` / `agent:release` / `agent:gate:release` 链推进远端发布编排与远端 `updateURL` 闭环验证，不改插件 runtime，不回头混写 Reader / startup / freshness
-7. Reader 更深事件点与 `P1` 白名单扩面继续保持为独立非阻断后续；若 future fresh `watch -> e2e -> monitor -> gate` 指向新的 blocker kind 或项目准备进入下一波模块扩展，再由 Codex 新开唯一后续高逻辑批次
+5. 当前 active `AGENT-REVIEW-WORKBENCH-WAVE-001` 只覆盖 dev-only review workbench：先收口 `workbench command registration / trigger semantics`、`standalone window` 生命周期、shell lost-tracking live-window fallback、profile-local JSON state store、structured snapshot、annotation CRUD、deterministic plan builder、allowlisted host action summary 与 monitor/gate `reviewWorkbench` acceptance telemetry，不把它误判成产品功能或 AI provider wave
+6. `ZOTERO-DOM-CONTRACT-WAVE-001` 已收口完成：继续保留 `domContractReport` route-aware 摘要作为完成波次基线，不把 route 级 DOM contract 失败单独抬回 blocker
+7. 当前唯一未收口主线仍是 `ENG-HIGH-104 / ENG-LOW-211~213`：沿现有 `release:plan` / `agent:release` / `agent:gate:release` 链推进远端发布编排与远端 `updateURL` 闭环验证，不改插件 runtime，不回头混写 Reader / startup / freshness
+8. Reader 更深事件点与 `P1` 白名单扩面继续保持为独立非阻断后续；若 future fresh `watch -> e2e -> monitor -> gate` 指向新的 blocker kind 或项目准备进入下一波模块扩展，再由 Codex 新开唯一后续高逻辑批次
 
 当前 `READER-HIGH-123` 已收尾完成并转为历史契约源；`ENG-HIGH-103` 的启动诊断与 `settle` 收口也已完成。
 当前 `READER-HIGH-124 / READER-LOW-261~263` 已在 live rerun 上证明 capture failure 结构化、`capture-command-failed` blocker 语义与 freshest-valid artifact 选源均已接通，并已转为历史契约 / review artifact。
@@ -565,17 +581,19 @@
 
 ## 总结
 
-当前项目已经完成 `ENG-HIGH-103`、`READER-HIGH-124 / READER-LOW-261~263`、`READER-HIGH-125`、`READER-HIGH-126` 与 `HOST-HIGH-201 / HOST-LOW-301~303` 的本轮独立收口；开发态 gate 已回到 ready，而当前唯一未收口主线已收敛为一条明确的远端发布阻断：远端 `update.json / update_link` 的真实分发闭环仍未完成。下一步在保持 release-only blocker 不变的前提下，新增一条 advisory DOM contract hardening wave，不再重开 host-visible polish 或 library-only 回归修复：
+当前项目已经完成 `ENG-HIGH-103`、`READER-HIGH-124 / READER-LOW-261~263`、`READER-HIGH-125`、`READER-HIGH-126` 与 `HOST-HIGH-201 / HOST-LOW-301~303` 的本轮独立收口；开发态 gate 已回到 ready，而当前唯一未收口主线仍是远端 `update.json / update_link` 的真实分发闭环。下一步在保持 release-only blocker 不变的前提下，当前 active 扩展 wave 切换为一条 dev-only `Agent Review Workbench` 波次，用于把 current truth / evidence 组织成可交互的人机审查层，而不是重开 host-visible polish 或 DOM contract 已完成结论：
 
 - `release / updateURL follow-up`
   - `ENG-HIGH-104 / ENG-LOW-211~213` 作为当前唯一未收口主线继续推进，不回写插件 runtime 或已完成的 host-visible polish
 - `completed host-visible polish`
   - `HOST-HIGH-201 / HOST-LOW-301~303` 已完成；`ZOTERO-HOST-POLISH-WAVE-001` 当前转为 completed wave 基线，后续只在 truth 变化或新 wave 启动时再复开
-- `dom contract hardening`
-  - `ZOTERO-DOM-CONTRACT-WAVE-001` 当前 active：只覆盖 `preference pane / item pane / reader`，通过 `domContractReport` 把 route-aware DOM contract 结果写入 `agent:zotero:e2e -> agent:monitor / dashboard / gate`，保持 advisory + non-blocking
+- `dev-only review workbench`
+  - `AGENT-REVIEW-WORKBENCH-WAVE-001` 当前 active：只覆盖 `dev-only review workbench`、`JSON state store`、`workbench command registration / trigger semantics`、`route-aware validation summary` 与 `workbench acceptance telemetry`，固定走 `standalone window + plain JS/HTML`，并以 `functional-first -> trigger semantics -> window lifecycle -> structured annotation -> deterministic plan -> workbench acceptance telemetry -> gate summary` 作为验收主线；当前模板 runtime 下若 `agent.reviewWorkbench.open` 只以 plugin-local fallback command 暴露，则不得把注册通过误判成真实 `command palette` / Prompt host-visible 入口通过
+- `completed dom contract baseline`
+  - `ZOTERO-DOM-CONTRACT-WAVE-001` 已完成：继续通过 `domContractReport` 保留 route-aware DOM contract advisory，不把已收口批次重新拉回 blocker
 - `optional bundle baseline`
   - `OPTIONAL-BUNDLE-WAVE-001` 继续作为已完成基线；`react-ui` 保持 implemented + default-disabled，`agent-runtime` / `ai-service` 继续只保留 spec-only，`wasm-kernel` 现已作为 `probe + digest + shadow unlock derivation` 的 `planned + default-disabled` lane 进入 registry，但仍只保留 bundle-local 语义
 - `reader deeper event points / P1 whitelist`
   - 继续深化 Reader 更深事件点观测与 `P1` 白名单扩面，但不回退当前稳定 truth
 - `truth / delegation guardrails`
-  - 保持“`HOST-HIGH-201` 已收口、`ENG-HIGH-104` 为当前唯一未收口主线”的文档 / manifest / docs consistency 口径同步
+  - 保持“`ENG-HIGH-104` 仍是唯一未收口主线、`AGENT-REVIEW-WORKBENCH-WAVE-001` 是当前 active 扩展 wave”的文档 / manifest / docs consistency 口径同步

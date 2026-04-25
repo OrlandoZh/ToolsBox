@@ -1545,6 +1545,53 @@ describe("Host Actions", () => {
     assert.equal(result.surfaceTarget.surfaceId, "window-shell");
   });
 
+  it("should keep a capped compact execution history for recent host actions", async () => {
+    const runner = createHostActionRunner({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+      host: {},
+      reader: {},
+      menuManager: {},
+      itemPane: {},
+      bundleRuntime: {
+        isEnabled(bundleID) {
+          return bundleID === "react-ui";
+        },
+      },
+      async openReactDemoWindow(payload = {}) {
+        return {
+          window: {
+            location: {
+              href: `chrome://cleanroomtemplate/${REACT_UI_DEMO_SHELL_PATH}`,
+            },
+          },
+          ready: payload.ready !== false,
+          reused: false,
+          surfaceTarget: createSurfaceTarget("window-shell", "window-shell-react-ui-demo"),
+        };
+      },
+    });
+
+    for (let index = 0; index < 25; index += 1) {
+      await runner.runHostAction("window.openReactDemo", {
+        ready: index % 2 === 0,
+      });
+    }
+
+    const recent = runner.getRecentExecutionSummaries();
+    assert.equal(recent.length, 20);
+    assert.equal(recent[0].actionId, "window.openReactDemo");
+    assert.equal(typeof recent[0].executedAt, "string");
+    assert.equal(recent[0].surfaceTarget, "window-shell-react-ui-demo");
+    assert.equal(typeof recent[0].observedStateSummary, "object");
+    assert.equal(recent[0].observedStateSummary.statusFields.href, undefined);
+    assert.equal(recent[0].observedStateSummary.statusFields.bundleId, undefined);
+    assert.equal(typeof recent[0].observedStateSummary.booleanMetrics.ready, "boolean");
+    assert.equal(Object.prototype.hasOwnProperty.call(recent[0].observedStateSummary, "scalarFields"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(recent[0], "observedState"), false);
+  });
+
   it("should prefer the settled preference surface element when building surface evidence", async () => {
     const paneElement = {};
     const surfaceElement = {};

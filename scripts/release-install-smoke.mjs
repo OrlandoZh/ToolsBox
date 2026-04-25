@@ -29,6 +29,7 @@ import {
   assertScript,
   buildScriptFailureInfo,
   createScriptError,
+  isExecutedAsScript,
   wrapScriptError,
 } from "./script-runtime-lib.mjs";
 
@@ -40,6 +41,7 @@ const scriptStartedAt = Date.now();
 function parseArgs(argv) {
   const options = {
     channel: "stable",
+    keepOpen: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -47,6 +49,10 @@ function parseArgs(argv) {
     if (arg === "--channel") {
       options.channel = String(argv[index + 1] || "").trim() || "stable";
       index += 1;
+      continue;
+    }
+    if (arg === "--keep-open") {
+      options.keepOpen = true;
       continue;
     }
     throw createScriptError("args", `Unknown option: ${arg}`, {
@@ -61,6 +67,8 @@ function parseArgs(argv) {
 
   return options;
 }
+
+export { parseArgs };
 
 function buildChannelEnv(channel, env = process.env) {
   const nextEnv = {
@@ -486,54 +494,64 @@ async function main() {
 
     const paths = await persistAggregateReport(report);
     console.log(`Release install smoke generated: ${paths.aggregatePath}`);
-    if (!report.passed) {
+    if (report.passed && options.keepOpen) {
+      console.log("Release install smoke passed and Zotero will stay open for Computer Use review. Press Ctrl+C when the review is finished.");
+      await new Promise((resolve) => {
+        process.once("SIGINT", resolve);
+        process.once("SIGTERM", resolve);
+      });
+    } else if (!report.passed) {
       process.exitCode = 2;
     }
   } finally {
     if (rdp) {
       rdp.disconnect();
     }
-    await stopChildProcess(child);
+    if (!options.keepOpen || process.exitCode === 2) {
+      await stopChildProcess(child);
+    }
   }
 }
 
-main().catch(async (error) => {
-  const channel = pickChannelFromArgs(process.argv.slice(2));
-  const report = {
-    generatedAt: new Date().toISOString(),
-    durationMs: Math.max(0, Date.now() - scriptStartedAt),
-    channel,
-    zoteroChannel: channel,
-    passed: false,
-    status: "failed",
-    statusLabel: "失败",
-    installMethod: "addon-manager-file",
-    addonId: null,
-    addonVersion: null,
-    xpiPath: null,
-    binaryPath: null,
-    profilePath: null,
-    dataDir: null,
-    installResult: null,
-    observedAddon: null,
-    readinessMode: null,
-    apiReady: false,
-    runtimeLogs: null,
-    runtimeErrorClasses: [],
-    blockingRuntimeErrorCount: 0,
-    hostNoiseErrorCount: 0,
-    pluginRuntimeErrorCount: 0,
-    resourceRuntimeErrorCount: 0,
-    blockingRuntimeErrors: [],
-    hostNoiseRuntimeErrors: [],
-    blockingRuntimeErrorPortrait: "-",
-    hostNoiseRuntimeErrorPortrait: "-",
-    issues: [error?.message || String(error)],
-    note: "正式安装态 smoke 执行异常。",
-    processLogTail: [],
-  };
-  Object.assign(report, buildScriptFailureInfo(error, { durationMs: report.durationMs }));
-  await persistAggregateReport(report);
-  console.error(error?.message || String(error));
-  process.exit(1);
-});
+if (isExecutedAsScript(import.meta.url)) {
+  main().catch(async (error) => {
+    const channel = pickChannelFromArgs(process.argv.slice(2));
+    const report = {
+      generatedAt: new Date().toISOString(),
+      durationMs: Math.max(0, Date.now() - scriptStartedAt),
+      channel,
+      zoteroChannel: channel,
+      passed: false,
+      status: "failed",
+      statusLabel: "失败",
+      installMethod: "addon-manager-file",
+      addonId: null,
+      addonVersion: null,
+      xpiPath: null,
+      binaryPath: null,
+      profilePath: null,
+      dataDir: null,
+      installResult: null,
+      observedAddon: null,
+      readinessMode: null,
+      apiReady: false,
+      runtimeLogs: null,
+      runtimeErrorClasses: [],
+      blockingRuntimeErrorCount: 0,
+      hostNoiseErrorCount: 0,
+      pluginRuntimeErrorCount: 0,
+      resourceRuntimeErrorCount: 0,
+      blockingRuntimeErrors: [],
+      hostNoiseRuntimeErrors: [],
+      blockingRuntimeErrorPortrait: "-",
+      hostNoiseRuntimeErrorPortrait: "-",
+      issues: [error?.message || String(error)],
+      note: "正式安装态 smoke 执行异常。",
+      processLogTail: [],
+    };
+    Object.assign(report, buildScriptFailureInfo(error, { durationMs: report.durationMs }));
+    await persistAggregateReport(report);
+    console.error(error?.message || String(error));
+    process.exit(1);
+  });
+}

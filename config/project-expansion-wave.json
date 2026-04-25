@@ -1,37 +1,45 @@
 {
   "schemaVersion": 1,
-  "status": "completed",
+  "status": "active",
   "currentContractId": "generic-expansion-wave-v1",
-  "currentWaveName": "ZOTERO-DOM-CONTRACT-WAVE-001",
-  "summary": "Active advisory DOM contract hardening wave for the existing preference pane, item pane, and reader host-visible surfaces while keeping release remote distribution, menu/context expansion, and deeper UI route archetypes out of scope.",
+  "currentWaveName": "AGENT-REVIEW-WORKBENCH-WAVE-001",
+  "summary": "Active dev-only review workbench wave for a standalone structured annotation window, profile-local JSON state store, deterministic revision-plan builder, route-aware validation summary, and workbench-specific monitor/gate acceptance telemetry while keeping real AI providers, product-facing user features, React lane promotion, arbitrary source patching, and release remote distribution out of scope.",
   "inScopeModules": [
-    "preference-pane-dom-contract",
-    "item-pane-dom-contract",
-    "reader-dom-contract"
+    "dev-only-review-workbench",
+    "review-workbench-json-state-store",
+    "review-workbench-command-entry",
+    "route-aware-validation-summary",
+    "workbench-acceptance-telemetry"
   ],
   "outOfScopeModules": [
-    "context-pane-dom-contract",
-    "menu-dom-contract",
-    "window-shell-dom-contract",
-    "iframe-app-dom-contract",
-    "xul-custom-element-dom-contract",
-    "virtualized-table-dom-contract",
+    "real-ai-provider",
+    "product-user-feature",
+    "react-lane-promotion",
+    "automatic-arbitrary-source-patching",
     "release-remote-distribution"
   ],
   "moduleArchetypes": [
     {
-      "module": "preference-pane-dom-contract",
+      "module": "dev-only-review-workbench",
       "archetype": "visible-surface"
     },
     {
-      "module": "item-pane-dom-contract",
-      "archetype": "visible-surface"
+      "module": "review-workbench-json-state-store",
+      "archetype": "runtime-capability"
     },
     {
-      "module": "reader-dom-contract",
-      "archetype": "visible-surface"
+      "module": "review-workbench-command-entry",
+      "archetype": "host-integration"
+    },
+    {
+      "module": "route-aware-validation-summary",
+      "archetype": "workspace-integration"
+    },
+    {
+      "module": "workbench-acceptance-telemetry",
+      "archetype": "workspace-integration"
     }
   ],
-  "acceptanceTrack": "host-first -> action replay -> route-aware dom contract -> advisory summary",
+  "acceptanceTrack": "functional-first -> window lifecycle -> structured annotation -> deterministic plan -> workbench acceptance telemetry -> gate summary",
   "explicitVisualUpgradeModules": []
 }

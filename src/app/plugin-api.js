@@ -1,3 +1,5 @@
+import { buildDisabledSnapshot } from "../features/agent-review-workbench.js";
+
 const SERVICE_HUB_API_KEY = ["service", "Registry"].join("");
 const AGENT_ACTION_API_KEY = ["run", "Agent", "Action"].join("");
 const PACKAGE_PROTECTION_SUMMARY_API_KEY = ["get", "Package", "Protection", "Summary"].join("");
@@ -37,6 +39,7 @@ export function createPluginAPI({
   inspectItemPresentation,
   listHostActions,
   runHostAction,
+  reviewWorkbench,
   getProtectionSummary,
 }) {
   function cloneValue(value) {
@@ -44,6 +47,14 @@ export function createPluginAPI({
       return value;
     }
     return JSON.parse(JSON.stringify(value));
+  }
+
+  function createDisabledReviewWorkbenchSnapshot(reason = "review-workbench-unavailable") {
+    return buildDisabledSnapshot(() => new Date(), {
+      available: false,
+      reason,
+      summary: "Agent Review Workbench is unavailable in the current runtime.",
+    });
   }
 
   return Object.freeze({
@@ -66,6 +77,48 @@ export function createPluginAPI({
           ? reader.getReaderInteractionSnapshot(target)
           : reader.getReaderSummary(target);
       },
+      reviewWorkbench: Object.freeze({
+        async getSnapshot() {
+          return cloneValue(
+            typeof reviewWorkbench?.getSnapshot === "function"
+              ? await reviewWorkbench.getSnapshot()
+              : createDisabledReviewWorkbenchSnapshot(),
+          );
+        },
+        async createAnnotation(payload) {
+          return cloneValue(
+            typeof reviewWorkbench?.createAnnotation === "function"
+              ? await reviewWorkbench.createAnnotation(payload)
+              : createDisabledReviewWorkbenchSnapshot(),
+          );
+        },
+        async updateAnnotation(id, fields) {
+          return cloneValue(
+            typeof reviewWorkbench?.updateAnnotation === "function"
+              ? await reviewWorkbench.updateAnnotation(id, fields)
+              : createDisabledReviewWorkbenchSnapshot(),
+          );
+        },
+        async generatePlan(payload) {
+          return cloneValue(
+            typeof reviewWorkbench?.generatePlan === "function"
+              ? await reviewWorkbench.generatePlan(payload)
+              : {
+                ok: false,
+                reason: "review-workbench-unavailable",
+                plan: null,
+                snapshot: createDisabledReviewWorkbenchSnapshot(),
+              },
+          );
+        },
+        async refreshStep(stage) {
+          return cloneValue(
+            typeof reviewWorkbench?.refreshStep === "function"
+              ? await reviewWorkbench.refreshStep(stage)
+              : createDisabledReviewWorkbenchSnapshot(),
+          );
+        },
+      }),
     }),
     runtime: Object.freeze({
       rootURI: runtimeInfo?.rootURI || null,

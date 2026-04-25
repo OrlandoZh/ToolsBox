@@ -193,4 +193,44 @@ describe("Window Shell", () => {
     assert.equal(manager.isOpen(), false);
     assert.deepEqual(calls, ["mount", "cleanup"]);
   });
+
+  it("should treat pre-ready window close as an aborted open instead of an error log", async () => {
+    const window = createMockWindow({
+      readyState: "loading",
+    });
+    const logs = [];
+
+    const manager = createWindowShellManager({
+      logger: {
+        debug(message, details) {
+          logs.push({ level: "debug", message, details });
+        },
+        warn(message, details) {
+          logs.push({ level: "warn", message, details });
+        },
+        error(message, details) {
+          logs.push({ level: "error", message, details });
+        },
+      },
+      openWindow() {
+        setTimeout(() => {
+          window.close();
+        }, 0);
+        return window;
+      },
+    });
+
+    const opening = manager.open();
+
+    let caught = null;
+    try {
+      await opening;
+    } catch (error) {
+      caught = error;
+    }
+    assert.ok(caught);
+    assert.match(String(caught.message || caught), /window closed before ready/);
+    assert.equal(logs.some((entry) => entry.level === "error"), false);
+    assert.ok(logs.some((entry) => entry.message === "windowShell.open.aborted"));
+  });
 });

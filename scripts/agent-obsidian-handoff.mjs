@@ -9,6 +9,8 @@ import {
 } from "./agent-obsidian-workspace.mjs";
 import {
   buildPluginFeatureMapMarkdown,
+  buildPluginModuleMapArtifacts,
+  buildPluginUIConcreteExcalidraw,
   buildPluginUIConceptArtifacts,
   buildObsidianVisualFlowMermaidMarkdown,
   buildObsidianVisualVerdictExcalidrawMarkdown,
@@ -68,7 +70,7 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   const workspace = resolveObsidianWorkspaceFiles(projectRoot, process.env);
   const visualsEnabled = resolveObsidianVisualsEnabled(process.env);
-  const [loop, gate, monitor, e2e, agentContext, projectExpansionWave, projectValidationOverrides] = await Promise.all([
+  const [loop, gate, monitor, e2e, agentContext, projectExpansionWave, projectValidationOverrides, addonConfig] = await Promise.all([
     readJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-zotero-loop.json")),
     readJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-gate.json")),
     readJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-monitor.json")),
@@ -76,6 +78,7 @@ async function main() {
     readJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-context.json")),
     readProjectJSONIfExists(path.join("config", "project-expansion-wave.json")),
     readProjectJSONIfExists(path.join("config", "project-validation-overrides.json")),
+    readProjectJSONIfExists(path.join("config", "addon.config.json")),
   ]);
   const currentTruthState = (() => {
     try {
@@ -85,24 +88,29 @@ async function main() {
     }
   })();
 
-  const summary = summarizeObsidianInterventionContext({
-    loop,
-    gate,
-    monitor,
-    e2e,
-    agentContext,
-    currentTruthSummary: currentTruthState?.summary || null,
-    currentTruthActiveBatchId: currentTruthState?.activeBatchId || null,
-    projectExpansionWave,
-    projectValidationOverrides,
-    bootstrapShell: options.bootstrapShell,
-  });
+  const summary = {
+    ...summarizeObsidianInterventionContext({
+      loop,
+      gate,
+      monitor,
+      e2e,
+      agentContext,
+      currentTruthSummary: currentTruthState?.summary || null,
+      currentTruthActiveBatchId: currentTruthState?.activeBatchId || null,
+      projectExpansionWave,
+      projectValidationOverrides,
+      bootstrapShell: options.bootstrapShell,
+    }),
+    addonConfig: addonConfig || null,
+  };
   const visualViewModel = buildObsidianVisualViewModel(summary);
   const statusMarkdown = buildObsidianInterventionMarkdown(summary);
   const evidenceMarkdown = buildObsidianEvidenceMarkdown(summary);
   const featureMapMarkdown = buildPluginFeatureMapMarkdown(summary);
+  const moduleMapArtifacts = buildPluginModuleMapArtifacts(summary);
   const technicalLineageMarkdown = buildObsidianTechnicalLineageMarkdown(summary);
   const conceptArtifacts = buildPluginUIConceptArtifacts(summary);
+  const uiConcreteExcalidrawMarkdown = buildPluginUIConcreteExcalidraw(summary);
   const humanQuickstartMarkdown = buildHumanQuickstartMarkdown();
   const humanAdvancedGuideMarkdown = buildHumanAdvancedGuideMarkdown();
   const canvas = buildObsidianInterventionCanvas(summary);
@@ -112,6 +120,7 @@ async function main() {
   const humanWindowMarkdown = buildHumanInterventionWindowMarkdown(summary, existingHumanWindow);
 
   await fs.mkdir(workspace.dir, { recursive: true });
+  await fs.mkdir(workspace.moduleMapDir, { recursive: true });
   await fs.writeFile(workspace.statusNote, `${statusMarkdown}\n`, "utf-8");
   await fs.writeFile(workspace.evidenceNote, `${evidenceMarkdown}\n`, "utf-8");
   await fs.writeFile(workspace.featureMapNote, `${featureMapMarkdown}\n`, "utf-8");
@@ -123,7 +132,17 @@ async function main() {
   await fs.writeFile(workspace.humanQuickstartNote, `${humanQuickstartMarkdown}\n`, "utf-8");
   await fs.writeFile(workspace.humanAdvancedGuideNote, `${humanAdvancedGuideMarkdown}\n`, "utf-8");
   await fs.writeFile(workspace.architectureCanvas, `${JSON.stringify(canvas, null, 2)}\n`, "utf-8");
+  await fs.writeFile(workspace.moduleMapOverviewNote, `${moduleMapArtifacts.overviewMarkdown}\n`, "utf-8");
+  await fs.writeFile(workspace.moduleMapCanvas, `${JSON.stringify(moduleMapArtifacts.canvas, null, 2)}\n`, "utf-8");
+  await fs.writeFile(workspace.moduleMapPaneNote, `${moduleMapArtifacts.cards[0]?.markdown || ""}\n`, "utf-8");
+  await fs.writeFile(workspace.moduleMapReaderNote, `${moduleMapArtifacts.cards[1]?.markdown || ""}\n`, "utf-8");
+  await fs.writeFile(workspace.moduleMapMenuNote, `${moduleMapArtifacts.cards[2]?.markdown || ""}\n`, "utf-8");
+  await fs.writeFile(workspace.moduleMapComposeNote, `${moduleMapArtifacts.cards[3]?.markdown || ""}\n`, "utf-8");
+  await fs.writeFile(workspace.moduleMapValidationNote, `${moduleMapArtifacts.cards[4]?.markdown || ""}\n`, "utf-8");
+  await fs.writeFile(workspace.moduleMapWaveNote, `${moduleMapArtifacts.waveMarkdown || ""}\n`, "utf-8");
+  await fs.writeFile(workspace.moduleMapCapabilityCatalogNote, `${moduleMapArtifacts.capabilityCatalogMarkdown || ""}\n`, "utf-8");
   await fs.writeFile(workspace.humanWindowNote, `${humanWindowMarkdown}\n`, "utf-8");
+  await fs.writeFile(workspace.uiConcreteExcalidrawNote, `${uiConcreteExcalidrawMarkdown}\n`, "utf-8");
   if (visualsEnabled) {
     await fs.writeFile(workspace.visualFlowNote, `${visualFlowMarkdown}\n`, "utf-8");
     await fs.writeFile(workspace.visualVerdictExcalidrawNote, `${visualVerdictExcalidrawMarkdown}\n`, "utf-8");
@@ -150,12 +169,27 @@ async function main() {
     technicalLineageNote: workspace.technicalLineageNote,
     humanWindowNote: workspace.humanWindowNote,
     architectureCanvas: workspace.architectureCanvas,
+    moduleMapDir: workspace.moduleMapDir,
+    moduleMapOverviewNote: workspace.moduleMapOverviewNote,
+    moduleMapCanvas: workspace.moduleMapCanvas,
+    moduleMapWaveNote: workspace.moduleMapWaveNote,
+    moduleMapCapabilityCatalogNote: workspace.moduleMapCapabilityCatalogNote,
+    moduleMapNotes: [
+      workspace.moduleMapPaneNote,
+      workspace.moduleMapReaderNote,
+      workspace.moduleMapMenuNote,
+      workspace.moduleMapComposeNote,
+      workspace.moduleMapValidationNote,
+      workspace.moduleMapWaveNote,
+      workspace.moduleMapCapabilityCatalogNote,
+    ],
     uiConceptNotes: [
       workspace.preferencePaneConceptNote,
       workspace.paneConceptNote,
       workspace.readerConceptNote,
       workspace.menuConceptNote,
     ],
+    uiConcreteExcalidrawNote: workspace.uiConcreteExcalidrawNote,
     visualFlowNote: visualsEnabled ? workspace.visualFlowNote : null,
     visualVerdictExcalidrawNote: visualsEnabled ? workspace.visualVerdictExcalidrawNote : null,
     summarySource: summary.summarySource || null,
@@ -190,6 +224,11 @@ async function main() {
       `- 摘要结论: ${handoffSummary.summaryHeadline || "-"}`,
       `- 摘要下一步: ${handoffSummary.summaryNextAction || "-"}`,
       `- 可执行命令: \`${handoffSummary.runnableNextCommand || "-"}\``,
+      `- 模块图谱总览: \`${workspace.moduleMapOverviewNote}\``,
+      `- 当前 wave 焦点: \`${workspace.moduleMapWaveNote}\``,
+      `- 能力目录: \`${workspace.moduleMapCapabilityCatalogNote}\``,
+      `- 模块图谱白板: \`${workspace.moduleMapCanvas}\``,
+      `- UI 具象图: \`${workspace.uiConcreteExcalidrawNote}\``,
       `- Bootstrap Shell: \`${handoffSummary.bootstrapShell ? "是" : "否"}\``,
       `- 视觉配套: \`${visualsEnabled ? "启用" : "关闭"}\``,
       `- 耗时: \`${handoffSummary.durationMs}ms\``,

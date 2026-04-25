@@ -1,6 +1,7 @@
 import { isOptionalBundleEnabled } from "./optional-bundles.js";
 import { createCopyFallbacks } from "./copy-fallbacks.js";
 import { createSurfaceDescriptors } from "./surface-descriptors.js";
+import { AGENT_REVIEW_WORKBENCH_COMMAND_ID } from "../features/agent-review-workbench.js";
 
 const PREFERENCE_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
 const PREFERENCE_INIT_API_KEY = "initCleanroomPreferences";
@@ -48,6 +49,8 @@ export function createFeatureComposer({
   demoNotifierID,
   updateDemoNotifierState,
   bundleRuntime,
+  openAgentReviewWorkbench = null,
+  isAgentReviewWorkbenchAvailable = null,
   openReactDemoWindow,
   presentReactSurface,
   renderReactItemPaneSurface,
@@ -241,6 +244,35 @@ export function createFeatureComposer({
         });
       },
     });
+
+    if (
+      typeof openAgentReviewWorkbench === "function"
+      && (typeof isAgentReviewWorkbenchAvailable !== "function" || isAgentReviewWorkbenchAvailable())
+    ) {
+      commandPalette.registerCommand({
+        id: AGENT_REVIEW_WORKBENCH_COMMAND_ID,
+        label: i18n.t(
+          "cleanroom-agent-review-workbench-command-label",
+          "Agent Review Workbench",
+        ),
+        category: config.addonName,
+        description: i18n.t(
+          "cleanroom-agent-review-workbench-command-description",
+          "Open the dev-only structured review workbench window.",
+        ),
+        aliases: ["agent review", "review workbench"],
+        keywords: ["review", "annotations", "evidence", "gate", "plan"],
+        condition: () => Boolean(prefs.get("enabled"))
+          && (typeof isAgentReviewWorkbenchAvailable !== "function" || isAgentReviewWorkbenchAvailable()),
+        handler: () => {
+          Promise.resolve(openAgentReviewWorkbench()).catch((error) => {
+            logger.warn("plugin.agentReviewWorkbench.open.failed", {
+              message: String(error?.message || error),
+            });
+          });
+        },
+      });
+    }
 
     if (reactUIBundleEnabled && typeof openReactDemoWindow === "function") {
       commandPalette.registerCommand({

@@ -96,10 +96,10 @@ export function buildUIDesignDelegationTask(projectRoot, workflowId, options = {
   const goal = normalizeString(options.goal) || preset.defaultGoal;
   const promptTemplate = [
     `本轮只允许创建或更新 \`${preset.notePathRelative}\`，用于产品整体 UI 设计与更新流程的人工草图。`,
-    "UI 设计呈现必须使用 Obsidian Excalidraw `.md` 格式，结构直接对齐当前工作台里现有 `07~11` 的 `.excalidraw.md` 文件样式。",
+    "UI 设计呈现必须使用 Obsidian Excalidraw `.md` 格式，结构直接对齐当前工作台里现有 `07~11` 概念图与 `14` 具象布局图的语义层次。",
     "只在这份 Excalidraw 中表达设计，不额外创建 Markdown 设计稿、说明文档、TODO 清单、mirror 或业务实现文件。",
     `本轮人工目标：${goal}`,
-    "可以把 `docs/CURRENT_BACKLOG.md`、`obsidian/agent-workbench/05-当前Zotero插件-功能与可见面地图.md`、`obsidian/agent-workbench/06-当前Zotero插件-技术脉络与宿主接入.md`，以及现有 `07~11` UI 概念图当作只读背景，但不得修改这些文件。",
+    "可以把 `docs/CURRENT_BACKLOG.md`、`obsidian/agent-workbench/05-当前Zotero插件-功能与可见面地图.md`、`obsidian/agent-workbench/06-当前Zotero插件-技术脉络与宿主接入.md`，以及现有 `07~11` UI 概念图和 `14-当前Zotero插件-UI 具象布局图.excalidraw.md` 当作只读背景，但不得修改这些文件。",
     "图中至少同时表达：当前产品 UI 版图、目标演进方向、主要 surface 关系、以及推荐的更新步骤/批次节奏。",
     "最终 stdout 只返回单个 JSON brief，字段至少包含 `status`、`owner_role`、`summary`、`changed_files`、`checks_run`、`risks`、`blockers`、`next_action`。",
   ].join(" ");

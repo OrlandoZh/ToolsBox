@@ -8,6 +8,9 @@ import {
   summarizeE2EReport,
   pickVisualCaptureSelectionReasonLabel,
 } from "./agent-zotero-validation-lib.mjs";
+import {
+  createCapabilityManifest as createSourceCapabilityManifest,
+} from "../src/app/capability-manifest.js";
 
 function truncateList(list, max = 6) {
   return Array.isArray(list) ? list.filter(Boolean).slice(0, max) : [];
@@ -86,6 +89,19 @@ function makeNode(id, x, y, width, height, text, color = "5") {
     height,
     color,
     text,
+  };
+}
+
+function makeFileNode(id, x, y, width, height, file, color = "4") {
+  return {
+    id,
+    type: "file",
+    file,
+    x,
+    y,
+    width,
+    height,
+    color,
   };
 }
 
@@ -1804,7 +1820,8 @@ export function buildPluginFeatureMapMarkdown(summary = {}) {
     "",
     "- 先看 [[01-当前Zotero插件-状态总览]]，确认当前主线和风险。",
     "- 再看 [[00-当前Zotero插件-功能与技术脉络]]，建立功能组与技术链的整体空间关系。",
-    "- 然后按需要打开各 UI 概念图：[[07-当前Zotero插件-偏好设置面板 UI 概念]]、[[08-当前Zotero插件-条目与上下文窗格 UI 概念]]、[[09-当前Zotero插件-Reader UI 概念]]、[[11-当前Zotero插件-菜单与子菜单 UI 概念]]。",
+    "- 如果你想按功能模块理解当前项目，再看 [[项目模块图谱/00-当前Zotero插件-功能模块总览]] 和 [[项目模块图谱/当前Zotero插件-功能模块图谱]]。",
+    "- 然后按需要打开各 UI 概念图：[[07-当前Zotero插件-偏好设置面板 UI 概念]]、[[08-当前Zotero插件-条目与上下文窗格 UI 概念]]、[[09-当前Zotero插件-Reader UI 概念]]、[[11-当前Zotero插件-菜单与子菜单 UI 概念]]、[[14-当前Zotero插件-UI 具象布局图]]。",
     "- 如果你想看为什么这些 surface 走这条技术路线，再读 [[06-当前Zotero插件-技术脉络与宿主接入]]。",
     "",
   ].join("\n");
@@ -1949,6 +1966,970 @@ export function buildPluginUIConceptArtifacts(summary = {}) {
       footerSummary: "模块：src/features/menu-manager.js、src/features/menu-command.js、src/app/host-actions.js\n证据：menu surface smoke、collection scene、submenu path 验证。",
     }),
   };
+}
+
+function normalizeModuleCardStatus(statusLabel) {
+  switch (String(statusLabel || "").trim()) {
+    case "待刷新":
+      return "bootstrap-shell";
+    case "当前主线":
+    case "Reader 主线":
+      return "current-line";
+    case "稳定基线":
+      return "stable-baseline";
+    default:
+      return "implemented";
+  }
+}
+
+const CAPABILITY_CATEGORY_LABELS = Object.freeze({
+  baseline: "基线能力",
+  feature: "功能能力",
+  governance: "治理能力",
+  runtime: "运行时能力",
+});
+
+const MODULE_CARD_FILE_NAMES = Object.freeze({
+  "pane-mainline": "01-主线-偏好设置与宿主窗格.md",
+  "reader-mainline": "02-主线-Reader 工具栏与侧栏.md",
+  "menu-mainline": "03-主线-菜单与子菜单.md",
+  "compose-support": "04-支撑-统一装配与 Host Action.md",
+  "validation-support": "05-支撑-验证与证据闭环.md",
+});
+
+const MODULE_CARD_CAPABILITY_IDS = Object.freeze({
+  "pane-mainline": [
+    "item-presentation",
+    "settings-governance",
+  ],
+  "reader-mainline": [
+    "reader-summary",
+    "reader-annotation-roundtrip",
+    "reader-ui-state",
+    "reader-event-hooks",
+  ],
+  "menu-mainline": [
+    "command-nonblocking",
+  ],
+  "compose-support": [
+    "baseline-registration",
+    "notifier-sync",
+    "host-actions",
+    "multi-window-mount",
+  ],
+  "validation-support": [
+    "runtime-bridge-report",
+  ],
+});
+
+function getObsidianAddonConfig(summary = {}) {
+  return summary.addonConfig && typeof summary.addonConfig === "object"
+    ? summary.addonConfig
+    : {};
+}
+
+function buildPluginCapabilityManifest(summary = {}) {
+  return createSourceCapabilityManifest({
+    config: getObsidianAddonConfig(summary),
+  });
+}
+
+function buildCapabilityMapById(capabilities = []) {
+  return new Map(
+    (Array.isArray(capabilities) ? capabilities : [])
+      .filter((item) => item && typeof item === "object")
+      .map((item) => [String(item.id || "").trim(), item])
+      .filter(([id]) => Boolean(id)),
+  );
+}
+
+function getCapabilityCategoryLabel(category) {
+  const key = String(category || "").trim();
+  return CAPABILITY_CATEGORY_LABELS[key] || key || "未分类";
+}
+
+function buildModuleCardCapabilityRefs(capabilityMap, cardId) {
+  return (Array.isArray(MODULE_CARD_CAPABILITY_IDS[cardId]) ? MODULE_CARD_CAPABILITY_IDS[cardId] : [])
+    .map((capabilityId) => capabilityMap.get(capabilityId))
+    .filter(Boolean)
+    .map((capability) => ({
+      id: capability.id,
+      label: capability.label,
+      category: capability.category,
+      categoryLabel: getCapabilityCategoryLabel(capability.category),
+      agentScenario: String(capability.agentScenario || "").trim() || null,
+      zoteroScenarios: truncateList(capability.zoteroScenarios, 3),
+    }));
+}
+
+function buildCapabilityCategorySummary(capabilities = []) {
+  const counts = new Map();
+  (Array.isArray(capabilities) ? capabilities : []).forEach((capability) => {
+    const category = String(capability?.category || "").trim() || "unknown";
+    counts.set(category, (counts.get(category) || 0) + 1);
+  });
+  return Array.from(counts.entries())
+    .map(([category, count]) => ({
+      category,
+      categoryLabel: getCapabilityCategoryLabel(category),
+      count,
+    }))
+    .sort((left, right) => String(left.category || "").localeCompare(String(right.category || ""), "zh-CN"));
+}
+
+function formatModuleArchetypeLabel(value) {
+  switch (String(value || "").trim()) {
+    case "visible-surface":
+      return "可见面";
+    case "runtime-capability":
+      return "运行时能力";
+    case "host-integration":
+      return "宿主接入";
+    case "workspace-integration":
+      return "工作台集成";
+    default:
+      return String(value || "").trim() || "未声明";
+  }
+}
+
+function buildWaveArchetypeMap(expansionWave = {}) {
+  const map = new Map();
+  (Array.isArray(expansionWave.moduleArchetypes) ? expansionWave.moduleArchetypes : []).forEach((item) => {
+    const text = String(item || "").trim();
+    if (!text) {
+      return;
+    }
+    const [moduleName, archetype] = text.split(/\s*->\s*/u);
+    if (moduleName && archetype) {
+      map.set(moduleName.trim(), archetype.trim());
+    }
+  });
+  return map;
+}
+
+function buildWaveRelationshipSummary(phase, expansionWave = {}) {
+  const inScopeText = [
+    expansionWave.currentWaveName,
+    expansionWave.summary,
+    ...(Array.isArray(expansionWave.inScopeModules) ? expansionWave.inScopeModules : []),
+    ...(Array.isArray(expansionWave.moduleArchetypes) ? expansionWave.moduleArchetypes : []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (phase.kind === "bootstrap-shell") {
+    return "当前工作台还是初始化占位，wave 只可视为配置存在与否提示，不能替代 fresh current truth。";
+  }
+  if (phase.kind === "release-only" && /workbench/u.test(inScopeText)) {
+    return "当前 01~05 模块卡片描述的是已经接线并基本收口的插件骨架；active wave 则额外指向 dev-only review workbench / workspace sidecar 焦点，不表示 pane / reader / menu 主线被重新打开。";
+  }
+  return "01~05 模块卡片描述的是当前插件整体骨架；active wave 只说明本轮扩展焦点，不一定等于所有已接线模块的全量范围。";
+}
+
+function buildWaveRecommendedLinks(expansionWave = {}) {
+  const archetypeText = (Array.isArray(expansionWave.moduleArchetypes) ? expansionWave.moduleArchetypes : []).join(" ");
+  const links = [];
+  if (/visible-surface/u.test(archetypeText)) {
+    links.push("[[01-主线-偏好设置与宿主窗格]]", "[[02-主线-Reader 工具栏与侧栏]]", "[[14-当前Zotero插件-UI 具象布局图]]");
+  }
+  if (/host-integration/u.test(archetypeText) || /runtime-capability/u.test(archetypeText)) {
+    links.push("[[04-支撑-统一装配与 Host Action]]");
+  }
+  if (/workspace-integration/u.test(archetypeText) || /validation/u.test(String(expansionWave.summary || ""))) {
+    links.push("[[05-支撑-验证与证据闭环]]");
+  }
+  links.push("[[07-能力目录-当前插件能力清单]]");
+  return dedupeList(links, 6);
+}
+
+function buildCapabilityToModuleLinks(capabilityId) {
+  const links = Object.entries(MODULE_CARD_CAPABILITY_IDS)
+    .filter(([, capabilityIds]) => Array.isArray(capabilityIds) && capabilityIds.includes(capabilityId))
+    .map(([cardId]) => {
+      const fileName = MODULE_CARD_FILE_NAMES[cardId];
+      return fileName ? `[[${fileName.replace(/\.md$/u, "")}]]` : "";
+    })
+    .filter(Boolean);
+  return dedupeList(links, 4);
+}
+
+function buildPluginModuleCards(summary = {}) {
+  const phase = buildPluginCurrentPhase(summary);
+  const surfaceGroups = buildPluginSurfaceGroups(summary);
+  const capabilityManifest = buildPluginCapabilityManifest(summary);
+  const capabilityMap = buildCapabilityMapById(capabilityManifest);
+  const projectContext = summary.projectContext && typeof summary.projectContext === "object"
+    ? summary.projectContext
+    : {};
+  const currentTruth = projectContext.currentTruth && typeof projectContext.currentTruth === "object"
+    ? projectContext.currentTruth
+    : {};
+  const expansionWave = projectContext.expansionWave && typeof projectContext.expansionWave === "object"
+    ? projectContext.expansionWave
+    : {};
+  const validationDecision = projectContext.validationDecision && typeof projectContext.validationDecision === "object"
+    ? projectContext.validationDecision
+    : {};
+  const cards = [
+    {
+      id: "pane-mainline",
+      fileName: MODULE_CARD_FILE_NAMES["pane-mainline"],
+      title: "主线：偏好设置与宿主窗格",
+      layer: "mainline",
+      statusLabel: surfaceGroups[0]?.statusLabel || "已建链",
+      summary: surfaceGroups[0]?.productGoal || "把插件设置、条目详情入口和上下文 pane 维持在 Zotero 原生 pane 心智内。",
+      surfaces: surfaceGroups[0]?.surfaces || [],
+      modules: surfaceGroups[0]?.modules || [],
+      route: surfaceGroups[0]?.route || "",
+      focus: surfaceGroups[0]?.scenarioFocus || phase.nextFocus,
+      actions: surfaceGroups[0]?.userActions || [],
+      diagramLinks: [
+        "[[07-当前Zotero插件-偏好设置面板 UI 概念]]",
+        "[[08-当前Zotero插件-条目与上下文窗格 UI 概念]]",
+      ],
+      routeHighlights: [
+        "宿主注册式 surface 是首选，不把 pane 问题直接退化成 DOM patch。",
+        "pane fragment / load bridge 负责把宿主 shell 和插件内容接在一起。",
+        "交互验证优先依赖 host action replay + surface-local evidence。",
+      ],
+    },
+    {
+      id: "reader-mainline",
+      fileName: MODULE_CARD_FILE_NAMES["reader-mainline"],
+      title: "主线：Reader 工具栏与侧栏",
+      layer: "mainline",
+      statusLabel: surfaceGroups[1]?.statusLabel || "已建链",
+      summary: surfaceGroups[1]?.productGoal || "把 Reader 入口和结果都停留在阅读流内。",
+      surfaces: surfaceGroups[1]?.surfaces || [],
+      modules: surfaceGroups[1]?.modules || [],
+      route: surfaceGroups[1]?.route || "",
+      focus: surfaceGroups[1]?.scenarioFocus || phase.nextFocus,
+      actions: surfaceGroups[1]?.userActions || [],
+      diagramLinks: [
+        "[[09-当前Zotero插件-Reader UI 概念]]",
+        "[[14-当前Zotero插件-UI 具象布局图]]",
+      ],
+      routeHighlights: [
+        "Reader 是独立宿主 surface，优先走官方事件桥和 renderToolbar 入口。",
+        "sidebar view 走 host-visible shell，不把结果藏到独立外壳窗口里。",
+        "Reader 证据优先用 local capture 和 deeper event diagnostics 收口。",
+      ],
+    },
+    {
+      id: "menu-mainline",
+      fileName: MODULE_CARD_FILE_NAMES["menu-mainline"],
+      title: "主线：菜单与子菜单",
+      layer: "mainline",
+      statusLabel: surfaceGroups[2]?.statusLabel || "已建链",
+      summary: surfaceGroups[2]?.productGoal || "把常用动作挂到场景化 menu entry，并保持 live state 驱动。",
+      surfaces: surfaceGroups[2]?.surfaces || [],
+      modules: surfaceGroups[2]?.modules || [],
+      route: surfaceGroups[2]?.route || "",
+      focus: surfaceGroups[2]?.scenarioFocus || phase.nextFocus,
+      actions: surfaceGroups[2]?.userActions || [],
+      diagramLinks: [
+        "[[11-当前Zotero插件-菜单与子菜单 UI 概念]]",
+        "[[14-当前Zotero插件-UI 具象布局图]]",
+      ],
+      routeHighlights: [
+        "菜单入口保持 target / submenu / onShowing 语义，不在启动时一次性写死。",
+        "dynamic submenu 以 lazy rebuild 为主，不默认走 popup repair fallback。",
+        "回放与验证优先记录 menu.show / menu.trigger / menuPath evidence。",
+      ],
+    },
+    {
+      id: "compose-support",
+      fileName: MODULE_CARD_FILE_NAMES["compose-support"],
+      title: "支撑：统一装配与 Host Action",
+      layer: "support",
+      statusLabel: phase.kind === "bootstrap-shell" ? "待刷新" : "已建链",
+      summary: "把 pane / reader / menu 收到同一装配层，并把宿主动作统一成可回放的开发入口。",
+      surfaces: ["feature composer", "host action replay", "Zotero host bridge"],
+      modules: [
+        "src/app/feature-composer.js",
+        "src/app/host-actions.js",
+        "src/platform/zotero-host.js",
+      ],
+      route: "feature-composer -> host action replay -> zotero host adapter -> scenario / evidence consumer",
+      focus: phase.nextFocus,
+      actions: [
+        "按统一装配入口挂载 pane / reader / menu 功能",
+        "把真实 UI 触达转换成场景可回放动作",
+        "为 scenario、monitor、review workbench 暴露稳定宿主桥接面",
+      ],
+      diagramLinks: [
+        "[[00-当前Zotero插件-功能与技术脉络]]",
+        "[[06-当前Zotero插件-技术脉络与宿主接入]]",
+      ],
+      routeHighlights: [
+        "统一装配层避免每个 surface 各自维护一套入口和生命周期。",
+        "host action replay 把人工可见操作变成可重放、可定位、可留证的动作。",
+        "当未来扩模块时，应优先扩装配与桥接面，而不是直接扩散到场景脚本。",
+      ],
+    },
+    {
+      id: "validation-support",
+      fileName: MODULE_CARD_FILE_NAMES["validation-support"],
+      title: "支撑：验证与证据闭环",
+      layer: "support",
+      statusLabel: phase.kind === "bootstrap-shell"
+        ? "待刷新"
+        : validationDecision.levelLabel || validationDecision.level || "已建链",
+      summary: "把 surface-local evidence、monitor / gate、Obsidian handoff 与人工窗口接成同一条验证导航链。",
+      surfaces: [
+        "surface-local evidence",
+        "agent:zotero:e2e",
+        "agent:monitor / agent:gate",
+        "agent:obsidian / human window",
+      ],
+      modules: [
+        "config/project-validation-surfaces.json",
+        "scripts/agent-zotero-e2e.mjs",
+        "scripts/agent-monitor.mjs",
+        "scripts/agent-gate.mjs",
+        "scripts/agent-obsidian-handoff.mjs",
+      ],
+      route: "scenario / smoke -> surface-local evidence -> monitor / gate summary -> obsidian handoff -> human intervention window",
+      focus: validationDecision.levelLabel || validationDecision.level || phase.nextFocus,
+      actions: [
+        "按 route-aware contract 验证可见面，而不是只看整窗截图",
+        "把 gate / monitor 当前结论折叠成可导航的当前项目态",
+        "在需要人工介入时只暴露一个输入窗口，不新开第二套 verdict 面",
+      ],
+      diagramLinks: [
+        "[[02-当前Zotero插件-证据索引]]",
+        "[[10-模板协作-人工指令窗口]]",
+      ],
+      routeHighlights: [
+        "validationDecision 只决定是否需要视觉证据，不替代 watch / host / provenance guard。",
+        `当前 active batch：${currentTruth.activeBatchId || "未声明"}`,
+        `当前 wave：${expansionWave.currentWaveName || expansionWave.summary || "未声明"}`,
+      ],
+    },
+  ];
+
+  return cards.map((card) => ({
+    ...card,
+    status: normalizeModuleCardStatus(card.statusLabel),
+    relatedCapabilities: buildModuleCardCapabilityRefs(capabilityMap, card.id),
+  }));
+}
+
+function buildPluginModuleMapOverviewMarkdown(summary = {}) {
+  const phase = buildPluginCurrentPhase(summary);
+  const cards = buildPluginModuleCards(summary);
+  const capabilityManifest = buildPluginCapabilityManifest(summary);
+  const capabilitySummary = buildCapabilityCategorySummary(capabilityManifest);
+  const projectContext = summary.projectContext && typeof summary.projectContext === "object"
+    ? summary.projectContext
+    : {};
+  const currentTruth = projectContext.currentTruth && typeof projectContext.currentTruth === "object"
+    ? projectContext.currentTruth
+    : {};
+  const expansionWave = projectContext.expansionWave && typeof projectContext.expansionWave === "object"
+    ? projectContext.expansionWave
+    : {};
+  const validationDecision = projectContext.validationDecision && typeof projectContext.validationDecision === "object"
+    ? projectContext.validationDecision
+    : {};
+  const mainlineCards = cards.filter((card) => card.layer === "mainline");
+  const supportCards = cards.filter((card) => card.layer === "support");
+
+  return [
+    "---",
+    "type: module-map",
+    `status: ${summary.bootstrapShell === true ? "bootstrap-shell" : "active"}`,
+    `updated: ${(summary.generatedAt || new Date().toISOString()).slice(0, 10)}`,
+    "---",
+    "",
+    "# 当前 Zotero 插件功能模块总览",
+    "",
+    "> [!info]",
+    "> 这套图谱只整理当前模板内“已接线且在仓库中有代码落点”的插件功能模块，不替代 `docs/CURRENT_BACKLOG.md` 的单一事实源。",
+    "",
+    "白板入口：[[当前Zotero插件-功能模块图谱]]",
+    "",
+    "## 整理依据",
+    "",
+    "- `docs/CURRENT_BACKLOG.md`",
+    "- `config/project-expansion-wave.json`",
+    "- `obsidian/agent-workbench/05-当前Zotero插件-功能与可见面地图.md`",
+    "- `obsidian/agent-workbench/06-当前Zotero插件-技术脉络与宿主接入.md`",
+    "",
+    "## 当前判断",
+    "",
+    `- 当前主线：${phase.label}。`,
+    `- 当前主线说明：${phase.summary}`,
+    `- 当前 active batch：${currentTruth.activeBatchId || "未声明"}`,
+    `- 当前 active wave：${expansionWave.currentWaveName || expansionWave.summary || "未声明"}`,
+    `- 当前 validation：${validationDecision.levelLabel || validationDecision.level || "未声明"}`,
+    `- 当前能力目录：${capabilityManifest.length} 项（${capabilitySummary.map((item) => `${item.categoryLabel} ${item.count}`).join(" / ") || "未提取"}）`,
+    `- 当前推荐下一步：${phase.nextFocus}`,
+    "",
+    "## 分层导航",
+    "",
+    "### 主线骨架",
+    "",
+    ...mainlineCards.map((card) => `- [[${card.fileName.replace(/\.md$/u, "")}]]`),
+    "",
+    "### 支撑能力",
+    "",
+    ...supportCards.map((card) => `- [[${card.fileName.replace(/\.md$/u, "")}]]`),
+    "",
+    "### 项目特定补充",
+    "",
+    "- [[06-当前扩展波次-模块焦点]]",
+    "- [[07-能力目录-当前插件能力清单]]",
+    "",
+    "## 推荐阅读顺序",
+    "",
+    "1. 先看 [[01-主线-偏好设置与宿主窗格]]，确认 pane 与 host-visible surface 的默认产品骨架。",
+    "2. 再看 [[02-主线-Reader 工具栏与侧栏]]，理解 Reader 入口和阅读流上下文。",
+    "3. 然后看 [[03-主线-菜单与子菜单]]，把 menu target / submenu / evidence 串起来。",
+    "4. 如果你关心“当前这轮 wave 到底在扩什么”，再看 [[06-当前扩展波次-模块焦点]]。",
+    "5. 如果你关心“仓库里已经声明了哪些真实能力”，再看 [[07-能力目录-当前插件能力清单]]。",
+    "6. 需要落到统一装配或验证闭环时，再看 `04`、`05` 两张支撑卡片。",
+    "7. 如果你要看接近真实界面的空间布局，再打开 [[14-当前Zotero插件-UI 具象布局图]]。",
+    "",
+  ].join("\n");
+}
+
+function buildPluginModuleCardMarkdown(summary = {}, card = {}) {
+  const phase = buildPluginCurrentPhase(summary);
+  const routeSteps = String(card.route || "")
+    .split("->")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return [
+    "---",
+    "type: module-card",
+    `layer: ${card.layer || "support"}`,
+    `status: ${card.status || "implemented"}`,
+    `updated: ${(summary.generatedAt || new Date().toISOString()).slice(0, 10)}`,
+    "---",
+    "",
+    `# ${card.title || "当前模块"}`,
+    "",
+    "## 功能定位",
+    "",
+    `- ${card.summary || "-"}`,
+    `- 当前阶段：${phase.label}`,
+    "",
+    "## 当前可见面",
+    "",
+    ...(Array.isArray(card.surfaces) && card.surfaces.length > 0
+      ? card.surfaces.map((item) => `- ${item}`)
+      : ["- 当前没有额外可见面说明。"]),
+    "",
+    "## 简要技术链路",
+    "",
+    ...(routeSteps.length > 0
+      ? routeSteps.map((item, index) => `${index + 1}. ${item}`)
+      : ["1. 当前未提取到稳定技术链路。"]),
+    "",
+    "## 关键落点",
+    "",
+    ...(Array.isArray(card.modules) && card.modules.length > 0
+      ? card.modules.map((item) => `- \`${item}\``)
+      : ["- 当前未提取到关键落点。"]),
+    "",
+    "## 当前状态判断",
+    "",
+    `- 当前状态：${card.statusLabel || "已建链"}`,
+    `- 当前关注：${card.focus || phase.nextFocus}`,
+    `- 当前说明：${phase.summary}`,
+    "",
+    "## 典型动作",
+    "",
+    ...(Array.isArray(card.actions) && card.actions.length > 0
+      ? card.actions.map((item) => `- ${item}`)
+      : ["- 当前未提取到典型动作。"]),
+    "",
+    "## 关联能力",
+    "",
+    ...(Array.isArray(card.relatedCapabilities) && card.relatedCapabilities.length > 0
+      ? card.relatedCapabilities.map((item) => {
+        const scenarios = Array.isArray(item.zoteroScenarios) && item.zoteroScenarios.length > 0
+          ? `；真机场景：${item.zoteroScenarios.join(" / ")}`
+          : "";
+        const agentScenario = item.agentScenario ? `；agent 场景：${item.agentScenario}` : "";
+        return `- \`${item.id}\` · ${item.label}（${item.categoryLabel}）${agentScenario}${scenarios}`;
+      })
+      : ["- 当前未提取到关联能力。"]),
+    "",
+    "## 路线提示",
+    "",
+    ...(Array.isArray(card.routeHighlights) && card.routeHighlights.length > 0
+      ? card.routeHighlights.map((item) => `- ${item}`)
+      : ["- 当前未提取到路线提示。"]),
+    "",
+    "## 关联跳转",
+    "",
+    "- [[00-当前Zotero插件-功能模块总览]]",
+    "- [[当前Zotero插件-功能模块图谱]]",
+    "- [[06-当前扩展波次-模块焦点]]",
+    "- [[07-能力目录-当前插件能力清单]]",
+    ...(Array.isArray(card.diagramLinks) && card.diagramLinks.length > 0
+      ? card.diagramLinks.map((item) => `- ${item}`)
+      : []),
+    "",
+  ].join("\n");
+}
+
+function buildPluginModuleMapCanvas(summary = {}) {
+  const phase = buildPluginCurrentPhase(summary);
+  const cards = buildPluginModuleCards(summary);
+  const projectContext = summary.projectContext && typeof summary.projectContext === "object"
+    ? summary.projectContext
+    : {};
+  const currentTruth = projectContext.currentTruth && typeof projectContext.currentTruth === "object"
+    ? projectContext.currentTruth
+    : {};
+  const expansionWave = projectContext.expansionWave && typeof projectContext.expansionWave === "object"
+    ? projectContext.expansionWave
+    : {};
+  const validationDecision = projectContext.validationDecision && typeof projectContext.validationDecision === "object"
+    ? projectContext.validationDecision
+    : {};
+  return {
+    nodes: [
+      makeFileNode(
+        "module-overview",
+        -180,
+        -180,
+        460,
+        250,
+        "项目模块图谱/00-当前Zotero插件-功能模块总览.md",
+        "5",
+      ),
+      makeFileNode("module-pane", -180, 180, 360, 250, `项目模块图谱/${cards[0]?.fileName || "01-主线-偏好设置与宿主窗格.md"}`, "4"),
+      makeFileNode("module-reader", 260, 180, 360, 280, `项目模块图谱/${cards[1]?.fileName || "02-主线-Reader 工具栏与侧栏.md"}`, "4"),
+      makeFileNode("module-menu", 700, 180, 360, 250, `项目模块图谱/${cards[2]?.fileName || "03-主线-菜单与子菜单.md"}`, "4"),
+      makeFileNode("module-wave-note", -180, 540, 360, 250, "项目模块图谱/06-当前扩展波次-模块焦点.md", "5"),
+      makeFileNode("module-compose", 260, 540, 360, 250, `项目模块图谱/${cards[3]?.fileName || "04-支撑-统一装配与 Host Action.md"}`, "6"),
+      makeFileNode("module-validation", 700, 540, 360, 250, `项目模块图谱/${cards[4]?.fileName || "05-支撑-验证与证据闭环.md"}`, "6"),
+      makeFileNode("module-capability-note", 260, 900, 360, 250, "项目模块图谱/07-能力目录-当前插件能力清单.md", "3"),
+      makeNode(
+        "module-phase",
+        -620,
+        180,
+        360,
+        260,
+        [
+          "当前项目上下文",
+          "",
+          `主线：${phase.label}`,
+          `Active batch：${currentTruth.activeBatchId || "-"}`,
+          `Wave：${expansionWave.currentWaveName || expansionWave.summary || "-"}`,
+          `Validation：${validationDecision.levelLabel || validationDecision.level || "-"}`,
+          `下一焦点：${phase.nextFocus}`,
+        ].join("\n"),
+        "2",
+      ),
+      makeNode(
+        "module-guide",
+        -620,
+        900,
+        360,
+        250,
+        [
+          "阅读建议",
+          "",
+          "1. 先看总览",
+          "2. 再读 01~03 主线卡片",
+          "3. 再读 06 当前 wave 焦点",
+          "4. 然后回到 04~05 支撑卡片",
+          "5. 需要能力入口时看 07 能力目录",
+          "6. 需要接近真实界面时再看 14-当前Zotero插件-UI 具象布局图",
+        ].join("\n"),
+        "3",
+      ),
+    ],
+    edges: [
+      makeEdge("module-edge-1", "module-overview", "module-pane", "pane"),
+      makeEdge("module-edge-2", "module-overview", "module-reader", "reader"),
+      makeEdge("module-edge-3", "module-overview", "module-menu", "menu"),
+      makeEdge("module-edge-4", "module-overview", "module-wave-note", "current wave"),
+      makeEdge("module-edge-5", "module-pane", "module-compose", "统一装配"),
+      makeEdge("module-edge-6", "module-reader", "module-compose", "host action"),
+      makeEdge("module-edge-7", "module-menu", "module-compose", "state / replay"),
+      makeEdge("module-edge-8", "module-compose", "module-validation", "evidence"),
+      makeEdge("module-edge-9", "module-phase", "module-overview", "当前 truth"),
+      makeEdge("module-edge-10", "module-phase", "module-wave-note", "扩展判定"),
+      makeEdge("module-edge-11", "module-wave-note", "module-validation", "acceptance"),
+      makeEdge("module-edge-12", "module-capability-note", "module-compose", "能力映射"),
+      makeEdge("module-edge-13", "module-guide", "module-capability-note", "快速定位"),
+    ],
+  };
+}
+
+function buildPluginWaveFocusMarkdown(summary = {}) {
+  const phase = buildPluginCurrentPhase(summary);
+  const projectContext = summary.projectContext && typeof summary.projectContext === "object"
+    ? summary.projectContext
+    : {};
+  const currentTruth = projectContext.currentTruth && typeof projectContext.currentTruth === "object"
+    ? projectContext.currentTruth
+    : {};
+  const expansionWave = projectContext.expansionWave && typeof projectContext.expansionWave === "object"
+    ? projectContext.expansionWave
+    : {};
+  const validationDecision = projectContext.validationDecision && typeof projectContext.validationDecision === "object"
+    ? projectContext.validationDecision
+    : {};
+  const archetypeMap = buildWaveArchetypeMap(expansionWave);
+  const recommendedLinks = buildWaveRecommendedLinks(expansionWave);
+  const inScopeModules = Array.isArray(expansionWave.inScopeModules) ? expansionWave.inScopeModules : [];
+  const outOfScopeModules = Array.isArray(expansionWave.outOfScopeModules) ? expansionWave.outOfScopeModules : [];
+  const explicitVisualUpgradeModules = Array.isArray(expansionWave.explicitVisualUpgradeModules)
+    ? expansionWave.explicitVisualUpgradeModules
+    : [];
+  return [
+    "---",
+    "type: module-wave-focus",
+    `status: ${summary.bootstrapShell === true ? "bootstrap-shell" : expansionWave.status || "active"}`,
+    `updated: ${(summary.generatedAt || new Date().toISOString()).slice(0, 10)}`,
+    "---",
+    "",
+    "# 当前扩展波次模块焦点",
+    "",
+    "> [!info]",
+    "> 这份笔记只回答“当前 active wave 在扩什么、暂时不扩什么、它和 01~05 模块卡片是什么关系”。",
+    "",
+    "## 当前上下文",
+    "",
+    `- 当前 phase：${phase.label}`,
+    `- 当前 active batch：${currentTruth.activeBatchId || "未声明"}`,
+    `- 当前 active wave：${expansionWave.currentWaveName || "未声明"}`,
+    `- 当前 validation：${validationDecision.levelLabel || validationDecision.level || "未声明"}`,
+    `- 当前 acceptance track：${expansionWave.acceptanceTrack || "未声明"}`,
+    "",
+    "## Wave 摘要",
+    "",
+    `- ${expansionWave.summary || "当前尚未声明 wave 摘要。"}`,
+    "",
+    "## 当前 in-scope 模块",
+    "",
+    ...(inScopeModules.length > 0
+      ? inScopeModules.map((moduleName) => {
+        const archetype = archetypeMap.get(moduleName);
+        return `- \`${moduleName}\`${archetype ? `（${formatModuleArchetypeLabel(archetype)}）` : ""}`;
+      })
+      : ["- 当前没有声明 in-scope 模块。"]),
+    "",
+    "## 当前 out-of-scope 模块",
+    "",
+    ...(outOfScopeModules.length > 0
+      ? outOfScopeModules.map((moduleName) => `- \`${moduleName}\``)
+      : ["- 当前没有声明 out-of-scope 模块。"]),
+    "",
+    "## 显式视觉升级模块",
+    "",
+    ...(explicitVisualUpgradeModules.length > 0
+      ? explicitVisualUpgradeModules.map((moduleName) => `- \`${moduleName}\``)
+      : ["- 当前 wave 没有声明显式 visual-upgrade 模块。"]),
+    "",
+    "## 这和模块图谱的关系",
+    "",
+    `- ${buildWaveRelationshipSummary(phase, expansionWave)}`,
+    "- `06` 关注的是“这轮要扩/不扩什么”；`01~05` 关注的是“当前插件已经有哪些稳定功能骨架”。",
+    "- 如果 wave 更偏 workspace / telemetry / runtime sidecar，不代表当前 pane / reader / menu 主线被重新判成未完成。",
+    "",
+    "## 建议跳转",
+    "",
+    ...recommendedLinks.map((item) => `- ${item}`),
+    "",
+  ].join("\n");
+}
+
+function buildPluginCapabilityCatalogMarkdown(summary = {}) {
+  const phase = buildPluginCurrentPhase(summary);
+  const projectContext = summary.projectContext && typeof summary.projectContext === "object"
+    ? summary.projectContext
+    : {};
+  const expansionWave = projectContext.expansionWave && typeof projectContext.expansionWave === "object"
+    ? projectContext.expansionWave
+    : {};
+  const addonConfig = getObsidianAddonConfig(summary);
+  const capabilityManifest = buildPluginCapabilityManifest(summary);
+  const categorySummary = buildCapabilityCategorySummary(capabilityManifest);
+  const currentWaveText = [
+    expansionWave.currentWaveName,
+    expansionWave.summary,
+    ...(Array.isArray(expansionWave.inScopeModules) ? expansionWave.inScopeModules : []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const capabilityText = capabilityManifest
+    .map((item) => JSON.stringify(item))
+    .join(" ")
+    .toLowerCase();
+  const currentWaveOutsideCatalog = /workbench/u.test(currentWaveText) && !/workbench/u.test(capabilityText);
+  const categoryGroups = new Map();
+  capabilityManifest.forEach((capability) => {
+    const category = String(capability?.category || "").trim() || "unknown";
+    if (!categoryGroups.has(category)) {
+      categoryGroups.set(category, []);
+    }
+    categoryGroups.get(category).push(capability);
+  });
+
+  const lines = [
+    "---",
+    "type: capability-catalog",
+    `updated: ${(summary.generatedAt || new Date().toISOString()).slice(0, 10)}`,
+    `addon_ref: "${String(addonConfig.addonRef || "cleanroomtemplate").replaceAll('"', "'")}"`,
+    "---",
+    "",
+    "# 当前插件能力清单",
+    "",
+    "> [!info]",
+    "> 这份目录直接派生自 `src/app/capability-manifest.js`，用于说明“当前插件已经声明并接通了哪些能力、入口、场景和责任文件”。",
+    "",
+    "## 当前概览",
+    "",
+    `- 插件名称：${addonConfig.addonName || "Zotero Cleanroom Template"}`,
+    `- Addon Ref：\`${addonConfig.addonRef || "cleanroomtemplate"}\``,
+    `- 当前 phase：${phase.label}`,
+    `- 当前 active wave：${expansionWave.currentWaveName || expansionWave.summary || "未声明"}`,
+    `- 能力总数：${capabilityManifest.length}`,
+    `- 分类分布：${categorySummary.map((item) => `${item.categoryLabel} ${item.count}`).join(" / ") || "未提取"}`,
+    "",
+    "## 读图提示",
+    "",
+    "- `01~05` 模块卡片适合看功能骨架；这份目录适合看真实入口、真机场景和责任文件。",
+    "- 如果你在找“当前这轮 wave 的 scope”，优先回到 [[06-当前扩展波次-模块焦点]]。",
+  ];
+
+  if (currentWaveOutsideCatalog) {
+    lines.push("- 当前 active wave 更偏 dev-only review workbench / workspace sidecar；因此它不会完整体现在现有 capability manifest 中。");
+  }
+
+  lines.push("", "## 能力清单", "");
+
+  Array.from(categoryGroups.entries())
+    .sort((left, right) => String(left[0] || "").localeCompare(String(right[0] || ""), "zh-CN"))
+    .forEach(([category, capabilities]) => {
+      lines.push(`### ${getCapabilityCategoryLabel(category)}`, "");
+      capabilities.forEach((capability) => {
+        const moduleLinks = buildCapabilityToModuleLinks(capability.id);
+        lines.push(`#### \`${capability.id}\` ${capability.label}`, "");
+        lines.push(`- 说明：${capability.description || "-"}`);
+        lines.push(`- agent 场景：${capability.agentScenario || "-"}`);
+        lines.push(`- 真机场景：${truncateList(capability.zoteroScenarios, 4).join(" / ") || "-"}`);
+        lines.push(`- 主要入口：${truncateList(capability.entrypoints, 4).map((item) => `\`${item}\``).join("、") || "-"}`);
+        lines.push(`- 责任文件：${truncateList(capability.ownedBy, 4).map((item) => `\`${item}\``).join("、") || "-"}`);
+        lines.push(`- 成功信号：${truncateList(capability.successSignals, 4).join("；") || "-"}`);
+        lines.push(`- 对应模块图谱：${moduleLinks.join("、") || "-"}`);
+        lines.push("");
+      });
+    });
+
+  return lines.join("\n");
+}
+
+function buildPluginUIConcreteExcalidrawMarkdown(summary = {}) {
+  const phase = buildPluginCurrentPhase(summary);
+  const projectContext = summary.projectContext && typeof summary.projectContext === "object"
+    ? summary.projectContext
+    : {};
+  const expansionWave = projectContext.expansionWave && typeof projectContext.expansionWave === "object"
+    ? projectContext.expansionWave
+    : {};
+  const validationDecision = projectContext.validationDecision && typeof projectContext.validationDecision === "object"
+    ? projectContext.validationDecision
+    : {};
+  const updated = Date.parse(String(summary.generatedAt || "")) || Date.now();
+  const elements = [
+    createExcalidrawRect("ui-concrete-root", 20, 20, 880, 120, 3001, 4001, updated, "#dbe4ff"),
+    createExcalidrawTextBox(
+      "ui-concrete-root-text",
+      44,
+      44,
+      `当前 Zotero 插件 UI 具象布局图\n状态：${phase.surfaceStatus}。把 preference pane、library panes、reader toolbar / sidebar 与 menu entry 放回接近真实宿主的布局位置。`,
+      3002,
+      4002,
+      updated,
+      { width: 836, height: 84, fontSize: 18, strokeColor: "#1e40af" },
+    ),
+    createExcalidrawRect("ui-concrete-meta", 940, 20, 380, 120, 3003, 4003, updated, "#fff3bf"),
+    createExcalidrawTextBox(
+      "ui-concrete-meta-text",
+      964,
+      44,
+      `当前 phase：${phase.label}\n当前 wave：${expansionWave.currentWaveName || expansionWave.summary || "未声明"}\nValidation：${validationDecision.levelLabel || validationDecision.level || "未声明"}\n下一焦点：${phase.nextFocus}`,
+      3004,
+      4004,
+      updated,
+      { width: 332, height: 84, fontSize: 16 },
+    ),
+
+    createExcalidrawRect("pref-shell", 20, 190, 360, 260, 3010, 4010, updated, "#f8f9fa"),
+    createExcalidrawTextBox("pref-shell-text", 40, 206, "Preferences Window\n偏好设置面板", 3011, 4011, updated, {
+      width: 320,
+      height: 36,
+      fontSize: 18,
+      strokeColor: "#1f2937",
+    }),
+    createExcalidrawRect("pref-sidebar", 40, 252, 86, 160, 3012, 4012, updated, "#e7f5ff"),
+    createExcalidrawTextBox("pref-sidebar-text", 52, 268, "宿主侧边栏\n插件 pane", 3013, 4013, updated, {
+      width: 62,
+      height: 80,
+      fontSize: 15,
+      strokeColor: "#1d4ed8",
+      textAlign: "center",
+    }),
+    createExcalidrawRect("pref-content", 144, 252, 212, 160, 3014, 4014, updated, "#dbe4ff"),
+    createExcalidrawTextBox("pref-content-text", 160, 268, "pane root\n开关 / theme / 偏好写回\n窄宽度 degrade\nsurface-local capture", 3015, 4015, updated, {
+      width: 180,
+      height: 120,
+      fontSize: 15,
+    }),
+
+    createExcalidrawRect("library-shell", 420, 190, 420, 320, 3020, 4020, updated, "#f8f9fa"),
+    createExcalidrawTextBox("library-shell-text", 440, 206, "Library Window\n条目与上下文窗格", 3021, 4021, updated, {
+      width: 380,
+      height: 36,
+      fontSize: 18,
+      strokeColor: "#1f2937",
+    }),
+    createExcalidrawRect("library-tree", 440, 252, 92, 220, 3022, 4022, updated, "#e7f5ff"),
+    createExcalidrawTextBox("library-tree-text", 452, 268, "Item Tree\n条目列表", 3023, 4023, updated, {
+      width: 68,
+      height: 70,
+      fontSize: 15,
+      textAlign: "center",
+    }),
+    createExcalidrawRect("library-list", 548, 252, 116, 220, 3024, 4024, updated, "#edf2ff"),
+    createExcalidrawTextBox("library-list-text", 562, 268, "选中条目\n主工作区", 3025, 4025, updated, {
+      width: 88,
+      height: 70,
+      fontSize: 15,
+      textAlign: "center",
+    }),
+    createExcalidrawRect("library-item-pane", 680, 252, 140, 100, 3026, 4026, updated, "#dbe4ff"),
+    createExcalidrawTextBox("library-item-pane-text", 694, 268, "Item Pane\nsection / info row\nsidenav", 3027, 4027, updated, {
+      width: 112,
+      height: 70,
+      fontSize: 15,
+    }),
+    createExcalidrawRect("library-context-pane", 680, 372, 140, 100, 3028, 4028, updated, "#c3fae8"),
+    createExcalidrawTextBox("library-context-pane-text", 694, 388, "context pane\n与当前条目 / reader tab\n保持同步", 3029, 4029, updated, {
+      width: 112,
+      height: 70,
+      fontSize: 15,
+    }),
+
+    createExcalidrawRect("reader-shell", 880, 190, 440, 320, 3030, 4030, updated, "#f8f9fa"),
+    createExcalidrawTextBox("reader-shell-text", 900, 206, "Reader Window\nrenderToolbar 与 sidebar view", 3031, 4031, updated, {
+      width: 400,
+      height: 36,
+      fontSize: 18,
+      strokeColor: "#1f2937",
+    }),
+    createExcalidrawRect("reader-toolbar", 900, 252, 396, 50, 3032, 4032, updated, "#e7f5ff"),
+    createExcalidrawTextBox("reader-toolbar-text", 916, 268, "renderToolbar / action button / ready state", 3033, 4033, updated, {
+      width: 364,
+      height: 24,
+      fontSize: 15,
+      textAlign: "center",
+    }),
+    createExcalidrawRect("reader-document", 900, 322, 252, 150, 3034, 4034, updated, "#edf2ff"),
+    createExcalidrawTextBox("reader-document-text", 916, 338, "阅读正文区域\n文档上下文是一等输入\nlocal capture / selectedTab ready", 3035, 4035, updated, {
+      width: 220,
+      height: 90,
+      fontSize: 15,
+    }),
+    createExcalidrawRect("reader-sidebar", 1172, 322, 124, 150, 3036, 4036, updated, "#d3f9d8"),
+    createExcalidrawTextBox("reader-sidebar-text", 1184, 338, "sidebar view\nannotations /\ncontext", 3037, 4037, updated, {
+      width: 96,
+      height: 90,
+      fontSize: 15,
+      textAlign: "center",
+    }),
+
+    createExcalidrawRect("menu-rail", 420, 550, 900, 140, 3040, 4040, updated, "#fff9db"),
+    createExcalidrawTextBox("menu-rail-text", 444, 566, "Menu Entry Rail\nitem / collection / reader menubar view", 3041, 4041, updated, {
+      width: 856,
+      height: 30,
+      fontSize: 18,
+      strokeColor: "#7c2d12",
+    }),
+    createExcalidrawRect("menu-item", 452, 606, 220, 56, 3042, 4042, updated, "#ffe8cc"),
+    createExcalidrawTextBox("menu-item-text", 470, 622, "item menu\n单条目动作入口", 3043, 4043, updated, {
+      width: 184,
+      height: 26,
+      fontSize: 15,
+      textAlign: "center",
+    }),
+    createExcalidrawRect("menu-collection", 700, 606, 220, 56, 3044, 4044, updated, "#ffe8cc"),
+    createExcalidrawTextBox("menu-collection-text", 718, 622, "collection menu\n批量范围动作入口", 3045, 4045, updated, {
+      width: 184,
+      height: 26,
+      fontSize: 15,
+      textAlign: "center",
+    }),
+    createExcalidrawRect("menu-view", 948, 606, 220, 56, 3046, 4046, updated, "#ffe8cc"),
+    createExcalidrawTextBox("menu-view-text", 966, 622, "reader / menubar / view\nReader 相关命令", 3047, 4047, updated, {
+      width: 184,
+      height: 26,
+      fontSize: 15,
+      textAlign: "center",
+    }),
+    createExcalidrawRect("menu-submenu", 1196, 606, 100, 56, 3048, 4048, updated, "#ffd8a8"),
+    createExcalidrawTextBox("menu-submenu-text", 1208, 622, "dynamic\nsubmenu", 3049, 4049, updated, {
+      width: 76,
+      height: 26,
+      fontSize: 15,
+      textAlign: "center",
+    }),
+
+    createExcalidrawRect("ui-concrete-footer", 20, 550, 360, 140, 3050, 4050, updated, "#e5dbff"),
+    createExcalidrawTextBox(
+      "ui-concrete-footer-text",
+      40,
+      570,
+      `读图提示\n1. 07~11 负责分 surface 概念图\n2. 14 负责接近真实宿主布局的全局观\n3. 当前推荐命令：${summary.runnableNextCommand || summary.nextAction || "-"}`,
+      3051,
+      4051,
+      updated,
+      { width: 320, height: 90, fontSize: 15 },
+    ),
+
+    createExcalidrawArrow("ui-arrow-item", 562, 662, 0, -152, 3060, 4060, updated),
+    createExcalidrawArrow("ui-arrow-view", 1058, 606, 62, -96, 3061, 4061, updated),
+  ];
+
+  return buildObsidianExcalidrawMarkdown({
+    type: "excalidraw",
+    version: 2,
+    source: "https://github.com/zsviczian/obsidian-excalidraw-plugin",
+    elements,
+    appState: {
+      gridSize: null,
+      viewBackgroundColor: "#ffffff",
+    },
+    files: {},
+  });
+}
+
+export function buildPluginModuleMapArtifacts(summary = {}) {
+  const cards = buildPluginModuleCards(summary);
+  return {
+    overviewMarkdown: buildPluginModuleMapOverviewMarkdown(summary),
+    waveMarkdown: buildPluginWaveFocusMarkdown(summary),
+    capabilityCatalogMarkdown: buildPluginCapabilityCatalogMarkdown(summary),
+    canvas: buildPluginModuleMapCanvas(summary),
+    cards: cards.map((card) => ({
+      fileName: card.fileName,
+      markdown: buildPluginModuleCardMarkdown(summary, card),
+    })),
+  };
+}
+
+export function buildPluginUIConcreteExcalidraw(summary = {}) {
+  return buildPluginUIConcreteExcalidrawMarkdown(summary);
 }
 
 export function buildObsidianInterventionMarkdown(summary) {
@@ -2308,6 +3289,10 @@ export function buildHumanQuickstartMarkdown() {
     "> - 插件功能白板：[[00-当前Zotero插件-功能与技术脉络]]",
     "> - 证据索引：[[02-当前Zotero插件-证据索引]]",
     "> - 功能地图：[[05-当前Zotero插件-功能与可见面地图]]",
+    "> - 模块图谱：[[项目模块图谱/00-当前Zotero插件-功能模块总览]]",
+    "> - 当前 wave：[[项目模块图谱/06-当前扩展波次-模块焦点]]",
+    "> - 能力目录：[[项目模块图谱/07-能力目录-当前插件能力清单]]",
+    "> - UI 具象图：[[14-当前Zotero插件-UI 具象布局图]]",
     "> - 高级规范：[[04-模板协作-高级介入规范]]",
     "> - 人工输入窗口：[[10-模板协作-人工指令窗口]]",
     "",
@@ -2319,6 +3304,10 @@ export function buildHumanQuickstartMarkdown() {
     "| `01-当前Zotero插件-状态总览.md` | 看当前主线、阻塞项、建议动作 | 先读这个，快速判断是不是需要人工接管 |",
     "| `02-当前Zotero插件-证据索引.md` | 跳转到报告和证据工件 | 当你需要核对日志、报告、旧结论时再下钻 |",
     "| `05-当前Zotero插件-功能与可见面地图.md` | 看当前插件有哪些稳定可见面与入口 | 当你要理解 UI 面的业务分组时优先看这里 |",
+    "| `项目模块图谱/00-当前Zotero插件-功能模块总览.md` | 看当前项目按功能模块拆开的主线与支撑层 | 当你要快速理解“哪些模块构成当前插件”时优先看这里 |",
+    "| `项目模块图谱/06-当前扩展波次-模块焦点.md` | 看当前 active wave 在扩什么、暂时不扩什么 | 当你想判断“为什么现在在改这批模块”时优先看这里 |",
+    "| `项目模块图谱/07-能力目录-当前插件能力清单.md` | 看当前插件已经声明的真实能力入口、场景与责任文件 | 当你要把“模块”进一步落到“可调用能力”时再看 |",
+    "| `14-当前Zotero插件-UI 具象布局图.excalidraw.md` | 看接近真实宿主布局的 UI 全局观 | 当你已经知道 surface 名称，想把它们放回真实界面位置时再看 |",
     "| `06-当前Zotero插件-技术脉络与宿主接入.md` | 看这些 surface 为什么走这条宿主接入路径 | 当你要做技术判断或扩面选型时再读 |",
     "| `04-模板协作-高级介入规范.md` | 看字段语义、介入边界、规范建议 | 当你要正式接管一轮路径时再读 |",
     "| `10-模板协作-人工指令窗口.md` | 唯一的人机协作输入窗口 | 只在这里写状态、下一步指令、关注文件、备注 |",
@@ -2328,11 +3317,14 @@ export function buildHumanQuickstartMarkdown() {
     "> [!check] 建议按这个顺序使用",
     "> 1. 先看 `01-当前Zotero插件-状态总览.md`，判断现在卡在哪。",
     "> 2. 再看 `00-当前Zotero插件-功能与技术脉络.canvas`，确认问题属于哪个插件功能组。",
-    "> 3. 需要深挖时，去 `05-当前Zotero插件-功能与可见面地图.md` 和 `06-当前Zotero插件-技术脉络与宿主接入.md` 找对应说明。",
-    "> 4. 需要证据时，再去 `02-当前Zotero插件-证据索引.md` 找对应报告。",
-    "> 5. 如果你准备正式介入，再读一遍 `04-模板协作-高级介入规范.md`。",
-    "> 6. 只有当你确定要改变本轮路径时，才去修改 `10-模板协作-人工指令窗口.md`。",
-    "> 7. 修改完成后，再让 agent 进入下一轮执行。",
+    "> 3. 如果你更关心“当前项目有哪些功能模块”，就去 `项目模块图谱/00-当前Zotero插件-功能模块总览.md` 和对应模块卡片。",
+    "> 4. 如果你想理解“为什么当前在推进这批模块”，去 `项目模块图谱/06-当前扩展波次-模块焦点.md`。",
+    "> 5. 如果你想把模块进一步落到真实入口和场景，去 `项目模块图谱/07-能力目录-当前插件能力清单.md`。",
+    "> 6. 需要深挖时，再去 `05-当前Zotero插件-功能与可见面地图.md`、`06-当前Zotero插件-技术脉络与宿主接入.md` 和 `14-当前Zotero插件-UI 具象布局图.excalidraw.md` 找对应说明。",
+    "> 7. 需要证据时，再去 `02-当前Zotero插件-证据索引.md` 找对应报告。",
+    "> 8. 如果你准备正式介入，再读一遍 `04-模板协作-高级介入规范.md`。",
+    "> 9. 只有当你确定要改变本轮路径时，才去修改 `10-模板协作-人工指令窗口.md`。",
+    "> 10. 修改完成后，再让 agent 进入下一轮执行。",
     "",
     "## 介入前检查清单",
     "",
@@ -2356,7 +3348,7 @@ export function buildHumanQuickstartMarkdown() {
     "## 产品整体 UI 设计草图怎么更新",
     "",
     "> [!info] 只在你需要一轮产品整体 UI 设计 / 改版草图时才用",
-    "> 这条链只产出 Obsidian Excalidraw，不改业务源码，也不覆盖默认 `07~11` 自动概念图。",
+    "> 这条链只产出 Obsidian Excalidraw，不改业务源码，也不覆盖默认 `07~11 / 14` 自动图。",
     "",
     "- 先执行 `npm run agent:ui:design -- list`，查看当前可用的人工 UI 设计工作链。",
     "- 运行时使用 `npm run agent:ui:design -- run product-ui-design-update --goal \"<你的设计目标>\"`。",
@@ -2532,7 +3524,7 @@ export function buildHumanAdvancedGuideMarkdown() {
     "## 产品整体 UI 设计链",
     "",
     "> [!info] 这条链适合什么场景",
-    "> 当你需要一轮面向产品整体的 UI 设计 / 改版草图，但又不想让 agent 直接改实现或覆盖默认 `07~11` 概念图时，优先走这条人工触发链。",
+    "> 当你需要一轮面向产品整体的 UI 设计 / 改版草图，但又不想让 agent 直接改实现或覆盖默认 `07~11 / 14` 自动图时，优先走这条人工触发链。",
     "",
     "- 推荐命令：`npm run agent:ui:design -- run product-ui-design-update --goal \"统一 preference pane / item pane / reader 的产品层导航\"`",
     "- 设计呈现只允许落在 `obsidian/agent-workbench/20-当前Zotero插件-产品整体 UI 设计与更新流程.excalidraw.md`。",

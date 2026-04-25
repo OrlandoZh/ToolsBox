@@ -616,7 +616,6 @@ describe("Agent Telemetry", () => {
         },
       ],
     });
-
     execNode(["scripts/agent-runner.mjs", "telemetry-test", "--", "node", "-e", "process.exit(0)"]);
 
     try {
@@ -3561,6 +3560,11 @@ describe("Agent Telemetry", () => {
     const humanQuickstartMD = fs.readFileSync(obsidianPath("03-模板协作-人工快速上手.md"), "utf-8");
     const humanAdvancedGuideMD = fs.readFileSync(obsidianPath("04-模板协作-高级介入规范.md"), "utf-8");
     const humanWindowMD = fs.readFileSync(obsidianPath("10-模板协作-人工指令窗口.md"), "utf-8");
+    const moduleMapOverviewMD = fs.readFileSync(obsidianPath("项目模块图谱/00-当前Zotero插件-功能模块总览.md"), "utf-8");
+    const moduleMapWaveMD = fs.readFileSync(obsidianPath("项目模块图谱/06-当前扩展波次-模块焦点.md"), "utf-8");
+    const moduleMapCapabilityCatalogMD = fs.readFileSync(obsidianPath("项目模块图谱/07-能力目录-当前插件能力清单.md"), "utf-8");
+    const moduleMapCanvas = fs.readFileSync(obsidianPath("项目模块图谱/当前Zotero插件-功能模块图谱.canvas"), "utf-8");
+    const uiConcreteMD = fs.readFileSync(obsidianPath("14-当前Zotero插件-UI 具象布局图.excalidraw.md"), "utf-8");
     const visualFlowPath = obsidianPath("12-当前Zotero插件-交互流转图.md");
     const visualExcalidrawPath = obsidianPath("13-当前Zotero插件-功能版图.excalidraw.md");
 
@@ -3574,6 +3578,15 @@ describe("Agent Telemetry", () => {
     assert.ok(humanAdvancedGuideMD.includes("# 模板协作高级介入规范"));
     assert.ok(humanAdvancedGuideMD.includes("## 介入规范建议"));
     assert.ok(humanWindowMD.includes("## 人工编辑区（保留）"));
+    assert.ok(moduleMapOverviewMD.includes("# 当前 Zotero 插件功能模块总览"));
+    assert.ok(moduleMapWaveMD.includes("# 当前扩展波次模块焦点"));
+    assert.ok(moduleMapCapabilityCatalogMD.includes("# 当前插件能力清单"));
+    assert.ok(moduleMapCapabilityCatalogMD.includes("`reader-summary` Reader 摘要"));
+    assert.ok(moduleMapCanvas.includes("\"type\": \"file\""));
+    assert.ok(moduleMapCanvas.includes("06-当前扩展波次-模块焦点.md"));
+    assert.ok(moduleMapCanvas.includes("07-能力目录-当前插件能力清单.md"));
+    assert.ok(uiConcreteMD.includes("# Excalidraw Data"));
+    assert.ok(uiConcreteMD.includes("Preferences Window"));
     assert.equal(fs.existsSync(visualFlowPath), false);
     assert.equal(fs.existsSync(visualExcalidrawPath), false);
   });

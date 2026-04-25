@@ -1,7 +1,61 @@
 {
   "schemaVersion": 1,
-  "summary": "Project-local validation overrides for the active ZOTERO-DOM-CONTRACT-WAVE-001 advisory DOM contract batch, the completed ZOTERO-HOST-POLISH-WAVE-001 host-visible polish baseline, and the completed OPTIONAL-BUNDLE-WAVE-001 optional bundle baseline.",
+  "summary": "Project-local validation overrides for the active AGENT-REVIEW-WORKBENCH-WAVE-001 dev-only standalone window batch, the default-disabled Codex Computer Use optional validation lane, the completed ZOTERO-DOM-CONTRACT-WAVE-001 advisory DOM contract baseline, the completed ZOTERO-HOST-POLISH-WAVE-001 host-visible polish baseline, and the completed OPTIONAL-BUNDLE-WAVE-001 optional bundle baseline.",
   "overrides": [
+    {
+      "id": "agent-review-workbench-wave-001",
+      "summary": "Dev-only Agent Review Workbench changes stay visual-recommended: treat the standalone window as a visible surface, but gate v1 on window lifecycle, JSON state/store resilience, structured annotation CRUD, deterministic plan mapping, diagnostics summary, and workbench-specific acceptance telemetry before any screenshot-only review.",
+      "pathMatchers": [
+        "^docs/CURRENT_BACKLOG\\.md$",
+        "^config/project-expansion-wave\\.json$",
+        "^config/project-validation-overrides\\.json$",
+        "^src/app/(?:feature-composer|host-actions|plugin|plugin-api|plugin-agent|review-workbench-runtime-provider)\\.js$",
+        "^src/core/i18n(?:-protected)?\\.js$",
+        "^src/features/agent-review-workbench(?:/|\\.|$)",
+        "^src/platform/zotero-json-state-store\\.js$",
+        "^src/services/file-state-store\\.js$",
+        "^src/utils/window-shell\\.js$",
+        "^scripts/(?:agent-frontpage-summary-lib|agent-monitor|agent-gate)\\.mjs$",
+        "^addon-static/content/lib/agent-review-workbench\\.(?:xhtml|js|css)$",
+        "^zotero-scenarios/review-workbench-window-lifecycle\\.scenario\\.js$",
+        "^tests/(?:agent-review-workbench|review-workbench-runtime-provider|feature-composer|host-actions|plugin|plugin-agent|plugin-api|agent-telemetry|agent-validation-decision-lib|run-all)\\.test\\.js$"
+      ],
+      "decision": "visual-recommended",
+      "requiredChecks": [
+        "继续先通过 `npm run check`、`npm run build`、`npm run agent:host:guard` 与 `npm run agent:host:semantic:guard`，不让 dev-only 工作台破坏 JS core、宿主 contract 或门禁链。",
+        "至少验证 workbench command 注册 / trigger semantics：若当前 Zotero runtime 暴露真实 host-visible Prompt / menu / shortcut 入口，则验证该入口；若 `agent.reviewWorkbench.open` 只以 plugin-local fallback command 暴露，则不要把它误判成 command palette host-visible entry，改为在最小内部触发后验证 standalone window open/focus reuse、shell lost-tracking live-window fallback、close/shutdown cleanup 与 profile-local JSON state store 的 load/save/migrate/corrupt fallback。",
+        "证明 structured snapshot、annotation CRUD、deterministic plan builder、allowlisted host action execution summary、diagnostics summary 与 monitor/gate workbench acceptance telemetry 已闭环；standalone window 截图只作为补证，不得替代功能验收。",
+        "保持 `visual-recommended` 作为 contract enum；中文 `需要视觉验证` 只能作为展示 label，不能回写为 validationLevel 值。",
+        "继续保持 `real AI provider`、`React optional lane promotion` 与 `automatic arbitrary source patching` 为 out-of-scope。"
+      ],
+      "nonGoals": [
+        "把 dev-only review workbench 升格成产品内用户功能",
+        "接入真实 AI provider 或 API key 闭环",
+        "通过 workbench 直接执行任意源码 patch"
+      ]
+    },
+    {
+      "id": "codex-computer-use-validation-lane",
+      "summary": "Default-disabled optional Codex Computer Use real-machine validation lane: it is a governance/tooling sidecar that only creates or records manual desktop validation evidence after an explicit user request, and it must not enter check, Zotero E2E, loop, gate, release gate, or pipeline by default.",
+      "pathMatchers": [
+        "^config/codex-computer-use-validation\\.json$",
+        "^scripts/agent-computer-use-validation(?:-lib)?\\.mjs$",
+        "^docs/CODEX_COMPUTER_USE_VALIDATION\\.md$",
+        "^tests/agent-computer-use-validation-lib\\.test\\.js$",
+        "^package\\.json$"
+      ],
+      "decision": "visual-not-needed",
+      "requiredChecks": [
+        "确认 `config/codex-computer-use-validation.json` 固定 `enabledByDefault=false`、`gateEffect=non-blocking`、`requiresExplicitUserRequest=true`。",
+        "确认 `npm run agent:computer-use:validate` 缺少 `--user-requested` 时失败，只有用户主动要求后才会生成 `agent-computer-use-validation` 工件。",
+        "确认 `check`、`agent:gate`、`agent:gate:release`、`agent:zotero:e2e`、`agent:zotero:loop` 与 `agent:pipeline` 不调用 Computer Use 支线。"
+      ],
+      "nonGoals": [
+        "把 Codex Computer Use 变成默认真机主链或 gate blocker",
+        "用桌面宏替代 `agent:zotero:e2e`、surface smoke、surface-local evidence 或 release gate",
+        "在未获用户明确要求时自动打开 GUI 或执行桌面操作"
+      ]
+    },
     {
       "id": "zotero-dom-contract-wave-001",
       "summary": "DOM contract hardening on the existing preference pane, item pane, and reader surfaces stays advisory-first: keep the real host actions and route-aware DOM checks visible in E2E / monitor / dashboard / gate output, but do not turn route-level DOM contract failures into a new v1 blocker.",

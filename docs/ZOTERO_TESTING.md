@@ -17,6 +17,7 @@
   - `npm run agent:zotero:loop:human`
   - `npm run agent:zotero:watch-recovery`
   - `npm run agent:zotero:autofix`
+  - `npm run agent:computer-use:plan`
   - `npm run agent:obsidian`
   - `npm run export:project`
 - runner 会先尝试走 Zotero 的原生 add-on 生命周期，再显式触发一次 `Zotero.Plugins.init()`；如果插件实例仍然没有自动挂到 `Zotero[instanceKey]`，则通过 chrome debugger 重放一次 clean-room bootstrap
@@ -71,6 +72,7 @@ npm run agent:zotero:loop
 npm run agent:zotero:loop:human
 npm run agent:zotero:watch-recovery
 npm run agent:zotero:autofix
+npm run agent:computer-use:plan
 npm run agent:obsidian
 npm run export:project
 ```
@@ -120,6 +122,7 @@ npm run export:project
   - 启动隔离 Zotero
   - 通过 `profile/extensions/<addonId>` proxy file 预装 `build/<addonRef>`
   - 必要时通过 chrome debugger 补 bootstrap fallback
+  - 默认复用项目 `.zotero-runtime/dev/` 下的 profile/dataDir；它与个人日常 profile 隔离，但不是一次性 fresh/disposable profile
   - 保持 Zotero 打开，适合人工调试
 - `npm run zotero:console`
   - 与 `zotero:dev` 相同
@@ -166,7 +169,7 @@ npm run export:project
   - 读取当前 `agent-zotero-loop / agent-gate / agent-monitor / agent-zotero-e2e` 工件
   - 输出到独立目录 `obsidian/agent-workbench/`
   - 默认以“当前 Zotero 插件”为中心生成工作台，而不是生成模板框架总览
-  - 包含当前插件功能与技术脉络白板、状态总览、证据索引、功能与可见面地图、技术脉络与宿主接入、分 surface 的 UI 概念图，以及模板协作指南和人工指令窗口
+  - 包含当前插件功能与技术脉络白板、状态总览、证据索引、功能与可见面地图、功能模块图谱、技术脉络与宿主接入、分 surface 的 UI 概念图、UI 具象 Excalidraw，以及模板协作指南和人工指令窗口
   - 可通过 `AGENT_OBSIDIAN_DIR=/path/to/vault-folder` 重定向到单独的 Obsidian 管理目录
 - `npm run export:project`
   - 导出剔除 agent / runner / tests / docs / reference 的纯项目工程
@@ -191,6 +194,32 @@ npm run export:project
   - 若显式带上 `--apply-whitelisted-patch` 且命中 `reader-ui:reader-visual-drift`，视觉 `copy` 补丁只允许按 `restart/hot-reload + library/reader` 的 canonical 映射回写对应基线文件
   - 若显式带上 `--apply-whitelisted-patch` 且命中 `reader-ui:reader-visual-drift`，还可受控把最新 E2E 截图复制回 `tests/visual-baselines/agent-zotero-e2e/`，作为第一类 Reader 低风险白名单修正
   - 最终输出 `dist/agent-zotero-autofix.json` 与 `dist/agent-zotero-autofix.md`
+- `npm run agent:computer-use:plan`
+  - 查看 default-disabled 的 Codex Computer Use 真机桌面验证支线
+- `npm run agent:computer-use:list`
+  - 列出当前必补项与已触发的条件项
+  - 当前默认必补项固定为 `review workbench standalone window visible smoke`
+  - 当前会直接显示每个 workflow 的默认 `proof kind`、`proof scope` 与 `default non-claims`
+  - 现在还会显示 `runtime-preflight`；若出现 `other same-bundle Zotero process(es)` 或多个匹配 runtime，workflow 会直接标成 `blocked`，避免在当前 Computer Use 无法可靠选实例时继续正式会话
+  - 若触发了很多 `surface-local` 候选，plain-text 输出默认只展示前 `3` 个，并给出 `--show-all-surfaces` 与 `--surface <surface-id>` 的聚焦提示
+- `npm run agent:computer-use:prepare`
+  - 为默认必补项建立独立的 Computer Use 会话目录与工件
+  - 可通过 `--all-triggered` 一次性准备“必补项 + 已触发条件项”
+  - 条件项一是本地安装态复核，条件项二是被重新打开的 host-visible surface
+  - 若显式带 `--surface <surface-id>`，surface-local catalog 和 prepare 结果都会只聚焦该 surface
+  - 该支线只在用户明确要求后通过 `npm run agent:computer-use:validate -- --user-requested --target "<目标>"` 启动
+  - 对 `review workbench standalone window visible smoke`，默认只把桌面观察收口到独立窗口 open / reuse / close 语义；若当前 runtime 没有真实 host-visible Prompt / menu / shortcut 入口，不得把 plugin-local fallback command 记成“命令面板入口已通过”
+  - `prepare` 生成的会话工件会带 `proofContract`，`record` 会再写入 `result.proof.kind`、`result.proof.summary`、`result.proof.nonClaims`、`hostVisibleEntryObserved` 与 `entryRouteObserved`，避免只看 `pass` 就误读成 host-visible 入口或 release 闭环已通过
+  - 若 workflow 带 `launchRuntime.desktopInstanceMatchRequired=true`，`record` 还要求显式记录 `--runtime-instance-match matched|mismatched|unknown` 与对应 `--runtime-instance-evidence`；没有确认“当前桌面窗口就是目标 runtime”时，不允许把结果记成 `pass`
+  - 若 `prepare` 阶段就已发现同 bundle 多实例或多个匹配 runtime，这条 workflow 会先以 `blocked` 返回；需要先关闭冲突 Zotero 实例，再重新准备正式会话
+  - `prepare` 还会给出预填默认 `--proof-kind` 的 `recordGuidance`，并显示默认/可升级 proof 的 `non-claims`；若要记 `host-visible-entry-window-lifecycle`，必须同时记录真实入口路径
+  - 它只生成 / 记录 `dist/agent-computer-use-validation.json` 与 `dist/agent-computer-use-validation.md`
+  - 不进入 `check`、`agent:zotero:e2e`、`agent:zotero:loop`、`agent:gate`、`agent:gate:release` 或 `agent:pipeline`
+  - 详细 contract 见 [CODEX_COMPUTER_USE_VALIDATION.md](./CODEX_COMPUTER_USE_VALIDATION.md)
+- `npm run release:install-smoke:stable -- --keep-open`
+  - 当前会在正式安装态 smoke 通过后保持 Zotero 打开，便于 Computer Use 接管桌面做本地安装态复核
+  - 若系统里同时开着其他同 bundle Zotero 实例，当前 Computer Use 会话应先视为 `blocked`，因为它可能绑定到错误窗口；只有清掉冲突实例并重新准备后，才允许进入正式本地安装态复核
+  - 这只用于本地安装态确认，不代表远端 `updateURL / update_link` 已通过
 - `npm run zotero:scenario`
   - 单独执行 `zotero-scenarios/*.scenario.js`
   - 当前采用“注册一次 -> 逐场景执行”的 runner 模型，不再把整包场景当成单次黑盒求值
@@ -210,6 +239,8 @@ npm run export:project
 - `zotero-watch-status.{json,md}`
 - `agent-zotero-e2e.{json,md}`
 - `agent-zotero-loop.{json,md}`
+- `agent-computer-use-validation.{json,md}`（仅用户明确要求启动 Codex Computer Use 支线后生成）
+- `/tmp/codex-cu/<YYYYMMDD-HHMMSS>-<target-slug>/agent-computer-use-validation.{json,md}`（通过 `agent:computer-use:prepare` 为每个目标生成独立会话目录时）
 - `zotero-watch-recovery-regression.{json,md}`
 - `agent-zotero-autofix.{json,md}`
 - `zotero-scenario-last-run.{json,md}`
@@ -228,6 +259,16 @@ npm run export:project
 - `09-当前Zotero插件-Reader UI 概念.excalidraw.md`
 - `10-模板协作-人工指令窗口.md`
 - `11-当前Zotero插件-菜单与子菜单 UI 概念.excalidraw.md`
+- `项目模块图谱/00-当前Zotero插件-功能模块总览.md`
+- `项目模块图谱/01-主线-偏好设置与宿主窗格.md`
+- `项目模块图谱/02-主线-Reader 工具栏与侧栏.md`
+- `项目模块图谱/03-主线-菜单与子菜单.md`
+- `项目模块图谱/04-支撑-统一装配与 Host Action.md`
+- `项目模块图谱/05-支撑-验证与证据闭环.md`
+- `项目模块图谱/06-当前扩展波次-模块焦点.md`
+- `项目模块图谱/07-能力目录-当前插件能力清单.md`
+- `项目模块图谱/当前Zotero插件-功能模块图谱.canvas`
+- `14-当前Zotero插件-UI 具象布局图.excalidraw.md`
 
 启用 `AGENT_OBSIDIAN_VISUALS=1` 时，还会额外生成：
 
@@ -241,7 +282,11 @@ npm run export:project
 - `agent-gate.json` 适合作为“是否可继续推进/发布”的准入判定
 - `obsidian/agent-workbench/01-当前Zotero插件-状态总览.md` 适合作为“当前插件主线入口”
 - `obsidian/agent-workbench/05-当前Zotero插件-功能与可见面地图.md` 适合作为“当前插件各可见面分组入口”
+- `obsidian/agent-workbench/项目模块图谱/00-当前Zotero插件-功能模块总览.md` 适合作为“当前插件功能模块入口”
+- `obsidian/agent-workbench/项目模块图谱/06-当前扩展波次-模块焦点.md` 适合作为“当前 active wave scope / acceptance 入口”
+- `obsidian/agent-workbench/项目模块图谱/07-能力目录-当前插件能力清单.md` 适合作为“当前真实能力入口 / 场景 / 责任文件入口”
 - `obsidian/agent-workbench/06-当前Zotero插件-技术脉络与宿主接入.md` 适合作为“当前 surface 为什么走这条技术链”的定位入口
+- `obsidian/agent-workbench/14-当前Zotero插件-UI 具象布局图.excalidraw.md` 适合作为“当前 surface 在真实宿主布局中的定位入口”
 - `obsidian/agent-workbench/10-模板协作-人工指令窗口.md` 仍是唯一人工输入面
 
 如果你只是想做脚本联调、单元测试，或希望把一次实验性的 agent 判断与当前真机结论分开，可以临时指定：

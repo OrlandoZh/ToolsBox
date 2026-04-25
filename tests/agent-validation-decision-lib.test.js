@@ -54,7 +54,46 @@ describe("Agent Validation Decision", () => {
     assert.equal(typeof decision.deferredEvidenceAction, "string");
   });
 
-  it("should keep the active DOM contract wave advisory when completed baseline paths coexist", () => {
+  it("should classify review workbench standalone window changes as visual-recommended", () => {
+    const decision = buildValidationDecision({
+      projectRoot,
+      changedPaths: [
+        "src/features/agent-review-workbench.js",
+        "addon-static/content/lib/agent-review-workbench.xhtml",
+      ],
+      e2e: {
+        present: false,
+        status: "missing",
+      },
+    });
+
+    assert.equal(decision.level, "visual-recommended");
+    assert.equal(decision.decisionSource, "project-override");
+    assert.ok(decision.matchedProjectOverride.includes("agent-review-workbench-wave-001"));
+  });
+
+  it("should classify the optional Computer Use validation lane as visual-not-needed by itself", () => {
+    const decision = buildValidationDecision({
+      projectRoot,
+      changedPaths: [
+        "config/codex-computer-use-validation.json",
+        "scripts/agent-computer-use-validation.mjs",
+        "scripts/agent-computer-use-validation-lib.mjs",
+        "docs/CODEX_COMPUTER_USE_VALIDATION.md",
+        "tests/agent-computer-use-validation-lib.test.js",
+      ],
+      e2e: {
+        present: false,
+        status: "missing",
+      },
+    });
+
+    assert.equal(decision.level, "visual-not-needed");
+    assert.equal(decision.decisionSource, "project-override");
+    assert.ok(decision.matchedProjectOverride.includes("codex-computer-use-validation-lane"));
+  });
+
+  it("should escalate mixed batches once completed host-polish contract files coexist with DOM contract paths", () => {
     const decision = buildValidationDecision({
       projectRoot,
       changedPaths: [
@@ -67,10 +106,10 @@ describe("Agent Validation Decision", () => {
       },
     });
 
-    assert.equal(decision.level, "visual-recommended");
+    assert.equal(decision.level, "visual-required");
     assert.equal(decision.decisionSource, "project-override");
-    assert.deepEqual(decision.matchedProjectOverride, ["zotero-dom-contract-wave-001"]);
-    assert.equal(decision.blocking, false);
+    assert.ok(decision.matchedProjectOverride.includes("zotero-dom-contract-wave-001"));
+    assert.ok(decision.matchedProjectOverride.includes("zotero-host-polish-wave-001"));
   });
 
   it("should classify visual-not-needed for runtime and settings-only changes", () => {

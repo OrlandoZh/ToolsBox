@@ -6,8 +6,10 @@
 - 当前插件状态总览
 - 当前插件证据索引
 - 当前插件功能与可见面地图
+- 当前插件功能模块图谱
 - 当前插件技术脉络与宿主接入说明
 - 面向当前插件的 UI 概念图
+- 更接近真实宿主布局的 UI 具象 Excalidraw
 - 仅供人工协作阅读的模板快速上手 / 高级介入规范
 - 唯一的人机协作输入窗口
 
@@ -47,6 +49,16 @@ AGENT_OBSIDIAN_VISUALS=1 npm run agent:obsidian
 - `obsidian/agent-workbench/09-当前Zotero插件-Reader UI 概念.excalidraw.md`
 - `obsidian/agent-workbench/10-模板协作-人工指令窗口.md`
 - `obsidian/agent-workbench/11-当前Zotero插件-菜单与子菜单 UI 概念.excalidraw.md`
+- `obsidian/agent-workbench/项目模块图谱/00-当前Zotero插件-功能模块总览.md`
+- `obsidian/agent-workbench/项目模块图谱/01-主线-偏好设置与宿主窗格.md`
+- `obsidian/agent-workbench/项目模块图谱/02-主线-Reader 工具栏与侧栏.md`
+- `obsidian/agent-workbench/项目模块图谱/03-主线-菜单与子菜单.md`
+- `obsidian/agent-workbench/项目模块图谱/04-支撑-统一装配与 Host Action.md`
+- `obsidian/agent-workbench/项目模块图谱/05-支撑-验证与证据闭环.md`
+- `obsidian/agent-workbench/项目模块图谱/06-当前扩展波次-模块焦点.md`
+- `obsidian/agent-workbench/项目模块图谱/07-能力目录-当前插件能力清单.md`
+- `obsidian/agent-workbench/项目模块图谱/当前Zotero插件-功能模块图谱.canvas`
+- `obsidian/agent-workbench/14-当前Zotero插件-UI 具象布局图.excalidraw.md`
 
 启用 `AGENT_OBSIDIAN_VISUALS=1` 时还会额外输出：
 
@@ -78,7 +90,11 @@ AGENT_OBSIDIAN_DIR=/你的/Obsidian/工作区 AGENT_OBSIDIAN_VISUALS=1 npm run a
    - `01-当前Zotero插件-状态总览.md`
    - `00-当前Zotero插件-功能与技术脉络.canvas`
    - `05-当前Zotero插件-功能与可见面地图.md`
+   - `项目模块图谱/00-当前Zotero插件-功能模块总览.md`
+   - `项目模块图谱/06-当前扩展波次-模块焦点.md`
+   - `项目模块图谱/07-能力目录-当前插件能力清单.md`
    - `06-当前Zotero插件-技术脉络与宿主接入.md`
+   - `14-当前Zotero插件-UI 具象布局图.excalidraw.md`
    - `03-模板协作-人工快速上手.md`
    - `04-模板协作-高级介入规范.md`
    - `10-模板协作-人工指令窗口.md`
@@ -89,8 +105,12 @@ AGENT_OBSIDIAN_DIR=/你的/Obsidian/工作区 AGENT_OBSIDIAN_VISUALS=1 npm run a
 - 当前插件主线、摘要结论、下一步建议
 - 当前插件功能与技术脉络白板：把功能组、可见面、宿主接入点和证据入口放在同一个空间里
 - 当前插件功能与可见面地图：按 `preference pane / item pane / context pane / reader / menu item` 等 surface 分组归纳
+- 当前插件功能模块图谱：把当前项目按“主线骨架 / 支撑能力”拆成模块卡片和独立 canvas，便于快速理解哪些模块构成当前插件
+- 当前扩展波次模块焦点：把 current wave 的 in-scope / out-of-scope / acceptance track 和当前模块图谱的关系单独写清
+- 当前插件能力目录：从 `src/app/capability-manifest.js` 自动派生能力、入口、场景与责任文件，帮助把“模块”继续落到“能力”
 - 当前插件技术脉络与宿主接入：说明为什么当前 surface 走宿主注册式、统一节点工厂、菜单注入或 Reader 接入链
 - 当前插件 UI 概念图：按偏好设置、条目/上下文窗格、Reader、菜单与子菜单分拆，便于单独讨论某一块 UI
+- 当前插件 UI 具象图：把各个 surface 放回接近真实宿主布局的位置，方便开发者建立“模块名 -> 实际界面位置”的直觉映射
 - 手工触发的产品整体 UI 设计草图：只在 `20-当前Zotero插件-产品整体 UI 设计与更新流程.excalidraw.md` 中呈现整体产品 UI 设计与演进步骤
 - 可选视觉层：交互流转 Mermaid 与功能版图 Excalidraw
 - 模板协作快速上手：只给人类阅读，不作为 agent 输入，帮助新接手的人理解如何在当前插件工作台中协作
@@ -99,7 +119,7 @@ AGENT_OBSIDIAN_DIR=/你的/Obsidian/工作区 AGENT_OBSIDIAN_VISUALS=1 npm run a
 - 人工编辑区保留：agent 刷新工作台时会保留 `## 人工编辑区（保留）` 之后的内容
 - 证据工件索引
 - Agent 会保留人工编辑区，不会在刷新工作台时覆盖人工指令
-- `agent:ui:design` 只允许把设计呈现落到单独的 Obsidian Excalidraw 草图，不覆盖默认 `07~11` 自动概念图
+- `agent:ui:design` 只允许把设计呈现落到单独的 Obsidian Excalidraw 草图，不覆盖默认 `07~11 / 14` 自动图
 
 说明：
 

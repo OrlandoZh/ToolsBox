@@ -1,5 +1,7 @@
 import { describe, it, assert } from "./test-framework.js";
 import {
+  buildPluginModuleMapArtifacts,
+  buildPluginUIConcreteExcalidraw,
   buildObsidianVisualFlowMermaidMarkdown,
   buildObsidianVisualVerdictExcalidrawMarkdown,
   buildObsidianVisualViewModel,
@@ -647,6 +649,79 @@ describe("Agent Obsidian Handoff Lib", () => {
     assert.ok(markdown.includes("Menu Surfaces"));
   });
 
+  it("should render plugin module map artifacts for obsidian workbench", () => {
+    const artifacts = buildPluginModuleMapArtifacts({
+      generatedAt: "2026-04-24T08:00:00.000Z",
+      bootstrapShell: false,
+      addonConfig: {
+        addonName: "Demo Workbench",
+        addonRef: "demo-workbench",
+      },
+      projectContext: {
+        currentTruth: {
+          activeBatchId: "ENG-HIGH-104",
+          summary: "当前主线聚焦远端发布编排与 updateURL 闭环。",
+        },
+        expansionWave: {
+          currentWaveName: "AGENT-REVIEW-WORKBENCH-WAVE-001",
+          summary: "AGENT-REVIEW-WORKBENCH-WAVE-001 / visual-recommended",
+        },
+        validationDecision: {
+          level: "visual-recommended",
+          levelLabel: "视觉建议补证",
+        },
+      },
+      summaryNextAction: "继续推进远端发布验证。",
+    });
+
+    assert.ok(artifacts.overviewMarkdown.includes("# 当前 Zotero 插件功能模块总览"));
+    assert.ok(artifacts.overviewMarkdown.includes("[[当前Zotero插件-功能模块图谱]]"));
+    assert.ok(artifacts.overviewMarkdown.includes("AGENT-REVIEW-WORKBENCH-WAVE-001"));
+    assert.ok(artifacts.overviewMarkdown.includes("[[06-当前扩展波次-模块焦点]]"));
+    assert.ok(artifacts.overviewMarkdown.includes("[[07-能力目录-当前插件能力清单]]"));
+    assert.ok(artifacts.waveMarkdown.includes("# 当前扩展波次模块焦点"));
+    assert.ok(artifacts.waveMarkdown.includes("AGENT-REVIEW-WORKBENCH-WAVE-001"));
+    assert.ok(artifacts.capabilityCatalogMarkdown.includes("# 当前插件能力清单"));
+    assert.ok(artifacts.capabilityCatalogMarkdown.includes("demo-workbench"));
+    assert.ok(artifacts.capabilityCatalogMarkdown.includes("`reader-summary` Reader 摘要"));
+    assert.equal(artifacts.cards.length, 5);
+    assert.equal(artifacts.cards[0].fileName, "01-主线-偏好设置与宿主窗格.md");
+    assert.ok(artifacts.cards[0].markdown.includes("## 当前可见面"));
+    assert.ok(artifacts.cards[0].markdown.includes("## 关联能力"));
+    assert.ok(artifacts.cards[0].markdown.includes("`item-presentation`"));
+    assert.ok(artifacts.cards[3].markdown.includes("统一装配与 Host Action"));
+    assert.ok(Array.isArray(artifacts.canvas.nodes));
+    assert.ok(artifacts.canvas.nodes.some((item) => item.type === "file" && String(item.file).includes("项目模块图谱/00-当前Zotero插件-功能模块总览.md")));
+    assert.ok(artifacts.canvas.nodes.some((item) => item.type === "file" && String(item.file).includes("项目模块图谱/06-当前扩展波次-模块焦点.md")));
+    assert.ok(artifacts.canvas.nodes.some((item) => item.type === "file" && String(item.file).includes("项目模块图谱/07-能力目录-当前插件能力清单.md")));
+  });
+
+  it("should render concrete ui excalidraw markdown for obsidian workbench", () => {
+    const markdown = buildPluginUIConcreteExcalidraw({
+      generatedAt: "2026-04-24T08:00:00.000Z",
+      bootstrapShell: false,
+      nextAction: "npm run agent:sync",
+      runnableNextCommand: "npm run agent:sync",
+      projectContext: {
+        expansionWave: {
+          currentWaveName: "AGENT-REVIEW-WORKBENCH-WAVE-001",
+          summary: "AGENT-REVIEW-WORKBENCH-WAVE-001 / visual-recommended",
+        },
+        validationDecision: {
+          level: "visual-recommended",
+          levelLabel: "视觉建议补证",
+        },
+      },
+    });
+
+    assert.ok(markdown.includes("excalidraw-plugin: parsed"));
+    assert.ok(markdown.includes("# Excalidraw Data"));
+    assert.ok(markdown.includes("Preferences Window"));
+    assert.ok(markdown.includes("Library Window"));
+    assert.ok(markdown.includes("Reader Window"));
+    assert.ok(markdown.includes("Menu Entry Rail"));
+  });
+
   it("should render split human guides for manual usage only", () => {
     const quickstart = buildHumanQuickstartMarkdown();
     const advanced = buildHumanAdvancedGuideMarkdown();
@@ -658,6 +733,10 @@ describe("Agent Obsidian Handoff Lib", () => {
     assert.ok(quickstart.includes("[[04-模板协作-高级介入规范]]"));
     assert.ok(quickstart.includes("npm run agent:ui:design -- run product-ui-design-update"));
     assert.ok(quickstart.includes("20-当前Zotero插件-产品整体 UI 设计与更新流程.excalidraw.md"));
+    assert.ok(quickstart.includes("项目模块图谱/00-当前Zotero插件-功能模块总览.md"));
+    assert.ok(quickstart.includes("项目模块图谱/06-当前扩展波次-模块焦点.md"));
+    assert.ok(quickstart.includes("项目模块图谱/07-能力目录-当前插件能力清单.md"));
+    assert.ok(quickstart.includes("14-当前Zotero插件-UI 具象布局图.excalidraw.md"));
     assert.ok(advanced.includes("# 模板协作高级介入规范"));
     assert.ok(advanced.includes("## 字段语义说明"));
     assert.ok(advanced.includes("## 哪些内容不要改"));

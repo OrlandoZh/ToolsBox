@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "laneId": "codex-computer-use-real-machine-validation",
+  "summary": "Optional Codex Computer Use real-machine validation lane. It is default-disabled, non-blocking, and may only be activated after an explicit user request.",
+  "enabledByDefault": false,
+  "gateEffect": "non-blocking",
+  "activationPolicy": {
+    "requiresExplicitUserRequest": true,
+    "acceptedActivationSignals": [
+      "User explicitly asks Codex to run Computer Use validation",
+      "CLI flag: --user-requested"
+    ],
+    "forbiddenDefaultEntrypoints": [
+      "check",
+      "agent:gate",
+      "agent:gate:release",
+      "agent:zotero:e2e",
+      "agent:zotero:loop",
+      "agent:pipeline"
+    ]
+  },
+  "entrypoint": {
+    "scriptName": "agent:computer-use:validate",
+    "command": "npm run agent:computer-use:validate -- --user-requested",
+    "planCommand": "npm run agent:computer-use:plan",
+    "recordCommand": "npm run agent:computer-use:record -- --verdict <pass|fail|partial> --summary \"...\""
+  },
+  "artifacts": {
+    "json": "dist/agent-computer-use-validation.json",
+    "markdown": "dist/agent-computer-use-validation.md"
+  },
+  "workflow": [
+    {
+      "id": "preflight-read",
+      "kind": "read-only",
+      "summary": "Read latest current truth, monitor, gate, and Zotero E2E artifacts to choose the smallest visible target."
+    },
+    {
+      "id": "computer-use-session",
+      "kind": "codex-computer-use",
+      "summary": "Use Codex desktop Computer Use tools to inspect the real host UI only after the user explicitly requested this lane."
+    },
+    {
+      "id": "evidence-record",
+      "kind": "manual-record",
+      "summary": "Record verdict, target, observed evidence, risks, and blockers back into the lane artifact."
+    }
+  ],
+  "recording": {
+    "allowedVerdicts": [
+      "pass",
+      "fail",
+      "partial"
+    ],
+    "requiredFields": [
+      "verdict",
+      "target",
+      "summary"
+    ]
+  },
+  "nonGoals": [
+    "Do not run during npm run check, agent:gate, release gate, or default Zotero E2E.",
+    "Do not replace agent:zotero:e2e, surface smoke, surface-local evidence, or gate verdicts.",
+    "Do not use Computer Use as a generic UI macro recorder or arbitrary desktop automation path.",
+    "Do not treat this optional lane as current truth unless a controller manually promotes a result."
+  ],
+  "docs": [
+    "docs/CODEX_COMPUTER_USE_VALIDATION.md"
+  ]
+}

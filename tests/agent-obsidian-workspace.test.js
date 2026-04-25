@@ -103,6 +103,7 @@ describe("Agent Obsidian Workspace", () => {
       const dir = resolveObsidianWorkspaceDir(projectRoot);
       const files = resolveObsidianWorkspaceFiles(projectRoot);
       assert.equal(dir, path.join(projectRoot, "obsidian", "agent-workbench"));
+      assert.equal(files.moduleMapDir, path.join(dir, "项目模块图谱"));
       assert.equal(files.statusNote, path.join(dir, "01-当前Zotero插件-状态总览.md"));
       assert.equal(files.humanQuickstartNote, path.join(dir, "03-模板协作-人工快速上手.md"));
       assert.equal(files.humanAdvancedGuideNote, path.join(dir, "04-模板协作-高级介入规范.md"));
@@ -111,6 +112,11 @@ describe("Agent Obsidian Workspace", () => {
       assert.equal(files.humanWindowNote, path.join(dir, "10-模板协作-人工指令窗口.md"));
       assert.equal(files.visualFlowNote, path.join(dir, "12-当前Zotero插件-交互流转图.md"));
       assert.equal(files.visualVerdictExcalidrawNote, path.join(dir, "13-当前Zotero插件-功能版图.excalidraw.md"));
+      assert.equal(files.uiConcreteExcalidrawNote, path.join(dir, "14-当前Zotero插件-UI 具象布局图.excalidraw.md"));
+      assert.equal(files.moduleMapOverviewNote, path.join(dir, "项目模块图谱", "00-当前Zotero插件-功能模块总览.md"));
+      assert.equal(files.moduleMapWaveNote, path.join(dir, "项目模块图谱", "06-当前扩展波次-模块焦点.md"));
+      assert.equal(files.moduleMapCapabilityCatalogNote, path.join(dir, "项目模块图谱", "07-能力目录-当前插件能力清单.md"));
+      assert.equal(files.moduleMapCanvas, path.join(dir, "项目模块图谱", "当前Zotero插件-功能模块图谱.canvas"));
     } finally {
       if (previous !== undefined) {
         process.env.AGENT_OBSIDIAN_DIR = previous;
@@ -124,11 +130,17 @@ describe("Agent Obsidian Workspace", () => {
     try {
       const files = resolveObsidianWorkspaceFiles(projectRoot);
       assert.equal(files.dir, "/tmp/custom-obsidian");
+      assert.equal(files.moduleMapDir, "/tmp/custom-obsidian/项目模块图谱");
       assert.equal(files.architectureCanvas, "/tmp/custom-obsidian/00-当前Zotero插件-功能与技术脉络.canvas");
       assert.equal(files.humanQuickstartNote, "/tmp/custom-obsidian/03-模板协作-人工快速上手.md");
       assert.equal(files.humanAdvancedGuideNote, "/tmp/custom-obsidian/04-模板协作-高级介入规范.md");
       assert.equal(files.visualFlowNote, "/tmp/custom-obsidian/12-当前Zotero插件-交互流转图.md");
       assert.equal(files.visualVerdictExcalidrawNote, "/tmp/custom-obsidian/13-当前Zotero插件-功能版图.excalidraw.md");
+      assert.equal(files.uiConcreteExcalidrawNote, "/tmp/custom-obsidian/14-当前Zotero插件-UI 具象布局图.excalidraw.md");
+      assert.equal(files.moduleMapOverviewNote, "/tmp/custom-obsidian/项目模块图谱/00-当前Zotero插件-功能模块总览.md");
+      assert.equal(files.moduleMapWaveNote, "/tmp/custom-obsidian/项目模块图谱/06-当前扩展波次-模块焦点.md");
+      assert.equal(files.moduleMapCapabilityCatalogNote, "/tmp/custom-obsidian/项目模块图谱/07-能力目录-当前插件能力清单.md");
+      assert.equal(files.moduleMapCanvas, "/tmp/custom-obsidian/项目模块图谱/当前Zotero插件-功能模块图谱.canvas");
     } finally {
       if (previous === undefined) {
         delete process.env.AGENT_OBSIDIAN_DIR;

@@ -14,6 +14,12 @@ function toErrorMessage(error) {
   return String(error.message || error);
 }
 
+function isWindowClosedBeforeReadyError(error) {
+  const message = toErrorMessage(error).toLowerCase();
+  return message === "window closed before ready"
+    || message === "window shell closed before ready";
+}
+
 function addDisposableListener(target, type, listener) {
   if (!target || typeof target.addEventListener !== "function") {
     return noop;
@@ -287,10 +293,15 @@ export function createWindowShellManager(options = {}) {
       };
     })()
       .catch((openError) => {
-        error("windowShell.open.failed", {
+        const details = {
           href: activeWindow?.location?.href || "unknown",
           message: toErrorMessage(openError),
-        });
+        };
+        if (isWindowClosedBeforeReadyError(openError)) {
+          debug("windowShell.open.aborted", details);
+        } else {
+          error("windowShell.open.failed", details);
+        }
         clearWindowState("open-failed");
         throw openError;
       })

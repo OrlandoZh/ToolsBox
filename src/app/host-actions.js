@@ -5,7 +5,10 @@ import {
 } from "./host-action-catalog.js";
 import { HOST_ACTION_IDS } from "./host-action-ids.js";
 import { HOST_ACTION_READINESS_IDS } from "./host-action-readiness-ids.js";
+import { summarizeHostActionExecutionEntry } from "./review-workbench-runtime-provider.js";
 import { createSurfaceDescriptors } from "./surface-descriptors.js";
+
+const HOST_ACTION_EXECUTION_HISTORY_LIMIT = 20;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -67,6 +70,17 @@ function buildFailureResult(actionId, options = {}) {
     surfaceTarget: options.surfaceTarget || null,
     failureKind: options.failureKind || "action-failed",
   });
+}
+
+function summarizeSurfaceTargetLabel(surfaceTarget = null) {
+  if (!surfaceTarget || typeof surfaceTarget !== "object") {
+    return null;
+  }
+  return toPlainString(
+    surfaceTarget.label
+    || surfaceTarget.surfaceId
+    || surfaceTarget.captureKind,
+  );
 }
 
 function getCollectionCount(collection) {
@@ -1483,6 +1497,7 @@ export function createHostActionRunner({
   const descriptors = surfaceDescriptors && typeof surfaceDescriptors === "object"
     ? surfaceDescriptors
     : createSurfaceDescriptors(config);
+  const recentExecutionSummaries = [];
 
   async function resolveWasmKernelProbe() {
     if (typeof getWasmKernelProbe === "function") {
@@ -1496,6 +1511,29 @@ export function createHostActionRunner({
       return getProtectionSummary();
     }
     return null;
+  }
+
+  function recordExecution(actionId, result = {}) {
+    const compactEntry = summarizeHostActionExecutionEntry({
+      actionId: toPlainString(actionId) || "unknown",
+      ok: result?.ok === true,
+      failureKind: toPlainString(result?.failureKind),
+      executedAt: new Date().toISOString(),
+      surfaceTarget: summarizeSurfaceTargetLabel(result?.surfaceTarget),
+      readiness: {
+        ok: result?.readiness?.ok === true,
+        total: Number(result?.readiness?.total || 0),
+        passed: Number(result?.readiness?.passed || 0),
+        failed: Number(result?.readiness?.failed || 0),
+      },
+      observedState: result?.observedState && typeof result.observedState === "object"
+        ? clone(result.observedState)
+        : {},
+    });
+    recentExecutionSummaries.unshift(compactEntry);
+    if (recentExecutionSummaries.length > HOST_ACTION_EXECUTION_HISTORY_LIMIT) {
+      recentExecutionSummaries.length = HOST_ACTION_EXECUTION_HISTORY_LIMIT;
+    }
   }
 
   async function runPreferencesOpenPane(actionId, payload = {}) {
@@ -3582,63 +3620,90 @@ export function createHostActionRunner({
       bundleRuntime,
     });
     if (!descriptor) {
-      return buildFailureResult(String(actionId || "unknown"), {
+      const result = buildFailureResult(String(actionId || "unknown"), {
         failureKind: "unknown-action",
       });
+      recordExecution(actionId, result);
+      return result;
     }
     if (!isExecutableHostAction(actionId, { bundleRuntime })) {
-      return buildFailureResult(actionId, {
+      const result = buildFailureResult(actionId, {
         observedState: {
           status: descriptor.status,
         },
         failureKind: "not-executable",
       });
+      recordExecution(actionId, result);
+      return result;
     }
 
+    let result = null;
     switch (actionId) {
       case HOST_ACTION_IDS.preferencesOpenPane:
-        return await runPreferencesOpenPane(actionId, payload);
+        result = await runPreferencesOpenPane(actionId, payload);
+        break;
       case HOST_ACTION_IDS.preferencesSelectTab:
-        return await runPreferencesSelectTab(actionId, payload);
+        result = await runPreferencesSelectTab(actionId, payload);
+        break;
       case HOST_ACTION_IDS.preferencesSetCheckbox:
-        return await runPreferenceControlAction(actionId, payload, "checkbox");
+        result = await runPreferenceControlAction(actionId, payload, "checkbox");
+        break;
       case HOST_ACTION_IDS.preferencesSetTextbox:
-        return await runPreferenceControlAction(actionId, payload, "textbox");
+        result = await runPreferenceControlAction(actionId, payload, "textbox");
+        break;
       case HOST_ACTION_IDS.preferencesSelectMenulist:
-        return await runPreferenceControlAction(actionId, payload, "menulist");
+        result = await runPreferenceControlAction(actionId, payload, "menulist");
+        break;
       case HOST_ACTION_IDS.contextPaneSetOpen:
-        return await runContextPaneSetOpen(actionId, payload);
+        result = await runContextPaneSetOpen(actionId, payload);
+        break;
       case HOST_ACTION_IDS.itemPaneSelectPane:
-        return await runItemPaneSelectPane(actionId, payload);
+        result = await runItemPaneSelectPane(actionId, payload);
+        break;
       case HOST_ACTION_IDS.contextPaneSelectPane:
-        return await runContextPaneSelectPane(actionId, payload);
+        result = await runContextPaneSelectPane(actionId, payload);
+        break;
       case HOST_ACTION_IDS.readerOpen:
-        return await runReaderOpen(actionId, payload);
+        result = await runReaderOpen(actionId, payload);
+        break;
       case HOST_ACTION_IDS.readerContextPaneSetOpen:
-        return await runReaderContextPaneSetOpen(actionId, payload);
+        result = await runReaderContextPaneSetOpen(actionId, payload);
+        break;
       case HOST_ACTION_IDS.readerToolbarTriggerButton:
-        return await runReaderToolbarTriggerButton(actionId, payload);
+        result = await runReaderToolbarTriggerButton(actionId, payload);
+        break;
       case HOST_ACTION_IDS.readerSidebarSelectView:
-        return await runReaderSidebarSelectView(actionId, payload);
+        result = await runReaderSidebarSelectView(actionId, payload);
+        break;
       case HOST_ACTION_IDS.menuShow:
-        return await runMenuShow(actionId, payload);
+        result = await runMenuShow(actionId, payload);
+        break;
       case HOST_ACTION_IDS.menuTrigger:
-        return await runMenuTrigger(actionId, payload);
+        result = await runMenuTrigger(actionId, payload);
+        break;
       case HOST_ACTION_IDS.runtimeProbeWasmKernel:
-        return await runRuntimeProbeWasmKernel(actionId, payload);
+        result = await runRuntimeProbeWasmKernel(actionId, payload);
+        break;
       case HOST_ACTION_IDS.runtimeDeriveWasmKernelDigest:
-        return await runRuntimeDeriveWasmKernelDigest(actionId, payload);
+        result = await runRuntimeDeriveWasmKernelDigest(actionId, payload);
+        break;
       case HOST_ACTION_IDS.runtimeDeriveWasmKernelUnlockToken:
-        return await runRuntimeDeriveWasmKernelUnlockToken(actionId, payload);
+        result = await runRuntimeDeriveWasmKernelUnlockToken(actionId, payload);
+        break;
       case HOST_ACTION_IDS.runtimeResolveLegacyEntitlementGate:
-        return await runRuntimeResolveLegacyEntitlementGate(actionId, payload);
+        result = await runRuntimeResolveLegacyEntitlementGate(actionId, payload);
+        break;
       case HOST_ACTION_IDS.windowOpenReactDemo:
-        return await runWindowOpenReactDemo(actionId, payload);
+        result = await runWindowOpenReactDemo(actionId, payload);
+        break;
       default:
-        return buildFailureResult(actionId, {
+        result = buildFailureResult(actionId, {
           failureKind: "unsupported-action",
         });
+        break;
     }
+    recordExecution(actionId, result);
+    return result;
   }
 
   return {
@@ -3649,6 +3714,9 @@ export function createHostActionRunner({
     },
     async runHostAction(actionId, payload = {}) {
       return await runHostAction(actionId, payload);
+    },
+    getRecentExecutionSummaries() {
+      return clone(recentExecutionSummaries);
     },
   };
 }

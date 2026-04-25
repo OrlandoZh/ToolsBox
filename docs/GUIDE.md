@@ -355,7 +355,7 @@ npm run zotero:test
 8. 只有当前任务明确属于发布链时，才进入 `npm run release:plan -> npm run release:upload -- --provider <provider> --release-tag <tag> --target-base-url <url> -> 手动上传远端产物 -> npm run release:preflight -- --verify-remote -> npm run release:prepare -> npm run release:matrix -> npm run agent:gate:release`。
 9. 如果只是要导出纯源码或模板交付物，使用 `npm run export:project`，不要直接复制整个工作目录。
 10. 如果这轮需要刷新本地 `reference/` 中受管的 git-backed 快照，不要直接手改 `reference/` 目录；先执行 `npm run agent:reference:update -- list` 查看受管项目，再用 `npm run agent:reference:update -- update --project <id>` 或 `--all`。
-11. 如果需要人工触发一轮“产品整体 UI 设计 / 更新”草图，不要直接改自动生成的 `07~11` UI 概念图；先执行 `npm run agent:ui:design -- list`，再用 `npm run agent:ui:design -- run product-ui-design-update --goal "<你的设计目标>"`，让子 agent 只更新 `obsidian/agent-workbench/20-当前Zotero插件-产品整体 UI 设计与更新流程.excalidraw.md`。
+11. 如果需要人工触发一轮“产品整体 UI 设计 / 更新”草图，不要直接改自动生成的 `07~11` UI 概念图或 `14-当前Zotero插件-UI 具象布局图.excalidraw.md`；先执行 `npm run agent:ui:design -- list`，再用 `npm run agent:ui:design -- run product-ui-design-update --goal "<你的设计目标>"`，让子 agent 只更新 `obsidian/agent-workbench/20-当前Zotero插件-产品整体 UI 设计与更新流程.excalidraw.md`。
 
 补充说明：
 
@@ -363,7 +363,7 @@ npm run zotero:test
 - mirror 负责表达当前批次的验证/扩展判定，truth 负责表达当前阶段结论；不要让两者分别记录不同 scope 或不同 acceptanceTrack。
 - `config/reference-projects.json` 里声明的是可人工更新的 rolling git 快照；像 `reference/lajiplugin/bibgenie-0.5.7` 这类版本号直接写在目录名里的 release/archive 快照，继续人工新建版本目录，不走 `agent:reference:update`。
 - `agent:reference:update` 默认会阻断脏 worktree、非 git 目录或 origin 不匹配的目标；只有明确接受覆盖时，才用 `--allow-dirty` 或 `--replace-existing`。
-- `agent:ui:design` 这条人工链只允许把 UI 设计呈现写到 Obsidian Excalidraw `.md`，不顺手改业务源码、当前 truth 或默认 `07~11` 自动概念图；真正改变执行路径，仍只改 `10-模板协作-人工指令窗口.md`。
+- `agent:ui:design` 这条人工链只允许把 UI 设计呈现写到 Obsidian Excalidraw `.md`，不顺手改业务源码、当前 truth 或默认 `07~11 / 14` 自动图；真正改变执行路径，仍只改 `10-模板协作-人工指令窗口.md`。
 
 ---
 

@@ -161,6 +161,7 @@ function createDeps() {
       runPrimaryAction() {
         calls.primary += 1;
       },
+      openAgentReviewWorkbench: null,
       runReaderDemo() {
         calls.readerDemo += 1;
       },
@@ -492,5 +493,41 @@ describe("Feature Composer", () => {
 
     sectionRegistrations[0].onDestroy({ body });
     assert.equal(calls.reactSurfaceUnmount, 1);
+  });
+
+  it("should register the review workbench command when an opener is provided", async () => {
+    const { deps, calls, commandRegistrations } = createDeps();
+    deps.openAgentReviewWorkbench = () => {
+      calls.reviewWorkbenchOpen = (calls.reviewWorkbenchOpen || 0) + 1;
+      return {
+        ready: true,
+      };
+    };
+    const composer = createFeatureComposer(deps);
+
+    await composer.registerBaselineFeatures();
+
+    const reviewWorkbenchCommand = commandRegistrations.find((entry) => entry.id === "agent.reviewWorkbench.open");
+    assert.equal(typeof reviewWorkbenchCommand?.condition, "function");
+    assert.equal(reviewWorkbenchCommand?.condition(), true);
+
+    await reviewWorkbenchCommand.handler();
+    assert.equal(calls.reviewWorkbenchOpen, 1);
+  });
+
+  it("should skip registering the review workbench command when availability is disabled", async () => {
+    const { deps, commandRegistrations } = createDeps();
+    deps.openAgentReviewWorkbench = () => ({
+      ready: true,
+    });
+    deps.isAgentReviewWorkbenchAvailable = () => false;
+
+    const composer = createFeatureComposer(deps);
+    await composer.registerBaselineFeatures();
+
+    assert.equal(
+      commandRegistrations.some((entry) => entry.id === "agent.reviewWorkbench.open"),
+      false,
+    );
   });
 });
