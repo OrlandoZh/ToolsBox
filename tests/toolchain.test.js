@@ -45,6 +45,24 @@ function removeDirIfExists(dirPath) {
   }
 }
 
+function assertPackageArchiveClean(xpiPath, options = {}) {
+  const listing = execFileSync("unzip", ["-Z1", xpiPath], {
+    cwd: projectRoot,
+    encoding: "utf-8",
+    stdio: "pipe",
+  });
+  const entries = listing.split(/\r?\n/u).map((entry) => entry.trim()).filter(Boolean);
+  const hasEntry = (predicate) => entries.some(predicate);
+
+  assert.equal(hasEntry((entry) => entry.startsWith("content/lib/agent-review-workbench.")), false);
+  assert.equal(hasEntry((entry) => entry.endsWith("/.DS_Store") || entry === ".DS_Store"), false);
+  assert.equal(hasEntry((entry) => entry.includes("__MACOSX/")), false);
+  assert.equal(hasEntry((entry) => entry.endsWith("/Thumbs.db") || entry === "Thumbs.db"), false);
+  if (options.buildReportExcluded) {
+    assert.equal(hasEntry((entry) => entry === "build-report.json"), false);
+  }
+}
+
 function makeFakeJSConfuserTool() {
   const toolRoot = fs.mkdtempSync(path.join(os.tmpdir(), "fake-jsconfuser-"));
   const distRoot = path.join(toolRoot, "dist");
@@ -366,6 +384,7 @@ describe("Toolchain Scripts", () => {
     assert.ok(protectedBundleSource.includes("subtle.decrypt"));
     assert.equal(protectedBundleSource.includes("__moduleDefs"), false);
     assert.equal(buildReport.moduleIdMode, "anonymized");
+    assert.equal(buildReport.devSurfacesIncluded, false);
 
     const encryptedZipListing = execFileSync("unzip", ["-l", encryptedXpiPath], {
       cwd: projectRoot,
@@ -373,6 +392,7 @@ describe("Toolchain Scripts", () => {
       stdio: "pipe",
     });
     assert.equal(encryptedZipListing.includes("build-report.json"), false);
+    assertPackageArchiveClean(encryptedXpiPath, { buildReportExcluded: true });
 
     removeDirIfExists(buildRoot);
     removeIfExists(encryptedXpiPath);
@@ -407,6 +427,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(protectedBundleSource.includes("plugin.api.agent.runHostAction"), false);
     assert.equal(protectedBundleSource.includes("src/app/host-actions.js"), false);
     assert.equal(protectedBundleSource.includes("overlay description"), false);
+    assertPackageArchiveClean(xpiPath, { buildReportExcluded: true });
 
     removeDirIfExists(buildRoot);
     removeIfExists(xpiPath);
@@ -448,6 +469,7 @@ describe("Toolchain Scripts", () => {
       assert.ok(protectedBundleSource.includes("__CLEANROOM_SHIELDED_BUNDLE__"));
       assert.equal(protectedBundleSource.includes("js-confuser transformed"), false);
       assert.equal(protectedBundleSource.includes("__moduleDefs"), false);
+      assertPackageArchiveClean(xpiPath, { buildReportExcluded: true });
     } finally {
       removeDirIfExists(buildRoot);
       removeIfExists(xpiPath);
@@ -492,6 +514,7 @@ describe("Toolchain Scripts", () => {
     assert.equal(preferencesXHTML.includes(`extensions.zotero.${protectedDescriptors.preferencePaneID}.p3`), true);
     assert.equal(prefsJS.includes(`extensions.zotero.${protectedDescriptors.preferencePaneID}.p0`), true);
     assert.equal(prefsJS.includes(`extensions.zotero.${protectedDescriptors.preferencePaneID}.p3`), true);
+    assertPackageArchiveClean(xpiPath, { buildReportExcluded: true });
 
     removeDirIfExists(buildRoot);
     removeIfExists(xpiPath);
@@ -534,47 +557,68 @@ describe("Toolchain Scripts", () => {
     assert.equal(prefsJS.includes(config.prefsPrefix), false);
     assert.equal(preferencesXHTML.includes(`extensions.zotero.${protectedDescriptors.preferencePaneID}.p0`), true);
     assert.equal(prefsJS.includes(`extensions.zotero.${protectedDescriptors.preferencePaneID}.p0`), true);
+    assertPackageArchiveClean(xpiPath, { buildReportExcluded: true });
 
     removeDirIfExists(buildRoot);
     removeIfExists(xpiPath);
   });
 
-  it("should keep protected package build env and zip exclusions scoped to custom variants", () => {
-    assert.deepEqual(resolvePackageBuildEnv({}), {});
+  it("should keep package build env and zip exclusions scoped to release artifacts", () => {
+    const packageBuildEnv = {
+      CLEANROOM_BUILD_INCLUDE_DEV_SURFACES: "0",
+    };
+    const packageZipMetadataExcludes = [
+      ".DS_Store",
+      "*/.DS_Store",
+      "__MACOSX/*",
+      "Thumbs.db",
+      "*/Thumbs.db",
+    ];
+    const protectedZipExcludes = [...packageZipMetadataExcludes, "build-report.json"];
+
+    assert.deepEqual(resolvePackageBuildEnv({}), packageBuildEnv);
     assert.deepEqual(resolvePackageBuildEnv({ encryptBundle: true }), {
+      ...packageBuildEnv,
       CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
       CLEANROOM_BUILD_SEMANTIC_SCRUB: "protected",
     });
     assert.deepEqual(resolvePackageBuildEnv({ shieldBundle: true }), {
+      ...packageBuildEnv,
       CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
       CLEANROOM_BUILD_SEMANTIC_SCRUB: "protected",
     });
     assert.deepEqual(resolvePackageBuildEnv({ descriptorBind: true, outputSuffix: "shielded-descriptor-bind" }), {
+      ...packageBuildEnv,
       CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
       CLEANROOM_BUILD_SEMANTIC_SCRUB: "protected",
     });
     assert.deepEqual(resolvePackageBuildEnv({ jsConfuserString: true, outputSuffix: "shielded-jsconfuser-string" }), {
+      ...packageBuildEnv,
       CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
       CLEANROOM_BUILD_SEMANTIC_SCRUB: "protected",
     });
     assert.deepEqual(resolvePackageBuildEnv({ prefBridge: true, outputSuffix: "shielded-pref-bridge" }), {
+      ...packageBuildEnv,
       CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
       CLEANROOM_BUILD_SEMANTIC_SCRUB: "protected",
       CLEANROOM_BUILD_PREFERENCE_BINDING_MODE: "bridge",
     });
     assert.deepEqual(resolvePackageBuildEnv({ surfaceScrub: true, prefBridge: true, outputSuffix: "shielded-surface-scrub" }), {
+      ...packageBuildEnv,
       CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
       CLEANROOM_BUILD_SEMANTIC_SCRUB: "protected",
       CLEANROOM_BUILD_PREFERENCE_BINDING_MODE: "bridge",
       CLEANROOM_BUILD_STATIC_SURFACE_MODE: "scrub",
     });
     assert.deepEqual(resolvePackageBuildEnv({ surfaceScrubWasmDigest: true, surfaceScrub: true, prefBridge: true, outputSuffix: "shielded-surface-scrub-wasm-digest" }), {
+      ...packageBuildEnv,
       CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
       CLEANROOM_BUILD_SEMANTIC_SCRUB: "protected",
       CLEANROOM_BUILD_PREFERENCE_BINDING_MODE: "bridge",
       CLEANROOM_BUILD_STATIC_SURFACE_MODE: "scrub",
     });
     assert.deepEqual(resolvePackageBuildEnv({ surfaceScrubWasmStage2Derive: true, surfaceScrub: true, prefBridge: true, outputSuffix: "shielded-surface-scrub-wasm-stage2-derive" }), {
+      ...packageBuildEnv,
       CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
       CLEANROOM_BUILD_SEMANTIC_SCRUB: "protected",
       CLEANROOM_BUILD_PREFERENCE_BINDING_MODE: "bridge",
@@ -587,6 +631,7 @@ describe("Toolchain Scripts", () => {
         CLEANROOM_ROUTE4_LEGACY_SECRET: "legacy-secret",
       },
     ), {
+      ...packageBuildEnv,
       CLEANROOM_BUILD_MODULE_ID_MODE: "anonymized",
       CLEANROOM_BUILD_SEMANTIC_SCRUB: "protected",
       CLEANROOM_BUILD_PREFERENCE_BINDING_MODE: "bridge",
@@ -602,21 +647,21 @@ describe("Toolchain Scripts", () => {
       {},
     ));
 
-    assert.deepEqual(resolvePackageZipExcludePatterns({}), []);
-    assert.deepEqual(resolvePackageZipExcludePatterns({ encryptBundle: true }), ["build-report.json"]);
-    assert.deepEqual(resolvePackageZipExcludePatterns({ shieldBundle: true }), ["build-report.json"]);
-    assert.deepEqual(resolvePackageZipExcludePatterns({ descriptorBind: true, outputSuffix: "shielded-descriptor-bind" }), ["build-report.json"]);
-    assert.deepEqual(resolvePackageZipExcludePatterns({ jsConfuserString: true, outputSuffix: "shielded-jsconfuser-string" }), ["build-report.json"]);
-    assert.deepEqual(resolvePackageZipExcludePatterns({ prefBridge: true, outputSuffix: "shielded-pref-bridge" }), ["build-report.json"]);
-    assert.deepEqual(resolvePackageZipExcludePatterns({ surfaceScrub: true, outputSuffix: "shielded-surface-scrub" }), ["build-report.json"]);
-    assert.deepEqual(resolvePackageZipExcludePatterns({ surfaceScrubWasmDigest: true, outputSuffix: "shielded-surface-scrub-wasm-digest" }), ["build-report.json"]);
-    assert.deepEqual(resolvePackageZipExcludePatterns({ surfaceScrubWasmStage2Derive: true, outputSuffix: "shielded-surface-scrub-wasm-stage2-derive" }), ["build-report.json"]);
-    assert.deepEqual(resolvePackageZipExcludePatterns({ surfaceScrubWasmEntitlementLegacy: true, outputSuffix: "shielded-surface-scrub-wasm-entitlement-legacy" }), ["build-report.json"]);
+    assert.deepEqual(resolvePackageZipExcludePatterns({}), packageZipMetadataExcludes);
+    assert.deepEqual(resolvePackageZipExcludePatterns({ encryptBundle: true }), protectedZipExcludes);
+    assert.deepEqual(resolvePackageZipExcludePatterns({ shieldBundle: true }), protectedZipExcludes);
+    assert.deepEqual(resolvePackageZipExcludePatterns({ descriptorBind: true, outputSuffix: "shielded-descriptor-bind" }), protectedZipExcludes);
+    assert.deepEqual(resolvePackageZipExcludePatterns({ jsConfuserString: true, outputSuffix: "shielded-jsconfuser-string" }), protectedZipExcludes);
+    assert.deepEqual(resolvePackageZipExcludePatterns({ prefBridge: true, outputSuffix: "shielded-pref-bridge" }), protectedZipExcludes);
+    assert.deepEqual(resolvePackageZipExcludePatterns({ surfaceScrub: true, outputSuffix: "shielded-surface-scrub" }), protectedZipExcludes);
+    assert.deepEqual(resolvePackageZipExcludePatterns({ surfaceScrubWasmDigest: true, outputSuffix: "shielded-surface-scrub-wasm-digest" }), protectedZipExcludes);
+    assert.deepEqual(resolvePackageZipExcludePatterns({ surfaceScrubWasmStage2Derive: true, outputSuffix: "shielded-surface-scrub-wasm-stage2-derive" }), protectedZipExcludes);
+    assert.deepEqual(resolvePackageZipExcludePatterns({ surfaceScrubWasmEntitlementLegacy: true, outputSuffix: "shielded-surface-scrub-wasm-entitlement-legacy" }), protectedZipExcludes);
 
-    assert.deepEqual(buildPackageZipArgs("/tmp/demo.xpi", {}), ["-r", "/tmp/demo.xpi", "."]);
+    assert.deepEqual(buildPackageZipArgs("/tmp/demo.xpi", {}), ["-r", "/tmp/demo.xpi", ".", "-x", ...packageZipMetadataExcludes]);
     assert.deepEqual(
       buildPackageZipArgs("/tmp/demo.xpi", { shieldBundle: true }),
-      ["-r", "/tmp/demo.xpi", ".", "-x", "build-report.json"],
+      ["-r", "/tmp/demo.xpi", ".", "-x", ...protectedZipExcludes],
     );
 
     const descriptorBindArgs = parsePackageArgs(["--descriptor-bind", "--skip-release-metadata"]);

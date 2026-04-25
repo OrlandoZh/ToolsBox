@@ -3,7 +3,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { listRunRecords } from "./agent-telemetry-lib.mjs";
 import { resolveAgentArtifactPath, resolveAgentArtifactsDir } from "./agent-artifacts.mjs";
-import { buildMonitorFrontpageSummary } from "./agent-frontpage-summary-lib.mjs";
+import {
+  buildMonitorFrontpageSummary,
+  buildReviewWorkbenchAcceptanceSummary,
+} from "./agent-frontpage-summary-lib.mjs";
 import { loadReferenceDistillationState } from "./agent-reference-intake-lib.mjs";
 import {
   buildValidationDecision,
@@ -296,6 +299,14 @@ async function loadReleaseMatrixSummary() {
   return await loadJSONIfExists(releaseMatrixPath);
 }
 
+async function loadReviewWorkbenchAcceptanceSummary() {
+  const scenarioLastRunPath = resolveAgentArtifactPath(projectRoot, "zotero-scenario-last-run.json");
+  const scenarioLastRun = await loadJSONIfExists(scenarioLastRunPath);
+  return buildReviewWorkbenchAcceptanceSummary({
+    scenarioLastRun,
+  });
+}
+
 function readDeadChainAuditCount(report, keys = [], fallback = 0) {
   for (const key of keys) {
     const value = Number(report?.[key] ?? report?.findings?.[key]);
@@ -494,6 +505,7 @@ function buildMarkdown(summary) {
     `- Debug Probe: \`${summary.frontpageSummary?.debugProbe?.statusLabel || "缺失"}\` / ${summary.frontpageSummary?.debugProbe?.ageText || "-"} / fresh-e2e \`${summary.frontpageSummary?.debugProbe?.freshForLatestE2E === null ? "-" : (summary.frontpageSummary?.debugProbe?.freshForLatestE2E ? "yes" : "no")}\``,
     `- Reference Distillation: \`${summary.frontpageSummary?.referenceDistillation?.statusLabel || "缺失"}\` / pending \`${summary.frontpageSummary?.referenceDistillation?.pendingCount ?? 0}\` / topic \`${summary.frontpageSummary?.referenceDistillation?.lastTopic || "-"}\``,
     `- Dead-Chain Audit: \`${summary.frontpageSummary?.deadChainAudit?.statusLabel || "缺失"}\` / hard-dead \`${summary.frontpageSummary?.deadChainAudit?.hardDeadCount ?? 0}\` / retired \`${summary.frontpageSummary?.deadChainAudit?.retiredChainCount ?? 0}\``,
+    `- Agent Review Workbench: \`${summary.frontpageSummary?.reviewWorkbench?.status || "unavailable"}\` / lifecycle \`${summary.frontpageSummary?.reviewWorkbench?.windowLifecycle || "unavailable"}\` / external blockers ${(summary.frontpageSummary?.reviewWorkbench?.externalBlockers || []).join("；") || "-"}`,
     "",
     "## 验证策略判定",
     "",
@@ -1104,7 +1116,7 @@ function buildMarkdown(summary) {
 async function main() {
   const runs = await listRunRecords();
   const summary = summarizeRuns(runs);
-  const [watchStatus, zoteroValidation, gateReport, releaseMatrix, validationContext, provenance, referenceDistillation, deadChainAudit] = await Promise.all([
+  const [watchStatus, zoteroValidation, gateReport, releaseMatrix, validationContext, provenance, referenceDistillation, deadChainAudit, reviewWorkbenchAcceptance] = await Promise.all([
     loadWatchStatusSummary(),
     loadZoteroValidationSummary(),
     loadJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-gate.json")),
@@ -1113,6 +1125,7 @@ async function main() {
     evaluateArtifactProvenance(projectRoot, runs, { env: process.env }),
     loadReferenceDistillationState(projectRoot),
     loadDeadChainAuditSummary(),
+    loadReviewWorkbenchAcceptanceSummary(),
   ]);
   const signalTrends = await archiveAgentSignalHistory(projectRoot, {
     watch: watchStatus,
@@ -1137,6 +1150,7 @@ async function main() {
   summary.provenance = provenance;
   summary.referenceDistillation = referenceDistillation;
   summary.deadChainAudit = deadChainAudit;
+  summary.reviewWorkbenchAcceptance = reviewWorkbenchAcceptance;
   summary.engineeringHardening = summarizeEngineeringHardening({
     e2e: zoteroValidation.e2e,
     autofix: zoteroValidation.autofix,
@@ -1146,6 +1160,9 @@ async function main() {
   summary.agentMemory = await writeAgentMemoryArtifacts(projectRoot, agentMemory);
   summary.frontpageSummary = buildMonitorFrontpageSummary(summary);
   summary.readinessSummary = summary.frontpageSummary;
+  summary.reviewWorkbenchAcceptanceStatus = summary.frontpageSummary.reviewWorkbenchAcceptanceStatus;
+  summary.reviewWorkbenchExternalBlockers = summary.frontpageSummary.reviewWorkbenchExternalBlockers;
+  summary.reviewWorkbenchLastLifecycleScenario = summary.frontpageSummary.reviewWorkbenchLastLifecycleScenario;
   summary.durationMs = Math.max(0, Date.now() - scriptStartedAt);
   summary.errorCategory = null;
   summary.errorCategoryLabel = null;

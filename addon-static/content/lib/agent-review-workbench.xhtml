@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" data-addon-ref="cleanroomtemplate" data-addon-name="Cleanroom Template">
+  <head>
+    <meta charset="utf-8" />
+    <title>Agent 审查工作台</title>
+    <link rel="stylesheet" type="text/css" href="./agent-review-workbench.css" />
+  </head>
+  <body>
+    <div id="review-workbench-root" class="review-workbench-shell">
+      <header class="review-workbench-header">
+        <div>
+          <p class="review-workbench-eyebrow">开发专用审查工作台</p>
+          <h1>Agent 审查工作台</h1>
+          <p id="review-workbench-summary" class="review-workbench-summary">等待运行时桥接...</p>
+        </div>
+        <button id="review-workbench-generate-plan" type="button">生成修订计划</button>
+      </header>
+
+      <main class="review-workbench-grid">
+        <aside id="review-workbench-stepper" class="review-workbench-stepper" aria-label="审查阶段"></aside>
+
+        <section class="review-workbench-center">
+          <div class="review-workbench-panel-heading">
+            <div>
+              <p class="review-workbench-panel-kicker">结构化视图</p>
+              <h2 id="review-workbench-stage-title">范围</h2>
+            </div>
+            <button id="review-workbench-refresh-stage" type="button">刷新阶段</button>
+          </div>
+          <div id="review-workbench-viewer" class="review-workbench-viewer" role="tree"></div>
+        </section>
+
+        <aside id="review-workbench-annotations" class="review-workbench-annotations">
+          <div class="review-workbench-panel-heading">
+            <div>
+              <p class="review-workbench-panel-kicker">批注</p>
+              <h2>阶段批注</h2>
+            </div>
+          </div>
+
+          <form id="review-workbench-annotation-form" class="review-workbench-form">
+            <label>
+              <span>目标路径</span>
+              <input id="review-workbench-target-path" type="text" autocomplete="off" />
+            </label>
+            <label>
+              <span>批注内容</span>
+              <textarea id="review-workbench-annotation-content" rows="5"></textarea>
+            </label>
+            <div class="review-workbench-form-actions">
+              <button id="review-workbench-save-annotation" type="submit">保存批注</button>
+              <button id="review-workbench-clear-annotation" type="button">清空</button>
+            </div>
+          </form>
+
+          <div id="review-workbench-annotation-list" class="review-workbench-annotation-list"></div>
+          <div id="review-workbench-plan-list" class="review-workbench-plan-list"></div>
+        </aside>
+      </main>
+
+      <section class="review-workbench-console">
+        <div class="review-workbench-panel-heading">
+          <div>
+            <p class="review-workbench-panel-kicker">控制台 / 进度</p>
+            <h2>验证导航</h2>
+          </div>
+        </div>
+        <div id="review-workbench-console-body" class="review-workbench-console-body"></div>
+      </section>
+    </div>
+    <script src="./agent-review-workbench.js"></script>
+  </body>
+</html>

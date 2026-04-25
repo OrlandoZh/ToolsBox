@@ -1,0 +1,351 @@
+:root {
+  color-scheme: light dark;
+  --review-bg: linear-gradient(180deg, rgba(241, 240, 233, 0.98) 0%, rgba(228, 224, 213, 0.98) 100%);
+  --review-panel: rgba(255, 255, 255, 0.76);
+  --review-panel-strong: rgba(255, 255, 255, 0.92);
+  --review-border: rgba(66, 57, 42, 0.16);
+  --review-text: #1f1a15;
+  --review-muted: #665d54;
+  --review-accent: #8a3b12;
+  --review-accent-soft: rgba(138, 59, 18, 0.12);
+  --review-warning: #9a3412;
+  --review-ok: #0f766e;
+  --review-shadow: 0 22px 50px rgba(34, 28, 19, 0.14);
+}
+
+html[data-theme="dark"] {
+  --review-bg: linear-gradient(180deg, rgba(27, 31, 34, 0.98) 0%, rgba(18, 21, 25, 0.98) 100%);
+  --review-panel: rgba(38, 43, 48, 0.84);
+  --review-panel-strong: rgba(31, 36, 40, 0.96);
+  --review-border: rgba(219, 207, 190, 0.12);
+  --review-text: #efe7da;
+  --review-muted: #baa98f;
+  --review-accent: #f59e0b;
+  --review-accent-soft: rgba(245, 158, 11, 0.14);
+  --review-warning: #fb923c;
+  --review-ok: #2dd4bf;
+  --review-shadow: 0 20px 48px rgba(0, 0, 0, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  background: var(--review-bg);
+  color: var(--review-text);
+}
+
+body {
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--review-accent);
+  color: #fff7ed;
+  padding: 0.7rem 1.1rem;
+  cursor: pointer;
+  transition: transform 120ms ease, opacity 120ms ease, border-color 120ms ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+input,
+textarea {
+  width: 100%;
+  border: 1px solid var(--review-border);
+  border-radius: 14px;
+  background: var(--review-panel-strong);
+  color: var(--review-text);
+  padding: 0.75rem 0.9rem;
+}
+
+textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+.review-workbench-shell {
+  display: grid;
+  gap: 1rem;
+  padding: 1.2rem;
+}
+
+.review-workbench-header,
+.review-workbench-console,
+.review-workbench-stepper,
+.review-workbench-center,
+.review-workbench-annotations {
+  border: 1px solid var(--review-border);
+  border-radius: 24px;
+  background: var(--review-panel);
+  box-shadow: var(--review-shadow);
+  backdrop-filter: blur(18px);
+}
+
+.review-workbench-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.2rem 1.35rem;
+}
+
+.review-workbench-eyebrow,
+.review-workbench-panel-kicker {
+  margin: 0 0 0.35rem;
+  font-family: "Avenir Next Condensed", "Helvetica Neue", sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.74rem;
+  color: var(--review-muted);
+}
+
+.review-workbench-header h1,
+.review-workbench-panel-heading h2 {
+  margin: 0;
+  font-size: 1.55rem;
+  line-height: 1.05;
+}
+
+.review-workbench-summary {
+  margin: 0.45rem 0 0;
+  max-width: 68rem;
+  color: var(--review-muted);
+  line-height: 1.5;
+}
+
+.review-workbench-grid {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1.4fr) minmax(320px, 0.95fr);
+  gap: 1rem;
+  min-height: 60vh;
+}
+
+.review-workbench-stepper,
+.review-workbench-center,
+.review-workbench-annotations,
+.review-workbench-console {
+  padding: 1rem;
+}
+
+.review-workbench-stepper {
+  display: grid;
+  align-content: start;
+  gap: 0.7rem;
+}
+
+.review-workbench-step-button {
+  display: grid;
+  gap: 0.15rem;
+  text-align: left;
+  border-radius: 18px;
+  border: 1px solid var(--review-border);
+  background: var(--review-panel-strong);
+  color: var(--review-text);
+  padding: 0.85rem 0.95rem;
+}
+
+.review-workbench-step-button[data-active="true"] {
+  border-color: var(--review-accent);
+  background: var(--review-accent-soft);
+}
+
+.review-workbench-step-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.review-workbench-step-meta {
+  font-size: 0.78rem;
+  color: var(--review-muted);
+}
+
+.review-workbench-step-stale {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(154, 52, 18, 0.12);
+  color: var(--review-warning);
+  font-size: 0.74rem;
+  padding: 0.18rem 0.55rem;
+}
+
+.review-workbench-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.review-workbench-viewer {
+  display: grid;
+  gap: 0.5rem;
+  min-height: 28rem;
+  max-height: 62vh;
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.review-workbench-viewer-row {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 16px;
+  border: 1px solid var(--review-border);
+  background: var(--review-panel-strong);
+}
+
+.review-workbench-viewer-row button {
+  justify-self: start;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--review-text);
+  border: 1px dashed var(--review-border);
+  padding: 0.25rem 0.45rem;
+}
+
+.review-workbench-viewer-path {
+  font-family: "SFMono-Regular", "Menlo", monospace;
+  font-size: 0.8rem;
+  color: var(--review-muted);
+  word-break: break-all;
+}
+
+.review-workbench-viewer-value {
+  font-family: "SFMono-Regular", "Menlo", monospace;
+  font-size: 0.88rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.review-workbench-form {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.review-workbench-form label {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.review-workbench-form-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.review-workbench-annotation-list,
+.review-workbench-plan-list,
+.review-workbench-console-body {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.review-workbench-card {
+  border: 1px solid var(--review-border);
+  border-radius: 18px;
+  background: var(--review-panel-strong);
+  padding: 0.8rem;
+}
+
+.review-workbench-card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.review-workbench-card p {
+  margin: 0.35rem 0 0;
+  color: var(--review-muted);
+  line-height: 1.45;
+}
+
+.review-workbench-card-code {
+  font-family: "SFMono-Regular", "Menlo", monospace;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.review-workbench-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+}
+
+.review-workbench-card-actions button {
+  background: transparent;
+  color: var(--review-text);
+  border-color: var(--review-border);
+}
+
+.review-workbench-card-actions button[data-tone="warning"] {
+  color: var(--review-warning);
+}
+
+.review-workbench-card-actions button[data-tone="ok"] {
+  color: var(--review-ok);
+}
+
+.review-workbench-command-list {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.7rem;
+}
+
+.review-workbench-command {
+  font-family: "SFMono-Regular", "Menlo", monospace;
+  font-size: 0.83rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 12px;
+  background: rgba(30, 24, 20, 0.06);
+}
+
+html[data-theme="dark"] .review-workbench-command {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.review-workbench-empty {
+  padding: 1rem;
+  border: 1px dashed var(--review-border);
+  border-radius: 16px;
+  color: var(--review-muted);
+  background: rgba(255, 255, 255, 0.3);
+}
+
+html[data-theme="dark"] .review-workbench-empty {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+@media (max-width: 1100px) {
+  .review-workbench-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .review-workbench-header {
+    flex-direction: column;
+  }
+}

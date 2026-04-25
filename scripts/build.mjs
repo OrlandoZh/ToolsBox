@@ -49,11 +49,21 @@ export const BUILD_PREFERENCE_BINDING_MODE_BRIDGE = "bridge";
 export const BUILD_STATIC_SURFACE_MODE_ENV = "CLEANROOM_BUILD_STATIC_SURFACE_MODE";
 export const BUILD_STATIC_SURFACE_MODE_STANDARD = "standard";
 export const BUILD_STATIC_SURFACE_MODE_SCRUB = "scrub";
+export const BUILD_INCLUDE_DEV_SURFACES_ENV = "CLEANROOM_BUILD_INCLUDE_DEV_SURFACES";
 export const BUILD_ROUTE4_LEGACY_ENABLED_ENV = "CLEANROOM_BUILD_ROUTE4_LEGACY_ENABLED";
 export const ROUTE4_LEGACY_ENDPOINT_ENV = "CLEANROOM_ROUTE4_LEGACY_ENDPOINT";
 export const ROUTE4_LEGACY_SECRET_ENV = "CLEANROOM_ROUTE4_LEGACY_SECRET";
 export const ROUTE4_LEGACY_IDENTITY_KIND_ENV = "CLEANROOM_ROUTE4_IDENTITY_KIND";
 export const ROUTE4_LEGACY_CACHE_TTL_MS_ENV = "CLEANROOM_ROUTE4_LEGACY_CACHE_TTL_MS";
+export const DEV_ONLY_STATIC_SURFACE_PATHS = Object.freeze([
+  "content/lib/agent-review-workbench.xhtml",
+  "content/lib/agent-review-workbench.js",
+  "content/lib/agent-review-workbench.css",
+]);
+
+const DEV_ONLY_STATIC_SURFACE_PATH_SET = new Set(DEV_ONLY_STATIC_SURFACE_PATHS);
+const PLATFORM_METADATA_FILE_NAMES = new Set([".DS_Store", "Thumbs.db"]);
+const PLATFORM_METADATA_DIRECTORY_NAMES = new Set(["__MACOSX"]);
 
 function toPosix(filePath) {
   return filePath.split(path.sep).join("/");
@@ -85,6 +95,28 @@ export function resolveBuildStaticSurfaceMode(env = process.env) {
   return rawMode === BUILD_STATIC_SURFACE_MODE_SCRUB
     ? BUILD_STATIC_SURFACE_MODE_SCRUB
     : BUILD_STATIC_SURFACE_MODE_STANDARD;
+}
+
+export function resolveBuildIncludeDevSurfaces(env = process.env) {
+  return String(env?.[BUILD_INCLUDE_DEV_SURFACES_ENV] || "").trim() !== "0";
+}
+
+function shouldSkipStaticEntry(relativePath, entry, options = {}) {
+  const normalizedPath = toPosix(relativePath);
+  const segments = normalizedPath.split("/").filter(Boolean);
+  if (entry.isDirectory() && PLATFORM_METADATA_DIRECTORY_NAMES.has(entry.name)) {
+    return true;
+  }
+  if (segments.some((segment) => PLATFORM_METADATA_DIRECTORY_NAMES.has(segment))) {
+    return true;
+  }
+  if (!entry.isDirectory() && PLATFORM_METADATA_FILE_NAMES.has(entry.name)) {
+    return true;
+  }
+  if (options.includeDevSurfaces === false && !entry.isDirectory() && DEV_ONLY_STATIC_SURFACE_PATH_SET.has(normalizedPath)) {
+    return true;
+  }
+  return false;
 }
 
 function normalizeBuildString(value) {
@@ -231,16 +263,21 @@ async function removeDir(dirPath) {
   await fs.rm(dirPath, { recursive: true, force: true });
 }
 
-async function copyDir(source, target) {
+async function copyDir(source, target, options = {}, relativeBase = "") {
   await ensureDir(target);
   const entries = await fs.readdir(source, { withFileTypes: true });
 
   for (const entry of entries) {
     const srcPath = path.join(source, entry.name);
     const dstPath = path.join(target, entry.name);
+    const relativePath = toPosix(path.join(relativeBase, entry.name));
+
+    if (shouldSkipStaticEntry(relativePath, entry, options)) {
+      continue;
+    }
 
     if (entry.isDirectory()) {
-      await copyDir(srcPath, dstPath);
+      await copyDir(srcPath, dstPath, options, relativePath);
       continue;
     }
 
@@ -897,6 +934,8 @@ async function writeBuildReport({
   moduleIdMode = BUILD_MODULE_ID_MODE_PATH,
   semanticScrubMode = BUILD_SEMANTIC_SCRUB_NONE,
   staticSurfaceMode = BUILD_STATIC_SURFACE_MODE_STANDARD,
+  devSurfacesIncluded = true,
+  excludedDevSurfacePaths = [],
 }) {
   const report = {
     generatedAt: new Date().toISOString(),
@@ -908,6 +947,8 @@ async function writeBuildReport({
     moduleIdMode,
     semanticScrubMode,
     staticSurfaceMode,
+    devSurfacesIncluded,
+    excludedDevSurfacePaths,
   };
 
   await fs.writeFile(
@@ -949,12 +990,14 @@ export async function main() {
     const semanticScrubMode = resolveBuildSemanticScrubMode(process.env);
     const preferenceBindingMode = resolveBuildPreferenceBindingMode(process.env);
     const staticSurfaceMode = resolveBuildStaticSurfaceMode(process.env);
+    const includeDevSurfaces = resolveBuildIncludeDevSurfaces(process.env);
+    const excludedDevSurfacePaths = includeDevSurfaces ? [] : [...DEV_ONLY_STATIC_SURFACE_PATHS];
     const buildRoot = path.join(projectRoot, "build", config.addonRef);
     const scriptsRoot = path.join(buildRoot, "content", "scripts");
 
     try {
       await removeDir(buildRoot);
-      await copyDir(staticRoot, buildRoot);
+      await copyDir(staticRoot, buildRoot, { includeDevSurfaces });
       await ensureDir(scriptsRoot);
     } catch (error) {
       throw wrapScriptError(error, {
@@ -1130,6 +1173,8 @@ export async function main() {
         moduleIdMode,
         semanticScrubMode,
         staticSurfaceMode,
+        devSurfacesIncluded: includeDevSurfaces,
+        excludedDevSurfacePaths,
       });
     } catch (error) {
       throw wrapScriptError(error, {

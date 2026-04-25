@@ -3,6 +3,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import {
+  BUILD_INCLUDE_DEV_SURFACES_ENV,
   BUILD_MODULE_ID_MODE_ANONYMIZED,
   BUILD_ROUTE4_LEGACY_ENABLED_ENV,
   BUILD_MODULE_ID_MODE_ENV,
@@ -353,11 +354,12 @@ function resolveRoute4LegacyBuildEnv(options = {}, env = process.env) {
 }
 
 export function resolvePackageBuildEnv(options = {}, env = process.env) {
+  const buildEnv = {
+    [BUILD_INCLUDE_DEV_SURFACES_ENV]: "0",
+  };
   if (options.encryptBundle || options.shieldBundle || options.outputSuffix) {
-    const buildEnv = {
-      [BUILD_MODULE_ID_MODE_ENV]: BUILD_MODULE_ID_MODE_ANONYMIZED,
-      [BUILD_SEMANTIC_SCRUB_ENV]: BUILD_SEMANTIC_SCRUB_PROTECTED,
-    };
+    buildEnv[BUILD_MODULE_ID_MODE_ENV] = BUILD_MODULE_ID_MODE_ANONYMIZED;
+    buildEnv[BUILD_SEMANTIC_SCRUB_ENV] = BUILD_SEMANTIC_SCRUB_PROTECTED;
     if (options.prefBridge) {
       buildEnv[BUILD_PREFERENCE_BINDING_MODE_ENV] = BUILD_PREFERENCE_BINDING_MODE_BRIDGE;
     }
@@ -365,18 +367,24 @@ export function resolvePackageBuildEnv(options = {}, env = process.env) {
       buildEnv[BUILD_STATIC_SURFACE_MODE_ENV] = BUILD_STATIC_SURFACE_MODE_SCRUB;
     }
     Object.assign(buildEnv, resolveRoute4LegacyBuildEnv(options, env));
-    return buildEnv;
   }
 
-  return {};
+  return buildEnv;
 }
 
 export function resolvePackageZipExcludePatterns(options = {}) {
+  const patterns = [
+    ".DS_Store",
+    "*/.DS_Store",
+    "__MACOSX/*",
+    "Thumbs.db",
+    "*/Thumbs.db",
+  ];
   if (options.encryptBundle || options.shieldBundle || options.outputSuffix) {
-    return ["build-report.json"];
+    patterns.push("build-report.json");
   }
 
-  return [];
+  return patterns;
 }
 
 export function buildPackageZipArgs(outputPath, options = {}) {

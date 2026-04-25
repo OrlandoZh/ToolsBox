@@ -13,6 +13,7 @@ import {
   WASM_KERNEL_PROBE_WORKER_PATH,
 } from "../src/utils/optional-bundle-paths.js";
 import {
+  BUILD_INCLUDE_DEV_SURFACES_ENV,
   BUILD_MODULE_ID_MODE_ANONYMIZED,
   BUILD_MODULE_ID_MODE_PATH,
   BUILD_PREFERENCE_BINDING_MODE_BRIDGE,
@@ -23,8 +24,10 @@ import {
   BUILD_STATIC_SURFACE_MODE_ENV,
   BUILD_STATIC_SURFACE_MODE_SCRUB,
   BUILD_STATIC_SURFACE_MODE_STANDARD,
+  DEV_ONLY_STATIC_SURFACE_PATHS,
   createBuildConfigExpression,
   createBundleModuleId,
+  resolveBuildIncludeDevSurfaces,
   resolveBuildModuleIdMode,
   resolveBuildPreferenceBindingMode,
   resolveBuildSemanticScrubMode,
@@ -89,6 +92,13 @@ describe("Build Artifacts", () => {
       resolveBuildStaticSurfaceMode({ [BUILD_STATIC_SURFACE_MODE_ENV]: "unexpected" }),
       BUILD_STATIC_SURFACE_MODE_STANDARD,
     );
+  });
+
+  it("should resolve dev surface inclusion from environment safely", () => {
+    assert.equal(resolveBuildIncludeDevSurfaces({}), true);
+    assert.equal(resolveBuildIncludeDevSurfaces({ [BUILD_INCLUDE_DEV_SURFACES_ENV]: "0" }), false);
+    assert.equal(resolveBuildIncludeDevSurfaces({ [BUILD_INCLUDE_DEV_SURFACES_ENV]: "1" }), true);
+    assert.equal(resolveBuildIncludeDevSurfaces({ [BUILD_INCLUDE_DEV_SURFACES_ENV]: "unexpected" }), true);
   });
 
   it("should anonymize bundle module ids only in protected build mode", () => {
@@ -234,6 +244,11 @@ describe("Build Artifacts", () => {
     assert.equal(report.moduleIdMode, "path");
     assert.equal(report.semanticScrubMode, "none");
     assert.equal(report.staticSurfaceMode, "standard");
+    assert.equal(report.devSurfacesIncluded, true);
+    assert.deepEqual(report.excludedDevSurfacePaths, []);
+    for (const relativePath of DEV_ONLY_STATIC_SURFACE_PATHS) {
+      assert.equal(fs.existsSync(path.join(projectRoot, "build", config.addonRef, ...relativePath.split("/"))), true);
+    }
     assert.equal(
       fs.existsSync(path.join(projectRoot, "build", config.addonRef, ...WASM_KERNEL_PROBE_PATH.split("/"))),
       true,
@@ -242,6 +257,31 @@ describe("Build Artifacts", () => {
       fs.existsSync(path.join(projectRoot, "build", config.addonRef, ...WASM_KERNEL_PROBE_WORKER_PATH.split("/"))),
       true,
     );
+  });
+
+  it("should exclude dev-only surfaces and platform metadata in package build mode", () => {
+    execFileSync("node", ["scripts/build.mjs"], {
+      cwd: projectRoot,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        [BUILD_INCLUDE_DEV_SURFACES_ENV]: "0",
+      },
+    });
+
+    const config = readJSON(path.join(projectRoot, "config", "addon.config.json"));
+    const buildRoot = path.join(projectRoot, "build", config.addonRef);
+    const report = readJSON(path.join(buildRoot, "build-report.json"));
+
+    assert.equal(report.devSurfacesIncluded, false);
+    assert.deepEqual(report.excludedDevSurfacePaths, DEV_ONLY_STATIC_SURFACE_PATHS);
+    for (const relativePath of DEV_ONLY_STATIC_SURFACE_PATHS) {
+      assert.equal(fs.existsSync(path.join(buildRoot, ...relativePath.split("/"))), false);
+    }
+    assert.equal(fs.existsSync(path.join(buildRoot, ".DS_Store")), false);
+    assert.equal(fs.existsSync(path.join(buildRoot, "locale", ".DS_Store")), false);
+    assert.equal(fs.existsSync(path.join(buildRoot, "content", ".DS_Store")), false);
+    assert.equal(fs.existsSync(path.join(buildRoot, "content", "locale", ".DS_Store")), false);
   });
 
   it("should build a protected source proxy with semantic anchors reduced", () => {

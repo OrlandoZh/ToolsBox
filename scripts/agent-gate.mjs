@@ -55,6 +55,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const scriptStartedAt = Date.now();
+const AGENT_REVIEW_WORKBENCH_WAVE_ID = "agent-review-workbench-wave-001";
+const AGENT_REVIEW_WORKBENCH_SCENARIO_COMMAND = "npm run zotero:scenario -- --scenario \"agent review workbench window lifecycle\"";
 
 const TASK_DESCRIPTIONS = {
   check: "执行统一质量检查（lint、格式、类型、verify、test）",
@@ -106,6 +108,37 @@ function isDiagnosticRunName(runName) {
     return true;
   }
   return /^gate-.*-case$/u.test(normalized);
+}
+
+function evaluateReviewWorkbenchWaveAcceptance(validationDecision, reviewWorkbenchAcceptance = null) {
+  const matchedProjectOverrides = Array.isArray(validationDecision?.matchedProjectOverride)
+    ? validationDecision.matchedProjectOverride
+    : [];
+  if (!matchedProjectOverrides.includes(AGENT_REVIEW_WORKBENCH_WAVE_ID)) {
+    return {
+      blocking: false,
+      status: String(reviewWorkbenchAcceptance?.status || "unavailable").trim().toLowerCase() || "unavailable",
+      issue: null,
+      recommendation: null,
+    };
+  }
+
+  const status = String(reviewWorkbenchAcceptance?.status || "unavailable").trim().toLowerCase() || "unavailable";
+  if (status === "passed") {
+    return {
+      blocking: false,
+      status,
+      issue: null,
+      recommendation: null,
+    };
+  }
+
+  return {
+    blocking: true,
+    status,
+    issue: `缺少 Agent Review Workbench lifecycle/CRUD/plan acceptance evidence（当前状态：${status}）。`,
+    recommendation: `先运行 \`${AGENT_REVIEW_WORKBENCH_SCENARIO_COMMAND}\`，再运行 \`npm run agent:monitor && npm run agent:gate\`。`,
+  };
 }
 
 function assert(condition, message) {
@@ -847,6 +880,13 @@ function evaluateGate(summary, policy, watchStatus = null, obsidianGuard = null,
   if (obsidianGuard?.violation) {
     issues.push(obsidianGuard.issue || obsidianGuard.message || "Obsidian workspace guard violation");
   }
+  const reviewWorkbenchWaveAcceptance = evaluateReviewWorkbenchWaveAcceptance(
+    validationDecision,
+    summary.reviewWorkbenchAcceptance || null,
+  );
+  if (reviewWorkbenchWaveAcceptance.blocking && reviewWorkbenchWaveAcceptance.issue) {
+    issues.push(reviewWorkbenchWaveAcceptance.issue);
+  }
 
   const recommendations = [];
   if (issues.length > 0) {
@@ -867,6 +907,9 @@ function evaluateGate(summary, policy, watchStatus = null, obsidianGuard = null,
   if (obsidianGuard?.violation && obsidianGuard.recommendation) {
     recommendations.push(obsidianGuard.recommendation);
   }
+  if (reviewWorkbenchWaveAcceptance.blocking && reviewWorkbenchWaveAcceptance.recommendation) {
+    recommendations.push(reviewWorkbenchWaveAcceptance.recommendation);
+  }
   const filteredRecommendations = filterConflictingRecommendationsForWatchStatus(
     recommendations,
     watchStatusCheck.status,
@@ -884,6 +927,7 @@ function evaluateGate(summary, policy, watchStatus = null, obsidianGuard = null,
     validationDecision,
     releaseMatrix: releaseMatrixCheck,
     deadChainAudit: summary.deadChainAudit || null,
+    reviewWorkbenchAcceptance: summary.reviewWorkbenchAcceptance || null,
   });
   frontpageSummary.agentContext = contextSummary;
 
@@ -920,6 +964,10 @@ function evaluateGate(summary, policy, watchStatus = null, obsidianGuard = null,
     validationDecision,
     provenance: summary.provenance || null,
     deadChainAudit: summary.deadChainAudit || null,
+    reviewWorkbenchAcceptance: summary.reviewWorkbenchAcceptance || null,
+    reviewWorkbenchAcceptanceStatus: frontpageSummary.reviewWorkbenchAcceptanceStatus,
+    reviewWorkbenchExternalBlockers: frontpageSummary.reviewWorkbenchExternalBlockers,
+    reviewWorkbenchLastLifecycleScenario: frontpageSummary.reviewWorkbenchLastLifecycleScenario,
     agentContext: contextSummary,
     readinessSummary: frontpageSummary,
     frontpageSummary,
@@ -1018,6 +1066,19 @@ function buildMarkdown(report) {
     lines.push(`- 所需检查: ${(report.validationDecision.requiredChecks || []).join("；") || "-"}`);
     lines.push(`- 所需证据: ${(report.validationDecision.requiredEvidence || []).join("；") || "-"}`);
     lines.push(`- 补证动作: ${report.validationDecision.deferredEvidenceAction || "-"}`);
+  }
+
+  lines.push("", "## Agent Review Workbench", "");
+  if (!report.frontpageSummary?.reviewWorkbench) {
+    lines.push("- 当前未生成 Agent Review Workbench 验收摘要。");
+  } else {
+    const workbench = report.frontpageSummary.reviewWorkbench;
+    lines.push(`- 验收状态: \`${workbench.status || "unavailable"}\``);
+    lines.push(`- Window lifecycle: \`${workbench.windowLifecycle || "unavailable"}\``);
+    lines.push(`- Snapshot provider: \`${workbench.snapshotProvider || "unavailable"}\``);
+    lines.push(`- Annotation CRUD: \`${workbench.annotationCrud || "unavailable"}\``);
+    lines.push(`- Plan builder: \`${workbench.planBuilder || "unavailable"}\``);
+    lines.push(`- External blockers: ${(workbench.externalBlockers || []).join("；") || "-"}`);
   }
 
   lines.push("", "## 死链与旧链路审计", "");

@@ -84,6 +84,29 @@ function writeDeadChainAudit(report) {
   fs.writeFileSync(target, `${JSON.stringify(report, null, 2)}\n`, "utf-8");
 }
 
+function writeWorkbenchScenarioLastRun(overrides = {}) {
+  const target = artifactPath("zotero-scenario-last-run.json");
+  const report = {
+    generatedAt: "2026-04-22T08:30:00.000Z",
+    passed: 1,
+    failed: 0,
+    selectedScenarios: [
+      {
+        name: "agent review workbench window lifecycle",
+        sourceFile: "zotero-scenarios/review-workbench-window-lifecycle.scenario.js",
+      },
+    ],
+    results: [
+      {
+        name: "agent review workbench window lifecycle",
+        status: "passed",
+      },
+    ],
+    ...overrides,
+  };
+  fs.writeFileSync(target, `${JSON.stringify(report, null, 2)}\n`, "utf-8");
+}
+
 function removeAutofixReport() {
   const target = artifactPath("agent-zotero-autofix.json");
   if (fs.existsSync(target)) {
@@ -602,6 +625,7 @@ describe("Agent Telemetry", () => {
       // expected non-zero exit
     }
 
+    writeWorkbenchScenarioLastRun();
     execNode(["scripts/agent-monitor.mjs"]);
 
     const monitorJSON = readArtifactJSON("agent-monitor.json");
@@ -626,6 +650,13 @@ describe("Agent Telemetry", () => {
     assert.equal(monitorJSON.frontpageSummary?.deadChainAudit?.nextWaveId, "retired-leaf-review");
     assert.equal(monitorJSON.frontpageSummary?.deadChainAudit?.nextWaveProposalAction, "review-and-remove-task-ids");
     assert.equal(monitorJSON.frontpageSummary?.deadChainAudit?.nextWaveProposalTaskCount, 1);
+    assert.equal(monitorJSON.frontpageSummary?.reviewWorkbench?.status, "passed");
+    assert.equal(monitorJSON.frontpageSummary?.reviewWorkbench?.windowLifecycle, "passed");
+    assert.equal(monitorJSON.frontpageSummary?.reviewWorkbench?.snapshotProvider, "available");
+    assert.equal(monitorJSON.frontpageSummary?.reviewWorkbench?.annotationCrud, "passed");
+    assert.equal(monitorJSON.frontpageSummary?.reviewWorkbench?.planBuilder, "passed");
+    assert.equal(monitorJSON.reviewWorkbenchAcceptanceStatus, "passed");
+    assert.equal(monitorJSON.reviewWorkbenchLastLifecycleScenario?.scenarioName, "agent review workbench window lifecycle");
     assert.ok(monitorJSON.frontpageSummary?.advisorySignals?.some((item) => item.includes("dead-chain audit advisory")));
     assert.ok(Array.isArray(monitorJSON.frontpageSummary?.primarySignals));
     assert.equal(monitorJSON.frontpageSummary?.primarySignals?.length, 0);
@@ -865,6 +896,7 @@ describe("Agent Telemetry", () => {
     });
 
     execNode(["scripts/agent-runner.mjs", "lifecycle-telemetry", "--", "node", "-e", "process.exit(0)"]);
+    writeWorkbenchScenarioLastRun();
     execNode(["scripts/agent-monitor.mjs"]);
     execNode(["scripts/agent-dashboard.mjs"]);
     try {
@@ -1075,6 +1107,7 @@ describe("Agent Telemetry", () => {
       entries: [],
       issues: [],
     });
+    writeWorkbenchScenarioLastRun();
 
     execNode(["scripts/agent-monitor.mjs"]);
 
@@ -1158,6 +1191,7 @@ describe("Agent Telemetry", () => {
       entries: [],
       issues: [],
     });
+    writeWorkbenchScenarioLastRun();
 
     execNode(["scripts/agent-monitor.mjs"]);
     try {
@@ -1323,6 +1357,7 @@ describe("Agent Telemetry", () => {
       entries: [],
       issues: [],
     });
+    writeWorkbenchScenarioLastRun();
 
     execNode(["scripts/agent-monitor.mjs"]);
     assert.throws(() => {
@@ -1492,6 +1527,7 @@ describe("Agent Telemetry", () => {
       issues: [],
     });
 
+    writeWorkbenchScenarioLastRun();
     execNode(["scripts/agent-monitor.mjs"]);
     execNode(["scripts/agent-dashboard.mjs"]);
     assert.throws(() => {
@@ -1665,6 +1701,7 @@ describe("Agent Telemetry", () => {
       issues: [],
     });
 
+    writeWorkbenchScenarioLastRun();
     execNode(["scripts/agent-monitor.mjs"]);
     const staleMonitor = readArtifactJSON("agent-monitor.json");
     staleMonitor.zoteroValidation.e2e.visualPrimaryBlockerKind = "ui-regression-candidate";
@@ -2510,6 +2547,7 @@ describe("Agent Telemetry", () => {
       issues: [],
     });
 
+    writeWorkbenchScenarioLastRun();
     execNode(["scripts/agent-monitor.mjs"]);
     assert.throws(() => {
       execNode([
@@ -2529,7 +2567,11 @@ describe("Agent Telemetry", () => {
     assert.equal(monitorJSON.watchStatus?.status, "failed");
     assert.equal(monitorJSON.frontpageSummary?.nextAction, "npm run zotero:watch");
     assert.ok(String(monitorJSON.frontpageSummary?.headline || "").includes("Zotero watch 当前为 失败"));
+    assert.equal(monitorJSON.frontpageSummary?.reviewWorkbench?.status, "passed");
+    assert.ok(monitorJSON.frontpageSummary?.reviewWorkbench?.externalBlockers.some((item) => String(item).includes("Zotero watch")));
     assert.ok(String(gateJSON.frontpageSummary?.nextAction || "").includes("zotero:watch"));
+    assert.equal(gateJSON.frontpageSummary?.reviewWorkbench?.status, "passed");
+    assert.ok(gateJSON.frontpageSummary?.reviewWorkbench?.externalBlockers.some((item) => String(item).includes("Zotero watch")));
     assert.equal(gateJSON.recommendations.some((item) => String(item).includes("agent:obsidian")), false);
   });
 
@@ -3876,6 +3918,7 @@ describe("Agent Telemetry", () => {
         },
       ],
     });
+    writeWorkbenchScenarioLastRun();
 
     execNode(["scripts/agent-runner.mjs", "gate-pass-case", "--", "node", "-e", "process.exit(0)"]);
     execNode(["scripts/agent-monitor.mjs"]);
@@ -3915,6 +3958,10 @@ describe("Agent Telemetry", () => {
     assert.equal(gateJSON.frontpageSummary?.deadChainAudit?.nextWaveId, "retired-leaf-review");
     assert.equal(gateJSON.frontpageSummary?.deadChainAudit?.nextWaveProposalAction, "review-and-remove-task-ids");
     assert.equal(gateJSON.frontpageSummary?.deadChainAudit?.nextWaveProposalTaskCount, 1);
+    assert.equal(gateJSON.frontpageSummary?.reviewWorkbench?.status, "passed");
+    assert.equal(gateJSON.frontpageSummary?.reviewWorkbench?.windowLifecycle, "passed");
+    assert.equal(gateJSON.reviewWorkbenchAcceptanceStatus, "passed");
+    assert.equal(gateJSON.reviewWorkbenchLastLifecycleScenario?.scenarioName, "agent review workbench window lifecycle");
     assert.ok(gateJSON.frontpageSummary?.advisorySignals?.some((item) => item.includes("dead-chain audit advisory")));
     assert.equal(gateJSON.zoteroValidation?.e2e?.toolbarDispatchMode, "customEvent");
     assert.equal(gateJSON.zoteroValidation?.e2e?.toolbarAppendedItemCount, 2);
@@ -4102,6 +4149,7 @@ describe("Agent Telemetry", () => {
       issues: [],
     });
 
+    writeWorkbenchScenarioLastRun();
     execNode(["scripts/agent-runner.mjs", "gate-pass-case", "--", "node", "-e", "process.exit(0)"]);
     execNode(["scripts/agent-monitor.mjs"]);
     execNode([
@@ -4585,6 +4633,7 @@ describe("Agent Telemetry", () => {
         entries: [],
         issues: [],
       });
+      writeWorkbenchScenarioLastRun();
 
       execNode(["scripts/agent-runner.mjs", "check", "--", "node", "-e", "process.exit(0)"]);
       execNode(["scripts/agent-monitor.mjs"]);
@@ -5195,6 +5244,7 @@ describe("Agent Telemetry", () => {
       ],
     });
 
+    writeWorkbenchScenarioLastRun();
     execNode(["scripts/agent-monitor.mjs"]);
     execNode(["scripts/agent-dashboard.mjs"]);
 
@@ -5392,6 +5442,7 @@ describe("Agent Telemetry", () => {
       ],
     });
 
+    writeWorkbenchScenarioLastRun();
     execNode(["scripts/agent-monitor.mjs"]);
     execNode(["scripts/agent-dashboard.mjs"]);
     execNode([
@@ -6568,6 +6619,41 @@ describe("Agent Telemetry", () => {
     assert.ok(gateMD.includes("阶段: `gate-evaluation`"));
   });
 
+  it("should fail active workbench wave gate without acceptance evidence", () => {
+    writeWatchStatus({
+      generatedAt: new Date().toISOString(),
+      latestStatus: "healthy",
+      latest: {
+        trigger: "watch-change",
+        passed: true,
+        issues: [],
+      },
+    });
+
+    execNode(["scripts/agent-runner.mjs", "gate-ok-case", "--", "node", "-e", "process.exit(0)"]);
+    execNode(["scripts/agent-monitor.mjs"]);
+    assert.throws(() => {
+      execNode([
+        "scripts/agent-gate.mjs",
+        "--profile",
+        "dev",
+        "--require",
+        "gate-ok-case",
+        "--min-pass-rate",
+        "0",
+        "--max-recent-failed",
+        "999",
+      ]);
+    });
+
+    const gateJSON = readArtifactJSON("agent-gate.json");
+
+    assert.equal(gateJSON.gatePassed, false);
+    assert.equal(gateJSON.reviewWorkbenchAcceptanceStatus, "unavailable");
+    assert.ok(gateJSON.issues.some((item) => String(item).includes("Agent Review Workbench")));
+    assert.ok(gateJSON.recommendations.some((item) => String(item).includes("agent review workbench window lifecycle")));
+  });
+
   it("should set error fields to null on successful gate evaluation", () => {
     writeWatchStatus({
       generatedAt: new Date().toISOString(),
@@ -6633,6 +6719,7 @@ describe("Agent Telemetry", () => {
       issues: [],
     });
 
+    writeWorkbenchScenarioLastRun();
     execNode(["scripts/agent-runner.mjs", "gate-ok-case", "--", "node", "-e", "process.exit(0)"]);
     execNode(["scripts/agent-monitor.mjs"]);
     execNode([

@@ -16,6 +16,121 @@ function normalizeStatusSlice(source, extra = {}) {
   };
 }
 
+const REVIEW_WORKBENCH_LIFECYCLE_SCENARIO_NAME = "agent review workbench window lifecycle";
+
+function compactSignal(value, maxLength = 180) {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return null;
+  }
+  return normalized.length > maxLength
+    ? `${normalized.slice(0, maxLength - 1)}…`
+    : normalized;
+}
+
+function findReviewWorkbenchLifecycleScenario(scenarioLastRun = null) {
+  const report = scenarioLastRun && typeof scenarioLastRun === "object" ? scenarioLastRun : {};
+  const results = Array.isArray(report.results) ? report.results : [];
+  const selected = Array.isArray(report.selectedScenarios) ? report.selectedScenarios : [];
+  const result = results.find((entry) => entry?.name === REVIEW_WORKBENCH_LIFECYCLE_SCENARIO_NAME) || null;
+  const selectedScenario = selected.find((entry) => entry?.name === REVIEW_WORKBENCH_LIFECYCLE_SCENARIO_NAME) || null;
+  if (!result && !selectedScenario) {
+    return null;
+  }
+  const status = result?.status
+    || (Number(report.failed || 0) > 0 ? "failed" : Number(report.passed || 0) > 0 ? "passed" : "unknown");
+  return {
+    status,
+    generatedAt: typeof report.generatedAt === "string" ? report.generatedAt : null,
+    scenarioName: REVIEW_WORKBENCH_LIFECYCLE_SCENARIO_NAME,
+    sourceFile: selectedScenario?.sourceFile || selectedScenario?.sourceFileHref || null,
+    error: result?.error?.message || result?.error || report.failure?.message || report.failure || null,
+  };
+}
+
+export function buildReviewWorkbenchAcceptanceSummary({
+  scenarioLastRun = null,
+  externalBlockers = [],
+} = {}) {
+  const lifecycleScenario = findReviewWorkbenchLifecycleScenario(scenarioLastRun);
+  const scenarioStatus = lifecycleScenario?.status || "unavailable";
+  const status = scenarioStatus === "passed"
+    ? "passed"
+    : scenarioStatus === "failed"
+      ? "failed"
+      : "unavailable";
+  const lifecycleStatus = status === "passed"
+    ? "passed"
+    : status === "failed"
+      ? "failed"
+      : "unavailable";
+  return {
+    status,
+    windowLifecycle: lifecycleStatus,
+    snapshotProvider: status === "passed" ? "available" : "unavailable",
+    annotationCrud: status === "passed" ? "passed" : lifecycleStatus,
+    planBuilder: status === "passed" ? "passed" : lifecycleStatus,
+    externalBlockers: Array.from(new Set(
+      (Array.isArray(externalBlockers) ? externalBlockers : [])
+        .map((item) => compactSignal(item))
+        .filter(Boolean),
+    )).slice(0, 5),
+    lastLifecycleScenario: lifecycleScenario
+      ? {
+        status: lifecycleScenario.status,
+        generatedAt: lifecycleScenario.generatedAt,
+        scenarioName: lifecycleScenario.scenarioName,
+      }
+      : null,
+    summary: status === "passed"
+      ? "Agent Review Workbench V1 lifecycle and functional smoke are accepted."
+      : status === "failed"
+        ? `Agent Review Workbench lifecycle scenario failed: ${compactSignal(lifecycleScenario?.error) || "unknown"}`
+        : "Agent Review Workbench lifecycle scenario evidence is unavailable.",
+  };
+}
+
+function normalizeReviewWorkbenchAcceptanceSlice(source = null, externalBlockers = []) {
+  const record = source && typeof source === "object"
+    ? source
+    : buildReviewWorkbenchAcceptanceSummary({ externalBlockers });
+  return {
+    status: ["passed", "failed", "unavailable"].includes(record.status) ? record.status : "unavailable",
+    windowLifecycle: record.windowLifecycle || "unavailable",
+    snapshotProvider: record.snapshotProvider || "unavailable",
+    annotationCrud: record.annotationCrud || "unavailable",
+    planBuilder: record.planBuilder || "unavailable",
+    externalBlockers: Array.from(new Set([
+      ...(Array.isArray(record.externalBlockers) ? record.externalBlockers : []),
+      ...(Array.isArray(externalBlockers) ? externalBlockers : []),
+    ].map((item) => compactSignal(item)).filter(Boolean))).slice(0, 5),
+    lastLifecycleScenario: record.lastLifecycleScenario && typeof record.lastLifecycleScenario === "object"
+      ? {
+        status: record.lastLifecycleScenario.status || "unknown",
+        generatedAt: record.lastLifecycleScenario.generatedAt || null,
+        scenarioName: record.lastLifecycleScenario.scenarioName || REVIEW_WORKBENCH_LIFECYCLE_SCENARIO_NAME,
+      }
+      : null,
+    summary: record.summary || "Agent Review Workbench acceptance summary is unavailable.",
+  };
+}
+
+function collectReviewWorkbenchExternalBlockers(signals = []) {
+  return Array.from(new Set(
+    (Array.isArray(signals) ? signals : [])
+      .map((item) => String(item || "").trim())
+      .filter(Boolean)
+      .filter((item) => {
+        if (/reviewWorkbench|Agent Review Workbench|review workbench/iu.test(item)) {
+          return false;
+        }
+        return /zotero watch|watch|reader|visual|视觉|真机|e2e|baseline|capture/iu.test(item);
+      })
+      .map((item) => compactSignal(item))
+      .filter(Boolean),
+  )).slice(0, 5);
+}
+
 function getReaderEventSlice(e2e) {
   const readerEvent = e2e?.readerEventReport && typeof e2e.readerEventReport === "object"
     ? e2e.readerEventReport
@@ -340,6 +455,7 @@ export function buildGateFrontpageSummary({
   validationDecision = null,
   releaseMatrix = null,
   deadChainAudit = null,
+  reviewWorkbenchAcceptance = null,
 }) {
   const normalizedIssues = Array.isArray(issues) ? issues.filter(Boolean) : [];
   const normalizedRecommendations = Array.isArray(recommendations) ? recommendations.filter(Boolean) : [];
@@ -353,6 +469,11 @@ export function buildGateFrontpageSummary({
   const pureVisualReaderFailure = isPureVisualReaderFailure(e2e);
   const pureVisualReaderSummary = buildPureVisualReaderFailureSummary(e2e);
   const deadChain = normalizeDeadChainAuditSlice(deadChainAudit);
+  const reviewWorkbenchExternalBlockers = collectReviewWorkbenchExternalBlockers(normalizedIssues);
+  const reviewWorkbench = normalizeReviewWorkbenchAcceptanceSlice(
+    reviewWorkbenchAcceptance,
+    reviewWorkbenchExternalBlockers,
+  );
   const freshDebugProbe = debugProbe.status !== "missing" && debugProbe.freshForLatestE2E !== false;
   const actionCandidates = validationDecision?.level && validationDecision.level !== "visual-required"
     ? normalizedRecommendations.filter((item) => !isVisualFocusedAction(item))
@@ -450,6 +571,10 @@ export function buildGateFrontpageSummary({
     watchRecovery: normalizeStatusSlice(recovery),
     debugProbe,
     deadChainAudit: deadChain,
+    reviewWorkbench,
+    reviewWorkbenchAcceptanceStatus: reviewWorkbench.status,
+    reviewWorkbenchExternalBlockers: reviewWorkbench.externalBlockers,
+    reviewWorkbenchLastLifecycleScenario: reviewWorkbench.lastLifecycleScenario,
   };
 }
 
@@ -549,6 +674,11 @@ export function buildMonitorFrontpageSummary(summary) {
   if (!stable && autofix.present && autofix.status === "unrecovered") {
     primarySignals.push("最近自动修复未恢复成功，建议回看补丁计划与诊断。");
   }
+  const reviewWorkbenchExternalBlockers = collectReviewWorkbenchExternalBlockers(primarySignals);
+  const reviewWorkbench = normalizeReviewWorkbenchAcceptanceSlice(
+    summary.reviewWorkbenchAcceptance,
+    reviewWorkbenchExternalBlockers,
+  );
   const advisorySignals = [];
   if (freshDebugProbe && debugProbe.status === "completed" && debugProbe.executedProbeCount > 0) {
     advisorySignals.push(`debug probe ready：${debugProbe.summary}`);
@@ -665,6 +795,10 @@ export function buildMonitorFrontpageSummary(summary) {
     debugProbe,
     referenceDistillation,
     deadChainAudit,
+    reviewWorkbench,
+    reviewWorkbenchAcceptanceStatus: reviewWorkbench.status,
+    reviewWorkbenchExternalBlockers: reviewWorkbench.externalBlockers,
+    reviewWorkbenchLastLifecycleScenario: reviewWorkbench.lastLifecycleScenario,
     latestRun: summary.latest
       ? {
         runName: summary.latest.runName || null,
