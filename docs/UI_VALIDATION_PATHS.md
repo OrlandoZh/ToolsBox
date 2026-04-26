@@ -40,7 +40,7 @@
 - 当前模板已对 Reader 细粒度 hook 做了比普通 surface 更深的专项验证：
   - `zotero-scenarios/reader-event-hooks.scenario.js`
   - `zotero-scenarios/reader-fine-grained-hooks.scenario.js`
-  - `src/app/capability-manifest.js`
+  - `dev/agent-runtime/capability-manifest.js`
 - 当前仓库内并没有已成体系的 route-specific validator 去覆盖 `VirtualizedTable`、`customElements.define(...)`、`parseXULToFragment(...)`、isolated iframe，或 `openDialog(...) + _initPromise` 这类 UI 路线自身 contract。
 
 ## Current Validation Model

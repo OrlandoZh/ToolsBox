@@ -317,7 +317,7 @@ const DIAGNOSIS_RULES = [
     featureLabel: "Reader 事件桥",
     candidateFiles: [
       "src/features/reader.js",
-      "src/app/plugin-agent.js",
+      "dev/agent-runtime/plugin-agent.js",
       "zotero-scenarios/reader-event-hooks.scenario.js",
       "zotero-scenarios/reader-fine-grained-hooks.scenario.js",
     ],

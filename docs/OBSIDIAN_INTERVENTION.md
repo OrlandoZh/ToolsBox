@@ -107,7 +107,7 @@ AGENT_OBSIDIAN_DIR=/你的/Obsidian/工作区 AGENT_OBSIDIAN_VISUALS=1 npm run a
 - 当前插件功能与可见面地图：按 `preference pane / item pane / context pane / reader / menu item` 等 surface 分组归纳
 - 当前插件功能模块图谱：把当前项目按“主线骨架 / 支撑能力”拆成模块卡片和独立 canvas，便于快速理解哪些模块构成当前插件
 - 当前扩展波次模块焦点：把 current wave 的 in-scope / out-of-scope / acceptance track 和当前模块图谱的关系单独写清
-- 当前插件能力目录：从 `src/app/capability-manifest.js` 自动派生能力、入口、场景与责任文件，帮助把“模块”继续落到“能力”
+- 当前插件能力目录：从 `dev/agent-runtime/capability-manifest.js` 自动派生能力、入口、场景与责任文件，帮助把“模块”继续落到“能力”
 - 当前插件技术脉络与宿主接入：说明为什么当前 surface 走宿主注册式、统一节点工厂、菜单注入或 Reader 接入链
 - 当前插件 UI 概念图：按偏好设置、条目/上下文窗格、Reader、菜单与子菜单分拆，便于单独讨论某一块 UI
 - 当前插件 UI 具象图：把各个 surface 放回接近真实宿主布局的位置，方便开发者建立“模块名 -> 实际界面位置”的直觉映射

@@ -5,8 +5,8 @@ import {
 } from "./host-action-catalog.js";
 import { HOST_ACTION_IDS } from "./host-action-ids.js";
 import { HOST_ACTION_READINESS_IDS } from "./host-action-readiness-ids.js";
-import { summarizeHostActionExecutionEntry } from "./review-workbench-runtime-provider.js";
-import { createSurfaceDescriptors } from "./surface-descriptors.js";
+import { summarizeHostActionExecutionEntry } from "../agent-review-workbench/review-workbench-runtime-provider.js";
+import { createSurfaceDescriptors } from "../../src/app/surface-descriptors.js";
 
 const HOST_ACTION_EXECUTION_HISTORY_LIMIT = 20;
 

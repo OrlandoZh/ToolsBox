@@ -8,8 +8,8 @@
       "contractSurfaceId": "preference-pane",
       "summary": "Open the cleanroom preference pane from Zotero preferences, prove structure smoke under Zotero's `800x600` host boundary, and require at least one live control interaction when pane behavior or pref writeback changes.",
       "ownerPaths": [
-        "src/app/host-action-catalog.js",
-        "src/app/host-actions.js",
+        "dev/agent-runtime/host-action-catalog.js",
+        "dev/agent-runtime/host-actions.js",
         "src/features/preference-panes.js",
         "src/platform/zotero-host.js",
         "zotero-scenarios/preferences-surface-smoke.scenario.js",
@@ -32,8 +32,8 @@
       "contractSurfaceId": "item-pane-sidenav",
       "summary": "Switch a library Item Pane sidenav button and verify that the selected pane becomes visible and ready.",
       "ownerPaths": [
-        "src/app/host-action-catalog.js",
-        "src/app/host-actions.js",
+        "dev/agent-runtime/host-action-catalog.js",
+        "dev/agent-runtime/host-actions.js",
         "src/features/item-pane.js",
         "src/platform/zotero-host.js",
         "zotero-scenarios/item-pane-surface-smoke.scenario.js"
@@ -52,8 +52,8 @@
       "contractSurfaceId": "context-pane",
       "summary": "Open the right context pane and switch to the requested context pane section for the active reader tab; edge-attached layouts should follow the live pane bounds.",
       "ownerPaths": [
-        "src/app/host-action-catalog.js",
-        "src/app/host-actions.js",
+        "dev/agent-runtime/host-action-catalog.js",
+        "dev/agent-runtime/host-actions.js",
         "src/features/reader.js",
         "src/platform/zotero-host.js",
         "zotero-scenarios/context-pane-surface-smoke.scenario.js"
@@ -72,8 +72,8 @@
       "contractSurfaceId": "render-toolbar",
       "summary": "Verify that the Reader renderToolbar injection becomes visible in a live reader instance and exposes a local evidence target.",
       "ownerPaths": [
-        "src/app/host-action-catalog.js",
-        "src/app/host-actions.js",
+        "dev/agent-runtime/host-action-catalog.js",
+        "dev/agent-runtime/host-actions.js",
         "src/features/reader.js",
         "zotero-scenarios/reader-surface-smoke.scenario.js"
       ],
@@ -90,8 +90,8 @@
       "contractSurfaceId": "reader-sidebar-view",
       "summary": "Switch the active Reader sidebar view and verify that the requested sidebar surface is selected, ready, and geometry-aware when edge-attached.",
       "ownerPaths": [
-        "src/app/host-action-catalog.js",
-        "src/app/host-actions.js",
+        "dev/agent-runtime/host-action-catalog.js",
+        "dev/agent-runtime/host-actions.js",
         "src/features/reader.js",
         "zotero-scenarios/reader-surface-smoke.scenario.js"
       ],
@@ -109,8 +109,8 @@
       "contractSurfaceId": "menu-item",
       "summary": "Show a live Zotero menu target, verify the registered menu item is visible, and trigger it through Host Actions.",
       "ownerPaths": [
-        "src/app/host-action-catalog.js",
-        "src/app/host-actions.js",
+        "dev/agent-runtime/host-action-catalog.js",
+        "dev/agent-runtime/host-actions.js",
         "src/features/menu-manager.js",
         "src/platform/zotero-host.js",
         "zotero-scenarios/menu-surface-smoke.scenario.js"
@@ -129,8 +129,8 @@
       "contractSurfaceId": "collection-menu",
       "summary": "Show a live Zotero collection menu target, verify collection context is active, and replay the registered action through Host Actions.",
       "ownerPaths": [
-        "src/app/host-action-catalog.js",
-        "src/app/host-actions.js",
+        "dev/agent-runtime/host-action-catalog.js",
+        "dev/agent-runtime/host-actions.js",
         "src/features/menu-manager.js",
         "src/platform/zotero-host.js",
         "scripts/zotero-scenario-runtime.js",
@@ -150,8 +150,8 @@
       "contractSurfaceId": "menu-submenu",
       "summary": "Show a live submenu surface, verify child rebuild or lazy submenu content, and replay a submenu child through Host Actions with menuPath evidence.",
       "ownerPaths": [
-        "src/app/host-action-catalog.js",
-        "src/app/host-actions.js",
+        "dev/agent-runtime/host-action-catalog.js",
+        "dev/agent-runtime/host-actions.js",
         "src/features/menu-manager.js",
         "scripts/zotero-scenario-runtime.js",
         "zotero-scenarios/menu-submenu-surface-smoke.scenario.js"

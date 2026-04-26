@@ -6,7 +6,7 @@ import { describe, it, beforeEach, afterEach, assert } from "./test-framework.js
 import {
   createReviewWorkbenchRuntimeProvider,
   isReviewWorkbenchDevRuntime,
-} from "../src/app/review-workbench-runtime-provider.js";
+} from "../dev/agent-review-workbench/review-workbench-runtime-provider.js";
 
 function createIOUtils() {
   return {

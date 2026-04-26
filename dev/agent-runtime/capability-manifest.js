@@ -54,7 +54,7 @@ export function createCapabilityManifest({ config } = {}) {
         "plugin.api.agent.inspectItem(itemID)",
       ],
       ownedBy: [
-        "src/app/plugin-agent.js",
+        "dev/agent-runtime/plugin-agent.js",
         "src/features/item-pane.js",
         "src/features/item-tree.js",
       ],
@@ -101,7 +101,7 @@ export function createCapabilityManifest({ config } = {}) {
       ],
       ownedBy: [
         "src/features/reader.js",
-        "src/app/plugin-agent.js",
+        "dev/agent-runtime/plugin-agent.js",
       ],
       successSignals: [
         "canOpen(itemID) 为 true",
@@ -171,7 +171,7 @@ export function createCapabilityManifest({ config } = {}) {
       ],
       ownedBy: [
         "src/features/reader.js",
-        "src/app/plugin-agent.js",
+        "dev/agent-runtime/plugin-agent.js",
         "zotero-scenarios/reader-event-hooks.scenario.js",
         "zotero-scenarios/reader-fine-grained-hooks.scenario.js",
       ],
@@ -221,9 +221,9 @@ export function createCapabilityManifest({ config } = {}) {
         "plugin.api.agent.runHostAction(actionId, payload)",
       ],
       ownedBy: [
-        "src/app/host-action-catalog.js",
-        "src/app/host-actions.js",
-        "src/app/plugin-agent.js",
+        "dev/agent-runtime/host-action-catalog.js",
+        "dev/agent-runtime/host-actions.js",
+        "dev/agent-runtime/plugin-agent.js",
         "src/app/plugin-api.js",
       ],
       successSignals: [

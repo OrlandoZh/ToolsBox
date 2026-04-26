@@ -30,25 +30,24 @@ import {
 } from "../services/index.js";
 import { createPluginKernel } from "./kernel.js";
 import { createPluginAPI } from "./plugin-api.js";
-import { createPluginAgent } from "./plugin-agent.js";
 import { createCopyFallbacks } from "./copy-fallbacks.js";
 import { createFeatureComposer } from "./feature-composer.js";
 import { createOptionalBundleRuntime } from "./optional-bundles.js";
 import { createRuntimeCapabilityState } from "./runtime-capabilities.js";
-import { createHostActionRunner } from "./host-actions.js";
 import { createSurfaceDescriptors } from "./surface-descriptors.js";
-import {
-  createCapabilityManifest as createSourceCapabilityManifest,
-  getCapabilityManifestView as getSourceCapabilityManifestView,
-} from "./capability-manifest.js";
-import {
-  createCapabilityManifest as createProtectedCapabilityManifest,
-  getCapabilityManifestView as getProtectedCapabilityManifestView,
-} from "./capability-manifest-protected.js";
 import { createReactUIDemoLauncher } from "../features/react-ui-demo.js";
 import { createWasmKernelProbe } from "../features/wasm-kernel-probe.js";
-import { createAgentReviewWorkbench } from "../features/agent-review-workbench.js";
-import { createReviewWorkbenchRuntimeProvider } from "./review-workbench-runtime-provider.js";
+import {
+  createAgentReviewWorkbench,
+  createCapabilityManifest as createSourceCapabilityManifest,
+  createHostActionRunner,
+  createPluginAgent,
+  createProtectedCapabilityManifest,
+  getCapabilityManifestView as getSourceCapabilityManifestView,
+  getProtectedCapabilityManifestView,
+  createReviewWorkbenchRuntimeProvider,
+  registerDevRuntimeFeatures,
+} from "./dev-runtime.js";
 
 const WASM_STAGE2_DERIVE_PACKAGE_VARIANT = "shielded-surface-scrub-wasm-stage2-derive";
 const ROUTE4_LEGACY_PACKAGE_VARIANT = "shielded-surface-scrub-wasm-entitlement-legacy";
@@ -1365,13 +1364,13 @@ export function createPlugin({
         return {
           available: false,
           reason: "plugin-disabled",
-          summary: "Agent Review Workbench is disabled because the plugin is not enabled.",
+          summary: "Dev-only review runtime is disabled because the plugin is not enabled.",
         };
       }
       return {
         available: true,
         reason: null,
-        summary: "Agent Review Workbench is available in the current dev runtime.",
+        summary: "Dev-only review runtime is available in the current dev runtime.",
       };
     },
     listHostActions: hostActions.listHostActions,
@@ -1413,8 +1412,6 @@ export function createPlugin({
     demoNotifierID,
     updateDemoNotifierState,
     bundleRuntime,
-    openAgentReviewWorkbench: reviewWorkbench.open,
-    isAgentReviewWorkbenchAvailable: reviewWorkbench.isAvailable,
     openReactDemoWindow: reactUIDemo.openDemoWindow,
     surfaceDescriptors,
     presentReactSurface: reactUIDemo.presentSurface,
@@ -1429,7 +1426,18 @@ export function createPlugin({
     lifecycle,
     windows,
     settings,
-    registerBaselineFeatures: featureComposer.registerBaselineFeatures,
+    registerBaselineFeatures: async () => {
+      await featureComposer.registerBaselineFeatures();
+      registerDevRuntimeFeatures({
+        config,
+        logger,
+        prefs,
+        i18n,
+        commandPalette,
+        openAgentReviewWorkbench: reviewWorkbench.open,
+        isAgentReviewWorkbenchAvailable: reviewWorkbench.isAvailable,
+      });
+    },
     applySettings: applySettingsFromPrefs,
     onSettingsChange: handlePrefChange,
     addonName: config.addonName,

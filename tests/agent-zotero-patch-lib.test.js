@@ -1068,7 +1068,7 @@ describe("Agent Zotero Patch Lib", () => {
     });
     plan.patchDrafts.push({
       ...plan.patchDrafts[0],
-      file: "src/app/plugin-agent.js",
+      file: "dev/agent-runtime/plugin-agent.js",
     });
 
     const result = await applyPatchPlan(tempRoot, plan);

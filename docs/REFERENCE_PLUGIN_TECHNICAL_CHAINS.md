@@ -167,8 +167,8 @@
 
 当前模板落点：
 
-- `src/app/host-action-catalog.js`
-- `src/app/host-actions.js`
+- `dev/agent-runtime/host-action-catalog.js`
+- `dev/agent-runtime/host-actions.js`
 - `zotero-scenarios/*surface-smoke*.scenario.js`
 
 模板当前结论：
@@ -574,8 +574,8 @@
 当前模板落点：
 
 - `src/features/reader.js`
-- `src/app/host-action-catalog.js`
-- `src/app/host-actions.js`
+- `dev/agent-runtime/host-action-catalog.js`
+- `dev/agent-runtime/host-actions.js`
 
 模板当前结论：
 
@@ -658,8 +658,8 @@
 当前模板落点：
 
 - `src/features/menu-manager.js`
-- `src/app/host-action-catalog.js`
-- `src/app/host-actions.js`
+- `dev/agent-runtime/host-action-catalog.js`
+- `dev/agent-runtime/host-actions.js`
 - `src/features/item-pane.js`
 - `src/features/reader.js`
 
@@ -761,8 +761,8 @@
 - `src/features/menu-manager.js`
 - `src/features/prompt.js`
 - `src/utils/window-shell.js`
-- `src/app/host-action-catalog.js`
-- `src/app/host-actions.js`
+- `dev/agent-runtime/host-action-catalog.js`
+- `dev/agent-runtime/host-actions.js`
 - `src/services/registry.js`
 - `src/services/file-state-store.js`
 - `src/platform/zotero-file-storage.js`

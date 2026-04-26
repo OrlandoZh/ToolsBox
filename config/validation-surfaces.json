@@ -12,8 +12,8 @@
       "kind": "preference-pane",
       "entryMatchers": [
         "^src/features/preference-panes(?:/|\\.|$)",
-        "^src/app/host-action-catalog(?:/|\\.|$)",
-        "^src/app/host-actions(?:/|\\.|$)",
+        "^dev/agent-runtime/host-action-catalog(?:/|\\.|$)",
+        "^dev/agent-runtime/host-actions(?:/|\\.|$)",
         "^src/app/feature-composer(?:/|\\.|$)",
         "^addon-static/content/.*preferences.*\\.xhtml$"
       ],
@@ -68,8 +68,8 @@
       "summary": "A Zotero Item Pane sidenav surface that switches a real pane button and confirms the target pane becomes visible.",
       "kind": "item-pane-sidenav",
       "entryMatchers": [
-        "^src/app/host-action-catalog(?:/|\\.|$)",
-        "^src/app/host-actions(?:/|\\.|$)",
+        "^dev/agent-runtime/host-action-catalog(?:/|\\.|$)",
+        "^dev/agent-runtime/host-actions(?:/|\\.|$)",
         "^src/features/item-pane(?:/|\\.|$)",
         "^src/platform/zotero-host(?:/|\\.|$)"
       ],
@@ -167,7 +167,7 @@
       "summary": "A host-visible collection menu action aligned with Zotero collection selection semantics and main/library/collection target behavior.",
       "kind": "collection-menu",
       "entryMatchers": [
-        "^src/app/host-action-(?:catalog|actions)(?:/|\\.|$)",
+        "^dev/agent-runtime/(?:host-action-catalog|host-actions)(?:/|\\.|$)",
         "^src/features/menu-manager(?:/|\\.|$)",
         "^src/platform/zotero-host(?:/|\\.|$)"
       ],
@@ -193,7 +193,7 @@
       "summary": "A host-visible submenu surface whose visibility, structure, or child actions may depend on live menu state and `menuPath` resolution.",
       "kind": "menu-submenu",
       "entryMatchers": [
-        "^src/app/host-action-(?:catalog|actions)(?:/|\\.|$)",
+        "^dev/agent-runtime/(?:host-action-catalog|host-actions)(?:/|\\.|$)",
         "^src/features/menu-manager(?:/|\\.|$)"
       ],
       "hostSemanticDomains": [
@@ -218,8 +218,8 @@
       "summary": "A Reader sidebar view surface aligned with Zotero Reader sidebarView semantics and live sidebar buttons or panels, with edge-attached layouts following live sidebar geometry.",
       "kind": "reader-sidebar-view",
       "entryMatchers": [
-        "^src/app/host-action-catalog(?:/|\\.|$)",
-        "^src/app/host-actions(?:/|\\.|$)",
+        "^dev/agent-runtime/host-action-catalog(?:/|\\.|$)",
+        "^dev/agent-runtime/host-actions(?:/|\\.|$)",
         "^src/features/reader(?:/|\\.|$)"
       ],
       "hostSemanticDomains": [

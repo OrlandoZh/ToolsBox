@@ -1,5 +1,5 @@
-import { createZoteroJSONStateStore } from "../platform/zotero-json-state-store.js";
-import { createWindowShellManager } from "../utils/window-shell.js";
+import { createZoteroJSONStateStore } from "../../src/platform/zotero-json-state-store.js";
+import { createWindowShellManager } from "../../src/utils/window-shell.js";
 
 export const AGENT_REVIEW_WORKBENCH_COMMAND_ID = "agent.reviewWorkbench.open";
 export const AGENT_REVIEW_WORKBENCH_SHELL_PATH = "content/lib/agent-review-workbench.xhtml";
@@ -874,6 +874,60 @@ function buildDisabledSnapshot(now = () => new Date(), availability = {}) {
       staleStageCount: 0,
       lastError: normalizedAvailability.reason,
       windowOpen: false,
+    },
+  });
+}
+
+export function registerAgentReviewWorkbenchCommand({
+  config = {},
+  logger = null,
+  prefs = null,
+  i18n = null,
+  commandPalette = null,
+  openAgentReviewWorkbench = null,
+  isAgentReviewWorkbenchAvailable = null,
+} = {}) {
+  if (
+    !commandPalette
+    || typeof commandPalette.registerCommand !== "function"
+    || typeof openAgentReviewWorkbench !== "function"
+  ) {
+    return null;
+  }
+  if (
+    typeof commandPalette.hasCommand === "function"
+    && commandPalette.hasCommand(AGENT_REVIEW_WORKBENCH_COMMAND_ID)
+  ) {
+    return AGENT_REVIEW_WORKBENCH_COMMAND_ID;
+  }
+  if (
+    typeof isAgentReviewWorkbenchAvailable === "function"
+    && !isAgentReviewWorkbenchAvailable()
+  ) {
+    return null;
+  }
+
+  return commandPalette.registerCommand({
+    id: AGENT_REVIEW_WORKBENCH_COMMAND_ID,
+    label: i18n?.t?.(
+      "cleanroom-agent-review-workbench-command-label",
+      "Agent Review Workbench",
+    ) || "Agent Review Workbench",
+    category: config?.addonName || "Plugin",
+    description: i18n?.t?.(
+      "cleanroom-agent-review-workbench-command-description",
+      "Open the dev-only structured review workbench window.",
+    ) || "Open the dev-only structured review workbench window.",
+    aliases: ["agent review", "review workbench"],
+    keywords: ["review", "annotations", "evidence", "gate", "plan"],
+    condition: () => Boolean(prefs?.get?.("enabled"))
+      && (typeof isAgentReviewWorkbenchAvailable !== "function" || isAgentReviewWorkbenchAvailable()),
+    handler: () => {
+      Promise.resolve(openAgentReviewWorkbench()).catch((error) => {
+        logger?.warn?.("plugin.agentReviewWorkbench.open.failed", {
+          message: String(error?.message || error),
+        });
+      });
     },
   });
 }

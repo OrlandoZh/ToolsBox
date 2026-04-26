@@ -4,7 +4,7 @@
 
 说明：
 
-- 文档内容对应代码里的 `src/app/capability-manifest.js`
+- 文档内容对应代码里的 `dev/agent-runtime/capability-manifest.js`
 - 这里是人类可读版本，便于开发、排障和后续扩展
 
 ## 当前能力
@@ -12,12 +12,12 @@
 | 能力 ID | 中文名 | 主要入口 | 对应真机场景 | 主要责任文件 |
 |------|------|------|------|------|
 | `baseline-registration` | 基线注册 | `plugin.api.agent.collectDiagnostics()` | `baseline registration diagnostics` | `src/app/feature-composer.js` |
-| `item-presentation` | 条目展示摘要 | `plugin.api.agent.inspectItem(itemID)` | `real item selection diagnostics` | `src/app/plugin-agent.js` |
+| `item-presentation` | 条目展示摘要 | `plugin.api.agent.inspectItem(itemID)` | `real item selection diagnostics` | `dev/agent-runtime/plugin-agent.js` |
 | `notifier-sync` | 通知器联动 | `plugin.api.agent.collectDiagnostics()` | `real notifier follows item updates` | `src/core/notifier.js` |
 | `reader-summary` | Reader 摘要与交互快照 | `plugin.api.reader.openReader(...)`、`plugin.api.agent.inspectReader(itemID)` | `real reader summary on generated pdf`、`reader interaction diagnostics` | `src/features/reader.js` |
 | `reader-annotation-roundtrip` | Reader 批注回环 | `plugin.api.reader.createAnnotation(...)`、`updateAnnotation(...)`、`deleteAnnotation(...)` | `reader annotation roundtrip` | `src/features/reader.js`、`zotero-scenarios/reader-annotation-roundtrip.scenario.js` |
 | `reader-ui-state` | Reader UI 状态 | `plugin.api.reader.getReaderUIStateSnapshot(...)`、`plugin.api.agent.inspectReader(itemID)` | `reader interaction diagnostics` | `src/features/reader.js`、`zotero-scenarios/reader-interaction.scenario.js` |
-| `reader-event-hooks` | Reader 事件桥 | `plugin.api.reader.registerEventListener(...)`、`unregisterAllEventListeners()`、`plugin.api.agent.runScenario("reader-current")` | `reader event hook diagnostics`、`reader fine-grained hook diagnostics` | `src/features/reader.js`、`src/app/plugin-agent.js`、`zotero-scenarios/reader-event-hooks.scenario.js`、`zotero-scenarios/reader-fine-grained-hooks.scenario.js` |
+| `reader-event-hooks` | Reader 事件桥 | `plugin.api.reader.registerEventListener(...)`、`unregisterAllEventListeners()`、`plugin.api.agent.runScenario("reader-current")` | `reader event hook diagnostics`、`reader fine-grained hook diagnostics` | `src/features/reader.js`、`dev/agent-runtime/plugin-agent.js`、`zotero-scenarios/reader-event-hooks.scenario.js`、`zotero-scenarios/reader-fine-grained-hooks.scenario.js` |
 | `command-nonblocking` | 无阻塞动作执行 | `plugin.api.runAgentAction()` | `agent action runs without blocking UI` | `src/features/menu-command.js` |
 | `settings-governance` | 设置治理 | `plugin.api.settings.listDefinitions()` | `settings schema and preference pane diagnostics` | `src/settings/schema.js`、`src/settings/store.js`、`src/features/preference-panes.js` |
 | `multi-window-mount` | 多窗口挂载 | `plugin.api.host.listMainWindows()` | `multi-window mount diagnostics` | `src/platform/zotero-host.js`、`src/features/window-manager.js` |
@@ -91,6 +91,6 @@
 
 新增能力时，建议同步补齐这三层：
 
-1. 在 `src/app/capability-manifest.js` 添加能力元数据
+1. 在 `dev/agent-runtime/capability-manifest.js` 添加能力元数据
 2. 在 `zotero-scenarios/` 或 `zotero-tests/` 添加对应验收
 3. 在诊断/门禁链路里把该能力映射到候选文件和责任边界

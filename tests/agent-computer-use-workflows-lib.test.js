@@ -308,7 +308,7 @@ describe("Agent Computer Use Workflows Lib", () => {
     const root = createWorkflowFixture();
     try {
       const result = await listComputerUseWorkflowCatalog(root, {
-        changedPaths: ["src/app/host-actions.js"],
+        changedPaths: ["dev/agent-runtime/host-actions.js"],
         surfaceIds: ["cleanroom-preferences-pane"],
         env: {
           ...process.env,

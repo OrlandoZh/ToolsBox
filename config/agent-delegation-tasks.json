@@ -821,7 +821,7 @@
       "scopePaths": [
         "src/main.js",
         "src/app/kernel.js",
-        "src/app/plugin-agent.js",
+        "dev/agent-runtime/plugin-agent.js",
         "src/app/plugin.js",
         "scripts/zotero-agent-runtime-lib.mjs",
         "tests/kernel.test.js",
@@ -848,7 +848,7 @@
       "handoffArtifacts": [
         "src/main.js",
         "src/app/kernel.js",
-        "src/app/plugin-agent.js",
+        "dev/agent-runtime/plugin-agent.js",
         "src/app/plugin.js",
         "scripts/zotero-agent-runtime-lib.mjs"
       ]
@@ -1016,8 +1016,8 @@
       "title": "收紧 host-visible surface geometry 结果形状与显式 degrade 合同",
       "lane": "opencode-implementation-delivery",
       "scopePaths": [
-        "src/app/host-actions.js",
-        "src/app/host-action-catalog.js",
+        "dev/agent-runtime/host-actions.js",
+        "dev/agent-runtime/host-action-catalog.js",
         "tests/host-actions.test.js"
       ],
       "dependsOn": [

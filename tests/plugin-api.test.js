@@ -1,5 +1,6 @@
 import { describe, it, assert } from "./test-framework.js";
 import { createPluginAPI } from "../src/app/plugin-api.js";
+import { buildDisabledSnapshot as buildDevUnavailableReviewWorkbenchSnapshot } from "../dev/agent-review-workbench/agent-review-workbench.js";
 
 describe("Plugin API", () => {
   it("should clone review workbench snapshots before returning them", async () => {
@@ -174,6 +175,24 @@ describe("Plugin API", () => {
 
     assert.equal(snapshot.disabled, true);
     assert.equal(snapshot.diagnostics.enabled, false);
+    assert.equal(typeof snapshot.session, "object");
+    assert.equal(typeof snapshot.capabilities, "object");
+    assert.equal(snapshot.capabilities.canCreateAnnotation, false);
+    assert.equal(snapshot.capabilities.canGeneratePlan, false);
+    assert.equal(Object.keys(snapshot.stepResults).length, 6);
+    assert.deepEqual(Object.keys(snapshot.stale.byStage), Object.keys(snapshot.stepResults));
+
+    const devUnavailableSnapshot = buildDevUnavailableReviewWorkbenchSnapshot(
+      () => new Date(snapshot.generatedAt),
+      {
+        available: false,
+        reason: "review-workbench-unavailable",
+        summary: "Dev-only review runtime is unavailable in the current runtime.",
+      },
+    );
+    assert.deepEqual(snapshot.session, devUnavailableSnapshot.session);
+    assert.deepEqual(snapshot.capabilities, devUnavailableSnapshot.capabilities);
+    assert.deepEqual(Object.keys(snapshot.stepResults), Object.keys(devUnavailableSnapshot.stepResults));
     assert.equal(plan.ok, false);
     assert.equal(plan.reason, "review-workbench-unavailable");
     assert.equal(plan.snapshot.disabled, true);

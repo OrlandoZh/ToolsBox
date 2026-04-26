@@ -46,6 +46,7 @@ function removeDirIfExists(dirPath) {
 }
 
 function assertPackageArchiveClean(xpiPath, options = {}) {
+  const config = readJSON(path.join(projectRoot, "config", "addon.config.json"));
   const listing = execFileSync("unzip", ["-Z1", xpiPath], {
     cwd: projectRoot,
     encoding: "utf-8",
@@ -58,8 +59,27 @@ function assertPackageArchiveClean(xpiPath, options = {}) {
   assert.equal(hasEntry((entry) => entry.endsWith("/.DS_Store") || entry === ".DS_Store"), false);
   assert.equal(hasEntry((entry) => entry.includes("__MACOSX/")), false);
   assert.equal(hasEntry((entry) => entry.endsWith("/Thumbs.db") || entry === "Thumbs.db"), false);
-  if (options.buildReportExcluded) {
-    assert.equal(hasEntry((entry) => entry === "build-report.json"), false);
+  assert.equal(hasEntry((entry) => entry === "build-report.json"), false);
+
+  const bundleSource = execFileSync("unzip", ["-p", xpiPath, `content/scripts/${config.addonRef}.js`], {
+    cwd: projectRoot,
+    encoding: "utf-8",
+    maxBuffer: 100 * 1024 * 1024,
+    stdio: "pipe",
+  });
+  assert.equal(bundleSource.includes("content/lib/agent-review-workbench.xhtml"), false);
+  assert.equal(bundleSource.includes("createReviewWorkbenchStateStore"), false);
+  assert.equal(bundleSource.includes("AGENT_REVIEW_WORKBENCH_WINDOW_CLEANUP_KEY"), false);
+  assert.equal(bundleSource.includes("REVIEW_WORKBENCH_SCOPE_SNAPSHOT"), false);
+  assert.equal(bundleSource.includes("Runtime compact review workbench provider is available."), false);
+  assert.equal(bundleSource.includes("BASELINE_ITEM_PANE_L10N"), false);
+  assert.equal(bundleSource.includes("Host Action catalog returns source-driven descriptors"), false);
+  assert.equal(bundleSource.includes("runtime.probeWasmKernel"), false);
+  assert.equal(bundleSource.includes("Open Preference Pane"), false);
+  assert.equal(bundleSource.includes("agent-runtime"), false);
+  assert.equal(bundleSource.includes("ai-service"), false);
+  if (options.expectDisabledStubText) {
+    assert.equal(bundleSource.includes("Dev-only runtime is excluded from packaged runtime."), true);
   }
 }
 
@@ -351,6 +371,35 @@ describe("Toolchain Scripts", () => {
     assert.ok(releaseManifest.xpiName.endsWith(".xpi"));
   });
 
+  it("should build a standard package archive without dev metadata reports", () => {
+    const config = readJSON(path.join(projectRoot, "config", "addon.config.json"));
+    const distRoot = path.join(projectRoot, "dist");
+    const buildRoot = path.join(projectRoot, "build", config.addonRef);
+    const xpiName = `${config.addonRef}-${config.addonVersion}.xpi`;
+    const xpiPath = path.join(distRoot, xpiName);
+    const releaseManifestPath = path.join(distRoot, "release-manifest.json");
+    const updateManifestPath = path.join(distRoot, "update.json");
+
+    removeDirIfExists(buildRoot);
+    removeIfExists(xpiPath);
+    removeIfExists(releaseManifestPath);
+    removeIfExists(updateManifestPath);
+
+    execFileSync("node", ["scripts/package.mjs", "--skip-release-metadata"], {
+      cwd: projectRoot,
+      stdio: "pipe",
+    });
+
+    assert.ok(fs.existsSync(xpiPath));
+    assert.equal(fs.existsSync(releaseManifestPath), false);
+    assert.equal(fs.existsSync(updateManifestPath), false);
+    assert.ok(fs.existsSync(path.join(buildRoot, "build-report.json")));
+    assertPackageArchiveClean(xpiPath, { expectDisabledStubText: true });
+
+    removeDirIfExists(buildRoot);
+    removeIfExists(xpiPath);
+  });
+
   it("should build a manual encrypted package variant without writing release metadata", () => {
     const config = readJSON(path.join(projectRoot, "config", "addon.config.json"));
     const distRoot = path.join(projectRoot, "dist");
@@ -425,7 +474,7 @@ describe("Toolchain Scripts", () => {
     const protectedBundleSource = fs.readFileSync(protectedBundlePath, "utf-8");
     assert.ok(protectedBundleSource.includes("__CLEANROOM_SHIELDED_BUNDLE__"));
     assert.equal(protectedBundleSource.includes("plugin.api.agent.runHostAction"), false);
-    assert.equal(protectedBundleSource.includes("src/app/host-actions.js"), false);
+    assert.equal(protectedBundleSource.includes("dev/agent-runtime/host-actions.js"), false);
     assert.equal(protectedBundleSource.includes("overlay description"), false);
     assertPackageArchiveClean(xpiPath, { buildReportExcluded: true });
 
@@ -573,8 +622,9 @@ describe("Toolchain Scripts", () => {
       "__MACOSX/*",
       "Thumbs.db",
       "*/Thumbs.db",
+      "build-report.json",
     ];
-    const protectedZipExcludes = [...packageZipMetadataExcludes, "build-report.json"];
+    const protectedZipExcludes = [...packageZipMetadataExcludes];
 
     assert.deepEqual(resolvePackageBuildEnv({}), packageBuildEnv);
     assert.deepEqual(resolvePackageBuildEnv({ encryptBundle: true }), {

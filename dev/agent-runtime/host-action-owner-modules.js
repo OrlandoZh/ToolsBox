@@ -5,20 +5,20 @@ function freezeModules(modules = []) {
 export const HOST_ACTION_OWNER_MODULES = Object.freeze({
   hostBridge: freezeModules([
     "src/platform/zotero-host.js",
-    "src/app/host-actions.js",
+    "dev/agent-runtime/host-actions.js",
   ]),
   actionHostBridge: freezeModules([
-    "src/app/host-actions.js",
+    "dev/agent-runtime/host-actions.js",
     "src/platform/zotero-host.js",
   ]),
   readerActionBridge: freezeModules([
     "src/features/reader.js",
-    "src/app/host-actions.js",
+    "dev/agent-runtime/host-actions.js",
   ]),
   menuBridge: freezeModules([
     "src/platform/zotero-host.js",
     "src/features/menu-manager.js",
-    "src/app/host-actions.js",
+    "dev/agent-runtime/host-actions.js",
   ]),
   hostOnly: freezeModules([
     "src/platform/zotero-host.js",
@@ -26,13 +26,13 @@ export const HOST_ACTION_OWNER_MODULES = Object.freeze({
   reactWindowActionBridge: freezeModules([
     "src/features/react-ui-demo.js",
     "src/utils/window-shell.js",
-    "src/app/host-actions.js",
+    "dev/agent-runtime/host-actions.js",
   ]),
   wasmProbe: freezeModules([
     "src/features/wasm-kernel-probe.js",
-    "src/app/host-actions.js",
+    "dev/agent-runtime/host-actions.js",
   ]),
   catalogOnly: freezeModules([
-    "src/app/host-action-catalog.js",
+    "dev/agent-runtime/host-action-catalog.js",
   ]),
 });

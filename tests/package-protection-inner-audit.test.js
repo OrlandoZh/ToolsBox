@@ -74,7 +74,7 @@ describe("Package Protection Inner Audit", () => {
     assert.equal(options.channel, "stable");
   });
 
-  it("should capture decrypted inner source and descriptor overlay without executing payload", async () => {
+  it("should capture decrypted inner source without exposing descriptor overlay metadata", async () => {
     const loaderSource = buildLoaderSource(`
 globalThis.__INNER_EXECUTED__ = true;
 globalThis.bootstrapPlugin = async function bootstrapPlugin() {
@@ -99,12 +99,8 @@ globalThis.bootstrapPlugin = async function bootstrapPlugin() {
     assert.equal(extracted.decryptedSource.includes("__INNER_EXECUTED__"), true);
     assert.equal(extracted.runtimeVariant, "shielded-descriptor-bind");
     assert.equal(extracted.packageProtection.variant, "shielded-descriptor-bind");
-    assert.equal(Array.isArray(extracted.overlayValue), true);
-    assert.equal(extracted.overlayValue.length, 1);
-    assert.equal(extracted.overlayValue[0].id, "runtime-bridge-report");
-    assert.deepEqual(extracted.overlayValue[0].ownedBy, ["src/app/plugin.js"]);
-    assert.deepEqual(extracted.overlayValue[0].entrypoints, ["bootstrapPlugin"]);
-    assert.deepEqual(extracted.overlayValue[0].successSignals, ["reader-ready"]);
+    assert.equal(extracted.overlayValue, null);
+    assert.equal(typeof extracted.packageProtection.overlayResolver, "undefined");
   });
 
   it("should rate inner bundle readability conservatively", async () => {

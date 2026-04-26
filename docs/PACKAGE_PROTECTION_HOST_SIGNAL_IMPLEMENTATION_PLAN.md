@@ -76,8 +76,8 @@
 
 当前应用层已经有：
 
-- `src/app/capability-manifest.js`
-- `src/app/capability-manifest-protected.js`
+- `dev/agent-runtime/capability-manifest.js`
+- `dev/agent-runtime/capability-manifest-protected.js`
 
 这说明仓库已经接受了一个关键前提：
 
@@ -193,7 +193,7 @@
   - `__CLEANROOM_TEMPLATE_RUNTIME__.hostBinding`
 - diagnostics sink:
   - `src/app/plugin.js` 的 `getProtectionSummary()` 汇总链
-  - `src/app/plugin-agent.js` 的 `runAgentSelfCheck()` 输出链
+  - `dev/agent-runtime/plugin-agent.js` 的 `runAgentSelfCheck()` 输出链
 
 当前阶段只允许新增：
 
@@ -297,7 +297,7 @@ diagnostics 至少应回报：
 
 建议新增：
 
-- `src/app/capability-manifest-overlay.js`
+- `dev/agent-runtime/capability-manifest-overlay.js`
   或
 - build 时生成一个 stage2 descriptor blob
 
@@ -351,10 +351,10 @@ diagnostics 至少应回报：
 
 - `src/app/plugin.js`
   - 继续作为 runtime summary 汇总入口
-- `src/app/plugin-agent.js`
+- `dev/agent-runtime/plugin-agent.js`
   - 继续作为 self-check / diagnostics 输出入口
-- `src/app/capability-manifest.js`
-- `src/app/capability-manifest-protected.js`
+- `dev/agent-runtime/capability-manifest.js`
+- `dev/agent-runtime/capability-manifest-protected.js`
   - 继续作为 descriptor split 的基础
 - `scripts/package-protection-lib.mjs`
 - `scripts/package.mjs`

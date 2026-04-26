@@ -1,4 +1,4 @@
-import { isOptionalBundleEnabled } from "./optional-bundles.js";
+import { isOptionalBundleEnabled } from "../../src/app/optional-bundles.js";
 import { HOST_ACTION_IDS } from "./host-action-ids.js";
 import { HOST_ACTION_OWNER_MODULES } from "./host-action-owner-modules.js";
 

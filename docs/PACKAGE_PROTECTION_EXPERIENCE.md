@@ -246,8 +246,8 @@
 ### 4.3 protected-only host-action semantic scrub 已验证可行
 
 - 截至 `2026-04-19`，protected build 已把 `host action` 的连续字符串 ID 抽成独立语义模块，并在 protected 分支下改成 tokenized alias：
-  - `src/app/host-action-ids.js`
-  - `src/app/host-action-ids-protected.js`
+  - `dev/agent-runtime/host-action-ids.js`
+  - `dev/agent-runtime/host-action-ids-protected.js`
 - 同一轮还新增了 `host-action-catalog-protected.js`，只保留运行时需要的最小字段：
   - `id`
   - `status`
@@ -543,6 +543,8 @@
 - 如果后续目标升级为“连高层架构都尽量不让 AI 单轮看懂”，才需要进入下一波更重的 hardening
 
 ### 10. `shielded-descriptor-bind` 的真实收益不在 raw export，而在 host-binding-aware runtime descriptor recovery
+
+> Current boundary note: dev-only 内容剥离后，`shielded-descriptor-bind` / `shielded-surface-scrub-wasm-stage2-derive` 仍保留为历史实验入口，但产品包不再从 `dev/agent-runtime/capability-manifest.js` 派生或恢复 capability overlay。下面关于 runtime descriptor recovery 的记录只作为旧实验结论保留，不再代表当前默认 package boundary。
 
 截至 `2026-04-16`，`shielded-descriptor-bind` 这一条手动实验分支已经补齐一个真实实现缺口：
 
@@ -1076,5 +1078,5 @@ npm run package:protection:perf -- --channel stable
 - [scripts/package.mjs](./../scripts/package.mjs)
 - [scripts/release-install-smoke.mjs](./../scripts/release-install-smoke.mjs)
 - [src/app/plugin-api.js](./../src/app/plugin-api.js)
-- [src/app/plugin-agent.js](./../src/app/plugin-agent.js)
+- [dev/agent-runtime/plugin-agent.js](./../dev/agent-runtime/plugin-agent.js)
 - [PACKAGE_PROTECTION_HOST_WEAK_BINDING_V1.md](./PACKAGE_PROTECTION_HOST_WEAK_BINDING_V1.md)

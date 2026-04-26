@@ -1,4 +1,4 @@
-import { createCapabilityManifest } from "../src/app/capability-manifest.js";
+import { createCapabilityManifest } from "../dev/agent-runtime/capability-manifest.js";
 
 function uniqueStrings(values) {
   return Array.from(new Set(

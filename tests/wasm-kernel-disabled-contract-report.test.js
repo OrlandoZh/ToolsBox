@@ -104,7 +104,7 @@ export function createPlugin({ createWasmKernelProbeImpl } = {}) {
 }
 `);
 
-  writeText(path.join(projectRoot, "src", "app", "host-actions.js"), `
+  writeText(path.join(projectRoot, "dev", "agent-runtime", "host-actions.js"), `
 export function createHostActionRunner({
   wasmKernelProbe,
   getWasmKernelProbe,

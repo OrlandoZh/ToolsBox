@@ -65,6 +65,7 @@
    - UI 路线固定为 `standalone window`；V1 只做结构化批注、deterministic plan builder 与验证导航，不接真实 AI provider、不启用 React lane、不执行任意源码 patch
    - 当前 validation decision 固定为 `visual-recommended`：先收口 `window lifecycle + functional smoke + JSON API`，视觉证据作为补证而非主阻断
    - 本轮 hardening 收口点固定为 shell lost-tracking 时的 live-window reuse/close fallback、host action execution summary allowlist 脱敏、standalone shell 中文审查文案、monitor/gate 的 `reviewWorkbench` acceptance / external blocker 分离，以及 “plugin-local fallback command ≠ host-visible command palette entry” 的触发语义收紧
+   - 当前 package boundary 继续固定为“dev-only 只在开发态引入”：标准 / protected XPI 不携带 workbench 静态文件、`build-report.json`、`agent-runtime` / `ai-service` optional metadata、dev capability overlay 或可恢复 `ownedBy / entrypoints / successSignals`；validation matcher 不再用 broad `dev/agent-runtime` 覆盖 host-visible action 文件，`host-actions` / `host-action-catalog` / `plugin-agent` 仍回到 `ZOTERO-HOST-POLISH-WAVE-001` 的 `visual-required` 边界
    - 该工作台不是产品内用户功能，也不是 current truth 本身；它只消费 current truth / evidence 的 compact snapshot 作为交互式审查层
 4. 已收口 hardening wave：`ZOTERO-DOM-CONTRACT-WAVE-001`
    - 范围固定为 `preference pane / item pane / reader`
@@ -269,6 +270,7 @@
 - `AGENT-REVIEW-WORKBENCH-WAVE-001` 的 v1 边界已冻结：不接真实 AI provider、不启用 React optional lane、不提升为产品内用户功能、不自动应用任意源码 patch；若批注指向源码修复，仍只允许链接到现有白名单 patch/autofix 机制或落回 `manual-investigation`
 - 当前该 wave 的 validation decision 固定为 `visual-recommended`：优先证明 command entry、window reuse/focus、close cleanup、profile-local JSON state store、annotation CRUD、deterministic plan mapping 与 diagnostics summary 已闭环；standalone window 截图只作为补证，不替代功能验收
 - 本轮 `AGENT-REVIEW-WORKBENCH-WAVE-001` 收口继续限定在 workbench 自身工程质量：已把 shell manager 丢失 active window 时的 live-window reuse/focus/close/shutdown fallback、host action `observedStateSummary` allowlist 摘要、standalone shell 中文审查文案、以及 monitor/gate 中 `reviewWorkbench.windowLifecycle/snapshotProvider/annotationCrud/planBuilder` acceptance 与旧 `watch` / Reader visual blocker externalization 接入当前验收口径
+- 当前 package boundary 已收紧：标准 / protected XPI 都不得携带 `build-report.json`、dev-only workbench 静态文件、`agent-runtime` / `ai-service` optional metadata、dev capability overlay 或可恢复 `ownedBy / entrypoints / successSignals`；`descriptor-bind` / `stage2-derive` 继续保留实验命令入口，但不再从 `dev/agent-runtime/capability-manifest.js` 派生可恢复 overlay
 - Codex Computer Use 真机验证已作为 default-disabled optional validation lane 建立：`config/codex-computer-use-validation.json` 固定 `enabledByDefault=false`、`gateEffect=non-blocking`、`requiresExplicitUserRequest=true`，手动入口为 `npm run agent:computer-use:validate -- --user-requested --target "<目标>"`；它只生成 / 记录 `dist/agent-computer-use-validation.{json,md}`，不进入 `check`、`agent:zotero:e2e`、`agent:zotero:loop`、`agent:gate`、`agent:gate:release` 或 `agent:pipeline`
 - `ZOTERO-DOM-CONTRACT-WAVE-001` 已收口完成：覆盖 `preference pane / item pane / reader` 三条既有宿主面，新增 `domContractReport` route-aware 摘要接入 `agent:zotero:e2e -> agent:monitor / dashboard / gate`，三条 route 均通过；当前保持 advisory + non-blocking，不重开旧的 host-polish blocker
 - 当前 `preference pane` 窄宽度 hardening 与右侧 host-visible surface capture 链已全部对齐：以 Zotero 偏好设置宿主窗口最小尺寸 `800x600` 为 host boundary，当前接受“geometry ready + root width observed + no horizontal overflow”的稳定证据，不再把短暂的 geometry settle 超时单独抬成 blocker
@@ -589,6 +591,7 @@
   - `HOST-HIGH-201 / HOST-LOW-301~303` 已完成；`ZOTERO-HOST-POLISH-WAVE-001` 当前转为 completed wave 基线，后续只在 truth 变化或新 wave 启动时再复开
 - `dev-only review workbench`
   - `AGENT-REVIEW-WORKBENCH-WAVE-001` 当前 active：只覆盖 `dev-only review workbench`、`JSON state store`、`workbench command registration / trigger semantics`、`route-aware validation summary` 与 `workbench acceptance telemetry`，固定走 `standalone window + plain JS/HTML`，并以 `functional-first -> trigger semantics -> window lifecycle -> structured annotation -> deterministic plan -> workbench acceptance telemetry -> gate summary` 作为验收主线；当前模板 runtime 下若 `agent.reviewWorkbench.open` 只以 plugin-local fallback command 暴露，则不得把注册通过误判成真实 `command palette` / Prompt host-visible 入口通过
+  - package boundary 固定为产品包不携带 dev-only metadata：`build-report.json` 不进入 XPI，`descriptor-bind` / `stage2-derive` 不再恢复 dev capability overlay，`dev/agent-runtime/host-actions.js` 等 host-visible action 文件不被 workbench override 降级
 - `completed dom contract baseline`
   - `ZOTERO-DOM-CONTRACT-WAVE-001` 已完成：继续通过 `domContractReport` 保留 route-aware DOM contract advisory，不把已收口批次重新拉回 blocker
 - `optional bundle baseline`

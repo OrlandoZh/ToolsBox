@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { createCapabilityManifest as createSourceCapabilityManifest } from "../src/app/capability-manifest.js";
 import {
   createScriptError,
   wrapScriptError,
@@ -120,69 +119,17 @@ function encryptBuffer(buffer) {
   };
 }
 
-function normalizeStringArray(values) {
-  return (Array.isArray(values) ? values : [])
-    .map((item) => String(item || "").trim())
-    .filter(Boolean);
-}
-
-function normalizeDescriptorOverlay(descriptorOverlay = null) {
-  return (Array.isArray(descriptorOverlay) ? descriptorOverlay : [])
-    .map((item) => {
-      const id = String(item?.id || "").trim();
-      if (!id) {
-        return null;
-      }
-
-      const normalized = { id };
-      if (typeof item?.label === "string" && item.label.trim()) {
-        normalized.label = item.label.trim();
-      }
-      if (typeof item?.category === "string" && item.category.trim()) {
-        normalized.category = item.category.trim();
-      }
-      if (typeof item?.description === "string" && item.description.trim()) {
-        normalized.description = item.description.trim();
-      }
-
-      for (const key of ["entrypoints", "ownedBy", "successSignals"]) {
-        const normalizedValues = normalizeStringArray(item?.[key]);
-        if (normalizedValues.length > 0) {
-          normalized[key] = normalizedValues;
-        }
-      }
-
-      return Object.keys(normalized).length > 1 ? normalized : null;
-    })
-    .filter(Boolean);
-}
-
-export function createCapabilityManifestDescriptorOverlay({ config } = {}) {
-  const manifest = createSourceCapabilityManifest({ config });
-  return normalizeDescriptorOverlay(manifest);
-}
-
 function buildProtectedBundleLoaderSource({
   keyBase64,
   ivBase64,
   encryptedPayloadBase64,
   variant,
-  descriptorOverlay = null,
 }) {
   const protectedVariant = resolveProtectedBundleVariant(variant);
   const marker = resolveProtectedBundleMarker(protectedVariant);
   const payloadSegments = buildSegmentedBase64Literal(encryptedPayloadBase64, { segmentLength: 96 });
   const keySegments = buildSegmentedBase64Literal(keyBase64, { segmentLength: 24 });
   const ivSegments = buildSegmentedBase64Literal(ivBase64, { segmentLength: 12 });
-  const overlayPayloadSegments = descriptorOverlay?.encryptedPayloadBase64
-    ? buildSegmentedBase64Literal(descriptorOverlay.encryptedPayloadBase64, { segmentLength: 96 })
-    : "null";
-  const overlayKeySegments = descriptorOverlay?.keyBase64
-    ? buildSegmentedBase64Literal(descriptorOverlay.keyBase64, { segmentLength: 24 })
-    : "null";
-  const overlayIVSegments = descriptorOverlay?.ivBase64
-    ? buildSegmentedBase64Literal(descriptorOverlay.ivBase64, { segmentLength: 12 })
-    : "null";
   return `/* ${marker} */
 (function (__global) {
   var __bundleMeta = {
@@ -192,12 +139,8 @@ function buildProtectedBundleLoaderSource({
   var __payloadSegments = ${payloadSegments};
   var __keySegments = ${keySegments};
   var __ivSegments = ${ivSegments};
-  var __overlayPayloadSegments = ${overlayPayloadSegments};
-  var __overlayKeySegments = ${overlayKeySegments};
-  var __overlayIVSegments = ${overlayIVSegments};
   var __protectedBootstrapPromise = null;
   var __protectedBootstrap = null;
-  var __overlayValue = null;
   var __decodeMethod = null;
 
   function __now() {
@@ -404,35 +347,6 @@ function buildProtectedBundleLoaderSource({
     runtimeFactory.call(__global, __global, __global, __global, __global);
   }
 
-  async function __loadDescriptorOverlay(cryptoObject, decoder) {
-    if (__overlayValue) {
-      return __cloneJSON(__overlayValue);
-    }
-
-    if (!__overlayPayloadSegments || !__overlayKeySegments || !__overlayIVSegments) {
-      return null;
-    }
-
-    try {
-      var overlayPayload = __base64ToBytes(__joinSegments(__overlayPayloadSegments));
-      var overlayKeyBytes = __base64ToBytes(__joinSegments(__overlayKeySegments));
-      var overlayIVBytes = __base64ToBytes(__joinSegments(__overlayIVSegments));
-      var overlayKey = await cryptoObject.subtle.importKey('raw', overlayKeyBytes, { name: 'AES-GCM' }, false, ['decrypt']);
-      var overlayBuffer = await cryptoObject.subtle.decrypt({ name: 'AES-GCM', iv: overlayIVBytes }, overlayKey, overlayPayload);
-      var overlaySource = decoder.decode(new Uint8Array(overlayBuffer));
-      var overlay = JSON.parse(overlaySource);
-
-      if (!Array.isArray(overlay)) {
-        return null;
-      }
-
-      __overlayValue = overlay;
-      return __cloneJSON(__overlayValue);
-    } catch (error) {
-      return null;
-    }
-  }
-
   async function __loadProtectedBootstrap() {
     if (__protectedBootstrap) {
       return __protectedBootstrap;
@@ -454,7 +368,6 @@ function buildProtectedBundleLoaderSource({
         var decoder = new (__getTextDecoder())();
         var decryptedSource = decoder.decode(new Uint8Array(decryptedBuffer));
         var previousBootstrap = __global.bootstrapPlugin;
-        var overlayResolver = null;
         var evalStartedAt = __now();
 
         __global.bootstrapPlugin = undefined;
@@ -466,13 +379,6 @@ function buildProtectedBundleLoaderSource({
         }
 
         var evalDurationMs = __now() - evalStartedAt;
-        var overlay = await __loadDescriptorOverlay(cryptoObject, decoder);
-
-        if (overlay) {
-          overlayResolver = function () {
-            return __cloneJSON(__overlayValue);
-          };
-        }
 
         __recordPackageProtectionState({
           active: true,
@@ -483,9 +389,6 @@ function buildProtectedBundleLoaderSource({
           evalDurationMs: Math.max(0, evalDurationMs),
           prepareDurationMs: Math.max(0, __now() - prepareStartedAt),
         });
-        if (overlayResolver) {
-          __getPackageProtectionState().overlayResolver = overlayResolver;
-        }
 
         if (typeof __global.bootstrapPlugin !== 'function') {
           __global.bootstrapPlugin = previousBootstrap;
@@ -558,22 +461,13 @@ export function protectBundleSource(sourceCode, options = {}) {
   const generatedAt = String(options.generatedAt || new Date().toISOString());
   const variant = resolveProtectedBundleVariant(options.variant);
   const encryptedBundle = encryptBuffer(sourceBuffer);
-  const descriptorOverlay = normalizeDescriptorOverlay(options.descriptorOverlay);
-  const encryptedDescriptorOverlay = descriptorOverlay.length > 0
-    ? encryptBuffer(Buffer.from(JSON.stringify(descriptorOverlay), "utf-8"))
-    : null;
+  const descriptorOverlay = [];
+  const encryptedDescriptorOverlay = null;
   const loaderSource = buildProtectedBundleLoaderSource({
     keyBase64: encodeBase64(encryptedBundle.key),
     ivBase64: encodeBase64(encryptedBundle.iv),
     encryptedPayloadBase64: encodeBase64(encryptedBundle.ciphertext),
     variant,
-    descriptorOverlay: encryptedDescriptorOverlay
-      ? {
-        keyBase64: encodeBase64(encryptedDescriptorOverlay.key),
-        ivBase64: encodeBase64(encryptedDescriptorOverlay.iv),
-        encryptedPayloadBase64: encodeBase64(encryptedDescriptorOverlay.ciphertext),
-      }
-      : null,
   });
 
   return {

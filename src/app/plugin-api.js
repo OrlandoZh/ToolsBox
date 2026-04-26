@@ -1,8 +1,18 @@
-import { buildDisabledSnapshot } from "../features/agent-review-workbench.js";
+import { buildDisabledReviewWorkbenchSnapshot as buildDisabledReviewWorkbenchContractSnapshot } from "./review-workbench-disabled-contract.js";
 
 const SERVICE_HUB_API_KEY = ["service", "Registry"].join("");
 const AGENT_ACTION_API_KEY = ["run", "Agent", "Action"].join("");
 const PACKAGE_PROTECTION_SUMMARY_API_KEY = ["get", "Package", "Protection", "Summary"].join("");
+
+function buildDisabledReviewWorkbenchSnapshot(reason = "review-workbench-unavailable") {
+  return buildDisabledReviewWorkbenchContractSnapshot(
+    () => new Date(),
+    {
+      reason,
+      summary: "Dev-only review runtime is unavailable in the current runtime.",
+    },
+  );
+}
 
 export function createPluginAPI({
   host,
@@ -50,11 +60,7 @@ export function createPluginAPI({
   }
 
   function createDisabledReviewWorkbenchSnapshot(reason = "review-workbench-unavailable") {
-    return buildDisabledSnapshot(() => new Date(), {
-      available: false,
-      reason,
-      summary: "Agent Review Workbench is unavailable in the current runtime.",
-    });
+    return buildDisabledReviewWorkbenchSnapshot(reason);
   }
 
   return Object.freeze({

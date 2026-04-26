@@ -64,8 +64,8 @@ export const PACKAGE_PROTECTION_MODULE_RECOVERY_ANCHORS = Object.freeze([
   },
   {
     id: "src-app-host-action-catalog",
-    label: "src/app/host-action-catalog.js",
-    needle: "src/app/host-action-catalog.js",
+    label: "dev/agent-runtime/host-action-catalog.js",
+    needle: "dev/agent-runtime/host-action-catalog.js",
     category: "module-recovery",
   },
   {

@@ -3,7 +3,7 @@ import {
   createCapabilityManifest,
   findCapabilityById,
   getCapabilityManifestView,
-} from "../src/app/capability-manifest-protected.js";
+} from "../dev/agent-runtime/capability-manifest-protected.js";
 
 describe("Protected Capability Manifest", () => {
   it("should default to limited protected baseline without richer overlay", () => {
@@ -42,7 +42,7 @@ describe("Protected Capability Manifest", () => {
       category: "feature",
       description: "overlay description",
       entrypoints: ["plugin.api.agent.runHostAction(actionId, payload)"],
-      ownedBy: ["src/app/host-actions.js"],
+      ownedBy: ["dev/agent-runtime/host-actions.js"],
       successSignals: ["Host actions return readiness details"],
     }];
     const view = getCapabilityManifestView({
@@ -89,7 +89,7 @@ describe("Protected Capability Manifest", () => {
       category: "feature",
       description: "验证 host action overlay 已按宿主弱绑定解锁。",
       entrypoints: ["plugin.api.agent.runHostAction(actionId, payload)"],
-      ownedBy: ["src/app/host-actions.js", "src/app/plugin-agent.js"],
+      ownedBy: ["dev/agent-runtime/host-actions.js", "dev/agent-runtime/plugin-agent.js"],
       successSignals: ["Host actions return readiness details"],
       ignoredField: "should-not-pass-through",
     }];
@@ -128,7 +128,7 @@ describe("Protected Capability Manifest", () => {
       category: "feature",
       description: "验证 wasm stage2 derive gate。",
       entrypoints: ["plugin.api.agent.runHostAction(actionId, payload)"],
-      ownedBy: ["src/app/host-actions.js"],
+      ownedBy: ["dev/agent-runtime/host-actions.js"],
       successSignals: ["Host actions return readiness details"],
     }];
     const protectionSummary = {
@@ -167,7 +167,7 @@ describe("Protected Capability Manifest", () => {
       category: "feature",
       description: "验证 wasm stage2 derive gate。",
       entrypoints: ["plugin.api.agent.runHostAction(actionId, payload)"],
-      ownedBy: ["src/app/host-actions.js"],
+      ownedBy: ["dev/agent-runtime/host-actions.js"],
       successSignals: ["Host actions return readiness details"],
     }];
     const protectionSummary = {

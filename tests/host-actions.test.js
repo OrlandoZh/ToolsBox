@@ -1,9 +1,9 @@
 import { describe, it, assert } from "./test-framework.js";
-import { createHostActionRunner } from "../src/app/host-actions.js";
+import { createHostActionRunner } from "../dev/agent-runtime/host-actions.js";
 import {
   getHostActionDescriptor,
   listHostActionDescriptors,
-} from "../src/app/host-action-catalog.js";
+} from "../dev/agent-runtime/host-action-catalog.js";
 import {
   REACT_UI_DEMO_SHELL_PATH,
   WASM_KERNEL_PROBE_PATH,

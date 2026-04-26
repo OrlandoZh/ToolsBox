@@ -15,8 +15,8 @@
 - Supports Visual Evidence: `true`
 - Entry Matchers:
   - `^src/features/preference-panes(?:/|\.|$)`
-  - `^src/app/host-action-catalog(?:/|\.|$)`
-  - `^src/app/host-actions(?:/|\.|$)`
+  - `^dev/agent-runtime/host-action-catalog(?:/|\.|$)`
+  - `^dev/agent-runtime/host-actions(?:/|\.|$)`
   - `^src/app/feature-composer(?:/|\.|$)`
   - `^addon-static/content/.*preferences.*\.xhtml$`
 - Host Semantic Domains:
@@ -63,8 +63,8 @@
 - Summary: A Zotero Item Pane sidenav surface that switches a real pane button and confirms the target pane becomes visible.
 - Supports Visual Evidence: `true`
 - Entry Matchers:
-  - `^src/app/host-action-catalog(?:/|\.|$)`
-  - `^src/app/host-actions(?:/|\.|$)`
+  - `^dev/agent-runtime/host-action-catalog(?:/|\.|$)`
+  - `^dev/agent-runtime/host-actions(?:/|\.|$)`
   - `^src/features/item-pane(?:/|\.|$)`
   - `^src/platform/zotero-host(?:/|\.|$)`
 - Host Semantic Domains:
@@ -146,7 +146,7 @@
 - Summary: A host-visible collection menu action aligned with Zotero collection selection semantics and main/library/collection target behavior.
 - Supports Visual Evidence: `true`
 - Entry Matchers:
-  - `^src/app/host-action-(?:catalog|actions)(?:/|\.|$)`
+  - `^dev/agent-runtime/(?:host-action-catalog|host-actions)(?:/|\.|$)`
   - `^src/features/menu-manager(?:/|\.|$)`
   - `^src/platform/zotero-host(?:/|\.|$)`
 - Host Semantic Domains:
@@ -168,7 +168,7 @@
 - Summary: A host-visible submenu surface whose visibility, structure, or child actions may depend on live menu state and `menuPath` resolution.
 - Supports Visual Evidence: `true`
 - Entry Matchers:
-  - `^src/app/host-action-(?:catalog|actions)(?:/|\.|$)`
+  - `^dev/agent-runtime/(?:host-action-catalog|host-actions)(?:/|\.|$)`
   - `^src/features/menu-manager(?:/|\.|$)`
 - Host Semantic Domains:
   - `menu-manager`
@@ -189,8 +189,8 @@
 - Summary: A Reader sidebar view surface aligned with Zotero Reader sidebarView semantics and live sidebar buttons or panels, with edge-attached layouts following live sidebar geometry.
 - Supports Visual Evidence: `true`
 - Entry Matchers:
-  - `^src/app/host-action-catalog(?:/|\.|$)`
-  - `^src/app/host-actions(?:/|\.|$)`
+  - `^dev/agent-runtime/host-action-catalog(?:/|\.|$)`
+  - `^dev/agent-runtime/host-actions(?:/|\.|$)`
   - `^src/features/reader(?:/|\.|$)`
 - Host Semantic Domains:
   - `reader-events`

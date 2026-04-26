@@ -794,7 +794,7 @@ export async function inspectWasmKernelDisabledContract(projectRootPath = projec
   const addonConfigPath = path.join(absoluteProjectRoot, "config", "addon.config.json");
   const packagePath = path.join(absoluteProjectRoot, "package.json");
   const pluginSourcePath = path.join(absoluteProjectRoot, "src", "app", "plugin.js");
-  const hostActionsSourcePath = path.join(absoluteProjectRoot, "src", "app", "host-actions.js");
+  const hostActionsSourcePath = path.join(absoluteProjectRoot, "dev", "agent-runtime", "host-actions.js");
   const addonConfig = await readJSONFile(addonConfigPath, {
     missingCategory: "environment",
     invalidCategory: "validation",
@@ -813,7 +813,7 @@ export async function inspectWasmKernelDisabledContract(projectRootPath = projec
   const hostActionsSource = await readTextIfExists(hostActionsSourcePath);
 
   if (typeof pluginSource !== "string" || typeof hostActionsSource !== "string") {
-    throw createScriptError("environment", "Missing plugin.js or host-actions.js source file", {
+    throw createScriptError("environment", "Missing plugin.js or dev host-actions.js source file", {
       failedStage: "read-source-contract",
       details: {
         pluginSourcePath,

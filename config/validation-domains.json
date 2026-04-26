@@ -40,7 +40,7 @@
         "^src/services/(?:|.*)",
         "^src/settings/(?:|.*)",
         "^src/app/product-runtime(?:/|\\.|$)",
-        "^src/app/capability-manifest(?:/|\\.|$)",
+        "^dev/agent-runtime/capability-manifest(?:/|\\.|$)",
         "^src/utils/(?:react-surface-bridge|surface-window-mode)\\.js$",
         "^types/(?!features\\.d\\.ts$)(?:|.*)"
       ],

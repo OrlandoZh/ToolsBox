@@ -35,6 +35,7 @@ const projectRoot = path.resolve(__dirname, "..");
 
 const configPath = path.join(projectRoot, "config", "addon.config.json");
 const staticRoot = path.join(projectRoot, "addon-static");
+const devOnlyStaticRoot = path.join(projectRoot, "dev", "agent-review-workbench", "static");
 const srcRoot = path.join(projectRoot, "src");
 const scriptStartedAt = Date.now();
 export const BUILD_MODULE_ID_MODE_ENV = "CLEANROOM_BUILD_MODULE_ID_MODE";
@@ -60,8 +61,36 @@ export const DEV_ONLY_STATIC_SURFACE_PATHS = Object.freeze([
   "content/lib/agent-review-workbench.js",
   "content/lib/agent-review-workbench.css",
 ]);
+export const DEV_ONLY_SOURCE_MODULE_PATHS = Object.freeze([
+  "dev/agent-review-workbench/agent-review-workbench.js",
+  "dev/agent-review-workbench/review-workbench-runtime-provider.js",
+  "dev/agent-runtime/agent-scenario-ids.js",
+  "dev/agent-runtime/agent-scenario-ids-protected.js",
+  "dev/agent-runtime/capability-ids.js",
+  "dev/agent-runtime/capability-ids-protected.js",
+  "dev/agent-runtime/capability-manifest.js",
+  "dev/agent-runtime/capability-manifest-protected.js",
+  "dev/agent-runtime/host-action-catalog.js",
+  "dev/agent-runtime/host-action-catalog-protected.js",
+  "dev/agent-runtime/host-action-ids.js",
+  "dev/agent-runtime/host-action-ids-protected.js",
+  "dev/agent-runtime/host-action-owner-modules.js",
+  "dev/agent-runtime/host-action-owner-modules-protected.js",
+  "dev/agent-runtime/host-action-readiness-ids.js",
+  "dev/agent-runtime/host-action-readiness-ids-protected.js",
+  "dev/agent-runtime/host-actions.js",
+  "dev/agent-runtime/plugin-agent.js",
+]);
+export const DEV_ONLY_SOURCE_MODULE_ALIASES = Object.freeze({
+  "app/dev-runtime.js": "app/dev-runtime-disabled.js",
+});
+export const PACKAGE_EXCLUDED_OPTIONAL_BUNDLE_IDS = Object.freeze([
+  "agent-runtime",
+  "ai-service",
+]);
 
 const DEV_ONLY_STATIC_SURFACE_PATH_SET = new Set(DEV_ONLY_STATIC_SURFACE_PATHS);
+const PACKAGE_EXCLUDED_OPTIONAL_BUNDLE_ID_SET = new Set(PACKAGE_EXCLUDED_OPTIONAL_BUNDLE_IDS);
 const PLATFORM_METADATA_FILE_NAMES = new Set([".DS_Store", "Thumbs.db"]);
 const PLATFORM_METADATA_DIRECTORY_NAMES = new Set(["__MACOSX"]);
 
@@ -172,43 +201,53 @@ function resolveBuildModuleAliases(
   srcRootPath,
   semanticScrubMode = BUILD_SEMANTIC_SCRUB_NONE,
   preferenceBindingMode = BUILD_PREFERENCE_BINDING_MODE_NATIVE,
+  includeDevSurfaces = true,
 ) {
   const aliases = new Map();
+  if (!includeDevSurfaces) {
+    for (const [from, to] of Object.entries(DEV_ONLY_SOURCE_MODULE_ALIASES)) {
+      aliases.set(
+        path.resolve(srcRootPath, ...from.split("/")),
+        path.resolve(srcRootPath, ...to.split("/")),
+      );
+    }
+  }
   if (semanticScrubMode !== BUILD_SEMANTIC_SCRUB_PROTECTED) {
     return aliases;
   }
 
+  const devAgentRuntimeRoot = path.resolve(srcRootPath, "..", "dev", "agent-runtime");
   aliases.set(
-    path.resolve(srcRootPath, "app", "agent-scenario-ids.js"),
-    path.resolve(srcRootPath, "app", "agent-scenario-ids-protected.js"),
+    path.resolve(devAgentRuntimeRoot, "agent-scenario-ids.js"),
+    path.resolve(devAgentRuntimeRoot, "agent-scenario-ids-protected.js"),
   );
   aliases.set(
-    path.resolve(srcRootPath, "app", "capability-ids.js"),
-    path.resolve(srcRootPath, "app", "capability-ids-protected.js"),
+    path.resolve(devAgentRuntimeRoot, "capability-ids.js"),
+    path.resolve(devAgentRuntimeRoot, "capability-ids-protected.js"),
   );
   aliases.set(
-    path.resolve(srcRootPath, "app", "host-action-ids.js"),
-    path.resolve(srcRootPath, "app", "host-action-ids-protected.js"),
+    path.resolve(devAgentRuntimeRoot, "host-action-ids.js"),
+    path.resolve(devAgentRuntimeRoot, "host-action-ids-protected.js"),
   );
   aliases.set(
-    path.resolve(srcRootPath, "app", "host-action-owner-modules.js"),
-    path.resolve(srcRootPath, "app", "host-action-owner-modules-protected.js"),
+    path.resolve(devAgentRuntimeRoot, "host-action-owner-modules.js"),
+    path.resolve(devAgentRuntimeRoot, "host-action-owner-modules-protected.js"),
   );
   aliases.set(
-    path.resolve(srcRootPath, "app", "host-action-catalog.js"),
-    path.resolve(srcRootPath, "app", "host-action-catalog-protected.js"),
+    path.resolve(devAgentRuntimeRoot, "host-action-catalog.js"),
+    path.resolve(devAgentRuntimeRoot, "host-action-catalog-protected.js"),
   );
   aliases.set(
-    path.resolve(srcRootPath, "app", "host-action-readiness-ids.js"),
-    path.resolve(srcRootPath, "app", "host-action-readiness-ids-protected.js"),
+    path.resolve(devAgentRuntimeRoot, "host-action-readiness-ids.js"),
+    path.resolve(devAgentRuntimeRoot, "host-action-readiness-ids-protected.js"),
   );
   aliases.set(
     path.resolve(srcRootPath, "core", "i18n.js"),
     path.resolve(srcRootPath, "core", "i18n-protected.js"),
   );
   aliases.set(
-    path.resolve(srcRootPath, "app", "capability-manifest.js"),
-    path.resolve(srcRootPath, "app", "capability-manifest-protected.js"),
+    path.resolve(devAgentRuntimeRoot, "capability-manifest.js"),
+    path.resolve(devAgentRuntimeRoot, "capability-manifest-protected.js"),
   );
   aliases.set(
     path.resolve(srcRootPath, "app", "copy-fallbacks.js"),
@@ -245,12 +284,35 @@ function createProtectedOptionalBundleRegistryView(optionalBundleRegistry = null
   };
 }
 
+function createPackageOptionalBundleRegistryView(optionalBundleRegistry = null) {
+  const bundles = Array.isArray(optionalBundleRegistry?.bundles)
+    ? optionalBundleRegistry.bundles
+      .filter((bundle) => !PACKAGE_EXCLUDED_OPTIONAL_BUNDLE_ID_SET.has(String(bundle?.id || "").trim()))
+      .map((bundle) => ({
+        ...bundle,
+        build: bundle?.build && typeof bundle.build === "object" ? { ...bundle.build } : null,
+        validation: bundle?.validation && typeof bundle.validation === "object" ? { ...bundle.validation } : null,
+        docs: Array.isArray(bundle?.docs) ? [...bundle.docs] : [],
+      }))
+    : [];
+
+  return {
+    schemaVersion: Number(optionalBundleRegistry?.schemaVersion || 1),
+    summary: "Package runtime registry view.",
+    bundles,
+  };
+}
+
 function resolveOptionalBundleRegistryBuildView(
   optionalBundleRegistry = null,
   semanticScrubMode = BUILD_SEMANTIC_SCRUB_NONE,
+  includeDevSurfaces = true,
 ) {
   if (semanticScrubMode === BUILD_SEMANTIC_SCRUB_PROTECTED) {
     return createProtectedOptionalBundleRegistryView(optionalBundleRegistry);
+  }
+  if (!includeDevSurfaces) {
+    return createPackageOptionalBundleRegistryView(optionalBundleRegistry);
   }
   return optionalBundleRegistry;
 }
@@ -454,7 +516,7 @@ const PROTECTED_SOURCE_LITERAL_REPLACEMENTS = Object.freeze({
     ["reader.openReader", "reader.r0"],
     ["reader.openByURI", "reader.r1"],
   ]),
-  "app/host-actions.js": Object.freeze([
+  "../dev/agent-runtime/host-actions.js": Object.freeze([
     ["reader.openReader", "reader.r0"],
   ]),
   "app/surface-descriptors-protected.js": Object.freeze([
@@ -639,12 +701,19 @@ export async function bundleEntry({
   moduleIdMode = BUILD_MODULE_ID_MODE_PATH,
   semanticScrubMode = BUILD_SEMANTIC_SCRUB_NONE,
   preferenceBindingMode = BUILD_PREFERENCE_BINDING_MODE_NATIVE,
+  includeDevSurfaces = true,
 }) {
   const moduleMap = new Map();
-  const moduleAliases = resolveBuildModuleAliases(srcRootPath, semanticScrubMode, preferenceBindingMode);
+  const moduleAliases = resolveBuildModuleAliases(
+    srcRootPath,
+    semanticScrubMode,
+    preferenceBindingMode,
+    includeDevSurfaces,
+  );
   const bundledOptionalBundleRegistry = resolveOptionalBundleRegistryBuildView(
     optionalBundleRegistry,
     semanticScrubMode,
+    includeDevSurfaces,
   );
 
   async function visit(filePath) {
@@ -936,6 +1005,8 @@ async function writeBuildReport({
   staticSurfaceMode = BUILD_STATIC_SURFACE_MODE_STANDARD,
   devSurfacesIncluded = true,
   excludedDevSurfacePaths = [],
+  devRuntimeModulesIncluded = true,
+  excludedDevRuntimeModulePaths = [],
 }) {
   const report = {
     generatedAt: new Date().toISOString(),
@@ -949,6 +1020,8 @@ async function writeBuildReport({
     staticSurfaceMode,
     devSurfacesIncluded,
     excludedDevSurfacePaths,
+    devRuntimeModulesIncluded,
+    excludedDevRuntimeModulePaths,
   };
 
   await fs.writeFile(
@@ -992,12 +1065,16 @@ export async function main() {
     const staticSurfaceMode = resolveBuildStaticSurfaceMode(process.env);
     const includeDevSurfaces = resolveBuildIncludeDevSurfaces(process.env);
     const excludedDevSurfacePaths = includeDevSurfaces ? [] : [...DEV_ONLY_STATIC_SURFACE_PATHS];
+    const excludedDevRuntimeModulePaths = includeDevSurfaces ? [] : [...DEV_ONLY_SOURCE_MODULE_PATHS];
     const buildRoot = path.join(projectRoot, "build", config.addonRef);
     const scriptsRoot = path.join(buildRoot, "content", "scripts");
 
     try {
       await removeDir(buildRoot);
       await copyDir(staticRoot, buildRoot, { includeDevSurfaces });
+      if (includeDevSurfaces) {
+        await copyDir(devOnlyStaticRoot, buildRoot, { includeDevSurfaces });
+      }
       await ensureDir(scriptsRoot);
     } catch (error) {
       throw wrapScriptError(error, {
@@ -1107,6 +1184,7 @@ export async function main() {
         moduleIdMode,
         semanticScrubMode,
         preferenceBindingMode,
+        includeDevSurfaces,
       });
     } catch (error) {
       throw wrapScriptError(error, {
@@ -1142,7 +1220,10 @@ export async function main() {
       });
     }
 
-    const optionalBundleResults = listOptionalBundles(optionalBundleRegistry).map((bundle) => {
+    const buildReportOptionalBundleRegistry = includeDevSurfaces
+      ? optionalBundleRegistry
+      : createPackageOptionalBundleRegistryView(optionalBundleRegistry);
+    const optionalBundleResults = listOptionalBundles(buildReportOptionalBundleRegistry).map((bundle) => {
       if (bundle.id === "react-ui") {
         return reactUIBuildResult || {
           bundleId: bundle.id,
@@ -1175,6 +1256,8 @@ export async function main() {
         staticSurfaceMode,
         devSurfacesIncluded: includeDevSurfaces,
         excludedDevSurfacePaths,
+        devRuntimeModulesIncluded: includeDevSurfaces,
+        excludedDevRuntimeModulePaths,
       });
     } catch (error) {
       throw wrapScriptError(error, {

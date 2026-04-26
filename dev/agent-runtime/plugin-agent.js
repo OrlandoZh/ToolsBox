@@ -4,7 +4,7 @@ import {
   getCapabilityManifestView as getCapabilityManifestViewFactory,
 } from "./capability-manifest.js";
 import { AGENT_SCENARIO_IDS } from "./agent-scenario-ids.js";
-import { createSurfaceDescriptors } from "./surface-descriptors.js";
+import { createSurfaceDescriptors } from "../../src/app/surface-descriptors.js";
 
 const BASELINE_ITEM_PANE_L10N = Object.freeze({
   infoRowLabel: "cleanroom-item-pane-info-row-label",

@@ -1,10 +1,10 @@
 import { describe, it, assert } from "./test-framework.js";
-import { createPluginAgent } from "../src/app/plugin-agent.js";
+import { createPluginAgent } from "../dev/agent-runtime/plugin-agent.js";
 import {
   createCapabilityManifest as createProtectedCapabilityManifest,
   findCapabilityById as findProtectedCapabilityById,
   getCapabilityManifestView as getProtectedCapabilityManifestView,
-} from "../src/app/capability-manifest-protected.js";
+} from "../dev/agent-runtime/capability-manifest-protected.js";
 
 function createMinimalPluginAgent(overrides = {}) {
   return createPluginAgent({
@@ -608,7 +608,7 @@ describe("Plugin Agent", () => {
       category: "feature",
       description: "验证 host action overlay 已按宿主弱绑定解锁。",
       entrypoints: ["plugin.api.agent.runHostAction(actionId, payload)"],
-      ownedBy: ["src/app/host-actions.js"],
+      ownedBy: ["dev/agent-runtime/host-actions.js"],
       successSignals: ["Host actions return readiness details"],
     }];
 

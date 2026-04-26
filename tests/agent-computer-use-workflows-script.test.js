@@ -45,7 +45,7 @@ describe("Agent Computer Use Workflows Script", () => {
     try {
       const result = runWorkflowScript([
         "--changed-path",
-        "src/app/host-actions.js",
+        "dev/agent-runtime/host-actions.js",
       ], root);
 
       assert.equal(result.status, 0);
@@ -63,7 +63,7 @@ describe("Agent Computer Use Workflows Script", () => {
     try {
       const result = runWorkflowScript([
         "--changed-path",
-        "src/app/host-actions.js",
+        "dev/agent-runtime/host-actions.js",
         "--surface",
         "cleanroom-preferences-pane",
       ], root);

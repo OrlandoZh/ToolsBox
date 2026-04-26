@@ -37,7 +37,7 @@ Phase 2 已完成第一批拆分（MVP）：
 3. 新增 `src/app/plugin-api.js`：
 - 抽离统一 API 冻结与导出逻辑。
 
-4. 新增 `src/app/plugin-agent.js`：
+4. 新增 `dev/agent-runtime/plugin-agent.js`：
 - 抽离 agent 场景执行与诊断收集逻辑。
 
 5. `src/app/plugin.js` 已降级为“组合与装配为主”的薄层，行为保持兼容。

@@ -4,7 +4,6 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, assert, describe, it } from "./test-framework.js";
 import {
-  createCapabilityManifestDescriptorOverlay,
   protectBuildBundle,
   protectBundleSource,
   SHIELDED_PACKAGE_VARIANT,
@@ -160,7 +159,7 @@ describe("Package Protection Lib", () => {
     assert.equal(metadata.variant, SHIELDED_PACKAGE_VARIANT);
   });
 
-  it("should expose a descriptor overlay resolver only for the descriptor-bind experiment variant", async () => {
+  it("should not expose descriptor overlay recovery in protected runtime packages", async () => {
     const sourceCode = `
       (function (__global) {
         "use strict";
@@ -177,7 +176,7 @@ describe("Package Protection Lib", () => {
       category: "feature",
       description: "overlay description",
       entrypoints: ["plugin.api.agent.runHostAction(actionId, payload)"],
-      ownedBy: ["src/app/host-actions.js"],
+      ownedBy: ["dev/agent-runtime/host-actions.js"],
       successSignals: ["Host actions return readiness details"],
     }];
     const { loaderSource, metadata } = protectBundleSource(sourceCode, {
@@ -195,15 +194,15 @@ describe("Package Protection Lib", () => {
 
     assert.equal(result, "ready");
     assert.equal(metadata.variant, SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT);
-    assert.equal(metadata.descriptorOverlayPresent, true);
-    assert.equal(metadata.descriptorOverlayEntryCount, 1);
+    assert.equal(metadata.descriptorOverlayPresent, false);
+    assert.equal(metadata.descriptorOverlayEntryCount, 0);
     assert.equal(runtime?.packageProtection?.variant, SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT);
-    assert.equal(typeof runtime?.packageProtection?.overlayResolver, "function");
-    assert.deepEqual(runtime.packageProtection.overlayResolver(), descriptorOverlay);
+    assert.equal(typeof runtime?.packageProtection?.overlayResolver, "undefined");
     assert.equal(loaderSource.includes("overlay description"), false);
+    assert.equal(loaderSource.includes("overlayResolver"), false);
     assert.equal(loaderSource.includes("宿主动作编排"), false);
     assert.equal(loaderSource.includes("runHostAction"), false);
-    assert.equal(loaderSource.includes("src/app/host-actions.js"), false);
+    assert.equal(loaderSource.includes("dev/agent-runtime/host-actions.js"), false);
   });
 
   it("should keep the js-confuser string experiment variant on the runtime marker without enabling overlay recovery", async () => {
@@ -338,7 +337,7 @@ describe("Package Protection Lib", () => {
     assert.equal(typeof scope.__CLEANROOM_TEMPLATE_RUNTIME__?.packageProtection?.overlayResolver, "undefined");
   });
 
-  it("should expose an encrypted overlay resolver for the surface-scrub-wasm-stage2-derive experiment variant", async () => {
+  it("should keep the surface-scrub-wasm-stage2-derive experiment from recovering descriptor overlays", async () => {
     const sourceCode = `
       (function (__global) {
         "use strict";
@@ -354,7 +353,7 @@ describe("Package Protection Lib", () => {
       category: "feature",
       description: "stage2 derive overlay description",
       entrypoints: ["plugin.api.agent.runHostAction(actionId, payload)"],
-      ownedBy: ["src/app/host-actions.js"],
+      ownedBy: ["dev/agent-runtime/host-actions.js"],
       successSignals: ["Host actions return readiness details"],
     }];
 
@@ -373,38 +372,18 @@ describe("Package Protection Lib", () => {
 
     assert.equal(result, "ready");
     assert.equal(metadata.variant, SHIELDED_SURFACE_SCRUB_WASM_STAGE2_DERIVE_PACKAGE_VARIANT);
-    assert.equal(metadata.descriptorOverlayPresent, true);
-    assert.equal(metadata.descriptorOverlayEntryCount, 1);
+    assert.equal(metadata.descriptorOverlayPresent, false);
+    assert.equal(metadata.descriptorOverlayEntryCount, 0);
     assert.equal(scope.__CLEANROOM_PACKAGE_VARIANT__, SHIELDED_SURFACE_SCRUB_WASM_STAGE2_DERIVE_PACKAGE_VARIANT);
     assert.equal(runtime?.packageProtection?.variant, SHIELDED_SURFACE_SCRUB_WASM_STAGE2_DERIVE_PACKAGE_VARIANT);
-    assert.equal(typeof runtime?.packageProtection?.overlayResolver, "function");
-    assert.deepEqual(runtime.packageProtection.overlayResolver(), descriptorOverlay);
+    assert.equal(typeof runtime?.packageProtection?.overlayResolver, "undefined");
     assert.equal(loaderSource.includes("stage2 derive overlay description"), false);
+    assert.equal(loaderSource.includes("overlayResolver"), false);
     assert.equal(loaderSource.includes("宿主动作编排"), false);
     assert.equal(loaderSource.includes("runHostAction"), false);
   });
 
-  it("should derive a minimal descriptor overlay from the source capability manifest", () => {
-    const overlay = createCapabilityManifestDescriptorOverlay({
-      config: {
-        addonRef: "cleanroomtemplate",
-      },
-    });
-    const hostActions = overlay.find((item) => item.id === "host-actions");
-
-    assert.ok(Array.isArray(overlay));
-    assert.ok(overlay.length >= 12);
-    assert.equal(hostActions?.label, "宿主动作编排");
-    assert.equal(hostActions?.category, "feature");
-    assert.equal(typeof hostActions?.description, "string");
-    assert.ok(Array.isArray(hostActions?.entrypoints));
-    assert.ok(Array.isArray(hostActions?.ownedBy));
-    assert.ok(Array.isArray(hostActions?.successSignals));
-    assert.equal(Object.prototype.hasOwnProperty.call(hostActions || {}, "agentScenario"), false);
-    assert.equal(Object.prototype.hasOwnProperty.call(hostActions || {}, "zoteroScenarios"), false);
-  });
-
-  it("should preserve descriptor overlay data when protecting a build bundle on disk", async () => {
+  it("should drop descriptor overlay data when protecting a build bundle on disk", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cleanroom-protect-build-"));
     const bundlePath = path.join(tempRoot, "bundle.js");
     const sourceCode = `
@@ -422,7 +401,7 @@ describe("Package Protection Lib", () => {
       category: "feature",
       description: "overlay description",
       entrypoints: ["plugin.api.agent.runHostAction(actionId, payload)"],
-      ownedBy: ["src/app/host-actions.js"],
+      ownedBy: ["dev/agent-runtime/host-actions.js"],
       successSignals: ["Host actions return readiness details"],
     }];
 
@@ -444,14 +423,14 @@ describe("Package Protection Lib", () => {
 
       assert.equal(result, "ready");
       assert.equal(metadata.variant, SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT);
-      assert.equal(metadata.descriptorOverlayPresent, true);
-      assert.equal(metadata.descriptorOverlayEntryCount, 1);
-      assert.equal(typeof scope.__CLEANROOM_TEMPLATE_RUNTIME__?.packageProtection?.overlayResolver, "function");
-      assert.deepEqual(scope.__CLEANROOM_TEMPLATE_RUNTIME__.packageProtection.overlayResolver(), descriptorOverlay);
+      assert.equal(metadata.descriptorOverlayPresent, false);
+      assert.equal(metadata.descriptorOverlayEntryCount, 0);
+      assert.equal(typeof scope.__CLEANROOM_TEMPLATE_RUNTIME__?.packageProtection?.overlayResolver, "undefined");
       assert.equal(loaderSource.includes("overlay description"), false);
+      assert.equal(loaderSource.includes("overlayResolver"), false);
       assert.equal(loaderSource.includes("宿主动作编排"), false);
       assert.equal(loaderSource.includes("runHostAction"), false);
-      assert.equal(loaderSource.includes("src/app/host-actions.js"), false);
+      assert.equal(loaderSource.includes("dev/agent-runtime/host-actions.js"), false);
     } finally {
       await fs.rm(tempRoot, { recursive: true, force: true });
     }

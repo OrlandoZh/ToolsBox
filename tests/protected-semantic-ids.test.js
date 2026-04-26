@@ -4,40 +4,40 @@ import { fileURLToPath } from "node:url";
 import { describe, it, assert } from "./test-framework.js";
 import {
   AGENT_SCENARIO_IDS as PLAIN_AGENT_SCENARIO_IDS,
-} from "../src/app/agent-scenario-ids.js";
+} from "../dev/agent-runtime/agent-scenario-ids.js";
 import {
   AGENT_SCENARIO_IDS as PROTECTED_AGENT_SCENARIO_IDS,
-} from "../src/app/agent-scenario-ids-protected.js";
+} from "../dev/agent-runtime/agent-scenario-ids-protected.js";
 import {
   CAPABILITY_IDS as PLAIN_CAPABILITY_IDS,
-} from "../src/app/capability-ids.js";
+} from "../dev/agent-runtime/capability-ids.js";
 import {
   CAPABILITY_IDS as PROTECTED_CAPABILITY_IDS,
-} from "../src/app/capability-ids-protected.js";
+} from "../dev/agent-runtime/capability-ids-protected.js";
 import {
   HOST_ACTION_IDS as PLAIN_HOST_ACTION_IDS,
-} from "../src/app/host-action-ids.js";
+} from "../dev/agent-runtime/host-action-ids.js";
 import {
   HOST_ACTION_IDS as PROTECTED_HOST_ACTION_IDS,
-} from "../src/app/host-action-ids-protected.js";
+} from "../dev/agent-runtime/host-action-ids-protected.js";
 import {
   listHostActionDescriptors as listPlainHostActionDescriptors,
-} from "../src/app/host-action-catalog.js";
+} from "../dev/agent-runtime/host-action-catalog.js";
 import {
   listHostActionDescriptors as listProtectedHostActionDescriptors,
-} from "../src/app/host-action-catalog-protected.js";
+} from "../dev/agent-runtime/host-action-catalog-protected.js";
 import {
   HOST_ACTION_OWNER_MODULES as PLAIN_HOST_ACTION_OWNER_MODULES,
-} from "../src/app/host-action-owner-modules.js";
+} from "../dev/agent-runtime/host-action-owner-modules.js";
 import {
   HOST_ACTION_OWNER_MODULES as PROTECTED_HOST_ACTION_OWNER_MODULES,
-} from "../src/app/host-action-owner-modules-protected.js";
+} from "../dev/agent-runtime/host-action-owner-modules-protected.js";
 import {
   HOST_ACTION_READINESS_IDS as PLAIN_HOST_ACTION_READINESS_IDS,
-} from "../src/app/host-action-readiness-ids.js";
+} from "../dev/agent-runtime/host-action-readiness-ids.js";
 import {
   HOST_ACTION_READINESS_IDS as PROTECTED_HOST_ACTION_READINESS_IDS,
-} from "../src/app/host-action-readiness-ids-protected.js";
+} from "../dev/agent-runtime/host-action-readiness-ids-protected.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,7 +58,7 @@ describe("Protected Semantic ID Modules", () => {
     ]);
     assert.deepEqual(PLAIN_HOST_ACTION_OWNER_MODULES.hostBridge, [
       "src/platform/zotero-host.js",
-      "src/app/host-actions.js",
+      "dev/agent-runtime/host-actions.js",
     ]);
   });
 
@@ -96,31 +96,31 @@ describe("Protected Semantic ID Modules", () => {
 
   it("should avoid contiguous capability and scenario anchors in protected id sources", async () => {
     const protectedCapabilitySource = await fs.readFile(
-      path.join(projectRoot, "src", "app", "capability-ids-protected.js"),
+      path.join(projectRoot, "dev", "agent-runtime", "capability-ids-protected.js"),
       "utf-8",
     );
     const protectedScenarioSource = await fs.readFile(
-      path.join(projectRoot, "src", "app", "agent-scenario-ids-protected.js"),
+      path.join(projectRoot, "dev", "agent-runtime", "agent-scenario-ids-protected.js"),
       "utf-8",
     );
     const protectedHostActionOwnerModulesSource = await fs.readFile(
-      path.join(projectRoot, "src", "app", "host-action-owner-modules-protected.js"),
+      path.join(projectRoot, "dev", "agent-runtime", "host-action-owner-modules-protected.js"),
       "utf-8",
     );
     const protectedHostActionReadinessSource = await fs.readFile(
-      path.join(projectRoot, "src", "app", "host-action-readiness-ids-protected.js"),
+      path.join(projectRoot, "dev", "agent-runtime", "host-action-readiness-ids-protected.js"),
       "utf-8",
     );
     const protectedHostActionIDsSource = await fs.readFile(
-      path.join(projectRoot, "src", "app", "host-action-ids-protected.js"),
+      path.join(projectRoot, "dev", "agent-runtime", "host-action-ids-protected.js"),
       "utf-8",
     );
     const protectedHostActionCatalogSource = await fs.readFile(
-      path.join(projectRoot, "src", "app", "host-action-catalog-protected.js"),
+      path.join(projectRoot, "dev", "agent-runtime", "host-action-catalog-protected.js"),
       "utf-8",
     );
     const protectedCapabilityManifestSource = await fs.readFile(
-      path.join(projectRoot, "src", "app", "capability-manifest-protected.js"),
+      path.join(projectRoot, "dev", "agent-runtime", "capability-manifest-protected.js"),
       "utf-8",
     );
 

@@ -4,7 +4,7 @@ import {
   findCapabilityById,
   getCapabilityManifestView,
   listCapabilityIds,
-} from "../src/app/capability-manifest.js";
+} from "../dev/agent-runtime/capability-manifest.js";
 
 describe("Capability Manifest", () => {
   it("should expose stable capability ids and ownership metadata", () => {

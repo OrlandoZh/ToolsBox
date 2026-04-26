@@ -25,6 +25,8 @@ import {
   BUILD_STATIC_SURFACE_MODE_SCRUB,
   BUILD_STATIC_SURFACE_MODE_STANDARD,
   DEV_ONLY_STATIC_SURFACE_PATHS,
+  DEV_ONLY_SOURCE_MODULE_PATHS,
+  PACKAGE_EXCLUDED_OPTIONAL_BUNDLE_IDS,
   createBuildConfigExpression,
   createBundleModuleId,
   resolveBuildIncludeDevSurfaces,
@@ -246,6 +248,8 @@ describe("Build Artifacts", () => {
     assert.equal(report.staticSurfaceMode, "standard");
     assert.equal(report.devSurfacesIncluded, true);
     assert.deepEqual(report.excludedDevSurfacePaths, []);
+    assert.equal(report.devRuntimeModulesIncluded, true);
+    assert.deepEqual(report.excludedDevRuntimeModulePaths, []);
     for (const relativePath of DEV_ONLY_STATIC_SURFACE_PATHS) {
       assert.equal(fs.existsSync(path.join(projectRoot, "build", config.addonRef, ...relativePath.split("/"))), true);
     }
@@ -272,12 +276,31 @@ describe("Build Artifacts", () => {
     const config = readJSON(path.join(projectRoot, "config", "addon.config.json"));
     const buildRoot = path.join(projectRoot, "build", config.addonRef);
     const report = readJSON(path.join(buildRoot, "build-report.json"));
+    const packageBundleIds = report.optionalBundles.map((entry) => entry.bundleId);
 
     assert.equal(report.devSurfacesIncluded, false);
     assert.deepEqual(report.excludedDevSurfacePaths, DEV_ONLY_STATIC_SURFACE_PATHS);
+    assert.equal(report.devRuntimeModulesIncluded, false);
+    assert.deepEqual(report.excludedDevRuntimeModulePaths, DEV_ONLY_SOURCE_MODULE_PATHS);
+    for (const bundleId of PACKAGE_EXCLUDED_OPTIONAL_BUNDLE_IDS) {
+      assert.equal(packageBundleIds.includes(bundleId), false);
+    }
     for (const relativePath of DEV_ONLY_STATIC_SURFACE_PATHS) {
       assert.equal(fs.existsSync(path.join(buildRoot, ...relativePath.split("/"))), false);
     }
+    const bundleSource = fs.readFileSync(path.join(buildRoot, "content", "scripts", `${config.addonRef}.js`), "utf-8");
+    assert.equal(bundleSource.includes("content/lib/agent-review-workbench.xhtml"), false);
+    assert.equal(bundleSource.includes("createReviewWorkbenchStateStore"), false);
+    assert.equal(bundleSource.includes("AGENT_REVIEW_WORKBENCH_WINDOW_CLEANUP_KEY"), false);
+    assert.equal(bundleSource.includes("REVIEW_WORKBENCH_SCOPE_SNAPSHOT"), false);
+    assert.equal(bundleSource.includes("Runtime compact review workbench provider is available."), false);
+    assert.equal(bundleSource.includes("BASELINE_ITEM_PANE_L10N"), false);
+    assert.equal(bundleSource.includes("Host Action catalog returns source-driven descriptors"), false);
+    assert.equal(bundleSource.includes("runtime.probeWasmKernel"), false);
+    assert.equal(bundleSource.includes("Open Preference Pane"), false);
+    assert.equal(bundleSource.includes("Dev-only runtime is excluded from packaged runtime."), true);
+    assert.equal(bundleSource.includes("agent-runtime"), false);
+    assert.equal(bundleSource.includes("ai-service"), false);
     assert.equal(fs.existsSync(path.join(buildRoot, ".DS_Store")), false);
     assert.equal(fs.existsSync(path.join(buildRoot, "locale", ".DS_Store")), false);
     assert.equal(fs.existsSync(path.join(buildRoot, "content", ".DS_Store")), false);

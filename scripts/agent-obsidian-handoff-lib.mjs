@@ -10,7 +10,7 @@ import {
 } from "./agent-zotero-validation-lib.mjs";
 import {
   createCapabilityManifest as createSourceCapabilityManifest,
-} from "../src/app/capability-manifest.js";
+} from "../dev/agent-runtime/capability-manifest.js";
 
 function truncateList(list, max = 6) {
   return Array.isArray(list) ? list.filter(Boolean).slice(0, max) : [];
@@ -1462,7 +1462,7 @@ const PLUGIN_SURFACE_GROUPS = Object.freeze([
       "src/app/feature-composer.js",
       "src/features/preference-panes.js",
       "src/features/item-pane.js",
-      "src/app/host-actions.js",
+      "dev/agent-runtime/host-actions.js",
       "src/platform/zotero-host.js",
     ],
     route: "宿主注册式 surface -> pane fragment / load bridge -> host action replay -> surface-local evidence",
@@ -1484,7 +1484,7 @@ const PLUGIN_SURFACE_GROUPS = Object.freeze([
       "src/app/feature-composer.js",
       "src/features/reader.js",
       "src/features/reader-selection-actions.js",
-      "src/app/host-actions.js",
+      "dev/agent-runtime/host-actions.js",
     ],
     route: "Reader event bridge -> renderToolbar / sidebar host surface -> action replay -> surface-local evidence",
     whyThisRoute: "Reader 是独立宿主 surface，优先走官方事件桥与 host action，不把它降级成普通 DOM patch。",
@@ -1506,7 +1506,7 @@ const PLUGIN_SURFACE_GROUPS = Object.freeze([
       "src/app/feature-composer.js",
       "src/features/menu-manager.js",
       "src/features/menu-command.js",
-      "src/app/host-actions.js",
+      "dev/agent-runtime/host-actions.js",
       "src/platform/zotero-host.js",
     ],
     route: "MenuManager target registration -> state resolver -> dynamic submenu builder -> menuPath evidence",
@@ -1616,7 +1616,7 @@ function buildPluginSharedTechnicalChain(summary = {}) {
     },
     {
       title: "可回放 Host Action",
-      detail: "`src/app/host-actions.js` 把真实 UI 触达统一成可回放动作，既服务 scenario/smoke，也服务 surface-local evidence。",
+      detail: "`dev/agent-runtime/host-actions.js` 把真实 UI 触达统一成可回放动作，既服务 scenario/smoke，也服务 surface-local evidence。",
     },
     {
       title: "surface-local evidence",
@@ -1876,7 +1876,7 @@ export function buildPluginUIConceptArtifacts(summary = {}) {
         },
       ],
       footerTitle: "对应模块与证据",
-      footerSummary: "模块：src/features/preference-panes.js、src/app/host-actions.js、src/platform/zotero-host.js\n证据：preference pane surface smoke + local capture。",
+      footerSummary: "模块：src/features/preference-panes.js、dev/agent-runtime/host-actions.js、src/platform/zotero-host.js\n证据：preference pane surface smoke + local capture。",
     }),
     paneMarkdown: buildLinearConceptExcalidrawMarkdown({
       generatedAt: summary.generatedAt,
@@ -1905,7 +1905,7 @@ export function buildPluginUIConceptArtifacts(summary = {}) {
         },
       ],
       footerTitle: "对应模块与证据",
-      footerSummary: "模块：src/features/item-pane.js、src/app/host-actions.js、src/platform/zotero-host.js\n证据：item/context pane surface smoke、geometry settle、surface-local evidence。",
+      footerSummary: "模块：src/features/item-pane.js、dev/agent-runtime/host-actions.js、src/platform/zotero-host.js\n证据：item/context pane surface smoke、geometry settle、surface-local evidence。",
     }),
     readerMarkdown: buildLinearConceptExcalidrawMarkdown({
       generatedAt: summary.generatedAt,
@@ -1934,7 +1934,7 @@ export function buildPluginUIConceptArtifacts(summary = {}) {
         },
       ],
       footerTitle: "对应模块与证据",
-      footerSummary: "模块：src/features/reader.js、src/features/reader-selection-actions.js、src/app/host-actions.js\n证据：reader surface smoke、toolbar trigger、sidebar select、local capture。",
+      footerSummary: "模块：src/features/reader.js、src/features/reader-selection-actions.js、dev/agent-runtime/host-actions.js\n证据：reader surface smoke、toolbar trigger、sidebar select、local capture。",
     }),
     menuMarkdown: buildLinearConceptExcalidrawMarkdown({
       generatedAt: summary.generatedAt,
@@ -1963,7 +1963,7 @@ export function buildPluginUIConceptArtifacts(summary = {}) {
         },
       ],
       footerTitle: "对应模块与证据",
-      footerSummary: "模块：src/features/menu-manager.js、src/features/menu-command.js、src/app/host-actions.js\n证据：menu surface smoke、collection scene、submenu path 验证。",
+      footerSummary: "模块：src/features/menu-manager.js、src/features/menu-command.js、dev/agent-runtime/host-actions.js\n证据：menu surface smoke、collection scene、submenu path 验证。",
     }),
   };
 }
@@ -2247,7 +2247,7 @@ function buildPluginModuleCards(summary = {}) {
       surfaces: ["feature composer", "host action replay", "Zotero host bridge"],
       modules: [
         "src/app/feature-composer.js",
-        "src/app/host-actions.js",
+        "dev/agent-runtime/host-actions.js",
         "src/platform/zotero-host.js",
       ],
       route: "feature-composer -> host action replay -> zotero host adapter -> scenario / evidence consumer",
@@ -2685,7 +2685,7 @@ function buildPluginCapabilityCatalogMarkdown(summary = {}) {
     "# 当前插件能力清单",
     "",
     "> [!info]",
-    "> 这份目录直接派生自 `src/app/capability-manifest.js`，用于说明“当前插件已经声明并接通了哪些能力、入口、场景和责任文件”。",
+    "> 这份目录直接派生自 `dev/agent-runtime/capability-manifest.js`，用于说明“当前插件已经声明并接通了哪些能力、入口、场景和责任文件”。",
     "",
     "## 当前概览",
     "",

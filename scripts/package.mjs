@@ -37,7 +37,6 @@ import {
   resolveJSConfuserPreflightProfile,
 } from "./package-protection-jsconfuser-preflight.mjs";
 import {
-  createCapabilityManifestDescriptorOverlay,
   ENCRYPTED_PACKAGE_VARIANT,
   SHIELDED_PACKAGE_VARIANT,
   SHIELDED_DESCRIPTOR_BIND_PACKAGE_VARIANT,
@@ -379,10 +378,8 @@ export function resolvePackageZipExcludePatterns(options = {}) {
     "__MACOSX/*",
     "Thumbs.db",
     "*/Thumbs.db",
+    "build-report.json",
   ];
-  if (options.encryptBundle || options.shieldBundle || options.outputSuffix) {
-    patterns.push("build-report.json");
-  }
 
   return patterns;
 }
@@ -487,9 +484,6 @@ export async function main(argv = process.argv.slice(2)) {
     let obfuscatedBundleMeta = null;
     let obfuscatedLoaderMeta = null;
     let jsConfuserTransformMeta = null;
-    const descriptorOverlay = options.descriptorBind || options.surfaceScrubWasmStage2Derive
-      ? createCapabilityManifestDescriptorOverlay({ config })
-      : null;
     if (options.jsConfuserString) {
       const jsConfuserTool = resolvePackageJSConfuserToolOptions(options);
       const toolSelection = await resolveJSConfuserToolSelection({
@@ -536,7 +530,6 @@ export async function main(argv = process.argv.slice(2)) {
         addonRef: config.addonRef,
         addonVersion: config.addonVersion,
         variant: resolvePackageProtectedVariant(options),
-        descriptorOverlay,
       });
     }
 

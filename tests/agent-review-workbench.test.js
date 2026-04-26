@@ -7,7 +7,8 @@ import {
   createAgentReviewWorkbench,
   createEmptyWorkbenchState,
   createReviewWorkbenchStateStore,
-} from "../src/features/agent-review-workbench.js";
+  registerAgentReviewWorkbenchCommand,
+} from "../dev/agent-review-workbench/agent-review-workbench.js";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -153,8 +154,8 @@ describe("Agent Review Workbench", () => {
   });
 
   it("should keep the standalone workbench shell localized for Chinese review usage", () => {
-    const shellPath = path.resolve("addon-static", "content", "lib", "agent-review-workbench.xhtml");
-    const scriptPath = path.resolve("addon-static", "content", "lib", "agent-review-workbench.js");
+    const shellPath = path.resolve("dev", "agent-review-workbench", "static", "content", "lib", "agent-review-workbench.xhtml");
+    const scriptPath = path.resolve("dev", "agent-review-workbench", "static", "content", "lib", "agent-review-workbench.js");
     const shellSource = fs.readFileSync(shellPath, "utf-8");
     const scriptSource = fs.readFileSync(scriptPath, "utf-8");
 
@@ -231,6 +232,78 @@ describe("Agent Review Workbench", () => {
     assert.equal(snapshot.availability.reason, "non-dev-runtime");
     assert.equal(plan.ok, false);
     assert.equal(plan.reason, "non-dev-runtime");
+  });
+
+  it("should register the review workbench command from the dev-only lane", async () => {
+    const commandRegistrations = [];
+    let openCount = 0;
+    const commandPalette = {
+      registerCommand(options) {
+        commandRegistrations.push(options);
+        return options.id;
+      },
+      hasCommand() {
+        return false;
+      },
+    };
+
+    const commandId = registerAgentReviewWorkbenchCommand({
+      config: {
+        addonName: "Cleanroom",
+      },
+      prefs: {
+        get(key) {
+          return key === "enabled";
+        },
+      },
+      i18n: {
+        t(_key, fallback) {
+          return fallback;
+        },
+      },
+      commandPalette,
+      openAgentReviewWorkbench() {
+        openCount += 1;
+        return {
+          ok: true,
+        };
+      },
+      isAgentReviewWorkbenchAvailable() {
+        return true;
+      },
+    });
+
+    assert.equal(commandId, "agent.reviewWorkbench.open");
+    assert.equal(commandRegistrations.length, 1);
+    assert.equal(commandRegistrations[0].id, "agent.reviewWorkbench.open");
+    assert.equal(commandRegistrations[0].condition(), true);
+
+    commandRegistrations[0].handler();
+    await Promise.resolve();
+    assert.equal(openCount, 1);
+  });
+
+  it("should skip review workbench command registration outside available dev runtime", () => {
+    const commandRegistrations = [];
+    const commandId = registerAgentReviewWorkbenchCommand({
+      commandPalette: {
+        registerCommand(options) {
+          commandRegistrations.push(options);
+          return options.id;
+        },
+      },
+      openAgentReviewWorkbench() {
+        return {
+          ok: true,
+        };
+      },
+      isAgentReviewWorkbenchAvailable() {
+        return false;
+      },
+    });
+
+    assert.equal(commandId, null);
+    assert.equal(commandRegistrations.length, 0);
   });
 
   it("should detect stale evidence snapshots and clear stale after refresh", async () => {

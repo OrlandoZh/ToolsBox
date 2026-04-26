@@ -68,8 +68,8 @@
 - 当前模板已经把其中几条常见链路沉淀成默认原语：
   - `src/features/preference-panes.js`
   - `src/utils/window-shell.js`
-  - `src/app/host-action-catalog.js`
-  - `src/app/host-actions.js`
+  - `dev/agent-runtime/host-action-catalog.js`
+  - `dev/agent-runtime/host-actions.js`
   - `src/services/registry.js`
   - `src/services/file-state-store.js`
   - `src/platform/zotero-file-storage.js`
