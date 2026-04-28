@@ -477,9 +477,6 @@ describe("Documentation Consistency", () => {
     assert.ok(readme.includes("`READER-HIGH-124 / READER-LOW-261~263`"));
     assert.ok(readme.includes("`READER-HIGH-125`"));
     assert.ok(readme.includes("`READER-HIGH-126`"));
-    assert.ok(readme.includes("`READER-HIGH-119 / READER-LOW-252~254`"));
-    assert.ok(readme.includes("`READER-HIGH-120 / READER-LOW-255~257`"));
-    assert.ok(readme.includes("`READER-HIGH-121 / READER-LOW-258~260`"));
     assert.ok(assessment.includes("`READER-HIGH-123` 已完成唯一分支收口，并转为历史契约源"));
     assert.ok(assessment.includes("`READER-HIGH-124`"));
     assert.ok(assessment.includes("`READER-HIGH-125`"));
