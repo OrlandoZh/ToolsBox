@@ -33,6 +33,8 @@ import {
 } from "./script-runtime-lib.mjs";
 import { summarizeEngineeringHardening } from "./engineering-hardening-lib.mjs";
 import { summarizeDebugProbeReport } from "./agent-zotero-debug-probe-lib.mjs";
+import { summarizeProfileReport } from "./agent-zotero-profile-lib.mjs";
+import { summarizeMemoryReport } from "./agent-zotero-memory-lib.mjs";
 import {
   DEFAULT_WATCH_STALE_AFTER_MINUTES,
   summarizeZoteroWatchStatus,
@@ -40,6 +42,8 @@ import {
 import {
   resolveZoteroAutofixArtifacts,
   resolveZoteroDebugProbeArtifacts,
+  resolveZoteroMemoryArtifacts,
+  resolveZoteroProfileArtifacts,
 } from "./zotero-agent-artifacts.mjs";
 import { evaluateArtifactProvenance } from "./agent-provenance-lib.mjs";
 
@@ -270,6 +274,60 @@ async function loadJSONIfExists(filePath) {
       }
       throw error;
     });
+}
+
+async function loadCPUProfilerSummary() {
+  const artifacts = resolveZoteroProfileArtifacts(projectRoot);
+  const report = await fs.readFile(artifacts.reportJSON, "utf-8")
+    .then((content) => JSON.parse(content))
+    .catch((error) => {
+      if (error && error.code === "ENOENT") {
+        return null;
+      }
+      return {
+        __parseError: error?.message || String(error),
+      };
+    });
+
+  if (report?.__parseError) {
+    return summarizeProfileReport(null, {
+      reportJSON: artifacts.reportJSON,
+      reportMD: artifacts.reportMD,
+      parseError: report.__parseError,
+    });
+  }
+
+  return summarizeProfileReport(report, {
+    reportJSON: artifacts.reportJSON,
+    reportMD: artifacts.reportMD,
+  });
+}
+
+async function loadMemoryDiagnosticsSummary() {
+  const artifacts = resolveZoteroMemoryArtifacts(projectRoot);
+  const report = await fs.readFile(artifacts.reportJSON, "utf-8")
+    .then((content) => JSON.parse(content))
+    .catch((error) => {
+      if (error && error.code === "ENOENT") {
+        return null;
+      }
+      return {
+        __parseError: error?.message || String(error),
+      };
+    });
+
+  if (report?.__parseError) {
+    return summarizeMemoryReport(null, {
+      reportJSON: artifacts.reportJSON,
+      reportMD: artifacts.reportMD,
+      parseError: report.__parseError,
+    });
+  }
+
+  return summarizeMemoryReport(report, {
+    reportJSON: artifacts.reportJSON,
+    reportMD: artifacts.reportMD,
+  });
 }
 
 async function loadZoteroValidationSummary() {
@@ -828,6 +886,58 @@ function buildMarkdown(summary) {
     lines.push(`- 预算活动: \`${summary.engineeringHardening.performanceBudget?.measuredActivityCount ?? 0}/${summary.engineeringHardening.performanceBudget?.expectedActivityCount ?? 0}\``);
     lines.push(`- 超预算项: \`${summary.engineeringHardening.performanceBudget?.violationCount ?? 0}\``);
     lines.push(`- 预算告警: \`${summary.engineeringHardening.performanceBudget?.violationSummary || "-"}\``);
+    const cpuProfiler = summary.engineeringHardening.cpuProfiler || {};
+    lines.push("", "### CPU Profiler 诊断", "");
+    lines.push(`- 状态: \`${cpuProfiler.statusLabel || cpuProfiler.status || "缺失"}\` / advisory \`${cpuProfiler.advisory === false ? "no" : "yes"}\` / gate \`${cpuProfiler.gateEffect || "non-blocking"}\``);
+    lines.push(`- 新鲜度: \`${cpuProfiler.ageText || "-"}\``);
+    lines.push(`- 活动采样: \`${cpuProfiler.successfulActivityCount ?? 0}/${cpuProfiler.activityCount ?? 0}\``);
+    lines.push(`- 失败活动: \`${cpuProfiler.failedActivityCount ?? 0}\``);
+    lines.push(`- total CPU time: \`${cpuProfiler.totalCpuTime ?? 0}\``);
+    lines.push(`- Current Plugin CPU: \`${cpuProfiler.currentPluginCpuPercent ?? 0}%\``);
+    lines.push(`- Unknown CPU: \`${cpuProfiler.unknownCpuPercent ?? 0}%\``);
+    lines.push(`- Top bucket: \`${cpuProfiler.topBucket?.label || "-"} / ${cpuProfiler.topBucket?.percent ?? 0}%\``);
+    lines.push(`- Top action: \`${cpuProfiler.topAction?.label || cpuProfiler.topAction?.actionId || "-"} / ${cpuProfiler.topAction?.cpuTime ?? 0}\``);
+    lines.push(`- 摘要: ${cpuProfiler.summary || "-"}`);
+    if (cpuProfiler.reportJSON) {
+      lines.push(`- JSON: \`${cpuProfiler.reportJSON}\``);
+    }
+    if (cpuProfiler.reportMD) {
+      lines.push(`- Markdown: \`${cpuProfiler.reportMD}\``);
+    }
+    const memoryDiagnostics = summary.engineeringHardening.memoryDiagnostics || {};
+    lines.push("", "### 内存诊断", "");
+    lines.push(`- 状态: \`${memoryDiagnostics.statusLabel || memoryDiagnostics.status || "缺失"}\` / advisory \`${memoryDiagnostics.advisory === false ? "no" : "yes"}\` / gate \`${memoryDiagnostics.gateEffect || "non-blocking"}\``);
+    lines.push(`- 新鲜度: \`${memoryDiagnostics.ageText || "-"}\``);
+    lines.push(`- 活动采样: \`${memoryDiagnostics.successfulActivityCount ?? 0}/${memoryDiagnostics.activityCount ?? 0}\``);
+    lines.push(`- 失败活动: \`${memoryDiagnostics.failedActivityCount ?? 0}\``);
+    lines.push(`- RSS delta: \`${memoryDiagnostics.rssDeltaMb ?? "-"} MB\``);
+    lines.push(`- Resident delta: \`${memoryDiagnostics.residentDeltaMb ?? "-"} MB\``);
+    lines.push(`- Explicit delta: \`${memoryDiagnostics.explicitDeltaMb ?? "-"} MB\``);
+    lines.push(`- about:memory: \`${memoryDiagnostics.aboutMemoryExport?.ok ? "captured" : (memoryDiagnostics.aboutMemoryExport?.included ? "failed" : "not requested")} / reporters ${memoryDiagnostics.aboutMemoryExport?.reporterCount ?? 0}\``);
+    lines.push(`- Top growing action: \`${memoryDiagnostics.topGrowingAction?.label || memoryDiagnostics.topGrowingAction?.actionId || "-"} / RSS ${memoryDiagnostics.topGrowingAction?.rssDeltaMb ?? "-"} MB\``);
+    lines.push(`- 摘要: ${memoryDiagnostics.summary || "-"}`);
+    if (memoryDiagnostics.reportJSON) {
+      lines.push(`- JSON: \`${memoryDiagnostics.reportJSON}\``);
+    }
+    if (memoryDiagnostics.reportMD) {
+      lines.push(`- Markdown: \`${memoryDiagnostics.reportMD}\``);
+    }
+    if (memoryDiagnostics.aboutMemoryExport?.textArtifact) {
+      lines.push(`- about:memory: \`${memoryDiagnostics.aboutMemoryExport.textArtifact}\``);
+    }
+    const performanceRecommendations = Array.isArray(summary.engineeringHardening.performanceRecommendations)
+      ? summary.engineeringHardening.performanceRecommendations
+      : [];
+    lines.push("", "### 性能诊断建议", "");
+    if (performanceRecommendations.length === 0) {
+      lines.push("- 当前没有性能诊断建议。");
+    } else {
+      performanceRecommendations.slice(0, 5).forEach((item) => {
+        lines.push(`- [${item.severity || "low"}] \`${item.kind || "-"}\` ${item.title || "性能建议"}: ${item.summary || "-"}`);
+        lines.push(`  - 建议动作: ${item.recommendedAction || "-"}`);
+        lines.push(`  - 支撑信号: ${(item.supportingSignals || []).join("；") || "-"}`);
+      });
+    }
     lines.push("");
   }
 
@@ -1116,9 +1226,11 @@ function buildMarkdown(summary) {
 async function main() {
   const runs = await listRunRecords();
   const summary = summarizeRuns(runs);
-  const [watchStatus, zoteroValidation, gateReport, releaseMatrix, validationContext, provenance, referenceDistillation, deadChainAudit, reviewWorkbenchAcceptance] = await Promise.all([
+  const [watchStatus, zoteroValidation, cpuProfiler, memoryDiagnostics, gateReport, releaseMatrix, validationContext, provenance, referenceDistillation, deadChainAudit, reviewWorkbenchAcceptance] = await Promise.all([
     loadWatchStatusSummary(),
     loadZoteroValidationSummary(),
+    loadCPUProfilerSummary(),
+    loadMemoryDiagnosticsSummary(),
     loadJSONIfExists(resolveAgentArtifactPath(projectRoot, "agent-gate.json")),
     loadReleaseMatrixSummary(),
     collectValidationContext(projectRoot),
@@ -1132,6 +1244,8 @@ async function main() {
     e2e: zoteroValidation.e2e,
     autofix: zoteroValidation.autofix,
     watchRecovery: zoteroValidation.watchRecovery,
+    cpuProfiler,
+    memoryDiagnostics,
     gate: gateReport,
     releaseMatrix,
   });
@@ -1154,6 +1268,8 @@ async function main() {
   summary.engineeringHardening = summarizeEngineeringHardening({
     e2e: zoteroValidation.e2e,
     autofix: zoteroValidation.autofix,
+    cpuProfiler,
+    memoryDiagnostics,
     gate: gateReport,
   });
   summary.releaseMatrix = releaseMatrix;

@@ -208,6 +208,121 @@ ${xrefOffset}
   return new TextEncoder().encode(pdf);
 }
 
+function normalizeCuratedPDFMatchValue(value) {
+  return String(value || "")
+    .trim()
+    .normalize("NFKC")
+    .replaceAll("\\", "/")
+    .toLowerCase();
+}
+
+function flattenCuratedPDFCorpusEntries(manifest) {
+  const groups = Array.isArray(manifest?.groups) ? manifest.groups : [];
+  const entries = [];
+
+  groups.forEach((group, groupIndex) => {
+    const groupID = typeof group?.id === "string" && group.id.trim()
+      ? group.id.trim()
+      : `group-${groupIndex + 1}`;
+    const groupLabel = typeof group?.label === "string" && group.label.trim()
+      ? group.label.trim()
+      : groupID;
+    const groupReason = typeof group?.reason === "string" && group.reason.trim()
+      ? group.reason.trim()
+      : null;
+    const groupEntries = Array.isArray(group?.entries) ? group.entries : [];
+
+    groupEntries.forEach((entry, entryIndex) => {
+      if (!entry || typeof entry !== "object") {
+        return;
+      }
+      entries.push({
+        groupID,
+        groupLabel,
+        groupReason,
+        groupIndex,
+        entryIndex,
+        entryID: typeof entry.id === "string" && entry.id.trim()
+          ? entry.id.trim()
+          : null,
+        fileName: typeof entry.fileName === "string" && entry.fileName.trim()
+          ? entry.fileName.trim()
+          : null,
+        relativePath: typeof entry.relativePath === "string" && entry.relativePath.trim()
+          ? entry.relativePath.trim()
+          : null,
+        absolutePath: typeof entry.absolutePath === "string" && entry.absolutePath.trim()
+          ? entry.absolutePath.trim()
+          : null,
+        familyKey: typeof entry.familyKey === "string" && entry.familyKey.trim()
+          ? entry.familyKey.trim()
+          : null,
+        recommendedLane: typeof entry.recommendedLane === "string" && entry.recommendedLane.trim()
+          ? entry.recommendedLane.trim()
+          : null,
+        variantKind: typeof entry.variantKind === "string" && entry.variantKind.trim()
+          ? entry.variantKind.trim()
+          : null,
+        entry,
+      });
+    });
+  });
+
+  return entries;
+}
+
+function selectCuratedPDFCorpusEntry(manifest, options = {}) {
+  const entries = flattenCuratedPDFCorpusEntries(manifest);
+  const filters = {
+    entryID: normalizeCuratedPDFMatchValue(options.entryID || options.id),
+    groupID: normalizeCuratedPDFMatchValue(options.groupID || options.groupId),
+    fileName: normalizeCuratedPDFMatchValue(options.fileName),
+    relativePath: normalizeCuratedPDFMatchValue(options.relativePath),
+    absolutePath: normalizeCuratedPDFMatchValue(options.absolutePath || options.filePath),
+    familyKey: normalizeCuratedPDFMatchValue(options.familyKey),
+    recommendedLane: normalizeCuratedPDFMatchValue(options.recommendedLane || options.lane),
+    variantKind: normalizeCuratedPDFMatchValue(options.variantKind),
+  };
+  let selected = entries.slice();
+
+  if (filters.entryID) {
+    selected = selected.filter((record) => normalizeCuratedPDFMatchValue(record.entryID) === filters.entryID);
+  }
+  if (filters.groupID) {
+    selected = selected.filter((record) => normalizeCuratedPDFMatchValue(record.groupID) === filters.groupID);
+  }
+  if (filters.fileName) {
+    selected = selected.filter((record) => normalizeCuratedPDFMatchValue(record.fileName) === filters.fileName);
+  }
+  if (filters.relativePath) {
+    selected = selected.filter((record) => normalizeCuratedPDFMatchValue(record.relativePath) === filters.relativePath);
+  }
+  if (filters.absolutePath) {
+    selected = selected.filter((record) => normalizeCuratedPDFMatchValue(record.absolutePath) === filters.absolutePath);
+  }
+  if (filters.familyKey) {
+    selected = selected.filter((record) => normalizeCuratedPDFMatchValue(record.familyKey) === filters.familyKey);
+  }
+  if (filters.recommendedLane) {
+    selected = selected.filter((record) => normalizeCuratedPDFMatchValue(record.recommendedLane) === filters.recommendedLane);
+  }
+  if (filters.variantKind) {
+    selected = selected.filter((record) => normalizeCuratedPDFMatchValue(record.variantKind) === filters.variantKind);
+  }
+
+  const rawSelectionIndex = Number(options.selectionIndex ?? 0);
+  const selectionIndex = Number.isFinite(rawSelectionIndex) && rawSelectionIndex >= 0
+    ? Math.floor(rawSelectionIndex)
+    : 0;
+
+  return {
+    entries,
+    selected,
+    selectionIndex,
+    entry: selected[selectionIndex] || null,
+  };
+}
+
 function resetScenarioReaderEnvironment(plugin) {
   if (!plugin?.api?.reader) {
     return;
@@ -238,7 +353,7 @@ function resetScenarioReaderEnvironment(plugin) {
 }
 
 function createScenarioHelpers(baseContext) {
-  const { Zotero, Services, ChromeUtils, plugin } = baseContext;
+  const { Zotero, Services, ChromeUtils, plugin, addonConfig } = baseContext;
   const cleanupTasks = [];
   const PathUtilsAPI = getPathUtils(ChromeUtils);
   const IOUtilsAPI = getIOUtils(ChromeUtils);
@@ -251,6 +366,254 @@ function createScenarioHelpers(baseContext) {
 
   function cloneValue(value) {
     return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+  }
+
+  function createCuratedCorpusError(message, options = {}) {
+    const error = createScenarioError(message, {
+      kind: options.kind || "scenario-fixture-unavailable",
+      phase: "fixture",
+      step: options.step || "curated-pdf-corpus",
+    });
+    error.cleanroomScenarioFixtureReason = String(options.reason || "").trim() || null;
+    return error;
+  }
+
+  function resolveCuratedPDFManifestPath(options = {}) {
+    const explicitManifestPath = String(options.manifestPath || "").trim();
+    if (explicitManifestPath) {
+      return explicitManifestPath;
+    }
+
+    const configManifestPath = String(
+      addonConfig?.cleanroomPdfTestCorpus?.defaultManifestPath
+      || "",
+    ).trim();
+    if (configManifestPath) {
+      return configManifestPath;
+    }
+
+    const projectRootPath = String(addonConfig?.cleanroomProjectRootPath || "").trim();
+    if (projectRootPath) {
+      if (PathUtilsAPI && typeof PathUtilsAPI.join === "function") {
+        return PathUtilsAPI.join(projectRootPath, "dist", "pdf-test-corpus-curated.balanced.json");
+      }
+      return `${projectRootPath}/dist/pdf-test-corpus-curated.balanced.json`;
+    }
+
+    return null;
+  }
+
+  async function fileExists(filePath) {
+    const normalizedPath = String(filePath || "").trim();
+    if (!normalizedPath) {
+      return false;
+    }
+    if (IOUtilsAPI && typeof IOUtilsAPI.exists === "function") {
+      return await IOUtilsAPI.exists(normalizedPath);
+    }
+    try {
+      if (Zotero?.File && typeof Zotero.File.getContentsAsync === "function") {
+        await Zotero.File.getContentsAsync(normalizedPath);
+        return true;
+      }
+    }
+    catch {
+      return false;
+    }
+    return false;
+  }
+
+  async function readUTF8File(filePath) {
+    const normalizedPath = String(filePath || "").trim();
+    if (!normalizedPath) {
+      throw createCuratedCorpusError("Curated PDF corpus manifest path is empty", {
+        reason: "manifest-path-unresolved",
+        step: "resolve-curated-pdf-manifest",
+      });
+    }
+    if (IOUtilsAPI && typeof IOUtilsAPI.readUTF8 === "function") {
+      return await IOUtilsAPI.readUTF8(normalizedPath);
+    }
+    if (Zotero?.File && typeof Zotero.File.getContentsAsync === "function") {
+      return await Zotero.File.getContentsAsync(normalizedPath);
+    }
+    throw createCuratedCorpusError("No UTF-8 file reader is available in the current Zotero runtime", {
+      kind: "scenario-fixture-invalid",
+      reason: "file-reader-unavailable",
+      step: "read-curated-pdf-manifest",
+    });
+  }
+
+  function buildCuratedPDFCorpusStatus(payload) {
+    const groups = Array.isArray(payload?.manifest?.groups) ? payload.manifest.groups : [];
+    const entries = Array.isArray(payload?.entries) ? payload.entries : [];
+    const laneCounts = {};
+    entries.forEach((record) => {
+      const lane = typeof record?.recommendedLane === "string" && record.recommendedLane.trim()
+        ? record.recommendedLane.trim()
+        : "unknown";
+      laneCounts[lane] = Number(laneCounts[lane] || 0) + 1;
+    });
+    return {
+      available: true,
+      manifestPath: payload.manifestPath,
+      sourceRoot: typeof payload?.manifest?.sourceRoot === "string" && payload.manifest.sourceRoot.trim()
+        ? payload.manifest.sourceRoot.trim()
+        : null,
+      groupCount: groups.length,
+      entryCount: entries.length,
+      groupIDs: groups
+        .map((group, index) => {
+          const groupID = typeof group?.id === "string" && group.id.trim()
+            ? group.id.trim()
+            : `group-${index + 1}`;
+          return groupID;
+        }),
+      laneCounts,
+    };
+  }
+
+  function resolveCuratedPDFEntryAbsolutePath(manifest, record) {
+    const explicitPath = String(record?.absolutePath || "").trim();
+    if (explicitPath) {
+      return explicitPath;
+    }
+    const relativePath = String(record?.relativePath || "").trim();
+    const sourceRoot = String(manifest?.sourceRoot || "").trim();
+    if (!relativePath || !sourceRoot) {
+      return null;
+    }
+
+    if (PathUtilsAPI && typeof PathUtilsAPI.join === "function") {
+      const segments = relativePath.split("/").filter(Boolean);
+      return PathUtilsAPI.join(sourceRoot, ...segments);
+    }
+
+    return `${sourceRoot}/${relativePath}`;
+  }
+
+  async function loadCuratedPDFCorpus(options = {}) {
+    const manifestPath = resolveCuratedPDFManifestPath(options);
+    if (!manifestPath) {
+      throw createCuratedCorpusError("Unable to resolve curated PDF corpus manifest path", {
+        reason: "manifest-path-unresolved",
+        step: "resolve-curated-pdf-manifest",
+      });
+    }
+
+    if (!(await fileExists(manifestPath))) {
+      throw createCuratedCorpusError(`Curated PDF corpus manifest not found: ${manifestPath}`, {
+        reason: "missing-manifest",
+        step: "resolve-curated-pdf-manifest",
+      });
+    }
+
+    let text = "";
+    try {
+      text = await readUTF8File(manifestPath);
+    }
+    catch (error) {
+      throw createCuratedCorpusError(
+        `Unable to read curated PDF corpus manifest: ${manifestPath}; ${error?.message || error}`,
+        {
+          reason: "manifest-read-failed",
+          step: "read-curated-pdf-manifest",
+        },
+      );
+    }
+
+    let manifest = null;
+    try {
+      manifest = JSON.parse(text);
+    }
+    catch (error) {
+      throw createCuratedCorpusError(
+        `Curated PDF corpus manifest is not valid JSON: ${manifestPath}; ${error?.message || error}`,
+        {
+          kind: "scenario-fixture-invalid",
+          reason: "manifest-parse-failed",
+          step: "parse-curated-pdf-manifest",
+        },
+      );
+    }
+
+    if (!manifest || typeof manifest !== "object" || !Array.isArray(manifest.groups)) {
+      throw createCuratedCorpusError(
+        `Curated PDF corpus manifest is missing a valid groups[] array: ${manifestPath}`,
+        {
+          kind: "scenario-fixture-invalid",
+          reason: "manifest-invalid",
+          step: "validate-curated-pdf-manifest",
+        },
+      );
+    }
+
+    const entries = flattenCuratedPDFCorpusEntries(manifest);
+    if (entries.length === 0) {
+      throw createCuratedCorpusError(
+        `Curated PDF corpus manifest does not contain any entries: ${manifestPath}`,
+        {
+          kind: "scenario-fixture-invalid",
+          reason: "manifest-empty",
+          step: "validate-curated-pdf-manifest",
+        },
+      );
+    }
+
+    return {
+      manifestPath,
+      manifest,
+      entries,
+    };
+  }
+
+  function buildCuratedPDFParentItemOptions(entry, options = {}) {
+    const createParentOptions = options && typeof options === "object" ? options : {};
+    const resolvedMetadata = entry?.resolvedMetadata && typeof entry.resolvedMetadata === "object"
+      ? entry.resolvedMetadata
+      : {};
+    const title = String(
+      createParentOptions.title
+      || resolvedMetadata.title
+      || entry?.fileName
+      || "Curated PDF Corpus Entry",
+    ).trim();
+    const fields = {
+      title,
+      ...((createParentOptions.fields && typeof createParentOptions.fields === "object")
+        ? cloneValue(createParentOptions.fields)
+        : {}),
+    };
+
+    if (!fields.title) {
+      fields.title = title;
+    }
+
+    if (!fields.publicationTitle && typeof resolvedMetadata.journal === "string" && resolvedMetadata.journal.trim()) {
+      fields.publicationTitle = resolvedMetadata.journal.trim();
+    }
+    if (!fields.DOI && typeof resolvedMetadata.doi === "string" && resolvedMetadata.doi.trim()) {
+      fields.DOI = resolvedMetadata.doi.trim();
+    }
+
+    const creators = Array.isArray(createParentOptions.creators)
+      ? cloneValue(createParentOptions.creators)
+      : [];
+    if (creators.length === 0 && typeof resolvedMetadata.author === "string" && resolvedMetadata.author.trim()) {
+      creators.push({
+        creatorType: "author",
+        name: resolvedMetadata.author.trim(),
+      });
+    }
+
+    return {
+      itemType: String(createParentOptions.itemType || "journalArticle").trim() || "journalArticle",
+      fields,
+      creators,
+      tags: Array.isArray(createParentOptions.tags) ? cloneValue(createParentOptions.tags) : [],
+      collections: Array.isArray(createParentOptions.collections) ? cloneValue(createParentOptions.collections) : [],
+      libraryID: Number.isFinite(createParentOptions.libraryID) ? createParentOptions.libraryID : undefined,
+    };
   }
 
   function normalizeSurfaceEvidenceTargets(value) {
@@ -740,6 +1103,116 @@ function createScenarioHelpers(baseContext) {
     return attachment;
   }
 
+  async function getCuratedPDFCorpusStatus(options = {}) {
+    try {
+      const payload = await loadCuratedPDFCorpus(options);
+      return buildCuratedPDFCorpusStatus(payload);
+    }
+    catch (error) {
+      return {
+        available: false,
+        manifestPath: resolveCuratedPDFManifestPath(options),
+        errorKind: String(error?.cleanroomScenarioFixtureReason || error?.cleanroomScenarioErrorKind || "unknown"),
+        errorMessage: String(error?.message || error),
+      };
+    }
+  }
+
+  async function importCuratedPDF(options = {}) {
+    const corpus = await loadCuratedPDFCorpus(options);
+    const hasExplicitSelection = Boolean(
+      options.entryID
+      || options.id
+      || options.groupID
+      || options.groupId
+      || options.fileName
+      || options.relativePath
+      || options.absolutePath
+      || options.filePath
+      || options.familyKey
+      || options.recommendedLane
+      || options.lane
+      || options.variantKind,
+    );
+    const selection = selectCuratedPDFCorpusEntry(corpus.manifest, {
+      ...options,
+      groupID: hasExplicitSelection ? (options.groupID || options.groupId) : "core-text-smoke",
+    });
+    const record = selection.entry;
+    if (!record) {
+      throw createCuratedCorpusError("No curated PDF corpus entry matched the current selection", {
+        kind: "scenario-fixture-invalid",
+        reason: "entry-not-found",
+        step: "select-curated-pdf-entry",
+      });
+    }
+
+    const sourceFilePath = resolveCuratedPDFEntryAbsolutePath(corpus.manifest, record);
+    if (!sourceFilePath) {
+      throw createCuratedCorpusError(
+        `Curated PDF corpus entry is missing a resolvable file path: ${record.entryID || record.fileName || "unknown-entry"}`,
+        {
+          kind: "scenario-fixture-invalid",
+          reason: "entry-path-missing",
+          step: "resolve-curated-pdf-entry-path",
+        },
+      );
+    }
+
+    if (!(await fileExists(sourceFilePath))) {
+      throw createCuratedCorpusError(`Curated PDF source file is missing: ${sourceFilePath}`, {
+        reason: "source-file-missing",
+        step: "resolve-curated-pdf-entry-path",
+      });
+    }
+
+    let parentItem = null;
+    if (typeof options.parentItemID !== "number" && options.createParentItem) {
+      parentItem = await createItem(buildCuratedPDFParentItemOptions(record.entry, (
+        options.createParentItem && typeof options.createParentItem === "object"
+          ? options.createParentItem
+          : {}
+      )));
+    }
+
+    const attachmentTitle = String(
+      options.title
+      || record.entry?.resolvedMetadata?.title
+      || record.fileName
+      || "Curated PDF Corpus Attachment",
+    ).trim() || "Curated PDF Corpus Attachment";
+    const attachment = await Zotero.Attachments.importFromFile({
+      file: sourceFilePath,
+      parentItemID: typeof options.parentItemID === "number"
+        ? options.parentItemID
+        : parentItem?.id,
+      title: attachmentTitle,
+      contentType: "application/pdf",
+    });
+
+    addCleanup(async () => {
+      const currentItem = Zotero.Items.get(attachment.id);
+      if (currentItem) {
+        await currentItem.eraseTx();
+      }
+    });
+
+    return {
+      manifestPath: corpus.manifestPath,
+      manifestStatus: buildCuratedPDFCorpusStatus(corpus),
+      group: {
+        id: record.groupID,
+        label: record.groupLabel,
+        reason: record.groupReason,
+      },
+      entry: cloneValue(record.entry),
+      selectionIndex: selection.selectionIndex,
+      sourceFilePath,
+      attachment,
+      parentItem,
+    };
+  }
+
   async function openReader(itemID, options = {}) {
     const reader = await plugin.api.reader.openReader({
       itemID,
@@ -1033,6 +1506,8 @@ function createScenarioHelpers(baseContext) {
       selectCollection,
       writeTempFile,
       createPDF,
+      getCuratedPDFCorpusStatus,
+      importCuratedPDF,
       openReader,
       listHostActions() {
         return typeof plugin?.api?.agent?.listHostActions === "function"

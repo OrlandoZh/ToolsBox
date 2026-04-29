@@ -1,3 +1,5 @@
+import { CURATED_PDF_DEFAULT_SCENARIO_NAMES } from "./agent-zotero-curated-pdf-lib.mjs";
+
 function normalizeErrorMessage(error) {
   return String(error?.message || error || "").trim();
 }
@@ -18,6 +20,17 @@ export function isRecoverableHotReloadTransportError(error) {
     || message.includes("rdp socket closed")
     || message.includes("rdp socket ended")
   );
+}
+
+export function buildDefaultScenarioExclusionList({
+  performanceBudgetScenarioName = null,
+  extraScenarioNames = [],
+} = {}) {
+  return uniqueStrings([
+    ...CURATED_PDF_DEFAULT_SCENARIO_NAMES,
+    performanceBudgetScenarioName,
+    ...extraScenarioNames,
+  ]);
 }
 
 async function restartCycleSession({

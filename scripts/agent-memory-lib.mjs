@@ -570,6 +570,8 @@ const SIGNAL_DEFINITIONS = [
   { id: "readerEvent", label: "Reader 事件桥" },
   { id: "autofix", label: "自动修复" },
   { id: "watchRecovery", label: "恢复回归" },
+  { id: "cpuProfiler", label: "CPU Profiler 诊断" },
+  { id: "memoryDiagnostics", label: "内存诊断" },
   { id: "gate", label: "质量闸门" },
   { id: "releaseMatrix", label: "本地发布矩阵" },
 ];
@@ -620,6 +622,18 @@ const SIGNAL_METRIC_DEFINITIONS = {
   watchRecovery: [
     { id: "issueCount", label: "恢复问题", better: "lower", highlightPriority: 4 },
     { id: "missingTriggerCount", label: "缺失触发", better: "lower", highlightPriority: 5 },
+  ],
+  cpuProfiler: [
+    { id: "failedActivityCount", label: "Profiler 失败活动", better: "lower", highlightPriority: 5 },
+    { id: "successfulActivityCount", label: "Profiler 成功活动", better: "higher", highlightPriority: 3 },
+    { id: "currentPluginCpuPercent", label: "当前插件 CPU 占比", better: "lower", highlightPriority: 4 },
+    { id: "unknownCpuPercent", label: "Unknown CPU 占比", better: "lower", highlightPriority: 4 },
+  ],
+  memoryDiagnostics: [
+    { id: "failedActivityCount", label: "内存诊断失败活动", better: "lower", highlightPriority: 5 },
+    { id: "rssDeltaMb", label: "RSS delta", better: "lower", highlightPriority: 4 },
+    { id: "residentDeltaMb", label: "Resident delta", better: "lower", highlightPriority: 4 },
+    { id: "explicitDeltaMb", label: "Explicit delta", better: "lower", highlightPriority: 4 },
   ],
   gate: [
     { id: "blockerCount", label: "阻断项", better: "lower", highlightPriority: 5 },
@@ -1641,6 +1655,46 @@ function normalizeSignalEntry(signalId, payload, options = {}) {
           .filter(Boolean)),
         ...(!ok && (!Array.isArray(payload.issues) || payload.issues.length === 0) && payload.summaryNote
           ? [createSignalEntryFallbackReason(signalId, label, { status, detail })].filter(Boolean)
+          : []),
+      ]);
+      break;
+    case "cpuProfiler":
+      ok = status === "passed";
+      detail = payload.summary || null;
+      metrics = {
+        activityCount: Number(payload.activityCount || 0),
+        successfulActivityCount: Number(payload.successfulActivityCount || 0),
+        failedActivityCount: Number(payload.failedActivityCount || 0),
+        totalCpuTime: Number(payload.totalCpuTime || 0),
+        currentPluginCpuPercent: Number(payload.currentPluginCpuPercent || 0),
+        unknownCpuPercent: Number(payload.unknownCpuPercent || 0),
+      };
+      reasons = dedupeReasonItems([
+        ...(Number(payload.failedActivityCount || 0) > 0
+          ? [createSignalStructuredReason(signalId, label, "activity-failed", "Profiler 活动采样失败", Number(payload.failedActivityCount || 0))]
+          : []),
+        ...(status === "attention" && payload.errorMessage
+          ? [createSignalEntryFallbackReason(signalId, label, { status, detail: payload.errorMessage })].filter(Boolean)
+          : []),
+      ]);
+      break;
+    case "memoryDiagnostics":
+      ok = status === "passed";
+      detail = payload.summary || null;
+      metrics = {
+        activityCount: Number(payload.activityCount || 0),
+        successfulActivityCount: Number(payload.successfulActivityCount || 0),
+        failedActivityCount: Number(payload.failedActivityCount || 0),
+        rssDeltaMb: Number(payload.rssDeltaMb || 0),
+        residentDeltaMb: Number(payload.residentDeltaMb || 0),
+        explicitDeltaMb: Number(payload.explicitDeltaMb || 0),
+      };
+      reasons = dedupeReasonItems([
+        ...(Number(payload.failedActivityCount || 0) > 0
+          ? [createSignalStructuredReason(signalId, label, "activity-failed", "内存诊断活动采样失败", Number(payload.failedActivityCount || 0))]
+          : []),
+        ...(status === "attention" && payload.errorMessage
+          ? [createSignalEntryFallbackReason(signalId, label, { status, detail: payload.errorMessage })].filter(Boolean)
           : []),
       ]);
       break;

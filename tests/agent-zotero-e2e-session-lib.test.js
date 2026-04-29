@@ -1,5 +1,6 @@
 import { describe, it, assert } from "./test-framework.js";
 import {
+  buildDefaultScenarioExclusionList,
   isRecoverableHotReloadTransportError,
   mergeRecoveredScenarioBatch,
   planScenarioBatchRecovery,
@@ -11,6 +12,24 @@ describe("Agent Zotero E2E Session Lib", () => {
     assert.equal(isRecoverableHotReloadTransportError(new Error("RDP socket is not connected")), true);
     assert.equal(isRecoverableHotReloadTransportError(new Error("RDP socket closed")), true);
     assert.equal(isRecoverableHotReloadTransportError(new Error("Timed out waiting for add-on")), false);
+  });
+
+  it("should exclude curated pdf scenarios from the default E2E batch", () => {
+    const exclusions = buildDefaultScenarioExclusionList({
+      performanceBudgetScenarioName: "performance budget diagnostics",
+      extraScenarioNames: [
+        "curated pdf scan ocr smoke",
+        "custom dev-only scenario",
+      ],
+    });
+
+    assert.deepEqual(exclusions, [
+      "curated pdf corpus import smoke",
+      "curated pdf scan ocr smoke",
+      "curated pdf permission edge smoke",
+      "performance budget diagnostics",
+      "custom dev-only scenario",
+    ]);
   });
 
   it("should start the first cycle with a restarted session", async () => {

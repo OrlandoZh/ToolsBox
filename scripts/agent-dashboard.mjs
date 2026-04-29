@@ -890,8 +890,18 @@ function renderEngineeringHardening(summary) {
     : "未记录新的校验失败";
   const performanceBudget = hardening.performanceBudget || null;
   const performanceStatus = String(performanceBudget?.status || "missing").trim();
+  const cpuProfiler = hardening.cpuProfiler || null;
+  const cpuProfilerStatus = String(cpuProfiler?.status || "missing").trim();
+  const memoryDiagnostics = hardening.memoryDiagnostics || null;
+  const memoryDiagnosticsStatus = String(memoryDiagnostics?.status || "missing").trim();
+  const performanceRecommendations = Array.isArray(hardening.performanceRecommendations)
+    ? hardening.performanceRecommendations
+    : [];
+  const topPerformanceRecommendation = performanceRecommendations[0] || null;
   const statusClass = hardening.errorBoundaryHitCount > 0 || Number(hardening.httpTimeoutCount || 0) > 0
     || performanceStatus === "attention"
+    || cpuProfilerStatus === "attention"
+    || memoryDiagnosticsStatus === "attention"
     ? "status-warn"
     : "status-ok";
 
@@ -917,6 +927,14 @@ function renderEngineeringHardening(summary) {
               <div><span class="label">性能预算</span><span class="metric-value">${escapeHTML(performanceBudget?.statusLabel || performanceBudget?.status || "-")}</span></div>
               <div><span class="label">预算活动</span><span class="metric-value">${escapeHTML(`${performanceBudget?.measuredActivityCount ?? 0}/${performanceBudget?.expectedActivityCount ?? 0}`)}</span></div>
               <div><span class="label">超预算项</span><span class="metric-value">${escapeHTML(performanceBudget?.violationCount ?? 0)}</span></div>
+              <div><span class="label">CPU profiler</span><span class="metric-value">${escapeHTML(cpuProfiler?.statusLabel || cpuProfiler?.status || "-")}</span></div>
+              <div><span class="label">Profiler 活动</span><span class="metric-value">${escapeHTML(`${cpuProfiler?.successfulActivityCount ?? 0}/${cpuProfiler?.activityCount ?? 0}`)}</span></div>
+              <div><span class="label">插件 CPU</span><span class="metric-value">${escapeHTML(`${cpuProfiler?.currentPluginCpuPercent ?? 0}%`)}</span></div>
+              <div><span class="label">Unknown CPU</span><span class="metric-value">${escapeHTML(`${cpuProfiler?.unknownCpuPercent ?? 0}%`)}</span></div>
+              <div><span class="label">内存诊断</span><span class="metric-value">${escapeHTML(memoryDiagnostics?.statusLabel || memoryDiagnostics?.status || "-")}</span></div>
+              <div><span class="label">内存活动</span><span class="metric-value">${escapeHTML(`${memoryDiagnostics?.successfulActivityCount ?? 0}/${memoryDiagnostics?.activityCount ?? 0}`)}</span></div>
+              <div><span class="label">RSS delta</span><span class="metric-value">${escapeHTML(`${memoryDiagnostics?.rssDeltaMb ?? "-"} MB`)}</span></div>
+              <div><span class="label">Resident delta</span><span class="metric-value">${escapeHTML(`${memoryDiagnostics?.residentDeltaMb ?? "-"} MB`)}</span></div>
             </div>
             <div class="subtle">${escapeHTML(hardening.summary || "暂无工程化硬化摘要")}</div>
             <div class="subtle">边界事件: ${escapeHTML(boundaryText)}</div>
@@ -927,6 +945,17 @@ function renderEngineeringHardening(summary) {
             <div class="subtle">最近 HTTP 错误: ${escapeHTML(`${hardening.httpLastErrorKind || "-"} / ${hardening.httpLastErrorMessage || "-"}`)}</div>
             <div class="subtle">性能预算: ${escapeHTML(performanceBudget?.summary || "当前未采集 dev-only performance budget")}</div>
             <div class="subtle">预算告警: ${escapeHTML(performanceBudget?.violationSummary || "-")}</div>
+            <div class="subtle">CPU profiler: ${escapeHTML(cpuProfiler?.summary || "未采集手动 CPU profiler")}</div>
+            <div class="subtle">Profiler top bucket: ${escapeHTML(`${cpuProfiler?.topBucket?.label || "-"} / ${cpuProfiler?.topBucket?.percent ?? 0}%`)}</div>
+            <div class="subtle">Profiler top action: ${escapeHTML(`${cpuProfiler?.topAction?.label || cpuProfiler?.topAction?.actionId || "-"} / ${cpuProfiler?.topAction?.cpuTime ?? 0}`)}</div>
+            <div class="subtle">Profiler 时间: ${escapeHTML(cpuProfiler?.generatedAt || "-")} / ${escapeHTML(cpuProfiler?.ageText || "-")}</div>
+            <div class="subtle">内存诊断: ${escapeHTML(memoryDiagnostics?.summary || "未采集手动内存诊断")}</div>
+            <div class="subtle">内存 top growing action: ${escapeHTML(`${memoryDiagnostics?.topGrowingAction?.label || memoryDiagnostics?.topGrowingAction?.actionId || "-"} / RSS ${memoryDiagnostics?.topGrowingAction?.rssDeltaMb ?? "-"} MB`)}</div>
+            <div class="subtle">Explicit delta: ${escapeHTML(`${memoryDiagnostics?.explicitDeltaMb ?? "-"} MB`)}</div>
+            <div class="subtle">about:memory: ${escapeHTML(`${memoryDiagnostics?.aboutMemoryExport?.ok ? "captured" : (memoryDiagnostics?.aboutMemoryExport?.included ? "failed" : "not requested")} / reporters ${memoryDiagnostics?.aboutMemoryExport?.reporterCount ?? 0}`)}</div>
+            <div class="subtle">内存诊断时间: ${escapeHTML(memoryDiagnostics?.generatedAt || "-")} / ${escapeHTML(memoryDiagnostics?.ageText || "-")}</div>
+            <div class="subtle">性能诊断建议: ${escapeHTML(topPerformanceRecommendation ? `${topPerformanceRecommendation.severity || "low"} / ${topPerformanceRecommendation.title || topPerformanceRecommendation.kind || "-"}` : "当前没有性能诊断建议")}</div>
+            <div class="subtle">建议动作: ${escapeHTML(topPerformanceRecommendation?.recommendedAction || "-")}</div>
           </div>
         </div>
       </section>`;

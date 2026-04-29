@@ -141,6 +141,14 @@ function buildMinimalAddonConfig(config) {
   return JSON.parse(JSON.stringify(normalizedConfig));
 }
 
+function resolveCuratedPdfManifestRuntimePath(projectRoot) {
+  const override = String(process.env.CLEANROOM_PDF_TEST_CORPUS_MANIFEST_PATH || "").trim();
+  if (override) {
+    return path.resolve(override);
+  }
+  return path.join(projectRoot, "dist", "pdf-test-corpus-curated.balanced.json");
+}
+
 function mapRegisteredScenarios(projectRoot, payload, fileEntries) {
   const hrefToRelativePath = new Map(fileEntries.map((entry) => [entry.href, entry.relativePath]));
   const registeredScenarios = Array.isArray(payload?.registeredScenarios)
@@ -215,6 +223,7 @@ export async function initializeScenarioRegistry({
   rdp,
   config,
   scenarioFilePattern = null,
+  scenarioRuntimeOptions = null,
 }) {
   const scenarioFiles = await discoverZoteroScenarios(projectRoot);
   if (scenarioFiles.length === 0) {
@@ -246,11 +255,21 @@ export async function initializeScenarioRegistry({
   }
 
   const harnessHref = toFileHref(path.join(projectRoot, "scripts", "zotero-scenario-runtime.js"));
+  const runtimeAddonConfig = {
+    ...config,
+    cleanroomProjectRootPath: projectRoot,
+    cleanroomScenarioOptions: scenarioRuntimeOptions && typeof scenarioRuntimeOptions === "object"
+      ? JSON.parse(JSON.stringify(scenarioRuntimeOptions))
+      : {},
+    cleanroomPdfTestCorpus: {
+      defaultManifestPath: resolveCuratedPdfManifestRuntimePath(projectRoot),
+    },
+  };
   const expression = `(async () => {
     Services.scriptloader.loadSubScript(${JSON.stringify(harnessHref)}, globalThis);
     return await globalThis.loadCleanroomZoteroScenarios(${JSON.stringify({
       fileHrefs: fileSelection.selected.map((entry) => entry.href),
-      addonConfig: buildMinimalAddonConfig(config),
+      addonConfig: buildMinimalAddonConfig(runtimeAddonConfig),
     })});
   })()`;
   const rawResult = await rdp.evaluateInChrome(expression, {
@@ -274,6 +293,7 @@ export async function runIntegratedScenarios({
   config,
   scenarioPattern = null,
   scenarioFilePattern = null,
+  scenarioRuntimeOptions = null,
   excludeScenarioNames = [],
   listOnly = false,
   modeLabel = "zotero:scenario",
@@ -284,6 +304,7 @@ export async function runIntegratedScenarios({
     rdp,
     config,
     scenarioFilePattern,
+    scenarioRuntimeOptions,
   });
   const scenarioSelection = filterRegisteredScenarios({
     registeredScenarios: registry.registeredScenarios,

@@ -74,6 +74,16 @@ function writeWatchRecoveryReport(report) {
   fs.writeFileSync(target, `${JSON.stringify(report, null, 2)}\n`, "utf-8");
 }
 
+function writeProfileReport(report) {
+  const target = artifactPath("agent-zotero-profile.json");
+  fs.writeFileSync(target, `${JSON.stringify(report, null, 2)}\n`, "utf-8");
+}
+
+function writeMemoryReport(report) {
+  const target = artifactPath("agent-zotero-memory.json");
+  fs.writeFileSync(target, `${JSON.stringify(report, null, 2)}\n`, "utf-8");
+}
+
 function writeReleaseMatrix(report) {
   const target = artifactPath("release-matrix.json");
   fs.writeFileSync(target, `${JSON.stringify(report, null, 2)}\n`, "utf-8");
@@ -998,6 +1008,82 @@ describe("Agent Telemetry", () => {
         },
       }],
     });
+    writeProfileReport({
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      kind: "agent-zotero-profile",
+      advisory: true,
+      gateEffect: "non-blocking",
+      status: "passed",
+      statusLabel: "通过",
+      activityCount: 4,
+      successfulActivityCount: 4,
+      failedActivityCount: 0,
+      totalCpuTime: 100,
+      summary: "profiler diagnostics captured 4/4 activity profile(s)",
+      activities: [
+        {
+          actionId: "preferences.openPane",
+          label: "Open Preferences",
+          durationMs: 50,
+          profilerOk: true,
+          analysis: {
+            totalCpuTime: 70,
+            buckets: [
+              { id: "current-plugin", label: "Current Plugin", cpuTime: 40, percent: 0.4, stackCount: 2, topStacks: [] },
+              { id: "zotero-main", label: "Zotero Main", cpuTime: 20, percent: 0.2, stackCount: 1, topStacks: [] },
+              { id: "unknown-other", label: "Unknown / Other", cpuTime: 10, percent: 0.1, stackCount: 1, topStacks: [] },
+            ],
+          },
+        },
+        {
+          actionId: "reader.sidebar.selectView",
+          label: "Reader Sidebar",
+          durationMs: 50,
+          profilerOk: true,
+          analysis: {
+            totalCpuTime: 30,
+            buckets: [
+              { id: "zotero-reader", label: "Zotero Reader", cpuTime: 30, percent: 0.3, stackCount: 1, topStacks: [] },
+            ],
+          },
+        },
+      ],
+    });
+    writeMemoryReport({
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      kind: "agent-zotero-memory",
+      advisory: true,
+      gateEffect: "non-blocking",
+      status: "passed",
+      statusLabel: "通过",
+      activityCount: 4,
+      successfulActivityCount: 4,
+      failedActivityCount: 0,
+      rssBeforeMb: 100,
+      rssAfterMb: 116,
+      rssDeltaMb: 16,
+      residentDeltaMb: 16,
+      explicitDeltaMb: 2,
+      aboutMemoryExport: {
+        ok: true,
+        included: true,
+        source: "gecko-memory-reporter-manager.getReports",
+        reporterCount: 3,
+        textLength: 120,
+        textArtifact: artifactPath("agent-zotero-memory-about-memory.txt"),
+      },
+      topGrowingAction: {
+        actionId: "preferences.openPane",
+        label: "Open Preferences",
+        rssDeltaMb: 12,
+        residentDeltaMb: 12,
+        explicitDeltaMb: 3,
+      },
+      summary: "memory diagnostics captured 4/4 activity snapshot(s)",
+      activities: [],
+    });
 
     execNode(["scripts/agent-runner.mjs", "performance-budget-telemetry", "--", "node", "-e", "process.exit(0)"]);
     execNode(["scripts/agent-monitor.mjs"]);
@@ -1016,14 +1102,59 @@ describe("Agent Telemetry", () => {
     assert.equal(monitorJSON.engineeringHardening?.performanceBudget?.status, "attention");
     assert.equal(monitorJSON.engineeringHardening?.performanceBudget?.violationCount, 2);
     assert.equal(monitorJSON.engineeringHardening?.performanceBudget?.measuredActivityCount, 4);
+    assert.equal(monitorJSON.engineeringHardening?.cpuProfiler?.status, "passed");
+    assert.equal(monitorJSON.engineeringHardening?.cpuProfiler?.successfulActivityCount, 4);
+    assert.equal(monitorJSON.engineeringHardening?.cpuProfiler?.currentPluginCpuPercent, 40);
+    assert.equal(monitorJSON.engineeringHardening?.cpuProfiler?.unknownCpuPercent, 10);
+    assert.equal(monitorJSON.engineeringHardening?.memoryDiagnostics?.status, "passed");
+    assert.equal(monitorJSON.engineeringHardening?.memoryDiagnostics?.rssDeltaMb, 16);
+    assert.equal(monitorJSON.engineeringHardening?.memoryDiagnostics?.explicitDeltaMb, 2);
+    assert.equal(monitorJSON.engineeringHardening?.memoryDiagnostics?.aboutMemoryExport?.ok, true);
+    assert.equal(monitorJSON.engineeringHardening?.memoryDiagnostics?.aboutMemoryExport?.reporterCount, 3);
+    assert.equal(Array.isArray(monitorJSON.engineeringHardening?.performanceRecommendations), true);
+    assert.equal(
+      monitorJSON.engineeringHardening.performanceRecommendations.some((item) => item.kind === "performance-budget-violations"),
+      true,
+    );
+    assert.equal(
+      monitorJSON.engineeringHardening.performanceRecommendations.some((item) => item.kind === "current-plugin-cpu-hotspot"),
+      true,
+    );
+    assert.equal(
+      monitorJSON.engineeringHardening.performanceRecommendations.every((item) => item.gateEffect === "non-blocking"),
+      true,
+    );
     assert.ok(String(monitorJSON.engineeringHardening?.summary || "").includes("性能预算"));
+    assert.ok(String(monitorJSON.engineeringHardening?.summary || "").includes("CPU profiler"));
+    assert.ok(String(monitorJSON.engineeringHardening?.summary || "").includes("内存诊断"));
+    assert.ok(String(monitorJSON.engineeringHardening?.summary || "").includes("性能建议"));
     assert.ok(monitorMD.includes("性能预算"));
     assert.ok(monitorMD.includes("预算活动"));
     assert.ok(monitorMD.includes("超预算项"));
+    assert.ok(monitorMD.includes("CPU Profiler 诊断"));
+    assert.ok(monitorMD.includes("Current Plugin CPU"));
+    assert.ok(monitorMD.includes("内存诊断"));
+    assert.ok(monitorMD.includes("RSS delta"));
+    assert.ok(monitorMD.includes("about:memory"));
+    assert.ok(monitorMD.includes("性能诊断建议"));
+    assert.ok(monitorMD.includes("current-plugin-cpu-hotspot"));
     assert.ok(dashboardHTML.includes("性能预算"));
     assert.ok(dashboardHTML.includes("预算告警"));
+    assert.ok(dashboardHTML.includes("CPU profiler"));
+    assert.ok(dashboardHTML.includes("Profiler top bucket"));
+    assert.ok(dashboardHTML.includes("内存诊断"));
+    assert.ok(dashboardHTML.includes("内存 top growing action"));
+    assert.ok(dashboardHTML.includes("about:memory"));
+    assert.ok(dashboardHTML.includes("性能诊断建议"));
+    assert.ok(dashboardHTML.includes("建议动作"));
     assert.ok(gateMD.includes("性能预算"));
     assert.ok(gateMD.includes("预算告警"));
+    assert.ok(gateMD.includes("CPU profiler"));
+    assert.ok(gateMD.includes("内存诊断"));
+    assert.ok(gateMD.includes("about:memory"));
+    assert.ok(gateMD.includes("性能诊断建议"));
+    assert.ok(gateMD.includes("advisory / non-blocking"));
+    assert.ok(gateMD.includes("non-blocking"));
   });
 
   it("should keep validation-stage e2e artifacts readable in monitor summary", () => {

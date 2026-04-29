@@ -75,6 +75,7 @@ import { inspectStaticRuntimeBaselineFiles } from "./static-runtime-baseline-lib
 import { summarizeE2EReport } from "./agent-zotero-validation-lib.mjs";
 import { runIntegratedScenarios as runIntegratedScenarioBatch } from "./zotero-scenario-runner-lib.mjs";
 import {
+  buildDefaultScenarioExclusionList,
   isRecoverableHotReloadTransportError,
   mergeRecoveredScenarioBatch,
   planScenarioBatchRecovery,
@@ -4501,10 +4502,9 @@ async function main() {
             rdp: session.rdp,
             config,
           }));
-        const blockingScenarioExclusions = [];
-        if (normalizeScenarioName(performanceBudgetConfig?.scenarioName)) {
-          blockingScenarioExclusions.push(normalizeScenarioName(performanceBudgetConfig.scenarioName));
-        }
+        const blockingScenarioExclusions = buildDefaultScenarioExclusionList({
+          performanceBudgetScenarioName: normalizeScenarioName(performanceBudgetConfig?.scenarioName),
+        });
         let scenarios = await step("run-scenarios", async () => runIntegratedScenarioBatch({
           projectRoot,
           rdp: session.rdp,

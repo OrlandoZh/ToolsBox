@@ -1361,6 +1361,20 @@ function buildMarkdown(report) {
     lines.push(`- 预算活动: \`${report.engineeringHardening.performanceBudget?.measuredActivityCount ?? 0}/${report.engineeringHardening.performanceBudget?.expectedActivityCount ?? 0}\``);
     lines.push(`- 超预算项: \`${report.engineeringHardening.performanceBudget?.violationCount ?? 0}\``);
     lines.push(`- 预算告警: ${report.engineeringHardening.performanceBudget?.violationSummary || "-"}`);
+    lines.push(`- CPU profiler: \`${report.engineeringHardening.cpuProfiler?.statusLabel || report.engineeringHardening.cpuProfiler?.status || "-"} / advisory / ${report.engineeringHardening.cpuProfiler?.gateEffect || "non-blocking"}\``);
+    lines.push(`- Profiler 活动: \`${report.engineeringHardening.cpuProfiler?.successfulActivityCount ?? 0}/${report.engineeringHardening.cpuProfiler?.activityCount ?? 0}\``);
+    lines.push(`- Profiler 摘要: ${report.engineeringHardening.cpuProfiler?.summary || "-"}`);
+    lines.push(`- 内存诊断: \`${report.engineeringHardening.memoryDiagnostics?.statusLabel || report.engineeringHardening.memoryDiagnostics?.status || "-"} / advisory / ${report.engineeringHardening.memoryDiagnostics?.gateEffect || "non-blocking"}\``);
+    lines.push(`- 内存活动: \`${report.engineeringHardening.memoryDiagnostics?.successfulActivityCount ?? 0}/${report.engineeringHardening.memoryDiagnostics?.activityCount ?? 0}\``);
+    lines.push(`- 内存摘要: ${report.engineeringHardening.memoryDiagnostics?.summary || "-"}`);
+    lines.push(`- about:memory: \`${report.engineeringHardening.memoryDiagnostics?.aboutMemoryExport?.ok ? "captured" : (report.engineeringHardening.memoryDiagnostics?.aboutMemoryExport?.included ? "failed" : "not requested")} / advisory / non-blocking\``);
+    const performanceRecommendations = Array.isArray(report.engineeringHardening.performanceRecommendations)
+      ? report.engineeringHardening.performanceRecommendations
+      : [];
+    lines.push(`- 性能诊断建议: \`${performanceRecommendations.length} 条 / advisory / non-blocking\``);
+    performanceRecommendations.slice(0, 3).forEach((item) => {
+      lines.push(`- 性能建议: \`${item.severity || "low"} / ${item.kind || "-"}\` ${item.summary || "-"}`);
+    });
   }
 
   lines.push("", "## 本地发布矩阵", "");
@@ -1507,6 +1521,8 @@ async function main() {
   report.engineeringHardening = summarizeEngineeringHardening({
     e2e: report.zoteroValidation?.e2e,
     autofix: report.zoteroValidation?.autofix,
+    cpuProfiler: summary.engineeringHardening?.cpuProfiler,
+    memoryDiagnostics: summary.engineeringHardening?.memoryDiagnostics,
     gate: report,
   });
   await fs.mkdir(resolveAgentArtifactsDir(projectRoot), { recursive: true });

@@ -261,4 +261,60 @@ describe("Zotero Script", () => {
     assert.ok(chromeExpression.includes("\"prefsPrefix\":\"extensions.zotero.cleanroomtemplate\""));
     assert.ok(chromeExpression.includes("\"defaultPrefs\":{\"enabled\":true,\"menuLabel\":\"\",\"logLevel\":\"info\"}"));
   });
+
+  it("should allow an environment override for the curated pdf manifest path in scenario runtime config", async () => {
+    const previousOverride = process.env.CLEANROOM_PDF_TEST_CORPUS_MANIFEST_PATH;
+    process.env.CLEANROOM_PDF_TEST_CORPUS_MANIFEST_PATH = "/tmp/custom-curated.json";
+
+    const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cleanroom-zotero-script-"));
+    const scenarioDir = path.join(projectRoot, "zotero-scenarios");
+    fs.mkdirSync(scenarioDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(scenarioDir, "curated-pdf-import.scenario.js"),
+      "registerZoteroScenario('curated pdf corpus import smoke', async () => ({}));\n",
+      "utf-8",
+    );
+
+    let chromeExpression = null;
+    try {
+      await initializeScenarioRegistry({
+        projectRoot,
+        rdp: {
+          async evaluateInChrome(expression) {
+            chromeExpression = expression;
+            return JSON.stringify({
+              registeredScenarios: [
+                {
+                  name: "curated pdf corpus import smoke",
+                  sourceFileHref: "file:///curated-pdf-import.scenario.js",
+                },
+              ],
+              execution: {
+                registeredScenarioNames: ["curated pdf corpus import smoke"],
+              },
+            });
+          },
+        },
+        config: {
+          addonId: "cleanroom-template@example.com",
+          addonName: "Cleanroom Template",
+          addonRef: "cleanroomtemplate",
+          addonVersion: "0.1.0",
+          instanceKey: "CleanroomTemplate",
+        },
+      });
+    }
+    finally {
+      if (previousOverride === undefined) {
+        delete process.env.CLEANROOM_PDF_TEST_CORPUS_MANIFEST_PATH;
+      }
+      else {
+        process.env.CLEANROOM_PDF_TEST_CORPUS_MANIFEST_PATH = previousOverride;
+      }
+      fs.rmSync(projectRoot, { recursive: true, force: true });
+    }
+
+    assert.equal(typeof chromeExpression, "string");
+    assert.ok(chromeExpression.includes("\"defaultManifestPath\":\"/tmp/custom-curated.json\""));
+  });
 });

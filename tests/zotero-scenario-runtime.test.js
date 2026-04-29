@@ -53,6 +53,7 @@ function loadScenarioRuntime(scriptedFiles = new Map()) {
 this.__scenarioRuntimeExports = {
   createScenarioRuntimeState,
   createErrorPayload,
+  createScenarioHelpers,
   runScenarioCase,
   snapshotScenarioExecution,
 };`,
@@ -276,5 +277,191 @@ describe("Zotero Scenario Runtime", () => {
     assert.equal(payload.result.details.domContract.statusLabel, "通过");
     assert.equal(payload.result.details.domContract.checkCount, 1);
     assert.equal(payload.result.details.domContract.failedCheckCount, 0);
+  });
+
+  it("should report curated pdf corpus availability without failing when the manifest is missing", async () => {
+    const { sandbox, exports } = loadScenarioRuntime();
+    sandbox.IOUtils = {
+      async exists() {
+        return false;
+      },
+    };
+
+    const runtime = exports.createScenarioHelpers({
+      Zotero: sandbox.Zotero,
+      Services: sandbox.Services,
+      ChromeUtils: sandbox.ChromeUtils,
+      addonConfig: {
+        instanceKey: "TestPlugin",
+        cleanroomPdfTestCorpus: {
+          defaultManifestPath: "/tmp/missing-curated.json",
+        },
+      },
+      plugin: sandbox.Zotero.TestPlugin,
+    });
+
+    const status = await runtime.helpers.getCuratedPDFCorpusStatus();
+
+    assert.equal(status.available, false);
+    assert.equal(status.errorKind, "missing-manifest");
+    assert.equal(status.manifestPath, "/tmp/missing-curated.json");
+  });
+
+  it("should import a curated pdf corpus entry and create a metadata parent item", async () => {
+    const { sandbox, exports } = loadScenarioRuntime();
+    const manifestPath = "/tmp/curated.json";
+    const sourceFilePath = "/tmp/core-entry.pdf";
+    const items = new Map();
+    const importedCalls = [];
+    let nextItemID = 1;
+
+    class MockItem {
+      constructor(itemType) {
+        this.itemType = itemType;
+        this.fields = {};
+        this.creators = [];
+        this.tags = [];
+        this.id = null;
+      }
+
+      setField(field, value) {
+        this.fields[field] = value;
+      }
+
+      setCreators(creators) {
+        this.creators = creators;
+      }
+
+      setCollections(collections) {
+        this.collections = collections;
+      }
+
+      addTag(tag) {
+        this.tags.push(tag);
+      }
+
+      async saveTx() {
+        if (!this.id) {
+          this.id = nextItemID++;
+          items.set(this.id, this);
+        }
+        return this.id;
+      }
+
+      async eraseTx() {
+        items.delete(this.id);
+        this.erased = true;
+      }
+
+      getField(field) {
+        return this.fields[field] || "";
+      }
+    }
+
+    sandbox.Zotero.Item = MockItem;
+    sandbox.Zotero.Items = {
+      get(itemID) {
+        return items.get(itemID) || null;
+      },
+    };
+    sandbox.Zotero.Attachments = {
+      async importFromFile(args) {
+        importedCalls.push(args);
+        const attachment = {
+          id: nextItemID++,
+          parentItemID: args.parentItemID,
+          title: args.title,
+          async eraseTx() {
+            items.delete(attachment.id);
+          },
+        };
+        items.set(attachment.id, attachment);
+        return attachment;
+      },
+    };
+    sandbox.IOUtils = {
+      async exists(targetPath) {
+        return targetPath === manifestPath || targetPath === sourceFilePath;
+      },
+      async readUTF8(targetPath) {
+        if (targetPath !== manifestPath) {
+          throw new Error(`Unexpected read: ${targetPath}`);
+        }
+        return JSON.stringify({
+          groups: [
+            {
+              id: "core-text-smoke",
+              label: "Core Text Smoke",
+              reason: "Core entry",
+              entries: [
+                {
+                  id: "pdf-core",
+                  fileName: "core-entry.pdf",
+                  relativePath: "core-entry.pdf",
+                  absolutePath: sourceFilePath,
+                  familyKey: "core-entry",
+                  recommendedLane: "core-text",
+                  variantKind: "original",
+                  resolvedMetadata: {
+                    title: "Core Entry Title",
+                    author: "Ada Lovelace",
+                    doi: "10.1000/core",
+                    journal: "Cleanroom Journal",
+                  },
+                },
+              ],
+            },
+          ],
+        });
+      },
+      async remove() {},
+    };
+
+    const runtime = exports.createScenarioHelpers({
+      Zotero: sandbox.Zotero,
+      Services: sandbox.Services,
+      ChromeUtils: sandbox.ChromeUtils,
+      addonConfig: {
+        instanceKey: "TestPlugin",
+        cleanroomPdfTestCorpus: {
+          defaultManifestPath: manifestPath,
+        },
+      },
+      plugin: sandbox.Zotero.TestPlugin,
+    });
+
+    const status = await runtime.helpers.getCuratedPDFCorpusStatus();
+    assert.equal(status.available, true);
+    assert.equal(status.groupCount, 1);
+    assert.equal(status.entryCount, 1);
+
+    const imported = await runtime.helpers.importCuratedPDF({
+      createParentItem: true,
+    });
+
+    assert.equal(imported.group.id, "core-text-smoke");
+    assert.equal(imported.entry.id, "pdf-core");
+    assert.equal(imported.sourceFilePath, sourceFilePath);
+    assert.equal(imported.parentItem.itemType, "journalArticle");
+    assert.equal(imported.parentItem.getField("title"), "Core Entry Title");
+    assert.equal(imported.parentItem.getField("publicationTitle"), "Cleanroom Journal");
+    assert.equal(imported.parentItem.getField("DOI"), "10.1000/core");
+    assert.deepEqual(imported.parentItem.creators, [
+      {
+        creatorType: "author",
+        name: "Ada Lovelace",
+      },
+    ]);
+    assert.deepEqual(importedCalls, [
+      {
+        file: sourceFilePath,
+        parentItemID: imported.parentItem.id,
+        title: "Core Entry Title",
+        contentType: "application/pdf",
+      },
+    ]);
+
+    await runtime.cleanup();
+    assert.equal(items.size, 0);
   });
 });

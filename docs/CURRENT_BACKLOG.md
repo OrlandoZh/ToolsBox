@@ -13,9 +13,16 @@
 - clean-room 模板骨架
 - Zotero 真机开发链
 - agent 验证/恢复/汇总/门禁链
-- dev-only 性能预算观察链
+- dev-only 性能诊断链
   - 参考 `know-ur-zotero` 的 activity-oriented 采样思路，但不把 `Services.profiler` 常驻监控带入模板基线
-  - 当前默认只在 `agent:zotero:e2e -> agent:monitor / dashboard / gate` 中评估 lifecycle/http 与代表性 host actions，保持 `advisory + non-blocking`
+  - `performanceBudget` 作为默认 E2E advisory，覆盖 lifecycle/http 与代表性 host actions 耗时，并进入 `agent:zotero:e2e -> agent:monitor / dashboard / gate` 摘要
+  - `agent:zotero:profile` 作为 dev-only、手动触发、non-blocking 的 CPU profiler 诊断旁路，输出 `dist/agent-zotero-profile.{json,md}`，按 Current Plugin / Zotero Main / Reader / Note Editor / Other / Unknown 归因
+  - 最新 CPU profiler 摘要已接入 `agent:monitor / dashboard` advisory 展示，并复用 `agent-memory/signals` 归档 `cpuProfiler` 趋势
+  - `agent:zotero:memory` 作为 dev-only、手动触发、non-blocking 的内存诊断旁路，输出 `dist/agent-zotero-memory.{json,md}`，采集 RSS/resident/explicit before-after delta，并接入 monitor/dashboard advisory 与 `memoryDiagnostics` 趋势
+  - `agent:zotero:memory -- --include-about-memory` 现可额外导出完整 Gecko memory reporter 文本到 `dist/agent-zotero-memory-about-memory.txt`
+  - `performanceRecommendations` 已把 `performanceBudget`、CPU profiler 与内存诊断 compact summary 汇总成 monitor/dashboard/gate 可见的 advisory 建议
+  - 手动诊断现已补 `profiler extended diagnostics` 与 `memory extended diagnostics`，覆盖批量 item selection 与 Reader sidebar view cycle 这类较重采样场景
+  - 性能诊断旁路与建议层不进入默认 `check / agent:gate / release` 阻断链，也不替代现有 `performanceBudget`
 - Obsidian 人工介入工作台
 - 纯项目导出
 - 中国法优先的商业交付法务骨架
@@ -279,7 +286,7 @@
 - 当前插件可见文案已统一跟随 Zotero 语言：`menu item`、Reader View 菜单项、`preference pane` 与 `item pane` 基线现统一复用 `main.ftl + i18n bridge`，内置 locale 覆盖 `en-US / zh-CN / zh-TW`
 - 最新 bounded foreground `zotero:watch` 已在 `2026-04-06T06:37:05.164Z` 刷新为 `healthy`：startup health 通过、`latestPassed=true`，当前不再把过期 watch 工件视为开发态主阻断
 - 最新开发态 `agent:monitor` / `agent:gate` 已在 `2026-04-06T06:37:56.329Z` / `2026-04-06T06:37:56.574Z` 消费 fresh E2E + watch 工件并回到 `stable / ready`；当前 `gatePassed=true`，frontpage headline 已重新固定为“watch、真机验证与恢复回归均已通过，当前闭环状态稳定”
-- 当前已新增 dev-only `performanceBudget` advisory：latest direct E2E `2026-04-06T06:35:06.375Z` 已把 lifecycle/http 与代表性 host actions 的预算结果写入 `agent-zotero-e2e / monitor / gate`；当前预算状态已回到 `passed`，`preferences.openPane` 已降到 `1113ms / 1600ms`，活动 `4/4` 全部通过，同时继续保持非阻断，不向下游项目注入额外 runtime profiler 开销
+- 当前 dev-only 性能诊断链已分为三层：`performanceBudget` 继续作为默认 E2E advisory，latest direct E2E `2026-04-06T06:35:06.375Z` 已把 lifecycle/http 与代表性 host actions 的预算结果写入 `agent-zotero-e2e / monitor / gate`，当前预算状态为 `passed`，`preferences.openPane` 为 `1113ms / 1600ms`，活动 `4/4` 全部通过；`agent:zotero:profile` 已作为手动 CPU profiler 旁路完成并真机验证，`npm run agent:zotero:profile -- --duration-ms 50 --skip-build` 已采集 `4/4` activity profiles，输出 `dist/agent-zotero-profile.{json,md}` 并按 Current Plugin / Zotero Main / Reader / Note Editor / Other / Unknown 归因，最新 profiler compact 摘要现已接入 `agent:monitor / dashboard` advisory 展示，并通过 `agent-memory/signals/cpuProfiler.json` 归档趋势；`agent:zotero:memory` 现已补 dev-only 手动内存诊断 MVP，输出 `dist/agent-zotero-memory.{json,md}`，采集代表性 host actions 的 RSS/resident/explicit before-after delta，并通过 `agent-memory/signals/memoryDiagnostics.json` 归档趋势，且 `--include-about-memory` 现可额外导出完整 Gecko memory reporter 文本到 `dist/agent-zotero-memory-about-memory.txt`；`performanceRecommendations` 现已把三层 compact summary 汇总成自动诊断建议，在 monitor/dashboard/gate 中作为 advisory evidence 展示；`profiler extended diagnostics` 与 `memory extended diagnostics` 现已补手动扩展采样场景，覆盖批量 item selection 与 Reader sidebar view cycle。三者、建议层与扩展场景均保持 advisory + non-blocking，不进入默认 `check / agent:gate / release` 阻断链，也不向下游项目注入常驻 profiler / memory monitor 开销
 - 最新 focused live probe `reader surface smoke` 已在 `2026-04-04T10:03:46.084Z` 通过，说明 Reader surface smoke 不只停留在历史 E2E 工件，而是继续可在真机单场景复现
 - `agent:context` 已新增统一只读上下文层：当前会输出 `dist/agent-context.{json,md}`，汇总 stable / dynamic context、decision hints 与 drift signals；本轮已新增 `runtime-compact-v1` 只读派生视图，默认只暴露 truth/action/status/drift/evidence/artifact refs + freshness/budget，并已接入 gate、Obsidian 工作台、dashboard 与 delegation runtime prompt；`agent:context:guard` 当前继续保持 warning-only
 - `ZOTERO-HOST-POLISH-WAVE-001` 已在 `2026-04-08` 收口完成：以 `config/project-validation-surfaces.json` 与现有 host action / surface smoke 为主轴的 live interaction consistency、edge-attached geometry 与 surface-local evidence 已完成模板级闭环；`ZOTERO-DOM-CONTRACT-WAVE-001` 也已完成，在这个完成基线之上追加 route-aware DOM contract advisory，不把上一轮已完成结论重新拉回 blocker
@@ -529,13 +536,13 @@
   - 全局错误边界
   - 参数验证增强
   - HTTP 超时策略增强
-  - 性能监控点
+  - 性能诊断增强：heap diff
 
 ### 优先级
 
 - 错误边界 / 参数验证
   - 中优先级
-- 性能监控点
+- 性能诊断增强（heap diff）
   - 低到中优先级
 
 ## 文档同步机制

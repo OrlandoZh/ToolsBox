@@ -489,6 +489,32 @@ describe("Agent Memory Lib", () => {
             "未观测到完整恢复触发序列：session-restart-recovery",
           ],
         },
+        cpuProfiler: {
+          present: true,
+          generatedAt: "2026-03-21T10:12:00.000Z",
+          status: "passed",
+          statusLabel: "通过",
+          summary: "profiler diagnostics captured 4/4 activity profile(s)",
+          activityCount: 4,
+          successfulActivityCount: 4,
+          failedActivityCount: 0,
+          totalCpuTime: 100,
+          currentPluginCpuPercent: 40,
+          unknownCpuPercent: 10,
+        },
+        memoryDiagnostics: {
+          present: true,
+          generatedAt: "2026-03-21T10:13:00.000Z",
+          status: "passed",
+          statusLabel: "通过",
+          summary: "memory diagnostics captured 4/4 activity snapshot(s)",
+          activityCount: 4,
+          successfulActivityCount: 4,
+          failedActivityCount: 0,
+          rssDeltaMb: 16,
+          residentDeltaMb: 16,
+          explicitDeltaMb: 2,
+        },
         gate: {
           generatedAt: "2026-03-21T10:15:00.000Z",
           gatePassed: false,
@@ -539,6 +565,12 @@ describe("Agent Memory Lib", () => {
       assert.includes(reasonKeys, "gate:autofix-missing");
       assert.includes(reasonKeys, "gate:watch-recovery-failed");
       assert.includes(reasonKeys, "gate:watch-recovery-sequence-incomplete");
+      const cpuProfiler = signalTrends.signals.find((item) => item.signalId === "cpuProfiler");
+      assert.equal(cpuProfiler?.latestStatus, "passed");
+      assert.equal(cpuProfiler?.metricTrends?.some((item) => item.metricId === "currentPluginCpuPercent"), true);
+      const memoryDiagnostics = signalTrends.signals.find((item) => item.signalId === "memoryDiagnostics");
+      assert.equal(memoryDiagnostics?.latestStatus, "passed");
+      assert.equal(memoryDiagnostics?.metricTrends?.some((item) => item.metricId === "rssDeltaMb"), true);
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }

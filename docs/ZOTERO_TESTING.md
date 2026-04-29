@@ -13,6 +13,8 @@
   - `npm run zotero:console`
   - `npm run zotero:watch`
   - `npm run agent:zotero:e2e`
+  - `npm run agent:zotero:profile`
+  - `npm run agent:zotero:memory`
   - `npm run agent:zotero:loop`
   - `npm run agent:zotero:loop:human`
   - `npm run agent:zotero:watch-recovery`
@@ -24,7 +26,7 @@
 - runner 通过 `consoleActor.evaluateJSAsync + Promise.resolve(...) + Services.tm.spinEventLoopUntil(...)` 在 Zotero chrome 侧同步等待异步表达式完成，避免 RDP 返回 `Promise<pending>` 干扰 agent 判定
 - 已额外在干净 profile 中验证：打包产物 `dist/cleanroomtemplate-0.1.0.xpi` 通过 Zotero “Install Add-on From File” 安装后，会自动进入原生 bootstrap 生命周期，并挂出 `Zotero.CleanroomTemplate.api`
 - `npm run zotero:test` 当前会验证 3 条真机断言：插件实例挂载、baseline API 暴露、默认 `ItemPane / ItemTree / Reader 菜单` demo 已进入 Zotero 原生管理器或注册表
-- `npm run zotero:scenario` 当前会验证 12 条真机场景：baseline 注册、真实条目选择、真实条目修改触发 Notifier、真实 PDF Reader 打开、Reader 交互摘要、Reader 批注回环、Reader renderToolbar 事件桥、Reader 细粒度浮层/上下文菜单探针、settings schema 与偏好设置面板诊断、preference pane live control interaction、多窗口挂载、无阻塞 agent 动作
+- `npm run zotero:scenario` 当前会验证 15 条真机场景：baseline 注册、真实条目选择、真实条目修改触发 Notifier、真实 PDF Reader 打开、Reader 交互摘要、Reader 批注回环、Reader renderToolbar 事件桥、Reader 细粒度浮层/上下文菜单探针、settings schema 与偏好设置面板诊断、preference pane live control interaction、多窗口挂载、无阻塞 agent 动作，以及 3 条可选的 curated PDF corpus smoke（core-text / scan-ocr / permission-edge）
 - `npm run zotero:watch` 当前已验证：启动健康检查通过；一次真实热重载后会刷新 `dist/zotero-watch-status.json` 与 `dist/zotero-watch-status.md`；一次受控构建失败后会先进入 `runtime-recovery`，并已在强制注入 runtime 恢复失败的情况下实测通过 `session-restart-recovery`
 - `npm run agent:zotero:watch-recovery` 当前已验证：可在真机中自动完成“启动 watch -> 注入一次性 build 失败 -> 注入一次性 runtime 恢复失败 -> 观测 session-restart-recovery 成功”的受控回归，并输出独立恢复报告
 - `agent:monitor` / `agent:dashboard` / `agent:gate` 已接入 `dist/zotero-watch-status.json`：agent 主报告会展示热重载状态、状态时间与简单问题摘要；开发档位门禁会额外识别“健康但已过期”或“时间超前”的旧状态，避免误把陈旧/异常结果当成当前可用结论
@@ -65,7 +67,23 @@ npm run zotero:console
 npm run zotero:smoke
 npm run zotero:test
 npm run zotero:scenario
+npm run zotero:scenario:curated-all
+npm run zotero:scenario:curated-pdf
+npm run zotero:scenario:scan-ocr
+npm run zotero:scenario:permission-edge
+npm run agent:zotero:curated-pdf
 npm run agent:zotero:e2e
+npm run agent:zotero:profile
+npm run agent:zotero:profile -- --scenario "profiler extended diagnostics"
+npm run agent:zotero:profile -- --duration-ms 50
+npm run agent:zotero:profile -- --include-details
+npm run agent:zotero:profile -- --profile-fixture "/absolute/path/to/profile.json"
+npm run agent:zotero:memory
+npm run agent:zotero:memory -- --scenario "memory extended diagnostics"
+npm run agent:zotero:memory -- --include-about-memory
+npm run agent:zotero:memory -- --duration-ms 50
+npm run agent:zotero:memory -- --include-details
+npm run agent:zotero:memory -- --memory-fixture "/absolute/path/to/memory.json"
 npm run agent:zotero:debug-probe
 npm run agent:zotero:e2e:restart
 npm run agent:zotero:loop
@@ -75,7 +93,102 @@ npm run agent:zotero:autofix
 npm run agent:computer-use:plan
 npm run agent:obsidian
 npm run export:project
+npm run pdf:corpus:scan -- --root "/absolute/path/to/pdf-corpus"
+npm run pdf:corpus:curate -- --manifest dist/pdf-test-corpus-manifest.json
 ```
+
+## 性能诊断
+
+当前性能诊断链分成默认 advisory 预算、手动 CPU profiler 与手动内存诊断三层：
+
+- `performanceBudget` 是 `agent:zotero:e2e` 默认携带的 advisory 摘要，覆盖 lifecycle/http 与代表性 host action 耗时，并被 `agent:monitor` / `agent:dashboard` / `agent:gate` 展示；它保持 non-blocking，不作为 release blocker。
+- `npm run agent:zotero:profile` 是 dev-only、手动触发、non-blocking 的 CPU profiler 诊断旁路，会在 Zotero chrome runtime 内临时调用 `Services.profiler`，对代表性 host actions 独立 start/stop profiler，并输出 `dist/agent-zotero-profile.json` 与 `dist/agent-zotero-profile.md`。
+- profiler 报告按 Current Plugin / Zotero Main / Reader / Note Editor / Other / Unknown 归因 CPU 样本；默认 Markdown 只展示 top buckets 与 top stacks，`--include-details` 才输出更详细 stack 列表。
+- `--duration-ms <n>` 可缩短或拉长每个 action 的采样窗口；`--profile-fixture <path>` 可用本地 Gecko profile fixture 生成报告，适合脚本和回归测试。
+- `--scenario "profiler extended diagnostics"` 会改跑手动扩展采样场景，覆盖批量 item selection 与 Reader sidebar view cycle；它不改变默认 profiler 场景。
+- hang probe 只服务 E2E 超时/卡死诊断，记录进程 RSS/%mem 与 macOS `sample` 线索；它不是 profiler，也不替代手动内存诊断。
+
+运行 profiler 后，可继续执行 `npm run agent:monitor` 与 `npm run agent:dashboard` 查看最新 CPU profiler advisory 摘要；摘要会展示活动采样数、Current Plugin / Unknown CPU 占比、top bucket / top action，并把 `cpuProfiler` 写入 `agent-memory/signals` 趋势归档。
+
+这条 profiler 旁路不会改变 `agent:zotero:e2e`、`agent:monitor`、`agent:gate` 或 release 结论，也不替代 `performanceBudget`。当前首版只做 CPU profiler，不做 heap diff、`about:memory` 导出或常驻监控。
+
+手动内存诊断入口为 `npm run agent:zotero:memory`：
+
+- 默认运行 `memory diagnostics` 场景，复用代表性 host actions，并对每个 action 采集 before/after memory snapshot。
+- 输出 `dist/agent-zotero-memory.json` 与 `dist/agent-zotero-memory.md`，默认展示 RSS/resident/explicit delta、top growing action 与每个 action 的采样状态。
+- `--duration-ms <n>` 可控制每个 action 的最小观测窗口；`--include-details` 会保留原始 snapshot；`--memory-fixture <path>` 可用本地 fixture 生成报告。
+- `--include-about-memory` 会额外导出完整 Gecko memory reporter 文本到 `dist/agent-zotero-memory-about-memory.txt`，JSON 中只保留 reporter 数、文本长度和 sidecar 路径。
+- `--scenario "memory extended diagnostics"` 会改跑手动扩展采样场景，覆盖批量 item selection 与 Reader sidebar view cycle；它不改变默认内存诊断场景。
+- 运行后 `agent:monitor` / `agent:dashboard` 会显示内存诊断 advisory 摘要，并把 `memoryDiagnostics` 写入 `agent-memory/signals` 趋势归档。
+- 这条 lane 不做 heap diff，也不作为 `check / agent:gate / release` blocker。
+
+`agent:monitor` / `agent:dashboard` 还会基于 `performanceBudget`、CPU profiler 与内存诊断 compact summary 生成 `performanceRecommendations` advisory 建议，用来提示优先查看超预算 action、插件 CPU hotspot、Unknown CPU 归因、内存增长或采样失败。`agent:gate` 可展示这些建议，但它们仍是 non-blocking，不新增 gate / release blocker。
+
+## 外置 PDF 固定测试集
+
+对于真实 PDF Reader / 导入 / 元数据回归，优先把 PDF 保持为**仓库外置语料库**，再用命令生成结构化 manifest，而不是把大体积真实文件直接提交到 `tests/`。
+
+示例：
+
+```bash
+npm run pdf:corpus:scan -- --root "/Users/me/Documents/pdf-corpus"
+npm run pdf:corpus:scan -- --root "/Users/me/Documents/pdf-corpus" --enrich-online --crossref-mailto "me@example.com"
+npm run pdf:corpus:curate -- --manifest dist/pdf-test-corpus-manifest.json
+npm run zotero:scenario:curated-all
+npm run zotero:scenario:curated-pdf
+npm run zotero:scenario:scan-ocr
+npm run zotero:scenario:permission-edge
+npm run agent:zotero:curated-pdf
+```
+
+这条命令会输出 `dist/pdf-test-corpus-manifest.json`，当前会记录：
+
+- 文件哈希、页数、加密状态、首页是否可抽文本
+- 嵌入式 PDF metadata 与文件名派生 metadata
+- family 去重关系、`translated-variant` / `scan-ocr` / `permission-edge` 等 tag
+- 可选 Crossref 联网补全结果与保守合并后的 `resolvedMetadata`
+
+而 `pdf:corpus:curate` 会继续基于 manifest 生成一版 balanced 固定子集：
+
+- `dist/pdf-test-corpus-curated.balanced.json`
+- `dist/pdf-test-corpus-curated.balanced.md`
+
+当前 curated 规则会优先覆盖：
+
+- core text smoke
+- metadata online repair
+- metadata local fallback
+- translation bundle family
+- scan / OCR lane
+- permission-edge lane
+
+生成 curated manifest 后，当前可以直接用 `npm run zotero:scenario:curated-pdf` 触发真实 Zotero 导入 smoke：
+
+- 默认读取 `dist/pdf-test-corpus-curated.balanced.json`
+- 默认优先选择 `core-text-smoke` 里的第一个样本
+- 若本机尚未生成 curated manifest，该场景会返回 `fixtureStatus=unavailable`，不把整条默认 scenario 链硬绑到每台机器都具备同一份外置 PDF
+- 若 manifest 已存在但 JSON 结构损坏、条目文件丢失，场景会失败，用来提醒修复本地测试语料
+
+另外两条 lane-specific smoke 当前分别对应：
+
+- `npm run zotero:scenario:scan-ocr`
+  - 导入 `scan-ocr` lane 的扫描件样本，验证“无可抽文本 PDF”也能稳定导入并打开 Reader，同时保留“textExtractable=false”的 lane 语义
+- `npm run zotero:scenario:permission-edge`
+  - 导入 `permission-edge` lane 的受限样本，验证加密 PDF 的导入/打开边界不会把 Zotero 或插件链路打挂
+
+如果想一条命令跑完整个 curated PDF dev-only 回归，当前可以直接用：
+
+- `npm run zotero:scenario:curated-all`
+  - 直接跑所有 `curated-pdf*.scenario.js` 场景
+- `npm run agent:zotero:curated-pdf`
+  - 先校验 curated manifest，再跑全部 curated PDF 场景，并输出 `dist/agent-zotero-curated-pdf.{json,md}`
+  - 这条命令是显式的 dev-only 支线，不进入默认 `watch -> e2e -> monitor -> gate` 主链
+
+约束：
+
+- 这条链只服务开发态回归，不改变 `watch -> e2e -> monitor -> gate` 主线结论
+- 真实 PDF 继续保持仓库外置；manifest 可以进 `dist/` 或本地私有目录，但不要把原始 PDF 直接并入发布包 / pure-project 导出物
+- 如果某条断言不需要真实 PDF，仍优先使用临时 fixture，而不是把外置语料库提升成单元测试硬依赖
 
 ## Debug Probe Design
 
@@ -480,6 +593,8 @@ registerZoteroScenario("real item selection diagnostics", async ({ assert, helpe
 - `createItem()`：创建临时 Zotero 条目，并在场景结束后自动清理
 - `selectItem()`：在主窗口中选择条目，并等待选择态稳定
 - `createPDF()`：生成 clean-room 临时 PDF，导入为 Zotero 附件
+- `getCuratedPDFCorpusStatus()`：读取 curated manifest 可用性摘要，便于把外置语料链做成 optional smoke
+- `importCuratedPDF()`：按 `groupID` / `entryID` / `fileName` 等条件导入 curated manifest 中的真实 PDF，并可选地按 `resolvedMetadata` 创建父条目
 - `openReader()`：打开指定附件的真实 Reader，并等待初始化完成
 - `openMainWindow()`：打开第二个 Zotero 主窗口，并等待插件窗口级挂载可观测
 - `wait()` / `waitFor()`：等待宿主异步状态

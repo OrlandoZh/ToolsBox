@@ -707,6 +707,7 @@ export async function runScenarioMode({
   listScenarios = false,
   scenarioPattern = null,
   scenarioFilePattern = null,
+  scenarioRuntimeOptions = null,
   quiet = false,
 } = {}) {
   const mode = "scenario";
@@ -815,6 +816,7 @@ export async function runScenarioMode({
       listOnly: listScenarios,
       scenarioPattern,
       scenarioFilePattern,
+      scenarioRuntimeOptions,
       modeLabel: "zotero:scenario",
       processLogs,
     });

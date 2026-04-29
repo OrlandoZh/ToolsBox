@@ -50,6 +50,23 @@ export function resolveZoteroDebugProbeArtifacts(projectRoot) {
   };
 }
 
+export function resolveZoteroProfileArtifacts(projectRoot) {
+  return {
+    artifactsDir: resolveAgentArtifactsDir(projectRoot),
+    reportJSON: resolveAgentArtifactPath(projectRoot, "agent-zotero-profile.json"),
+    reportMD: resolveAgentArtifactPath(projectRoot, "agent-zotero-profile.md"),
+  };
+}
+
+export function resolveZoteroMemoryArtifacts(projectRoot) {
+  return {
+    artifactsDir: resolveAgentArtifactsDir(projectRoot),
+    reportJSON: resolveAgentArtifactPath(projectRoot, "agent-zotero-memory.json"),
+    reportMD: resolveAgentArtifactPath(projectRoot, "agent-zotero-memory.md"),
+    aboutMemoryTXT: resolveAgentArtifactPath(projectRoot, "agent-zotero-memory-about-memory.txt"),
+  };
+}
+
 function normalizeWasmKernelScenarioName(scenarioName = "") {
   return String(scenarioName || "").trim().toLowerCase();
 }

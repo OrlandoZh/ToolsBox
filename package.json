@@ -121,7 +121,10 @@
     "agent:zotero:e2e": "node scripts/agent-zotero-e2e.mjs --cycles 2 --strategy hot",
     "agent:zotero:e2e:restart": "node scripts/agent-zotero-e2e.mjs --cycles 2 --strategy restart",
     "agent:zotero:e2e:update-baseline": "node scripts/agent-zotero-e2e.mjs --cycles 2 --strategy hot --update-visual-baseline",
+    "agent:zotero:curated-pdf": "node scripts/agent-zotero-curated-pdf.mjs",
     "agent:zotero:debug-probe": "node scripts/agent-zotero-debug-probe.mjs",
+    "agent:zotero:profile": "node scripts/agent-zotero-profile.mjs",
+    "agent:zotero:memory": "node scripts/agent-zotero-memory.mjs",
     "agent:zotero:loop": "node scripts/agent-zotero-loop.mjs",
     "agent:zotero:loop:human": "node scripts/agent-zotero-loop.mjs --human-window-ms 60000",
     "agent:zotero:watch-recovery": "node scripts/zotero-watch-recovery-regression.mjs",
@@ -154,9 +157,15 @@
     "zotero:smoke": "node scripts/zotero.mjs smoke",
     "zotero:test": "node scripts/zotero.mjs test",
     "zotero:scenario": "node scripts/zotero.mjs scenario",
+    "zotero:scenario:curated-all": "node scripts/zotero.mjs scenario --scenario-file \"curated-pdf\"",
     "zotero:scenario:preferences-surface": "node scripts/zotero.mjs scenario --scenario \"preference pane surface smoke\"",
     "zotero:scenario:preferences-controls": "node scripts/zotero.mjs scenario --scenario \"preference pane control interaction\"",
-    "scenario:coverage": "node scripts/scenario-runner.mjs"
+    "zotero:scenario:curated-pdf": "node scripts/zotero.mjs scenario --scenario \"curated pdf corpus import smoke\"",
+    "zotero:scenario:scan-ocr": "node scripts/zotero.mjs scenario --scenario \"curated pdf scan ocr smoke\"",
+    "zotero:scenario:permission-edge": "node scripts/zotero.mjs scenario --scenario \"curated pdf permission edge smoke\"",
+    "scenario:coverage": "node scripts/scenario-runner.mjs",
+    "pdf:corpus:scan": "node scripts/pdf-test-corpus.mjs",
+    "pdf:corpus:curate": "node scripts/pdf-test-corpus-curate.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.21.5",
