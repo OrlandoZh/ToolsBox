@@ -25,6 +25,7 @@ import './task-queue.test.js';
 import './window-shell.test.js';
 import './agent-review-workbench.test.js';
 import './review-workbench-runtime-provider.test.js';
+import './zotero-surface-wind-tunnel.test.js';
 import './surface-window-mode.test.js';
 import './lifecycle.test.js';
 import './http.test.js';

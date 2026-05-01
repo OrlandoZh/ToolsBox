@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zotero Surface Wind Tunnel</title>
+    <link rel="stylesheet" href="/static/wind-tunnel.css" />
+  </head>
+  <body>
+    <div class="wind-shell">
+      <header class="wind-header">
+        <div class="wind-title-block">
+          <p class="wind-kicker">Template Dev Tool</p>
+          <h1>Zotero Surface Wind Tunnel</h1>
+        </div>
+        <div class="wind-runbar" aria-label="运行控制">
+          <button id="wind-start" type="button">Start</button>
+          <button id="wind-step" type="button">Step</button>
+          <button id="wind-reset" type="button">Reset</button>
+        </div>
+      </header>
+
+      <main class="wind-grid">
+        <aside class="wind-control-panel" aria-label="场景与压力控制">
+          <section class="wind-panel-section">
+            <div class="wind-section-heading">
+              <h2>Modules</h2>
+              <span class="wind-badge">switch</span>
+            </div>
+            <div id="wind-module-list" class="wind-module-list"></div>
+            <p id="wind-module-summary" class="wind-module-summary"></p>
+          </section>
+
+          <section class="wind-panel-section">
+            <div class="wind-section-heading">
+              <h2>Scenario</h2>
+              <span id="wind-route-badge" class="wind-badge">library</span>
+            </div>
+            <label class="wind-field">
+              <span>场景</span>
+              <select id="wind-scenario"></select>
+            </label>
+            <label class="wind-field">
+              <span>瓶颈预设</span>
+              <select id="wind-preset"></select>
+            </label>
+            <div id="wind-scenario-cards" class="wind-scenario-cards"></div>
+            <div id="wind-coverage-tags" class="wind-surface-list"></div>
+            <div id="wind-reference-list" class="wind-reference-list"></div>
+            <div id="wind-surface-list" class="wind-surface-list"></div>
+          </section>
+
+          <section class="wind-panel-section">
+            <div class="wind-section-heading">
+              <h2>Pressure</h2>
+              <span id="wind-score-label" class="wind-badge">0</span>
+            </div>
+            <div id="wind-control-sliders" class="wind-slider-list"></div>
+          </section>
+        </aside>
+
+        <section class="wind-stage-panel" aria-label="Zotero surface simulation">
+          <div class="zotero-window-chrome">
+            <div class="zotero-window-buttons" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <div class="zotero-window-title">Zotero Template Runtime</div>
+            <div id="wind-status-pill" class="wind-status-pill">idle</div>
+          </div>
+          <div id="wind-stage" class="wind-stage"></div>
+          <div id="wind-event-log" class="wind-event-log" aria-label="事件日志"></div>
+        </section>
+
+        <aside class="wind-metrics-panel" aria-label="性能指标">
+          <div class="wind-panel-collapse-rail">
+            <button id="wind-toggle-metrics" type="button" aria-label="Toggle data panel" title="Toggle data panel">&gt;</button>
+            <span>Data</span>
+          </div>
+          <section class="wind-panel-section">
+            <div class="wind-section-heading">
+              <h2>Coverage</h2>
+              <span id="wind-coverage-count" class="wind-badge">0/0</span>
+            </div>
+            <div id="wind-coverage-map" class="wind-coverage-map"></div>
+          </section>
+
+          <section class="wind-panel-section">
+            <div class="wind-section-heading">
+              <h2>Metrics</h2>
+              <span id="wind-severity-label" class="wind-badge">low</span>
+            </div>
+            <div id="wind-metric-grid" class="wind-metric-grid"></div>
+          </section>
+
+          <section class="wind-panel-section">
+            <div class="wind-section-heading">
+              <h2>Timeline</h2>
+              <span id="wind-sample-count" class="wind-badge">0</span>
+            </div>
+            <div id="wind-timeline" class="wind-timeline"></div>
+          </section>
+
+          <section class="wind-panel-section">
+            <div class="wind-section-heading">
+              <h2>Hot Zones</h2>
+              <span id="wind-hot-zone-count" class="wind-badge">0</span>
+            </div>
+            <div id="wind-hot-zones" class="wind-hot-zones"></div>
+          </section>
+        </aside>
+      </main>
+    </div>
+    <script type="module" src="/static/wind-tunnel-app.js"></script>
+  </body>
+</html>

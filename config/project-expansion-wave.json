@@ -2,44 +2,81 @@
   "schemaVersion": 1,
   "status": "active",
   "currentContractId": "generic-expansion-wave-v1",
-  "currentWaveName": "AGENT-REVIEW-WORKBENCH-WAVE-001",
-  "summary": "Active dev-only review workbench wave for a standalone structured annotation window, profile-local JSON state store, deterministic revision-plan builder, route-aware validation summary, and workbench-specific monitor/gate acceptance telemetry while keeping real AI providers, product-facing user features, React lane promotion, arbitrary source patching, and release remote distribution out of scope.",
+  "currentWaveName": "ZOTERO-SURFACE-WIND-TUNNEL-WAVE-001",
+  "summary": "Active dev-only browser wind tunnel wave for template-level Zotero surface scene simulation, a comprehensive browser scene atlas across major Zotero product surfaces, modular scenario switching, reference-derived generic gap visualization, Zotero Web Library browser UI adaptation with redacted fixture display-field sampling and library interaction event simulation including Item Tree column resize semantics, Zotero client tag-system simulation for Tag Selector and Tags Box search/toggle/drag-drop/add/remove events, Zotero PDF.js document-analysis harnessing, controllable performance bottleneck injection, local browser serving, and focused static verification while keeping real host replacement, product-facing user features, release packaging, real AI providers, arbitrary source patching, source vendoring, and remote distribution out of scope.",
   "inScopeModules": [
-    "dev-only-review-workbench",
-    "review-workbench-json-state-store",
-    "review-workbench-command-entry",
-    "route-aware-validation-summary",
-    "workbench-acceptance-telemetry"
+    "dev-only-surface-wind-tunnel",
+    "zotero-surface-scene-matrix",
+    "zotero-comprehensive-browser-scene-atlas",
+    "wind-tunnel-module-switcher",
+    "reference-derived-generic-scenario-modules",
+    "zotero-web-library-browser-ui-adapter",
+    "zotero-client-tag-system-simulation",
+    "wind-tunnel-coverage-gap-dashboard",
+    "zotero-pdfjs-document-analysis-harness",
+    "performance-bottleneck-simulator",
+    "local-browser-wind-tunnel-server",
+    "wind-tunnel-static-verification"
   ],
   "outOfScopeModules": [
+    "real-zotero-host-replacement",
     "real-ai-provider",
     "product-user-feature",
-    "react-lane-promotion",
+    "release-package-surface",
     "automatic-arbitrary-source-patching",
+    "vendored-official-source-copy",
     "release-remote-distribution"
   ],
   "moduleArchetypes": [
     {
-      "module": "dev-only-review-workbench",
+      "module": "dev-only-surface-wind-tunnel",
       "archetype": "visible-surface"
     },
     {
-      "module": "review-workbench-json-state-store",
+      "module": "zotero-surface-scene-matrix",
       "archetype": "runtime-capability"
     },
     {
-      "module": "review-workbench-command-entry",
-      "archetype": "host-integration"
+      "module": "zotero-comprehensive-browser-scene-atlas",
+      "archetype": "visible-surface"
     },
     {
-      "module": "route-aware-validation-summary",
+      "module": "wind-tunnel-module-switcher",
+      "archetype": "visible-surface"
+    },
+    {
+      "module": "reference-derived-generic-scenario-modules",
+      "archetype": "runtime-capability"
+    },
+    {
+      "module": "zotero-web-library-browser-ui-adapter",
       "archetype": "workspace-integration"
     },
     {
-      "module": "workbench-acceptance-telemetry",
+      "module": "zotero-client-tag-system-simulation",
+      "archetype": "visible-surface"
+    },
+    {
+      "module": "wind-tunnel-coverage-gap-dashboard",
+      "archetype": "visible-surface"
+    },
+    {
+      "module": "zotero-pdfjs-document-analysis-harness",
+      "archetype": "workspace-integration"
+    },
+    {
+      "module": "performance-bottleneck-simulator",
+      "archetype": "runtime-capability"
+    },
+    {
+      "module": "local-browser-wind-tunnel-server",
+      "archetype": "workspace-integration"
+    },
+    {
+      "module": "wind-tunnel-static-verification",
       "archetype": "workspace-integration"
     }
   ],
-  "acceptanceTrack": "functional-first -> window lifecycle -> structured annotation -> deterministic plan -> workbench acceptance telemetry -> gate summary",
+  "acceptanceTrack": "functional-first -> module taxonomy -> scenario matrix -> coverage gap dashboard -> bottleneck simulation -> local browser server -> static verification -> optional browser smoke",
   "explicitVisualUpgradeModules": []
 }

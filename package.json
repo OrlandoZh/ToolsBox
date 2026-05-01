@@ -134,6 +134,7 @@
     "agent:computer-use:prepare": "node scripts/agent-computer-use-workflows.mjs prepare",
     "agent:computer-use:validate": "node scripts/agent-computer-use-validation.mjs run",
     "agent:computer-use:record": "node scripts/agent-computer-use-validation.mjs record",
+    "wind-tunnel": "node scripts/zotero-surface-wind-tunnel-server.mjs",
     "agent:check": "node scripts/agent-runner.mjs check -- npm run check",
     "agent:memory": "node scripts/agent-memory.mjs",
     "agent:reference:intake": "node scripts/agent-reference-intake.mjs",
