@@ -23,11 +23,6 @@ export const HOST_ACTION_OWNER_MODULES = Object.freeze({
   hostOnly: freezeModules([
     "src/platform/zotero-host.js",
   ]),
-  reactWindowActionBridge: freezeModules([
-    "src/features/react-ui-demo.js",
-    "src/utils/window-shell.js",
-    "dev/agent-runtime/host-actions.js",
-  ]),
   wasmProbe: freezeModules([
     "src/features/wasm-kernel-probe.js",
     "dev/agent-runtime/host-actions.js",

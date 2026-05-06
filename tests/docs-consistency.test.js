@@ -34,14 +34,12 @@ describe("Documentation Consistency", () => {
     const validationSurfaces = readDoc("docs/VALIDATION_SURFACES.md");
     const semanticIndex = readDoc("docs/ZOTERO_HOST_SEMANTIC_INDEX.md");
     const interfaceContracts = readDoc("docs/ZOTERO_HOST_INTERFACE_CONTRACTS.md");
-    const examplePlugin = readDoc("examples/basic-plugin/plugin.js");
-    const exampleReadme = readDoc("examples/basic-plugin/README.md");
     const menuSurfaceScenario = readDoc("zotero-scenarios/menu-surface-smoke.scenario.js");
     const patchLibTests = readDoc("tests/agent-zotero-patch-lib.test.js");
     const featureTypes = readDoc("types/features.d.ts");
     const menuManagerSource = readDoc("src/features/menu-manager.js");
 
-    assert.ok(spec.includes("Zotero Cleanroom Template"));
+    assert.ok(spec.includes("ToolsBox"));
     assert.ok(spec.includes("Zotero 7/8"));
     assert.ok(spec.includes("8.0.2-beta.5+c35d7f21e"));
     assert.ok(spec.includes("macOS 已验证"));
@@ -256,13 +254,6 @@ describe("Documentation Consistency", () => {
     assert.ok(interfaceContracts.includes("Reader context menu 与 renderToolbar surface"));
     assert.ok(interfaceContracts.includes("CREATE_VIEW_CONTEXT_MENU: \"createViewContextMenu\""));
     assert.ok(interfaceContracts.includes("CREATE_ANNOTATION_CONTEXT_MENU: \"createAnnotationContextMenu\""));
-    assert.ok(examplePlugin.includes("menu.registerItemMenuItem({"));
-    assert.ok(examplePlugin.includes("menu.registerCollectionMenuItem({"));
-    assert.equal(examplePlugin.includes("menu.registerContextMenuItem({"), false);
-    assert.ok(exampleReadme.includes("menu.registerItemMenuItem({"));
-    assert.ok(exampleReadme.includes("`registerItemMenuItem()`"));
-    assert.ok(exampleReadme.includes("`registerCollectionMenuItem()`"));
-    assert.equal(exampleReadme.includes("menu.registerContextMenuItem({"), false);
     assert.ok(menuSurfaceScenario.includes("registerReaderMenubarViewMenuItem({"));
     assert.equal(menuSurfaceScenario.includes("registerReaderMenuItem("), false);
     assert.ok(patchLibTests.includes("menuManager.registerItemMenuItem({"));

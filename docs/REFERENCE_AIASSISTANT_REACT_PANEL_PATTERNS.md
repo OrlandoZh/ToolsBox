@@ -99,6 +99,6 @@
 ## 模板使用建议
 
 - 只需要“在现有 host surface 里挂一个 React 面板”时，优先复用模板的 `surface-bridge`
-- 只需要独立窗口时，优先复用 `window-shell + demo-window` 路线
+- 只需要独立窗口时，优先复用 `window-shell` 路线并在下游项目中提供自己的窗口 shell
 - 需要 `docked / floating / standalone` 三态切换时，先用 `surface-window-mode` 固定 preferred/effective/fallback 语义，再决定是否值得实现产品自己的 shell/controller
 - 真正进入贴边式 geometry、右侧栏恢复或 sidebar takeover 前，先确认这已经是下游产品需求，而不是模板治理需求

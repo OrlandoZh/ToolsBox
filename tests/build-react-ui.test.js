@@ -5,7 +5,6 @@ import { describe, it, assert } from "./test-framework.js";
 import { buildReactUI } from "../scripts/build-react-ui.mjs";
 import { loadOptionalBundleRegistry } from "../scripts/optional-bundles-lib.mjs";
 import {
-  REACT_UI_DEMO_SCRIPT_PATH,
   REACT_UI_SURFACE_BRIDGE_SCRIPT_PATH,
 } from "../src/utils/optional-bundle-paths.js";
 
@@ -41,7 +40,6 @@ describe("Build React UI", () => {
       assert.equal(result.status, "skipped");
       assert.equal(result.reason, "disabled");
       assert.deepEqual(result.artifacts, []);
-      assert.equal(fs.existsSync(resolveBuildPath(buildRoot, REACT_UI_DEMO_SCRIPT_PATH)), false);
       assert.equal(fs.existsSync(resolveBuildPath(buildRoot, REACT_UI_SURFACE_BRIDGE_SCRIPT_PATH)), false);
     } finally {
       fs.rmSync(buildRoot, { recursive: true, force: true });
@@ -71,26 +69,20 @@ describe("Build React UI", () => {
           esbuild: {
             async build(options) {
               fs.mkdirSync(path.dirname(options.outfile), { recursive: true });
-              fs.writeFileSync(options.outfile, "window.__REACT_UI_DEMO__ = true;\n", "utf-8");
+              fs.writeFileSync(options.outfile, "window.__REACT_UI_SURFACE_BRIDGE__ = true;\n", "utf-8");
             },
           },
         }),
       });
 
       assert.equal(result.status, "built");
-      assert.equal(result.artifacts.length, 2);
-      const demoArtifact = result.artifacts.find((artifact) => artifact.artifactId === "demo-window");
+      assert.equal(result.artifacts.length, 1);
       const bridgeArtifact = result.artifacts.find((artifact) => artifact.artifactId === "surface-bridge");
 
-      assert.ok(demoArtifact);
       assert.ok(bridgeArtifact);
-      assert.equal(fs.existsSync(demoArtifact.scriptPath), true);
-      assert.equal(fs.existsSync(demoArtifact.stylePath), true);
       assert.equal(fs.existsSync(bridgeArtifact.scriptPath), true);
       assert.equal(fs.existsSync(bridgeArtifact.stylePath), true);
-      assert.ok(fs.readFileSync(demoArtifact.scriptPath, "utf-8").includes("__REACT_UI_DEMO__"));
-      assert.ok(fs.readFileSync(bridgeArtifact.scriptPath, "utf-8").includes("__REACT_UI_DEMO__"));
-      assert.ok(fs.readFileSync(demoArtifact.stylePath, "utf-8").includes(".react-ui-demo-shell"));
+      assert.ok(fs.readFileSync(bridgeArtifact.scriptPath, "utf-8").includes("__REACT_UI_SURFACE_BRIDGE__"));
       assert.ok(fs.readFileSync(bridgeArtifact.stylePath, "utf-8").includes(".react-surface-bridge-shell"));
     } finally {
       fs.rmSync(buildRoot, { recursive: true, force: true });
@@ -118,12 +110,9 @@ describe("Build React UI", () => {
       });
 
       assert.equal(result.status, "built");
-      assert.equal(result.artifacts.length, 2);
-      const demoArtifact = result.artifacts.find((artifact) => artifact.artifactId === "demo-window");
+      assert.equal(result.artifacts.length, 1);
       const bridgeArtifact = result.artifacts.find((artifact) => artifact.artifactId === "surface-bridge");
-      assert.ok(demoArtifact);
       assert.ok(bridgeArtifact);
-      assert.ok(fs.readFileSync(demoArtifact.scriptPath, "utf-8").includes("React UI Demo"));
       assert.ok(fs.readFileSync(bridgeArtifact.scriptPath, "utf-8").includes("__CleanroomTemplateReactSurface__"));
     } finally {
       fs.rmSync(buildRoot, { recursive: true, force: true });

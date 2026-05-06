@@ -32,7 +32,6 @@ export function createSurfaceDescriptors(config = {}) {
       hostNonce: `${scope}.s2`,
       controlPlane: `${scope}.s3`,
       runtimeBridge: `${scope}.s4`,
-      reactUIDemo: `${scope}.s5`,
     }),
     serviceLabels: Object.freeze({
       runtimeCore: "Service 0",
@@ -40,7 +39,6 @@ export function createSurfaceDescriptors(config = {}) {
       hostNonce: "Service 2",
       controlPlane: "Service 3",
       runtimeBridge: "Service 4",
-      reactUIDemo: "Service 5",
     }),
     menuCommand: Object.freeze({
       toolsMenuItemID: `${scope}-m0`,
@@ -52,7 +50,6 @@ export function createSurfaceDescriptors(config = {}) {
     primaryActionCommandID: `${scope}-c0`,
     readerSummaryCommandID: `${scope}-c1`,
     readerSelectionCommandID: `${scope}-c2`,
-    reactUIDemoCommandID: `${scope}-c3`,
     contextMenuItemID: `${scope}-m2`,
     readerSummaryMenuItemID: `${scope}-c1`,
     demoInfoRowID: `${scope}-r0`,
@@ -60,5 +57,12 @@ export function createSurfaceDescriptors(config = {}) {
     demoColumnKey: `${scope}-r2`,
     demoNotifierID: `${scope}-r3`,
     shortcutIDPrefix: `${scope}-k0`,
+    relationshipGraphCommandID: `${scope}-c3`,
+    relationshipGraphContextMenuID: `${scope}-m3`,
+    paperMatrixCommandID: `${scope}-c4`,
+    paperMatrixContextMenuID: `${scope}-m4`,
+    notesManagerCommandID: `${scope}-c5`,
+    notesManagerContextMenuID: `${scope}-m5`,
+    tabHelperCommandIDPrefix: `${scope}-t0`,
   });
 }

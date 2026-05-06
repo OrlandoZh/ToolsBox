@@ -19,7 +19,7 @@ describe("I18n", () => {
 
     assert.equal(i18n.locale, "zh-CN");
     assert.equal(i18n.t("cleanroom-reader-selection-command-label"), "显示 Reader 选区快照");
-    assert.equal(i18n.t("cleanroom-react-ui-demo-command-label"), "打开可选 React UI 示例");
+    assert.equal(i18n.t("cleanroom-react-ui-demo-command-label"), "打开可选面板");
     assert.equal(i18n.t("cleanroom-react-ui-surface-status"), "已通过条目窗格 section 挂载");
   });
 
@@ -28,7 +28,7 @@ describe("I18n", () => {
       locale: "en-US",
     });
 
-    assert.equal(i18n.t("cleanroom-pref-caption"), "Cleanroom Template Preferences");
+    assert.equal(i18n.t("cleanroom-pref-caption"), "ToolsBox Preferences");
     assert.equal(i18n.t("cleanroom-pref-theme-hint"), "Apply only to plugin-owned UI surfaces, including this preference pane, without changing Zotero's global Appearance.");
     assert.equal(i18n.t("cleanroom-react-ui-surface-title"), "Optional React Host Surface");
   });

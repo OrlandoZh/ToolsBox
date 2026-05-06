@@ -8,7 +8,6 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { describe, it, assert } from "./test-framework.js";
 import {
-  REACT_UI_DEMO_SHELL_PATH,
   WASM_KERNEL_PROBE_PATH,
   WASM_KERNEL_PROBE_WORKER_PATH,
 } from "../src/utils/optional-bundle-paths.js";
@@ -330,8 +329,6 @@ describe("Build Artifacts", () => {
     const bundleSource = fs.readFileSync(bundlePath, "utf-8");
     const enUSLocalePath = path.join(projectRoot, "build", config.addonRef, "locale", "en-US", "main.ftl");
     const enUSLocaleSource = fs.readFileSync(enUSLocalePath, "utf-8");
-    const reactDemoShellPath = path.join(projectRoot, "build", config.addonRef, ...REACT_UI_DEMO_SHELL_PATH.split("/"));
-    const reactDemoShell = fs.readFileSync(reactDemoShellPath, "utf-8");
     const preferencesXHTMLPath = path.join(projectRoot, "build", config.addonRef, "content", "preferences.xhtml");
     const preferencesXHTML = fs.readFileSync(preferencesXHTMLPath, "utf-8");
     const preferencesScriptPath = path.join(projectRoot, "build", config.addonRef, "content", "preferences.js");
@@ -406,13 +403,6 @@ describe("Build Artifacts", () => {
     assert.equal(enUSLocaleSource.includes("Cleanroom Template Preferences"), false);
     assert.equal(enUSLocaleSource.includes("Cleanroom Summary"), false);
     assert.equal(enUSLocaleSource.includes("Cleanroom Demo"), false);
-    assert.equal(reactDemoShell.includes(config.addonRef), true);
-    assert.equal(reactDemoShell.includes(config.addonName), true);
-    assert.equal(reactDemoShell.includes("React UI Demo"), false);
-    assert.equal(reactDemoShell.includes("React UI demo requires JavaScript."), false);
-    assert.equal(reactDemoShell.includes('href="./react-ui-demo.css"'), true);
-    assert.equal(reactDemoShell.includes('src="./react-ui-demo.js"'), true);
-    assert.equal(reactDemoShell.includes("chrome://"), false);
     assert.equal(preferencesXHTML.includes("cleanroomtemplate-preferences-root"), false);
     assert.equal(preferencesXHTML.includes("__PREFERENCE_ROOT_ID__"), false);
     assert.equal(preferencesXHTML.includes(protectedDescriptors.preferenceRootID), true);
@@ -441,14 +431,34 @@ describe("Build Artifacts", () => {
 
     const config = readJSON(path.join(projectRoot, "config", "addon.config.json"));
     const preferencesXHTMLPath = path.join(projectRoot, "build", config.addonRef, "content", "preferences.xhtml");
+    const prefsJSPath = path.join(projectRoot, "build", config.addonRef, "prefs.js");
     const preferencesXHTML = fs.readFileSync(preferencesXHTMLPath, "utf-8");
+    const prefsJS = fs.readFileSync(prefsJSPath, "utf-8");
     const protectedDescriptors = createProtectedSurfaceDescriptors(config);
+    const orderedPreferenceKeys = Array.from(new Set([
+      "enabled",
+      "menuLabel",
+      "logLevel",
+      "themeMode",
+      ...Object.keys(config.defaultPrefs || {}),
+    ]));
 
     assert.equal(preferencesXHTML.includes(config.prefsPrefix), false);
     assert.equal(preferencesXHTML.includes(`${config.prefsPrefix}.enabled`), false);
     assert.equal(preferencesXHTML.includes(`${config.prefsPrefix}.themeMode`), false);
-    assert.equal(preferencesXHTML.includes(`extensions.zotero.${protectedDescriptors.preferencePaneID}.p0`), true);
-    assert.equal(preferencesXHTML.includes(`extensions.zotero.${protectedDescriptors.preferencePaneID}.p3`), true);
+    assert.equal(prefsJS.includes(config.prefsPrefix), false);
+    assert.equal(prefsJS.includes(`${config.prefsPrefix}.enabled`), false);
+    assert.equal(prefsJS.includes(`${config.prefsPrefix}.themeMode`), false);
+    assert.equal(/__PREF_[A-Z0-9_]+_NAME__/u.test(preferencesXHTML), false);
+    assert.equal(/__PREF_[A-Z0-9_]+_NAME__/u.test(prefsJS), false);
+
+    for (const [index, key] of orderedPreferenceKeys.entries()) {
+      const placeholderName = `extensions.zotero.${protectedDescriptors.preferencePaneID}.p${index}`;
+      assert.equal(preferencesXHTML.includes(placeholderName), true);
+      assert.equal(prefsJS.includes(placeholderName), true);
+      assert.equal(preferencesXHTML.includes(`${config.prefsPrefix}.${key}`), false);
+      assert.equal(prefsJS.includes(`${config.prefsPrefix}.${key}`), false);
+    }
   });
 
   it("should scrub bootstrap literals in static surface scrub mode", () => {
@@ -471,8 +481,6 @@ describe("Build Artifacts", () => {
     const manifest = readJSON(manifestPath);
     const wasmWorkerPath = path.join(projectRoot, "build", config.addonRef, ...WASM_KERNEL_PROBE_WORKER_PATH.split("/"));
     const wasmWorkerSource = fs.readFileSync(wasmWorkerPath, "utf-8");
-    const reactDemoShellPath = path.join(projectRoot, "build", config.addonRef, ...REACT_UI_DEMO_SHELL_PATH.split("/"));
-    const reactDemoShell = fs.readFileSync(reactDemoShellPath, "utf-8");
     const report = readJSON(
       path.join(projectRoot, "build", config.addonRef, "build-report.json"),
     );
@@ -492,14 +500,6 @@ describe("Build Artifacts", () => {
     assert.equal(bootstrapSource.includes("capability-report"), false);
     assert.equal(bootstrapSource.includes('"__ADDON_REF__"'), false);
     assert.equal(bootstrapSource.includes('"__INSTANCE_KEY__"'), false);
-    assert.equal(reactDemoShell.includes(config.addonRef), false);
-    assert.equal(reactDemoShell.includes(config.addonName), false);
-    assert.equal(reactDemoShell.includes('data-addon-ref="tool"'), true);
-    assert.equal(reactDemoShell.includes('data-addon-name="Tool"'), true);
-    assert.equal(reactDemoShell.includes("<title>Tool Panel</title>"), true);
-    assert.equal(reactDemoShell.includes('href="./react-ui-demo.css"'), true);
-    assert.equal(reactDemoShell.includes('src="./react-ui-demo.js"'), true);
-    assert.equal(reactDemoShell.includes("chrome://"), false);
     assert.equal(wasmWorkerSource.includes("WebAssembly.instantiate"), false);
     assert.equal(wasmWorkerSource.includes("worker cannot fetch wasm bytes"), false);
   });

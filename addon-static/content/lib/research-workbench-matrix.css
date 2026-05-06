@@ -1,0 +1,173 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  color: var(--zotero-text-primary, #1c1c1c);
+  background: var(--zotero-bg-primary, #f5f5f5);
+}
+
+.pm-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.pm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--zotero-bg-secondary, #fff);
+  border-bottom: 1px solid var(--zotero-border, #e0e0e0);
+}
+
+.pm-header h1 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.pm-stat-summary {
+  font-size: 12px;
+  color: var(--zotero-text-secondary, #666);
+  margin-top: 2px;
+}
+
+.pm-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--zotero-bg-secondary, #fff);
+  border-bottom: 1px solid var(--zotero-border, #e0e0e0);
+}
+
+.pm-toolbar-spacer { flex: 1; }
+
+.pm-search {
+  width: 240px;
+  padding: 5px 10px;
+  border: 1px solid var(--zotero-border, #ddd);
+  border-radius: 4px;
+  font-size: 13px;
+  background: var(--zotero-bg-primary, #f5f5f5);
+  color: var(--zotero-text-primary, #1c1c1c);
+}
+
+.pm-search:focus {
+  outline: none;
+  border-color: var(--zotero-accent, #4a90d9);
+  box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.15);
+}
+
+.pm-btn {
+  padding: 5px 12px;
+  font-size: 12px;
+  border: 1px solid var(--zotero-border, #ddd);
+  background: var(--zotero-bg-secondary, #fff);
+  color: var(--zotero-text-primary, #1c1c1c);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.pm-btn:hover { background: var(--zotero-bg-hover, #eee); }
+.pm-btn-export { background: var(--zotero-accent, #4a90d9); color: #fff; border-color: var(--zotero-accent, #4a90d9); }
+.pm-btn-export:hover { opacity: 0.9; }
+
+.pm-columns-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--zotero-bg-tertiary, #fafafa);
+  border-bottom: 1px solid var(--zotero-border, #e0e0e0);
+  font-size: 12px;
+}
+
+.pm-columns-panel-label {
+  color: var(--zotero-text-secondary, #888);
+  font-weight: 600;
+}
+
+.pm-columns-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pm-col-toggle {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--zotero-text-primary, #1c1c1c);
+  cursor: pointer;
+}
+
+.pm-table-wrap {
+  flex: 1;
+  overflow: auto;
+  background: var(--zotero-bg-secondary, #fff);
+}
+
+.pm-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.pm-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--zotero-bg-tertiary, #f5f5f5);
+}
+
+.pm-table th {
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--zotero-text-secondary, #666);
+  border-bottom: 2px solid var(--zotero-border, #ddd);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.pm-table th:hover { color: var(--zotero-text-primary, #1c1c1c); background: var(--zotero-bg-hover, #eee); }
+
+.pm-table td {
+  padding: 7px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--zotero-border-light, #f0f0f0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-table tbody tr:hover { background: var(--zotero-bg-hover, #eef5fc); }
+.pm-table tbody tr:nth-child(even) { background: var(--zotero-bg-row-alt, #fafafa); }
+.pm-table tbody tr:nth-child(even):hover { background: var(--zotero-bg-hover, #eef5fc); }
+
+.pm-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--zotero-text-secondary, #999);
+  font-size: 14px;
+}
+
+html[data-theme="dark"] {
+  --zotero-text-primary: #e0e0e0;
+  --zotero-text-secondary: #999;
+  --zotero-bg-primary: #1e1e1e;
+  --zotero-bg-secondary: #2a2a2a;
+  --zotero-bg-tertiary: #252525;
+  --zotero-bg-hover: #333;
+  --zotero-bg-row-alt: #242424;
+  --zotero-border: #444;
+  --zotero-border-light: #333;
+  --zotero-accent: #6ba3d6;
+}

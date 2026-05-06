@@ -1,6 +1,6 @@
-# Zotero Cleanroom Template
+# ToolsBox
 
-面向独立实现的 Zotero 插件开发模板，目标是把插件源码、验证链、合规留痕和 agent 协作工具放在同一个仓库里。
+ToolsBox 是一个按 clean-room 约束实现的 Zotero 工作流工具箱，当前目标是提供本地 workflow 字段、条目列、菜单动作、Reader 入口和可验证的插件工程链。
 
 README 只做入口说明，不维护第二份项目真相。当前主线、扩展 wave、验证口径和最新结论统一以 [docs/CURRENT_BACKLOG.md](docs/CURRENT_BACKLOG.md) 为准。
 
@@ -48,7 +48,7 @@ README 只做入口说明，不维护第二份项目真相。当前主线、扩�
 - 最新 `wasm kernel probe diagnostics` 已在 `2026-04-19` 的 live Zotero scenario 中通过：当前主线程 `rootURI + content/lib/w/...` 与 `ChromeWorker + chrome://<addonRef>/content/lib/w/...` 均可用，但仍只作为 bundle-local probe，不进入默认 `build / package / gate` 主线
 - `wasm-kernel` 当前已补 probe 级成本量化链与独立 disabled-contract 报告链：默认 probe 总览仍固定写入 `dist/wasm-kernel-smoke.json` / `dist/wasm-kernel-performance.json` / `dist/wasm-kernel-disabled-contract.json`，digest lane 现已改为并存写入 `dist/wasm-kernel-digest-smoke.json` / `dist/wasm-kernel-digest-performance.json` / `dist/wasm-kernel-digest-disabled-contract.json`，不再覆盖 probe 基线；`npm run wasm:kernel:perf` 与 `npm run wasm:kernel:disabled-contract` 都会按场景优先读取对应 smoke/perf 证据，再回退到默认 artifacts。当前已记录 source/build 资产合计 `7.96KB`，并完成 fresh live repeated smoke：probe `3/3` 通过、main-thread 中位 `1ms`、worker 中位 `3ms`；digest `3/3` 通过、main-thread 中位 `1ms`、worker 中位 `5ms`；disabled-contract 也已回到 `passed`。shadow-mode `runtime.deriveWasmKernelUnlockToken` 已落地为 bundle-local 业务 derivation 实验，并新增 `wasm kernel unlock diagnostics` 场景；当前判断继续保持 `planned + default-disabled`
 - `wasm-kernel` 当前已补固定聚合入口：`npm run wasm:kernel:matrix` 会把 probe/digest 两条 lane 的 smoke / perf / disabled-contract 收成 `dist/wasm-kernel-matrix.json` / `md`，统一给 controller 使用；当前矩阵结论固定为 `keep-planned-default-disabled`，不会自动把 lane 升成 `implemented`
-- 当前模板已把 Lisianthus 抽出的 `file-state-store`、`task-runner`、`task-queue`、`zotero-file-storage`、`zotero-json-state-store` 与 `window-shell + theme-manager + host action gating` 视为已入基线的 JS-core 能力；同时把 default-disabled `react surface bridge + surface-window-mode` 收到 optional bundle 基线里；`build:react-ui` 当前继续只服务默认禁用的 demo lane + host-mounted surface bridge lane，并已由主仓 / pure-project 显式声明 `esbuild + react + react-dom` 作为 optional-lane devDependencies，不把 React/TS 依赖回灌进模板核心；`wasm-kernel` 当前已冻结 checked-in probe 资产、`runtime.probeWasmKernel` / `runtime.deriveWasmKernelDigest` / `runtime.deriveWasmKernelUnlockToken` host action、registry validation contract 与 pure-project export 保留边界，且 default-disabled 态已改为首次 host action 调用时才惰性创建 Wasm runtime，但仍不伪装为已实现 bundle
+- 当前模板已把 Lisianthus 抽出的 `file-state-store`、`task-runner`、`task-queue`、`zotero-file-storage`、`zotero-json-state-store` 与 `window-shell + theme-manager + host action gating` 视为已入基线的 JS-core 能力；同时把 default-disabled `react surface bridge + surface-window-mode` 收到 optional bundle 基线里；`build:react-ui` 当前继续只服务默认禁用的 host-mounted surface bridge lane，并已由主仓 / pure-project 显式声明 `esbuild + react + react-dom` 作为 optional-lane devDependencies，不把 React/TS 依赖回灌进模板核心；`wasm-kernel` 当前已冻结 checked-in probe 资产、`runtime.probeWasmKernel` / `runtime.deriveWasmKernelDigest` / `runtime.deriveWasmKernelUnlockToken` host action、registry validation contract 与 pure-project export 保留边界，且 default-disabled 态已改为首次 host action 调用时才惰性创建 Wasm runtime，但仍不伪装为已实现 bundle
 - 本 wave 当前 in-scope surfaces 继续写入 `config/project-validation-surfaces.json`：覆盖 `preference pane`、`context pane`、`item pane sidenav`、`reader renderToolbar`、`reader sidebar view`、`menu item`、`collection menu` 与 `menu submenu`，当前批次只补这些已声明 surface 的 polish，不新开产品 surface
 - 当前宿主可见 UI 主链已基本实现：`preference pane`、`context pane`、`item pane sidenav`、`reader renderToolbar`、`reader sidebar view`、`menu item / collection menu / menu submenu` 与窗口级 + 元素级主题 contract 已具备模板级基线、host action / surface smoke / surface-local evidence；当前批次默认转向交互一致性、贴边布局和复用细节，不把这一轮描述成“UI 已完全封板”
 - `details.runtimeSanitization` 已稳定透传到 direct E2E / monitor / gate：本轮 direct E2E 记录了 `exclusiveProjectRuntime=true`，并在启动前终止了 project-managed `watch` `zotero` / `plugin-container`；旧的 startup/RDP bring-up timeout 口径继续只保留为已收口的诊断能力
@@ -69,7 +69,7 @@ README 只做入口说明，不维护第二份项目真相。当前主线、扩�
 
 ## 快速开始
 
-1. 编辑 `config/addon.config.json`，填写真实的 `addonName`、`addonId`、`addonRef`、`author`、`homepage`、`updateURL`。
+1. 当前产品身份已固定为 `ToolsBox` / `toolsbox@orlandozh.github` / `toolsbox`；如需改名，再编辑 `config/addon.config.json`。
 2. 运行 `npm run verify` 和 `npm run check`，先确认配置、文档 truth 与测试基线一致。
 3. 运行 `npm run build` 构建插件。
 4. 运行 `npm run package` 生成 `.xpi`。
@@ -77,7 +77,7 @@ README 只做入口说明，不维护第二份项目真相。当前主线、扩�
 
 补充说明：
 
-- 当前仓库里的 Gitee `updateURL` 只用于这个模板项目自身的远端发布验收与测试；如果你是基于模板派生自己的插件，必须先替换 `addonId`、`homepage` 和 `updateURL`。
+- 当前仓库的 `updateURL` 指向 GitHub Releases：`https://github.com/OrlandoZh/ToolsBox/releases/download/release/update.json`。
 - 如果目标是交付纯源码，而不是把本地工件一起带走，使用 `npm run export:project` 生成剔除运行时工件与 agent 附件的最小工程。
 
 <details>
@@ -299,10 +299,6 @@ node scripts/agent-delegation.mjs close <taskId>
 - [代码来源留档](CODE_PROVENANCE.md)
 - [第三方 Notices](THIRD_PARTY_NOTICES.md)
 - [商业交付权利说明](COMMERCIAL_DELIVERY_RIGHTS_NOTICE.md)
-
-## 示例
-
-- [基础示例插件](examples/basic-plugin/README.md)
 
 ## 许可证
 

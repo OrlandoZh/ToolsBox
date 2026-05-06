@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" data-addon-ref="toolsbox" data-addon-name="ToolsBox">
+  <head>
+    <meta charset="utf-8" />
+    <title>Notes &amp; Annotation Manager</title>
+    <link rel="stylesheet" type="text/css" href="./research-workbench-notes.css" />
+  </head>
+  <body>
+    <div id="notes-manager-root" class="nm-shell">
+      <header class="nm-header">
+        <div>
+          <h1>Notes &amp; Annotation Manager</h1>
+          <p id="nm-stat-summary" class="nm-stat-summary"></p>
+        </div>
+      </header>
+
+      <div class="nm-body">
+        <aside class="nm-sidebar" id="nm-sidebar">
+          <div class="nm-toolbar">
+            <div class="nm-filter-tabs" id="nm-filter-tabs">
+              <button class="nm-filter-tab active" data-filter="all">All</button>
+              <button class="nm-filter-tab" data-filter="notes">Notes</button>
+              <button class="nm-filter-tab" data-filter="annotations">Annotations</button>
+            </div>
+            <input type="search" id="nm-search" class="nm-search" placeholder="Search notes and annotations..." />
+          </div>
+          <div id="nm-list" class="nm-list"></div>
+          <div class="nm-batch-bar" id="nm-batch-bar" hidden>
+            <span id="nm-batch-count">0 selected</span>
+            <button id="nm-batch-delete" type="button">Delete</button>
+            <button id="nm-batch-tag" type="button">Add Tag</button>
+            <button id="nm-batch-export" type="button">Export Markdown</button>
+          </div>
+        </aside>
+
+        <main class="nm-detail" id="nm-detail">
+          <p class="nm-empty-hint" id="nm-empty-hint">Select an entry to view its details.</p>
+          <div id="nm-detail-content" class="nm-detail-content" hidden>
+            <div class="nm-detail-header">
+              <span id="nm-detail-type" class="nm-detail-type-badge">Note</span>
+              <span id="nm-detail-parent" class="nm-detail-parent"></span>
+            </div>
+            <div class="nm-detail-meta" id="nm-detail-meta"></div>
+            <div class="nm-detail-text" id="nm-detail-text"></div>
+            <div class="nm-detail-actions">
+              <button id="nm-detail-open-item" type="button">Open Parent Item</button>
+              <button id="nm-detail-open-reader" type="button">Open in Reader</button>
+              <button id="nm-detail-delete" type="button">Delete</button>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+    <script src="./research-workbench-notes.js"></script>
+  </body>
+</html>

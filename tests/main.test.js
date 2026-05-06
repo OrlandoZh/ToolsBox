@@ -153,8 +153,8 @@ describe("Main Bootstrap", () => {
     assert.typeOf(globalThis.Zotero.CleanroomTemplate.shutdown, "function");
     assert.ok(globalThis.Zotero.CleanroomTemplate.api);
     assert.equal(preferenceRegistrations.length, 1);
-    assert.equal(promptRegistrations.length, 4);
-    assert.equal(menuRegistrations.length, 2);
+    assert.equal(promptRegistrations.length, 10);
+    assert.equal(menuRegistrations.length, 5);
   });
 
   it("should ignore repeated bootstrap calls in the same module instance", async () => {
@@ -170,8 +170,8 @@ describe("Main Bootstrap", () => {
 
     assert.equal(globalThis.Zotero.CleanroomTemplate, firstInstance);
     assert.equal(preferenceRegistrations.length, 1);
-    assert.equal(promptRegistrations.length, 4);
-    assert.equal(menuRegistrations.length, 2);
+    assert.equal(promptRegistrations.length, 10);
+    assert.equal(menuRegistrations.length, 5);
   });
 
   it("should clear failed bootstrap state and allow retry", async () => {
@@ -198,8 +198,8 @@ describe("Main Bootstrap", () => {
 
     assert.ok(globalThis.Zotero.CleanroomTemplate);
     assert.equal(preferenceRegistrations.length, 1);
-    assert.equal(promptRegistrations.length, 4);
-    assert.equal(menuRegistrations.length, 2);
+    assert.equal(promptRegistrations.length, 10);
+    assert.equal(menuRegistrations.length, 5);
   });
 
   it("should clear cached plugin state on shutdown so bootstrap can mount again", async () => {

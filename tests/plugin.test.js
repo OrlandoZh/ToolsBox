@@ -382,12 +382,12 @@ describe("Plugin", () => {
     await startPromise;
 
     assert.equal(preferenceRegistrations.length, 1);
-    assert.equal(promptRegistrations.length, 4);
-    assert.equal(menuRegistrations.length, 2);
+    assert.equal(promptRegistrations.length, 10);
+    assert.equal(menuRegistrations.length, 5);
     assert.equal(itemPaneSections.length, 1);
-    assert.equal(itemPaneRows.length, 1);
-    assert.equal(itemTreeColumns.length, 1);
-    assert.equal(notifierRegistrations.length, 1);
+    assert.equal(itemPaneRows.length, 0);
+    assert.equal(itemTreeColumns.length, 11);
+    assert.equal(notifierRegistrations.length, 0);
   });
 
   it("should register baseline integrations and expose runtime api", async () => {
@@ -423,49 +423,33 @@ describe("Plugin", () => {
     );
 
     assert.equal(promptRegistrations[0][0].id, "cleanroomtemplate-primary-action");
-    assert.equal(promptRegistrations[0][0].label, "Open Cleanroom Action");
+    assert.equal(promptRegistrations[0][0].label, "Open ToolsBox");
     assert.typeOf(promptRegistrations[0][0].when, "function");
     assert.equal(promptRegistrations[0][0].when(), true);
-    assert.equal(promptRegistrations[1][0].id, "cleanroomtemplate-reader-summary");
-    assert.equal(promptRegistrations[1][0].when(), false);
-    assert.equal(promptRegistrations[2][0].id, "cleanroomtemplate-reader-selection-snapshot");
-    assert.equal(promptRegistrations[2][0].when(), false);
-    assert.equal(promptRegistrations[3][0].id, "agent.reviewWorkbench.open");
-    assert.equal(promptRegistrations[3][0].when(), true);
+    assert.equal(promptRegistrations[9][0].id, "agent.reviewWorkbench.open");
+    assert.equal(promptRegistrations[9][0].when(), true);
 
     assert.equal(menuRegistrations[0].pluginID, "cleanroom-template@example.com");
     assert.equal(menuRegistrations[0].target, "main/library/item");
-    assert.equal(menuRegistrations[1].menuID, "cleanroomtemplate-reader-summary");
-    assert.equal(menuRegistrations[1].target, "reader/menubar/view");
-    assert.typeOf(menuRegistrations[1].menus[0].onShowing, "function");
-    let readerMenuVisible = null;
-    menuRegistrations[1].menus[0].onShowing(null, {
-      setVisible(value) {
-        readerMenuVisible = value;
-      },
-    });
-    assert.equal(readerMenuVisible, false);
-    assert.equal(itemPaneSections[0].paneID, "cleanroomtemplate-details");
-    assert.equal(itemPaneSections[0].header.l10nID, "cleanroom-item-pane-section-header");
-    assert.equal(itemPaneRows[0].rowID, "cleanroomtemplate-selection-summary");
-    assert.equal(itemPaneRows[0].label.l10nID, "cleanroom-item-pane-info-row-label");
-    assert.equal(itemTreeColumns[0].dataKey, "cleanroomtemplate-status");
-    assert.equal(itemTreeColumns[0].label, "Cleanroom");
-    assert.deepEqual(notifierRegistrations[0].types, ["item", "file", "tab"]);
+    assert.equal(menuRegistrations.length, 5);
+    assert.equal(itemPaneSections.length, 1);
+    assert.equal(itemPaneRows.length, 0);
+    assert.equal(itemTreeColumns.length, 11);
+    assert.equal(notifierRegistrations.length, 0);
 
     assert.ok(plugin.api);
     assert.ok(plugin.api.runtime);
     assert.ok(plugin.api.serviceRegistry);
     assert.equal(plugin.api.preferencePanes.getPaneCount(), 1);
-    assert.equal(plugin.api.commandPalette.getCommandCount(), 4);
-    assert.equal(plugin.api.menuManager.getMenuCount(), 2);
+    assert.equal(plugin.api.commandPalette.getCommandCount(), 10);
+    assert.equal(plugin.api.menuManager.getMenuCount(), 5);
     assert.typeOf(plugin.api.menuManager.registerItemMenuItem, "function");
     assert.typeOf(plugin.api.menuManager.registerItemPaneInfoRowMenuItem, "function");
     assert.typeOf(plugin.api.menuManager.registerReaderMenubarViewMenuItem, "function");
     assert.equal(plugin.api.itemPane.getSectionCount(), 1);
-    assert.equal(plugin.api.itemPane.getInfoRowCount(), 1);
-    assert.equal(plugin.api.itemTree.getColumnCount(), 1);
-    assert.equal(plugin.api.notifier.getActiveCount(), 1);
+    assert.equal(plugin.api.itemPane.getInfoRowCount(), 0);
+    assert.equal(plugin.api.itemTree.getColumnCount(), 11);
+    assert.equal(plugin.api.notifier.getActiveCount(), 0);
     assert.typeOf(plugin.api.agent, "object");
     assert.typeOf(plugin.api.agent.inspectItem, "function");
     assert.typeOf(plugin.api.agent.describeReader, "function");
@@ -487,7 +471,7 @@ describe("Plugin", () => {
     assert.typeOf(plugin.api.agent.listHostActions, "function");
     assert.typeOf(plugin.api.agent.runHostAction, "function");
     assert.typeOf(plugin.api.readerSelectionActions.getActionSnapshot, "function");
-    assert.equal(plugin.api.readerSelectionActions.getActionCount(), 1);
+    assert.equal(plugin.api.readerSelectionActions.getActionCount(), 0);
     assert.deepEqual(plugin.api.agent.listScenarios(), [
       "baseline-registration",
       "capability-manifest",
@@ -530,12 +514,12 @@ describe("Plugin", () => {
       eventHandler,
     );
     assert.equal(plugin.api.reader.isEventAPIAvailable(), true);
-    assert.equal(readerEventRegistrations.length, 1);
-    assert.equal(readerEventRegistrations[0].pluginID, "cleanroom-template@example.com");
-    assert.equal(plugin.api.reader.getEventListenerCount(), 1);
+    assert.equal(readerEventRegistrations.length, 6);
+    assert.equal(readerEventRegistrations[5].pluginID, "cleanroom-template@example.com");
+    assert.equal(plugin.api.reader.getEventListenerCount(), 6);
     unregisterToolbar();
     assert.equal(readerEventUnregistrations.length, 1);
-    assert.equal(plugin.api.reader.getEventListenerCount(), 0);
+    assert.equal(plugin.api.reader.getEventListenerCount(), 5);
 
     assert.typeOf(plugin.api.runPrimaryAction, "function");
     assert.typeOf(plugin.api.runAgentAction, "function");
@@ -568,7 +552,7 @@ describe("Plugin", () => {
     assert.includes(notifierScenario.lastNotifierEvent, "item:refresh #88");
     const diagnostics = plugin.api.agent.collectDiagnostics();
     assert.includes(diagnostics.lastNotifierEvent, "#88");
-    assert.equal(diagnostics.serviceTotal, 6);
+    assert.equal(diagnostics.serviceTotal, 5);
     assert.equal(diagnostics.serviceHealthyCount, 4);
     assert.equal(diagnostics.serviceUnhealthyCount, 0);
     assert.equal(diagnostics.serviceHealthOK, true);
@@ -590,14 +574,7 @@ describe("Plugin", () => {
     assert.equal(diagnostics.capabilityManifestOverlayApplied, false);
     assert.equal(diagnostics.capabilityManifestActivationSatisfied, true);
     assert.deepEqual(diagnostics.capabilityManifestActivationMissing, []);
-    assert.ok(
-      diagnostics.services.some((entry) => {
-        return entry.id === "cleanroomtemplate.react-ui-demo"
-          && entry.enabled === false
-          && entry.status === "disabled"
-          && entry.health?.status === "disabled";
-      }),
-    );
+    assert.equal(diagnostics.services.some((entry) => entry.id === "cleanroomtemplate.react-ui-demo"), false);
     assert.ok(
       diagnostics.services.some((entry) => {
         return entry.id === "cleanroomtemplate.host-signals"
@@ -623,7 +600,7 @@ describe("Plugin", () => {
     assert.equal(diagnostics.runtimeInjectedCapabilityCount, 4);
     assert.ok(diagnostics.capabilityCount >= 11);
     assert.equal(diagnostics.readerEventAPIAvailable, true);
-    assert.equal(diagnostics.readerEventListenerCount, 0);
+    assert.equal(diagnostics.readerEventListenerCount, 5);
     assert.ok(diagnostics.readerEventKnownTypeCount >= 8);
     assert.ok(diagnostics.readerEventProbeTypeCount >= 7);
     assert.equal(diagnostics.readerEventSyntheticFallbackAvailable, true);
@@ -636,7 +613,7 @@ describe("Plugin", () => {
     assert.equal(diagnostics.reviewWorkbenchAcceptanceStatus, "passed");
     assert.deepEqual(diagnostics.reviewWorkbenchExternalBlockers, []);
     assert.equal(diagnostics.reviewWorkbenchLastLifecycleScenario, null);
-    assert.ok(diagnostics.commandIDs.includes("cleanroomtemplate-reader-selection-snapshot"));
+    assert.equal(diagnostics.commandIDs.includes("cleanroomtemplate-reader-selection-snapshot"), false);
     assert.ok(diagnostics.commandIDs.includes("agent.reviewWorkbench.open"));
     assert.typeOf(plugin.api.getMainWindow, "function");
 
@@ -674,11 +651,11 @@ describe("Plugin", () => {
     assert.equal(plugin.api.notifier.getActiveCount(), 0);
     assert.equal(preferenceUnregistrations[0], "cleanroomtemplate-preferences");
     assert.equal(menuUnregistrations[0], "cleanroomtemplate-context-action");
-    assert.equal(menuUnregistrations[1], "cleanroomtemplate-reader-summary");
-    assert.equal(itemPaneSectionUnregistrations[0], "cleanroomtemplate-details");
-    assert.equal(itemPaneRowUnregistrations[0], "cleanroomtemplate-selection-summary");
-    assert.equal(itemTreeUnregistrations[0], "cleanroomtemplate-status");
-    assert.equal(notifierUnregistrations[0], "cleanroomtemplate-activity");
+    assert.equal(menuUnregistrations.length, 5);
+    assert.equal(itemPaneSectionUnregistrations.length, 1);
+    assert.equal(itemPaneRowUnregistrations.length, 0);
+    assert.equal(itemTreeUnregistrations.length, 11);
+    assert.equal(notifierUnregistrations.length, 0);
   });
 
   it("should keep the wasm probe inert until the host action is invoked", async () => {
@@ -987,7 +964,7 @@ describe("Plugin", () => {
     await plugin.shutdown();
   });
 
-  it("should enable the reader demo command when a reader tab is active", async () => {
+  it("should expose reader state when a reader tab is active", async () => {
     startupReady.initialization.resolve();
     startupReady.unlock.resolve();
     startupReady.uiReady.resolve();
@@ -1018,8 +995,6 @@ describe("Plugin", () => {
 
     await plugin.start();
 
-    assert.equal(promptRegistrations[1][0].when(), true);
-    assert.equal(promptRegistrations[2][0].when(), true);
     assert.deepEqual(plugin.api.reader.getActiveSummary(), {
       tabID: "reader-tab-42",
       itemID: 42,
@@ -1038,20 +1013,6 @@ describe("Plugin", () => {
       selectedAnnotationIDs: [],
       annotationCount: 3,
     });
-    const selectionActionExecution = await plugin.api.readerSelectionActions.executeAction(
-      "cleanroomtemplate-reader-selection-snapshot",
-    );
-    assert.equal(selectionActionExecution.ok, true);
-    assert.equal(selectionActionExecution.result.textLength, 27);
-
-    let visible = null;
-    menuRegistrations[1].menus[0].onShowing(null, {
-      setVisible(value) {
-        visible = value;
-      },
-    });
-    assert.equal(visible, true);
-
     await plugin.shutdown();
   });
 });

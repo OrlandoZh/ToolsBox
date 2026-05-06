@@ -84,8 +84,8 @@ const CHINA_LEGAL_DOC_REQUIREMENTS = [
     ],
   },
 ];
+const DEFAULT_SPEC_PRODUCT_NAME = "Zotero Cleanroom Template";
 const DEFAULT_SPEC_REQUIREMENTS = [
-  "Zotero Cleanroom Template",
   "Zotero 7/8",
   "8.0.2-beta.5+c35d7f21e",
   "macOS",
@@ -132,6 +132,19 @@ async function ensureDir(targetPath) {
 
 async function readText(targetPath) {
   return await fs.readFile(targetPath, "utf-8");
+}
+
+async function readOptionalAddonConfig(projectRoot) {
+  const configPath = path.join(projectRoot, "config", "addon.config.json");
+  if (!(await exists(configPath))) {
+    return null;
+  }
+  try {
+    return JSON.parse(await readText(configPath));
+  }
+  catch {
+    return null;
+  }
 }
 
 function normalizeProjectRoot(projectRoot) {
@@ -477,14 +490,22 @@ export async function runCleanroomSimilarity(options = {}) {
   return report;
 }
 
-function evaluateSpecDocument(content) {
+function buildSpecRequirements(addonConfig = null) {
+  const configuredProductName = String(addonConfig?.addonName || "").trim();
+  return [
+    configuredProductName || DEFAULT_SPEC_PRODUCT_NAME,
+    ...DEFAULT_SPEC_REQUIREMENTS,
+  ];
+}
+
+function evaluateSpecDocument(content, addonConfig = null) {
   const issues = [];
   for (const pattern of SPEC_PLACEHOLDER_PATTERNS) {
     if (content.includes(pattern)) {
       issues.push(`SPEC 仍包含占位片段: ${pattern}`);
     }
   }
-  for (const required of DEFAULT_SPEC_REQUIREMENTS) {
+  for (const required of buildSpecRequirements(addonConfig)) {
     if (!content.includes(required)) {
       issues.push(`SPEC 缺少必需说明: ${required}`);
     }
@@ -735,7 +756,8 @@ export async function runCleanroomAudit(options = {}) {
     referenceRoot,
     reportDir,
   });
-  const specEvaluation = evaluateSpecDocument(specContent);
+  const addonConfig = await readOptionalAddonConfig(projectRoot);
+  const specEvaluation = evaluateSpecDocument(specContent, addonConfig);
   const legalEvaluation = evaluateLegalChecklist(legalContent);
   const chinaLegal = await evaluateChinaLegalPack(projectRoot, legalEvaluation, mode);
   const forbiddenPatternFindings = await scanSourceFilesForForbiddenPatterns(projectRoot);
@@ -744,7 +766,7 @@ export async function runCleanroomAudit(options = {}) {
   const checks = [
     {
       id: "spec-baseline",
-      label: "SPEC 已脱离占位模板并冻结当前模板黑盒契约",
+      label: "SPEC 已脱离占位模板并冻结当前产品黑盒契约",
       ok: specEvaluation.ok,
       required: true,
       evidence: "SPEC.md",

@@ -79,7 +79,6 @@ describe("Protected Semantic ID Modules", () => {
     });
     const plainById = new Map(plainCatalog.map((entry) => [entry.id, entry]));
     const protectedById = new Map(protectedCatalog.map((entry) => [entry.id, entry]));
-    const protectedReactDemo = protectedById.get(PLAIN_HOST_ACTION_IDS.windowOpenReactDemo);
 
     assert.deepEqual(protectedCatalog.map((entry) => entry.id), plainCatalog.map((entry) => entry.id));
     assert.equal(protectedById.get(PLAIN_HOST_ACTION_IDS.preferencesOpenPane)?.status, plainById.get(PLAIN_HOST_ACTION_IDS.preferencesOpenPane)?.status);
@@ -87,7 +86,6 @@ describe("Protected Semantic ID Modules", () => {
     assert.equal(protectedById.get(PLAIN_HOST_ACTION_IDS.runtimeDeriveWasmKernelDigest)?.executable, plainById.get(PLAIN_HOST_ACTION_IDS.runtimeDeriveWasmKernelDigest)?.executable);
     assert.equal(protectedById.get(PLAIN_HOST_ACTION_IDS.runtimeDeriveWasmKernelUnlockToken)?.executable, plainById.get(PLAIN_HOST_ACTION_IDS.runtimeDeriveWasmKernelUnlockToken)?.executable);
     assert.equal(protectedById.get(PLAIN_HOST_ACTION_IDS.runtimeResolveLegacyEntitlementGate)?.executable, plainById.get(PLAIN_HOST_ACTION_IDS.runtimeResolveLegacyEntitlementGate)?.executable);
-    assert.equal(protectedReactDemo?.requiredBundle, "react-ui");
     assert.equal(Object.prototype.hasOwnProperty.call(protectedById.get(PLAIN_HOST_ACTION_IDS.preferencesOpenPane), "label"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(protectedById.get(PLAIN_HOST_ACTION_IDS.preferencesOpenPane), "summary"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(protectedById.get(PLAIN_HOST_ACTION_IDS.preferencesOpenPane), "authoritativeSource"), false);

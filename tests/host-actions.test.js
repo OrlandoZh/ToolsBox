@@ -5,7 +5,6 @@ import {
   listHostActionDescriptors,
 } from "../dev/agent-runtime/host-action-catalog.js";
 import {
-  REACT_UI_DEMO_SHELL_PATH,
   WASM_KERNEL_PROBE_PATH,
   WASM_KERNEL_PROBE_WORKER_PATH,
 } from "../src/utils/optional-bundle-paths.js";
@@ -850,26 +849,6 @@ describe("Host Actions", () => {
     assert.equal(getHostActionDescriptor("window.openReactDemo"), null);
   });
 
-  it("should expose the optional react-ui host action only when the bundle is enabled", () => {
-    const bundleRuntime = {
-      isEnabled(bundleID) {
-        return bundleID === "react-ui";
-      },
-    };
-
-    const actions = listHostActionDescriptors({
-      bundleRuntime,
-    });
-
-    assert.ok(actions.some((entry) => entry.id === "window.openReactDemo"));
-    assert.equal(
-      getHostActionDescriptor("window.openReactDemo", {
-        bundleRuntime,
-      })?.executable,
-      true,
-    );
-  });
-
   it("should run the wasm kernel probe host action without host surface dependencies", async () => {
     let receivedPayload = null;
     const runner = createHostActionRunner({
@@ -1508,43 +1487,6 @@ describe("Host Actions", () => {
     );
   });
 
-  it("should run the optional react-ui window host action when the bundle is enabled", async () => {
-    const bundleRuntime = {
-      isEnabled(bundleID) {
-        return bundleID === "react-ui";
-      },
-    };
-
-    const runner = createHostActionRunner({
-      config: {
-        addonRef: "cleanroomtemplate",
-      },
-      host: {},
-      reader: {},
-      menuManager: {},
-      itemPane: {},
-      bundleRuntime,
-      async openReactDemoWindow() {
-        return {
-          window: {
-            location: {
-              href: `chrome://cleanroomtemplate/${REACT_UI_DEMO_SHELL_PATH}`,
-            },
-          },
-          ready: true,
-          reused: false,
-          surfaceTarget: createSurfaceTarget("window-shell", "window-shell-react-ui-demo"),
-        };
-      },
-    });
-
-    const result = await runner.runHostAction("window.openReactDemo");
-
-    assert.equal(result.ok, true);
-    assert.equal(result.observedState.bundleId, "react-ui");
-    assert.equal(result.surfaceTarget.surfaceId, "window-shell");
-  });
-
   it("should keep a capped compact execution history for recent host actions", async () => {
     const runner = createHostActionRunner({
       config: {
@@ -1554,40 +1496,36 @@ describe("Host Actions", () => {
       reader: {},
       menuManager: {},
       itemPane: {},
-      bundleRuntime: {
-        isEnabled(bundleID) {
-          return bundleID === "react-ui";
-        },
-      },
-      async openReactDemoWindow(payload = {}) {
-        return {
-          window: {
-            location: {
-              href: `chrome://cleanroomtemplate/${REACT_UI_DEMO_SHELL_PATH}`,
+      wasmKernelProbe: {
+        async runProbe(payload = {}) {
+          return {
+            ok: payload.ready !== false,
+            mode: "main-thread",
+            mainThread: {
+              ok: payload.ready !== false,
+              matchesExpected: payload.ready !== false,
             },
-          },
-          ready: payload.ready !== false,
-          reused: false,
-          surfaceTarget: createSurfaceTarget("window-shell", "window-shell-react-ui-demo"),
-        };
+            worker: null,
+            consistentAcrossTransports: true,
+            errors: [],
+          };
+        },
       },
     });
 
     for (let index = 0; index < 25; index += 1) {
-      await runner.runHostAction("window.openReactDemo", {
+      await runner.runHostAction("runtime.probeWasmKernel", {
         ready: index % 2 === 0,
       });
     }
 
     const recent = runner.getRecentExecutionSummaries();
     assert.equal(recent.length, 20);
-    assert.equal(recent[0].actionId, "window.openReactDemo");
+    assert.equal(recent[0].actionId, "runtime.probeWasmKernel");
     assert.equal(typeof recent[0].executedAt, "string");
-    assert.equal(recent[0].surfaceTarget, "window-shell-react-ui-demo");
+    assert.equal(recent[0].surfaceTarget, null);
     assert.equal(typeof recent[0].observedStateSummary, "object");
-    assert.equal(recent[0].observedStateSummary.statusFields.href, undefined);
-    assert.equal(recent[0].observedStateSummary.statusFields.bundleId, undefined);
-    assert.equal(typeof recent[0].observedStateSummary.booleanMetrics.ready, "boolean");
+    assert.equal(typeof recent[0].observedStateSummary.booleanMetrics.ok, "boolean");
     assert.equal(Object.prototype.hasOwnProperty.call(recent[0].observedStateSummary, "scalarFields"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(recent[0], "observedState"), false);
   });

@@ -5,10 +5,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { createSurfaceDescriptors as createDefaultSurfaceDescriptors } from "../src/app/surface-descriptors.js";
 import { createSurfaceDescriptors as createProtectedSurfaceDescriptors } from "../src/app/surface-descriptors-protected.js";
-import {
-  REACT_UI_DEMO_SHELL_PATH,
-  WASM_KERNEL_PROBE_WORKER_PATH,
-} from "../src/utils/optional-bundle-paths.js";
+import { WASM_KERNEL_PROBE_WORKER_PATH } from "../src/utils/optional-bundle-paths.js";
 import {
   obfuscateBundleSource,
   SHIELDED_LOADER_OBFUSCATION_STAGE,
@@ -462,6 +459,7 @@ function buildPrefs(
     && semanticScrubMode === BUILD_SEMANTIC_SCRUB_PROTECTED
     ? buildPreferencePlaceholderNameMap(
       resolveBuildSurfaceDescriptors(config, semanticScrubMode),
+      config,
     )
     : buildPreferenceNameMap(config);
   return Object.entries(config.defaultPrefs)
@@ -516,15 +514,38 @@ const PROTECTED_SOURCE_LITERAL_REPLACEMENTS = Object.freeze({
     ["reader.openReader", "reader.r0"],
     ["reader.openByURI", "reader.r1"],
   ]),
+  "features/research-workbench-graph.js": Object.freeze([
+    ["toolsbox-relationship-graph", "w0"],
+    ["ToolsBox", "Tool"],
+    ["Open Relationship Graph", "Open View"],
+    ["Relationship Graph", "View"],
+    ["relationship-graph", "w0"],
+    ["research-graph", "w0"],
+  ]),
+  "features/research-workbench-matrix.js": Object.freeze([
+    ["toolsbox-paper-matrix", "w1"],
+    ["ToolsBox", "Tool"],
+    ["Open Paper Matrix", "Open View"],
+    ["Paper Matrix", "View"],
+    ["paper-matrix", "w1"],
+  ]),
+  "features/research-workbench-notes.js": Object.freeze([
+    ["toolsbox-notes-manager", "w2"],
+    ["ToolsBox", "Tool"],
+    ["Open Notes Manager", "Open View"],
+    ["Notes Manager", "View"],
+    ["notes-manager", "w2"],
+  ]),
+  "features/research-workbench-tabs.js": Object.freeze([
+    ["reader.openReader", "reader.r0"],
+    ["ToolsBox", "Tool"],
+    ["tab-helper", "w3"],
+  ]),
   "../dev/agent-runtime/host-actions.js": Object.freeze([
     ["reader.openReader", "reader.r0"],
   ]),
   "app/surface-descriptors-protected.js": Object.freeze([
     ["cleanroomtemplate", "tool"],
-  ]),
-  "features/react-ui-demo.js": Object.freeze([
-    ["cleanroomtemplate", "tool"],
-    ["Cleanroom Template", "Tool"],
   ]),
   "features/wasm-kernel-probe.js": Object.freeze([
     ["cleanroomtemplate", "tool"],
@@ -850,23 +871,34 @@ function resolveBuildSurfaceDescriptors(config, semanticScrubMode = BUILD_SEMANT
 
 function buildPreferenceNameMap(config = {}) {
   const prefsPrefix = String(config?.prefsPrefix || "").trim();
-  return {
-    enabled: `${prefsPrefix}.enabled`,
-    menuLabel: `${prefsPrefix}.menuLabel`,
-    logLevel: `${prefsPrefix}.logLevel`,
-    themeMode: `${prefsPrefix}.themeMode`,
-  };
+  const keys = new Set([
+    "enabled",
+    "menuLabel",
+    "logLevel",
+    "themeMode",
+    ...Object.keys(config?.defaultPrefs || {}),
+  ]);
+  return Object.fromEntries(Array.from(keys).map((key) => [key, `${prefsPrefix}.${key}`]));
 }
 
-function buildPreferencePlaceholderNameMap(surfaceDescriptors = null) {
+function preferencePlaceholderToken(key) {
+  return `__PREF_${String(key || "")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toUpperCase()}_NAME__`;
+}
+
+function buildPreferencePlaceholderNameMap(surfaceDescriptors = null, config = {}) {
   const paneScope = String(surfaceDescriptors?.preferencePaneID || "").trim() || "crp0";
   const prefsPrefix = `extensions.zotero.${paneScope}`;
-  return {
-    enabled: `${prefsPrefix}.p0`,
-    menuLabel: `${prefsPrefix}.p1`,
-    logLevel: `${prefsPrefix}.p2`,
-    themeMode: `${prefsPrefix}.p3`,
-  };
+  const orderedKeys = Array.from(new Set([
+    "enabled",
+    "menuLabel",
+    "logLevel",
+    "themeMode",
+    ...Object.keys(config?.defaultPrefs || {}),
+  ]));
+  return Object.fromEntries(orderedKeys.map((key, index) => [key, `${prefsPrefix}.p${index}`]));
 }
 
 function patchPreferences(
@@ -877,74 +909,56 @@ function patchPreferences(
 ) {
   const surfaceDescriptors = resolveBuildSurfaceDescriptors(config, semanticScrubMode);
   const prefNames = preferenceBindingMode === BUILD_PREFERENCE_BINDING_MODE_BRIDGE
-    ? buildPreferencePlaceholderNameMap(surfaceDescriptors)
+    ? buildPreferencePlaceholderNameMap(surfaceDescriptors, config)
     : buildPreferenceNameMap(config);
-  return templateContent
+  let patched = templateContent
     .replaceAll("__PREF_ENABLED_NAME__", prefNames.enabled)
     .replaceAll("__PREF_MENU_LABEL_NAME__", prefNames.menuLabel)
     .replaceAll("__PREF_LOG_LEVEL_NAME__", prefNames.logLevel)
     .replaceAll("__PREF_THEME_MODE_NAME__", prefNames.themeMode)
     .replaceAll("__PREFERENCE_ROOT_ID__", surfaceDescriptors.preferenceRootID);
-}
-
-function patchReactUIDemoShell(
-  templateContent,
-  config,
-  staticSurfaceMode = BUILD_STATIC_SURFACE_MODE_STANDARD,
-) {
-  const shellAddonRef = staticSurfaceMode === BUILD_STATIC_SURFACE_MODE_SCRUB
-    ? "tool"
-    : String(config?.addonRef || "").trim() || "tool";
-  const shellAddonName = staticSurfaceMode === BUILD_STATIC_SURFACE_MODE_SCRUB
-    ? "Tool"
-    : String(config?.addonName || "").trim() || "Tool";
-  const shellWindowTitle = staticSurfaceMode === BUILD_STATIC_SURFACE_MODE_SCRUB
-    ? "Tool Panel"
-    : `${shellAddonName} React UI Demo`;
-  const shellNoScript = staticSurfaceMode === BUILD_STATIC_SURFACE_MODE_SCRUB
-    ? "This panel requires JavaScript."
-    : "React UI demo requires JavaScript.";
-  return templateContent
-    .replaceAll("__SHELL_ADDON_REF__", escapeXHTML(shellAddonRef))
-    .replaceAll("__SHELL_ADDON_NAME__", escapeXHTML(shellAddonName))
-    .replaceAll("__SHELL_WINDOW_TITLE__", escapeXHTML(shellWindowTitle))
-    .replaceAll("__SHELL_NOSCRIPT__", escapeXHTML(shellNoScript));
+  for (const [key, name] of Object.entries(prefNames)) {
+    patched = patched.replaceAll(preferencePlaceholderToken(key), name);
+  }
+  return patched;
 }
 
 const PROTECTED_STATIC_REPLACEMENTS = Object.freeze({
   "locale/en-US/main.ftl": Object.freeze([
+    ["Open ToolsBox", "Open Tool"],
+    ["ToolsBox Preferences", "Tool Preferences"],
+    ["ToolsBox", "Tool"],
     ["Open Cleanroom Action", "Open Tool"],
-    ["Show Reader Demo Summary", "Open Current View"],
     ["Cleanroom Template Preferences", "Tool Preferences"],
     ["Enable plugin", "Enable tool"],
     ["Cleanroom Summary", "Current Summary"],
-    ["Cleanroom Demo", "Current Panel"],
+    ["Cleanroom Panel", "Current Panel"],
     ["Cleanroom Template", "Tool"],
     ["Plugin command executed successfully.", "Action completed."],
   ]),
   "locale/zh-CN/main.ftl": Object.freeze([
+    ["打开 ToolsBox", "打开工具"],
+    ["ToolsBox 首选项", "工具首选项"],
+    ["ToolsBox", "工具"],
     ["打开模板动作", "打开工具"],
-    ["显示 Reader 示例摘要", "打开当前视图"],
     ["Cleanroom 模板首选项", "工具首选项"],
     ["启用插件", "启用工具"],
     ["模板摘要", "当前摘要"],
-    ["模板示例", "当前面板"],
+    ["模板面板", "当前面板"],
     ["模板插件", "工具"],
     ["插件命令执行成功。", "操作已完成。"],
   ]),
   "locale/zh-TW/main.ftl": Object.freeze([
+    ["開啟 ToolsBox", "開啟工具"],
+    ["ToolsBox 偏好設定", "工具偏好設定"],
+    ["ToolsBox", "工具"],
     ["開啟範本動作", "開啟工具"],
-    ["顯示 Reader 示例摘要", "開啟目前視圖"],
     ["Cleanroom 範本偏好設定", "工具偏好設定"],
     ["啟用外掛", "啟用工具"],
     ["範本摘要", "目前摘要"],
-    ["範本示例", "目前面板"],
+    ["範本面板", "目前面板"],
     ["範本外掛", "工具"],
     ["外掛命令已成功執行。", "操作已完成。"],
-  ]),
-  [REACT_UI_DEMO_SHELL_PATH]: Object.freeze([
-    ["React UI Demo", "Panel"],
-    ["React UI demo requires JavaScript.", "This panel requires JavaScript."],
   ]),
 });
 
@@ -1133,24 +1147,6 @@ export async function main() {
         failedStage: "patch-preferences",
         details: { buildRoot },
       });
-    }
-
-    const reactUIDemoShellPath = path.join(buildRoot, ...REACT_UI_DEMO_SHELL_PATH.split("/"));
-    try {
-      const reactUIDemoShell = await fs.readFile(reactUIDemoShellPath, "utf-8");
-      const patchedReactUIDemoShell = patchReactUIDemoShell(
-        reactUIDemoShell,
-        config,
-        staticSurfaceMode,
-      );
-      await fs.writeFile(reactUIDemoShellPath, patchedReactUIDemoShell, "utf-8");
-    } catch (error) {
-      if (error?.code !== "ENOENT") {
-        throw wrapScriptError(error, {
-          failedStage: "patch-react-ui-shell",
-          details: { reactUIDemoShellPath },
-        });
-      }
     }
 
     if (semanticScrubMode === BUILD_SEMANTIC_SCRUB_PROTECTED) {

@@ -231,23 +231,40 @@ export function afterEach(fn) {
  */
 export async function runTests() {
   for (const test of testQueue) {
-    try {
-      for (const hook of test.hooks.beforeEach) {
+    let beforeEachFailed = false;
+    for (const hook of test.hooks.beforeEach) {
+      try {
         await hook();
+      } catch (e) {
+        beforeEachFailed = true;
+        results.failed++;
+        results.tests.push({ name: test.fullName, status: 'failed', error: `beforeEach: ${e.message}` });
+        console.log(`  ❌ ${test.name}`);
+        console.log(`     beforeEach Error: ${e.message}`);
+        break;
       }
-      await test.fn();
-      for (const hook of test.hooks.afterEach) {
-        await hook();
-      }
+    }
 
-      results.passed++;
-      results.tests.push({ name: test.fullName, status: 'passed' });
-      console.log(`  ✅ ${test.name}`);
-    } catch (error) {
-      results.failed++;
-      results.tests.push({ name: test.fullName, status: 'failed', error: error.message });
-      console.log(`  ❌ ${test.name}`);
-      console.log(`     Error: ${error.message}`);
+    if (!beforeEachFailed) {
+      try {
+        await test.fn();
+        results.passed++;
+        results.tests.push({ name: test.fullName, status: 'passed' });
+        console.log(`  ✅ ${test.name}`);
+      } catch (error) {
+        results.failed++;
+        results.tests.push({ name: test.fullName, status: 'failed', error: error.message });
+        console.log(`  ❌ ${test.name}`);
+        console.log(`     Error: ${error.message}`);
+      }
+    }
+
+    for (const hook of test.hooks.afterEach) {
+      try {
+        await hook();
+      } catch (e) {
+        console.log(`     afterEach cleanup Error: ${e.message}`);
+      }
     }
   }
 

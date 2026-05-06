@@ -7,7 +7,7 @@
       "enabled": false,
       "lane": "ts-isolated",
       "implementationStatus": "implemented",
-      "summary": "Standalone React/TS demo window plus a host-mounted surface bridge example. Its checked-in shell and built assets stay grouped under content/lib/r so downstream projects can opt in without forcing React into the template core.",
+      "summary": "Default-disabled React/TS host-mounted surface bridge lane. Built assets stay grouped under content/lib/r so downstream projects can opt in without forcing React into the template core.",
       "build": {
         "scriptName": "build:react-ui",
         "requiredPackages": [
@@ -16,16 +16,6 @@
           "react-dom"
         ],
         "artifacts": [
-          {
-            "id": "demo-window",
-            "kind": "window-shell",
-            "summary": "Standalone demo window backed by a checked-in XHTML shell.",
-            "entry": "src/react-ui/demo-window/entry.tsx",
-            "stylesheet": "src/react-ui/styles/demo.css",
-            "shell": "addon-static/content/lib/r/demo.xhtml",
-            "outputScript": "content/lib/r/react-ui-demo.js",
-            "outputStyle": "content/lib/r/react-ui-demo.css"
-          },
           {
             "id": "surface-bridge",
             "kind": "surface-bridge",

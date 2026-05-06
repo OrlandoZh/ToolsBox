@@ -1,18 +1,18 @@
-# Zotero Cleanroom Template Specification
+# ToolsBox Specification
 
-本文件只描述当前模板基线的黑盒行为，不描述参考项目结构，也不把内部 agent 脚本实现细节写成插件产品契约。
+本文件只描述当前 ToolsBox 插件的黑盒行为，不描述参考项目结构，也不把内部 agent 脚本实现细节写成插件产品契约。
 
 ## Product Identity
 
-- Name: `Zotero Cleanroom Template`
-- Package identity: `cleanroom-template@example.com` / `cleanroomtemplate`
+- Name: `ToolsBox`
+- Package identity: `toolsbox@orlandozh.github` / `toolsbox`
 - Zotero compatibility target: `Zotero 7/8`
 - Current verified build: `8.0.2-beta.5+c35d7f21e`
 - Current platform claim: `macOS 已验证，其他桌面平台为设计目标但未纳入当前基线声明`
 
 ## Product Goal
 
-该模板为 Zotero 插件提供一套可运行、可验证、可扩展的 clean-room 起点。默认安装后应呈现一组最小但完整的演示能力，用于验证命令注册、菜单注入、偏好设置、Reader 接口、生命周期治理与可观测性链路已经接通。
+ToolsBox 为 Zotero 提供一组本地优先的研究工作流工具。默认安装后应能通过本地标签与 Extra 字段维护状态、评分、备注、阅读状态与进度，并继续保留命令注册、菜单注入、偏好设置、Reader 接口、生命周期治理与可观测性链路。
 
 ## Baseline Capabilities
 

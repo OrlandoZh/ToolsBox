@@ -10,25 +10,12 @@ function createDeps() {
     sections: 0,
     notifier: 0,
     primary: 0,
-    readerDemo: 0,
-    updateNotifier: 0,
-    reactUIDemo: 0,
   };
-  const notifierHandlers = [];
   const paneRegistrations = [];
   const commandRegistrations = [];
-  const selectionActions = [];
-  const sectionRegistrations = [];
-  const demoState = {
-    shortcutLabel: "Ctrl+Shift+Y",
-    shortcutTriggerCount: 0,
-    lastNotifierEvent: "idle",
-  };
-  const demoSectionRefreshers = new Set();
 
   return {
     calls,
-    notifierHandlers,
     deps: {
       config: {
         addonRef: "cleanroomtemplate",
@@ -87,21 +74,7 @@ function createDeps() {
           return calls.commands;
         },
       },
-      readerSelectionActions: {
-        registerAction(options) {
-          selectionActions.push(options);
-          return options.id || `reader-selection-action-${selectionActions.length}`;
-        },
-        getActionSnapshot(actionId) {
-          const action = selectionActions.find((entry) => entry.id === actionId);
-          return action
-            ? {
-              id: action.id,
-              enabled: true,
-            }
-            : null;
-        },
-      },
+      readerSelectionActions: {},
       menuManager: {
         MENU_TARGETS: {
           READER_MENU_VIEW: "reader-view",
@@ -115,11 +88,7 @@ function createDeps() {
           return 0;
         },
       },
-      reader: {
-        getActiveSummary() {
-          return null;
-        },
-      },
+      reader: {},
       itemTree: {
         createConditionalCellRenderer() {
           return () => {};
@@ -135,9 +104,8 @@ function createDeps() {
         registerInfoRow() {
           calls.rows += 1;
         },
-        registerSection(options) {
+        registerSection() {
           calls.sections += 1;
-          sectionRegistrations.push(options);
         },
         getInfoRowCount() {
           return calls.rows;
@@ -147,9 +115,8 @@ function createDeps() {
         },
       },
       notifier: {
-        subscribe(types, handler) {
+        subscribe() {
           calls.notifier += 1;
-          notifierHandlers.push({ types, handler });
         },
         getActiveCount() {
           return calls.notifier;
@@ -161,31 +128,10 @@ function createDeps() {
       runPrimaryAction() {
         calls.primary += 1;
       },
-      runReaderDemo() {
-        calls.readerDemo += 1;
-      },
-      runReaderSelectionActionDemo() {
-        calls.readerSelectionDemo = (calls.readerSelectionDemo || 0) + 1;
-      },
       bundleRuntime: {
         isEnabled() {
           return false;
         },
-      },
-      openReactDemoWindow() {
-        calls.reactUIDemo += 1;
-        return {
-          ready: true,
-        };
-      },
-      presentReactSurface() {
-        calls.reactSurfacePresent = (calls.reactSurfacePresent || 0) + 1;
-      },
-      renderReactItemPaneSurface() {
-        calls.reactSurfaceRender = (calls.reactSurfaceRender || 0) + 1;
-      },
-      unmountReactItemPaneSurface() {
-        calls.reactSurfaceUnmount = (calls.reactSurfaceUnmount || 0) + 1;
       },
       getColumnValue() {
         return "item · 0";
@@ -196,82 +142,35 @@ function createDeps() {
       createSectionLine(_doc, _label, value) {
         return { value };
       },
-      demoState,
-      demoSectionRefreshers,
       demoInfoRowID: "demo-row",
       demoSectionID: "demo-section",
       demoColumnKey: "demo-column",
       demoNotifierID: "demo-notifier",
-      updateDemoNotifierState() {
-        calls.updateNotifier += 1;
-      },
+      updateDemoNotifierState() {},
     },
     paneRegistrations,
     commandRegistrations,
-    selectionActions,
-    sectionRegistrations,
   };
-}
-
-function createFakeSectionRenderContext() {
-  const doc = {
-    createElement(tagName) {
-      return {
-        tagName: String(tagName || "").toUpperCase(),
-        textContent: "",
-        children: [],
-        appendChild(child) {
-          this.children.push(child);
-          child.parentNode = this;
-          return child;
-        },
-      };
-    },
-  };
-
-  const body = {
-    ownerDocument: doc,
-    children: [],
-    appendChild(child) {
-      this.children.push(child);
-      child.parentNode = this;
-      return child;
-    },
-    replaceChildren(...children) {
-      this.children = children;
-      children.forEach((child) => {
-        if (child && typeof child === "object") {
-          child.parentNode = this;
-        }
-      });
-    },
-  };
-
-  return { doc, body };
 }
 
 describe("Feature Composer", () => {
   it("should register baseline features only once", async () => {
-    const { deps, calls, paneRegistrations, commandRegistrations, selectionActions } = createDeps();
+    const { deps, calls, paneRegistrations, commandRegistrations } = createDeps();
     const composer = createFeatureComposer(deps);
 
     await composer.registerBaselineFeatures();
     await composer.registerBaselineFeatures();
 
     assert.equal(calls.panes, 1);
-    assert.equal(calls.commands, 3);
-    assert.equal(calls.columns, 1);
-    assert.equal(calls.rows, 1);
+    assert.equal(calls.commands, 9);
+    assert.equal(calls.columns, 11);
+    assert.equal(calls.rows, 0);
     assert.equal(calls.sections, 1);
-    assert.equal(calls.notifier, 1);
+    assert.equal(calls.notifier, 0);
     assert.equal(typeof paneRegistrations[0]?.onPreferenceLoad, "function");
     assert.equal(paneRegistrations[0]?.scripts, undefined);
     assert.deepEqual(paneRegistrations[0]?.stylesheets, ["content/preferences.css"]);
-    assert.equal(selectionActions.length, 1);
-    assert.equal(selectionActions[0].id, "cleanroomtemplate-reader-selection-snapshot");
-    assert.equal(commandRegistrations[2].id, "cleanroomtemplate-reader-selection-snapshot");
-    commandRegistrations[2].handler();
-    assert.equal(calls.readerSelectionDemo, 1);
+    assert.equal(commandRegistrations[0].id, "cleanroomtemplate-primary-action");
   });
 
   it("should initialize preference panes through onPreferenceLoad", async () => {
@@ -354,7 +253,6 @@ describe("Feature Composer", () => {
       readerSelectionCommandID: "crabc-c2",
       primaryActionCommandID: "crabc-c0",
       readerSummaryCommandID: "crabc-c1",
-      reactUIDemoCommandID: "crabc-c3",
       contextMenuItemID: "crabc-m2",
       readerSummaryMenuItemID: "crabc-c1",
       demoInfoRowID: "crabc-r0",
@@ -371,14 +269,12 @@ describe("Feature Composer", () => {
         hostSignals: "crabc.s1",
         hostNonce: "crabc.s2",
         runtimeBridge: "crabc.s3",
-        reactUIDemo: "crabc.s4",
       },
       serviceLabels: {
         runtimeCore: "Service 0",
         hostSignals: "Service 1",
         hostNonce: "Service 2",
         runtimeBridge: "Service 3",
-        reactUIDemo: "Service 4",
       },
     };
     const composer = createFeatureComposer(deps);
@@ -413,16 +309,6 @@ describe("Feature Composer", () => {
     });
   });
 
-  it("should pass notifier events to updater callback", async () => {
-    const { deps, calls, notifierHandlers } = createDeps();
-    const composer = createFeatureComposer(deps);
-    await composer.registerBaselineFeatures();
-
-    assert.equal(notifierHandlers.length, 1);
-    notifierHandlers[0].handler("modify", "item", [101]);
-    assert.equal(calls.updateNotifier, 1);
-  });
-
   it("should use l10n ids for official menu registrations", async () => {
     const { deps } = createDeps();
     const contextMenus = [];
@@ -449,48 +335,11 @@ describe("Feature Composer", () => {
     const composer = createFeatureComposer(deps);
     await composer.registerBaselineFeatures();
 
-    assert.equal(contextMenus.length, 1);
-    assert.equal(readerMenus.length, 1);
+    assert.equal(contextMenus.length, 2);
+    assert.equal(readerMenus.length, 0);
     assert.equal(contextMenus[0].l10nID, "cleanroom-menu-label");
     assert.equal(contextMenus[0].label, undefined);
-    assert.equal(readerMenus[0].l10nID, "cleanroom-reader-menu-label");
-    assert.equal(readerMenus[0].label, undefined);
-  });
-
-  it("should register the optional react-ui command only when the bundle is enabled", async () => {
-    const { deps, calls, commandRegistrations, sectionRegistrations } = createDeps();
-    deps.bundleRuntime = {
-      isEnabled(bundleID) {
-        return bundleID === "react-ui";
-      },
-    };
-
-    const composer = createFeatureComposer(deps);
-    await composer.registerBaselineFeatures();
-
-    assert.equal(calls.commands, 4);
-    assert.equal(commandRegistrations[3].id, "cleanroomtemplate-open-react-ui-demo");
-
-    await commandRegistrations[3].handler();
-    assert.equal(calls.reactUIDemo, 1);
-
-    const { doc, body } = createFakeSectionRenderContext();
-    sectionRegistrations[0].onRender({
-      doc,
-      body,
-      item: {
-        id: 77,
-      },
-      setSectionSummary() {},
-    });
-    assert.equal(body.children.length, 1);
-    assert.equal(body.children[0].id, "demo-section-root");
-    assert.equal(body.children[0].dataset.cleanroomItemPaneRoot, "true");
-    assert.equal(body.children[0].dataset.cleanroomPaneID, "demo-section");
-    assert.equal(calls.reactSurfacePresent, 1);
-    assert.equal(calls.reactSurfaceRender || 0, 0);
-
-    sectionRegistrations[0].onDestroy({ body });
-    assert.equal(calls.reactSurfaceUnmount, 1);
+    assert.equal(contextMenus[1].l10nID, "cleanroom-rg-item-menu-label");
+    assert.equal(contextMenus[1].label, undefined);
   });
 });

@@ -51,6 +51,88 @@ export function createPluginAgent({
   const descriptors = surfaceDescriptors && typeof surfaceDescriptors === "object"
     ? surfaceDescriptors
     : createSurfaceDescriptors(config);
+  const baselineInfoRowID = String(demoInfoRowID || descriptors.demoInfoRowID || "").trim();
+  const baselineSectionID = String(demoSectionID || descriptors.demoSectionID || "").trim();
+  const notifierPreviewState = demoState && typeof demoState === "object"
+    ? demoState
+    : {
+      lastNotifierEvent: "idle",
+    };
+
+  function formatNotifierPreviewTimestamp(date = new Date()) {
+    return date.toISOString().slice(11, 19);
+  }
+
+  function readItemTypeLabel(item) {
+    if (typeof getItemTypeLabel === "function") {
+      return getItemTypeLabel(item);
+    }
+
+    if (!item) {
+      return "";
+    }
+    if (typeof item.itemType === "string" && item.itemType) {
+      return item.itemType;
+    }
+    if (
+      typeof item.itemTypeID === "number"
+      && zotero?.ItemTypes
+      && typeof zotero.ItemTypes.getName === "function"
+    ) {
+      try {
+        const typeName = zotero.ItemTypes.getName(item.itemTypeID);
+        if (typeName) {
+          return typeName;
+        }
+      }
+      catch {}
+    }
+    return "item";
+  }
+
+  function readItemTitle(item) {
+    if (typeof getItemTitle === "function") {
+      return getItemTitle(item);
+    }
+    if (!item || typeof item.getField !== "function") {
+      return "Untitled item";
+    }
+    return item.getField("title") || "Untitled item";
+  }
+
+  function readItemSummary(item) {
+    if (typeof getItemSummary === "function") {
+      return getItemSummary(item);
+    }
+    if (!item) {
+      return "No item selected.";
+    }
+    return [
+      readItemTypeLabel(item),
+      `#${item.id ?? "?"}`,
+      readItemTitle(item),
+    ].join(" · ");
+  }
+
+  function readItemColumnValue(item) {
+    if (typeof getColumnValue === "function") {
+      return getColumnValue(item);
+    }
+    if (!item) {
+      return "Idle";
+    }
+    const title = typeof item.getField === "function" ? item.getField("title") || "" : "";
+    return `${readItemTypeLabel(item)} · ${title.trim().length}`;
+  }
+
+  function updateNotifierPreviewState(event, type, ids = []) {
+    if (typeof updateDemoNotifierState === "function") {
+      updateDemoNotifierState(event, type, ids);
+      return;
+    }
+    const idToken = ids.length > 0 ? `#${ids[0]}` : "#-";
+    notifierPreviewState.lastNotifierEvent = `${type}:${event} ${idToken} @ ${formatNotifierPreviewTimestamp()}`;
+  }
 
   function createDefaultHostBindingSummary() {
     return {
@@ -141,7 +223,7 @@ export function createPluginAgent({
     const infoRows = Array.isArray(snapshot?.infoRows) ? snapshot.infoRows : [];
     const sections = Array.isArray(snapshot?.sections) ? snapshot.sections : [];
 
-    const baselineInfoRow = infoRows.find((entry) => entry?.rowID === demoInfoRowID);
+    const baselineInfoRow = infoRows.find((entry) => entry?.rowID === baselineInfoRowID);
     if (
       baselineInfoRow
       && typeof baselineInfoRow.labelL10nID === "string"
@@ -156,7 +238,7 @@ export function createPluginAgent({
       });
     }
 
-    const baselineSection = sections.find((entry) => entry?.paneID === demoSectionID);
+    const baselineSection = sections.find((entry) => entry?.paneID === baselineSectionID);
     if (
       baselineSection
       && typeof baselineSection.headerL10nID === "string"
@@ -524,10 +606,10 @@ export function createPluginAgent({
     const { item, source } = resolveAgentItem(target);
     return {
       itemID: item?.id ?? null,
-      itemType: getItemTypeLabel(item),
-      summary: getItemSummary(item),
-      columnValue: getColumnValue(item),
-      title: getItemTitle(item),
+      itemType: readItemTypeLabel(item),
+      summary: readItemSummary(item),
+      columnValue: readItemColumnValue(item),
+      title: readItemTitle(item),
       source,
       isRealItem: source === "zotero",
     };
@@ -539,7 +621,7 @@ export function createPluginAgent({
       ...runAgentSelfCheck(),
       capabilityCount: capabilityManifest.length,
       capabilityManifestView: getCurrentCapabilityManifestView(),
-      lastNotifierEvent: demoState.lastNotifierEvent,
+      lastNotifierEvent: notifierPreviewState.lastNotifierEvent,
       readerEventListeners: buildReaderEventReport().registeredListeners,
       readerEventReport: buildReaderEventReport(),
       itemPaneL10n: collectBaselineItemPaneL10nHealth(),
@@ -620,9 +702,9 @@ export function createPluginAgent({
         const event = payload.event || "modify";
         const type = payload.type || "item";
         const ids = Array.isArray(payload.ids) ? payload.ids : [payload.id ?? 42];
-        updateDemoNotifierState(event, type, ids);
+        updateNotifierPreviewState(event, type, ids);
         return {
-          lastNotifierEvent: demoState.lastNotifierEvent,
+          lastNotifierEvent: notifierPreviewState.lastNotifierEvent,
         };
       }
       case AGENT_SCENARIO_IDS.readerCurrent:

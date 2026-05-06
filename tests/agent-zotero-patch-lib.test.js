@@ -292,7 +292,7 @@ describe("Agent Zotero Patch Lib", () => {
     assert.equal(plan.whitelisted, true);
     assert.equal(plan.patchDrafts[0].operation, "append");
     assert.equal(plan.patchDrafts[0].file, "addon-static/locale/zh-CN/main.ftl");
-    assert.ok(String(plan.patchDrafts[0].snippet).includes("cleanroom-item-pane-section-header =\n    .label = 模板示例"));
+    assert.ok(String(plan.patchDrafts[0].snippet).includes("cleanroom-item-pane-section-header =\n    .label = 模板面板"));
   });
 
   it("should derive a create patch when locale main ftl file is missing", () => {
@@ -314,7 +314,7 @@ describe("Agent Zotero Patch Lib", () => {
     assert.equal(plan.patchDrafts[0].operation, "create");
     assert.equal(plan.patchDrafts[0].file, "addon-static/locale/zh-CN/main.ftl");
     assert.ok(String(plan.patchDrafts[0].snippet).includes("cleanroom-dialog-body = 插件命令执行成功。"));
-    assert.ok(String(plan.patchDrafts[0].snippet).includes("cleanroom-item-pane-section-header =\n    .label = 模板示例"));
+    assert.ok(String(plan.patchDrafts[0].snippet).includes("cleanroom-item-pane-section-header =\n    .label = 模板面板"));
   });
 
   it("should derive a dynamic review-ready patch plan for locale ftl value drift", () => {
@@ -324,7 +324,7 @@ describe("Agent Zotero Patch Lib", () => {
         fingerprint: "localization:item-pane-section-header-ftl-value-drift",
         feature: "localization",
         featureLabel: "本地化引用修正",
-        issue: "Locale zh-CN FTL key cleanroom-item-pane-section-header 值漂移：期望 模板示例，实际 模板示例-错误。 实际定义片段 [cleanroom-item-pane-section-header =\\n    .label = 模板示例-错误]。",
+        issue: "Locale zh-CN FTL key cleanroom-item-pane-section-header 值漂移：期望 模板面板，实际 模板面板-错误。 实际定义片段 [cleanroom-item-pane-section-header =\\n    .label = 模板面板-错误]。",
         candidateFiles: [
           "addon-static/locale/zh-CN/main.ftl",
         ],
@@ -336,8 +336,8 @@ describe("Agent Zotero Patch Lib", () => {
     assert.equal(plan.patchDrafts[0].operation, "replace-block");
     assert.equal(plan.patchDrafts[0].file, "addon-static/locale/zh-CN/main.ftl");
     assert.equal(String(plan.patchDrafts[0].startText), "cleanroom-item-pane-section-header =");
-    assert.equal(String(plan.patchDrafts[0].endText), "    .label = 模板示例-错误");
-    assert.ok(String(plan.patchDrafts[0].replacementText).includes("cleanroom-item-pane-section-header =\n    .label = 模板示例"));
+    assert.equal(String(plan.patchDrafts[0].endText), "    .label = 模板面板-错误");
+    assert.ok(String(plan.patchDrafts[0].replacementText).includes("cleanroom-item-pane-section-header =\n    .label = 模板面板"));
   });
 
   it("should derive a dynamic review-ready patch plan for locale ftl structure drift", () => {
@@ -347,7 +347,7 @@ describe("Agent Zotero Patch Lib", () => {
         fingerprint: "localization:item-pane-section-header-ftl-structure-drift",
         feature: "localization",
         featureLabel: "本地化引用修正",
-        issue: "Locale zh-CN FTL key cleanroom-item-pane-section-header 结构漂移：期望定义片段 [cleanroom-item-pane-section-header =\\n    .label = 模板示例]，实际定义片段 [cleanroom-item-pane-section-header = 模板示例]。",
+        issue: "Locale zh-CN FTL key cleanroom-item-pane-section-header 结构漂移：期望定义片段 [cleanroom-item-pane-section-header =\\n    .label = 模板面板]，实际定义片段 [cleanroom-item-pane-section-header = 模板面板]。",
         candidateFiles: [
           "addon-static/locale/zh-CN/main.ftl",
         ],
@@ -358,8 +358,8 @@ describe("Agent Zotero Patch Lib", () => {
     assert.equal(plan.whitelisted, true);
     assert.equal(plan.patchDrafts[0].operation, "replace");
     assert.equal(plan.patchDrafts[0].file, "addon-static/locale/zh-CN/main.ftl");
-    assert.equal(String(plan.patchDrafts[0].matchText), "cleanroom-item-pane-section-header = 模板示例");
-    assert.ok(String(plan.patchDrafts[0].replacementText).includes("cleanroom-item-pane-section-header =\n    .label = 模板示例"));
+    assert.equal(String(plan.patchDrafts[0].matchText), "cleanroom-item-pane-section-header = 模板面板");
+    assert.ok(String(plan.patchDrafts[0].replacementText).includes("cleanroom-item-pane-section-header =\n    .label = 模板面板"));
   });
 
   it("should derive a review-ready patch plan for reader visual baseline drift", () => {
@@ -2230,7 +2230,7 @@ cleanroom-dialog-title = 模板插件
 cleanroom-dialog-body = 插件命令执行成功。
 cleanroom-item-pane-info-row-label = 模板摘要
 cleanroom-item-pane-section-sidenav =
-    .tooltiptext = 模板示例
+    .tooltiptext = 模板面板
 `, "utf-8");
 
     const plan = derivePatchPlan({
@@ -2250,7 +2250,7 @@ cleanroom-item-pane-section-sidenav =
     assert.equal(result.attempted, true);
     assert.equal(result.ok, true);
     assert.ok(result.appliedFiles.includes("addon-static/locale/zh-CN/main.ftl"));
-    assert.ok(updated.includes("cleanroom-item-pane-section-header =\n    .label = 模板示例"));
+    assert.ok(updated.includes("cleanroom-item-pane-section-header =\n    .label = 模板面板"));
   });
 
   it("should create missing locale main ftl from minimal baseline", async () => {
@@ -2275,10 +2275,10 @@ cleanroom-item-pane-section-sidenav =
     assert.equal(result.ok, true);
     assert.ok(result.appliedFiles.includes("addon-static/locale/zh-CN/main.ftl"));
     assert.equal(result.precheck[0].reason, "ready");
-    assert.ok(created.includes("cleanroom-menu-label = 打开模板动作"));
-    assert.ok(created.includes("cleanroom-dialog-title = 模板插件"));
-    assert.ok(created.includes("cleanroom-item-pane-section-header =\n    .label = 模板示例"));
-    assert.ok(created.includes("cleanroom-item-pane-section-sidenav =\n    .tooltiptext = 模板示例"));
+    assert.ok(created.includes("cleanroom-menu-label = 打开 ToolsBox"));
+    assert.ok(created.includes("cleanroom-dialog-title = ToolsBox"));
+    assert.ok(created.includes("cleanroom-item-pane-section-header =\n    .label = 模板面板"));
+    assert.ok(created.includes("cleanroom-item-pane-section-sidenav =\n    .tooltiptext = 模板面板"));
   });
 
   it("should replace a drifted locale ftl value when locale resource drifts", async () => {
@@ -2291,9 +2291,9 @@ cleanroom-dialog-title = 模板插件
 cleanroom-dialog-body = 插件命令执行成功。
 cleanroom-item-pane-info-row-label = 模板摘要
 cleanroom-item-pane-section-header =
-    .label = 模板示例-错误
+    .label = 模板面板-错误
 cleanroom-item-pane-section-sidenav =
-    .tooltiptext = 模板示例
+    .tooltiptext = 模板面板
 `, "utf-8");
 
     const plan = derivePatchPlan({
@@ -2302,7 +2302,7 @@ cleanroom-item-pane-section-sidenav =
         fingerprint: "localization:item-pane-section-header-ftl-value-drift",
         feature: "localization",
         featureLabel: "本地化引用修正",
-        issue: "Locale zh-CN FTL key cleanroom-item-pane-section-header 值漂移：期望 模板示例，实际 模板示例-错误。 实际定义片段 [cleanroom-item-pane-section-header =\\n    .label = 模板示例-错误]。",
+        issue: "Locale zh-CN FTL key cleanroom-item-pane-section-header 值漂移：期望 模板面板，实际 模板面板-错误。 实际定义片段 [cleanroom-item-pane-section-header =\\n    .label = 模板面板-错误]。",
         candidateFiles: ["addon-static/locale/zh-CN/main.ftl"],
       },
     });
@@ -2313,8 +2313,8 @@ cleanroom-item-pane-section-sidenav =
     assert.equal(result.attempted, true);
     assert.equal(result.ok, true);
     assert.ok(result.appliedFiles.includes("addon-static/locale/zh-CN/main.ftl"));
-    assert.ok(updated.includes("cleanroom-item-pane-section-header =\n    .label = 模板示例"));
-    assert.equal(updated.includes("    .label = 模板示例-错误"), false);
+    assert.ok(updated.includes("cleanroom-item-pane-section-header =\n    .label = 模板面板"));
+    assert.equal(updated.includes("    .label = 模板面板-错误"), false);
   });
 
   it("should repair locale ftl structure drift with canonical block replacement", async () => {
@@ -2326,9 +2326,9 @@ cleanroom-item-pane-section-sidenav =
 cleanroom-dialog-title = 模板插件
 cleanroom-dialog-body = 插件命令执行成功。
 cleanroom-item-pane-info-row-label = 模板摘要
-cleanroom-item-pane-section-header = 模板示例
+cleanroom-item-pane-section-header = 模板面板
 cleanroom-item-pane-section-sidenav =
-    .tooltiptext = 模板示例
+    .tooltiptext = 模板面板
 `, "utf-8");
 
     const plan = derivePatchPlan({
@@ -2337,7 +2337,7 @@ cleanroom-item-pane-section-sidenav =
         fingerprint: "localization:item-pane-section-header-ftl-structure-drift",
         feature: "localization",
         featureLabel: "本地化引用修正",
-        issue: "Locale zh-CN FTL key cleanroom-item-pane-section-header 结构漂移：期望定义片段 [cleanroom-item-pane-section-header =\\n    .label = 模板示例]，实际定义片段 [cleanroom-item-pane-section-header = 模板示例]。",
+        issue: "Locale zh-CN FTL key cleanroom-item-pane-section-header 结构漂移：期望定义片段 [cleanroom-item-pane-section-header =\\n    .label = 模板面板]，实际定义片段 [cleanroom-item-pane-section-header = 模板面板]。",
         candidateFiles: ["addon-static/locale/zh-CN/main.ftl"],
       },
     });
@@ -2348,8 +2348,8 @@ cleanroom-item-pane-section-sidenav =
     assert.equal(result.attempted, true);
     assert.equal(result.ok, true);
     assert.ok(result.appliedFiles.includes("addon-static/locale/zh-CN/main.ftl"));
-    assert.ok(updated.includes("cleanroom-item-pane-section-header =\n    .label = 模板示例"));
-    assert.equal(updated.includes("cleanroom-item-pane-section-header = 模板示例"), false);
+    assert.ok(updated.includes("cleanroom-item-pane-section-header =\n    .label = 模板面板"));
+    assert.equal(updated.includes("cleanroom-item-pane-section-header = 模板面板"), false);
   });
 
   it("should evaluate patch verification contract with rule-specific checks", () => {
@@ -2485,7 +2485,7 @@ cleanroom-item-pane-section-sidenav =
         fingerprint: "localization:item-pane-section-header-ftl-value-drift",
         feature: "localization",
         featureLabel: "本地化引用修正",
-        issue: "Locale zh-CN FTL key cleanroom-item-pane-section-header 值漂移：期望 模板示例，实际 模板示例-错误。 实际定义片段 [cleanroom-item-pane-section-header =\\n    .label = 模板示例-错误]。",
+        issue: "Locale zh-CN FTL key cleanroom-item-pane-section-header 值漂移：期望 模板面板，实际 模板面板-错误。 实际定义片段 [cleanroom-item-pane-section-header =\\n    .label = 模板面板-错误]。",
         candidateFiles: ["addon-static/locale/zh-CN/main.ftl"],
       },
     });
@@ -2529,7 +2529,7 @@ cleanroom-item-pane-section-sidenav =
         fingerprint: "localization:item-pane-section-header-ftl-structure-drift",
         feature: "localization",
         featureLabel: "本地化引用修正",
-        issue: "Locale zh-CN FTL key cleanroom-item-pane-section-header 结构漂移：期望定义片段 [cleanroom-item-pane-section-header =\\n    .label = 模板示例]，实际定义片段 [cleanroom-item-pane-section-header = 模板示例]。",
+        issue: "Locale zh-CN FTL key cleanroom-item-pane-section-header 结构漂移：期望定义片段 [cleanroom-item-pane-section-header =\\n    .label = 模板面板]，实际定义片段 [cleanroom-item-pane-section-header = 模板面板]。",
         candidateFiles: ["addon-static/locale/zh-CN/main.ftl"],
       },
     });

@@ -5,12 +5,11 @@
     {
       "id": "visible-surface",
       "version": 1,
-      "summary": "Real user-visible preference, reader, annotation, baseline, standalone window, or other UI scenario surfaces.",
+      "summary": "Real user-visible preference, reader, annotation, baseline, host-mounted panel, or other UI scenario surfaces.",
       "pathMatchers": [
         "^src/features/reader-chat(?:/|\\.|$)",
         "^src/features/annotation-ai(?:/|\\.|$)",
         "^src/features/reader-ui-surface(?:/|\\.|$)",
-        "^src/features/react-ui-demo(?:/|\\.|$)",
         "^src/react-ui(?:/|\\.|$)",
         "^addon-static/content/(?:.*preferences|.*xhtml|.*css|.*icon)",
         "^addon-static/content/lib/r(?:/|\\.|$)",

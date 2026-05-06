@@ -1,13 +1,13 @@
 export function createCopyFallbacks() {
   return Object.freeze({
     command: Object.freeze({
-      label: "Open Cleanroom Action",
-      description: "Run the default clean-room template action.",
+      label: "Open ToolsBox",
+      description: "Open the local ToolsBox workflow action.",
       disabled: "Plugin is disabled. Re-enable it in preferences first.",
     }),
     shortcut: Object.freeze({
-      description: "Show the clean-room shortcut demo toast.",
-      toastTitle: "Cleanroom Shortcut",
+      description: "Show the ToolsBox shortcut status toast.",
+      toastTitle: "ToolsBox Shortcut",
     }),
     demo: Object.freeze({
       item: "Item",
@@ -17,21 +17,21 @@ export function createCopyFallbacks() {
       noSelection: "No item selected.",
       untitled: "Untitled item",
       notifierIdle: "No notifier event yet.",
-      statusReady: "Baseline demos ready",
+      statusReady: "Ready",
     }),
     reader: Object.freeze({
-      menuLabel: "Show Reader Demo Summary",
+      menuLabel: "Open Current View",
       commandDescription: "Show the active reader summary.",
       selectionCommandLabel: "Show Reader Selection Snapshot",
       selectionCommandDescription: "Inspect the current reader selection.",
-      toastTitle: "Cleanroom Reader",
+      toastTitle: "ToolsBox Reader",
       noActive: "No active reader tab.",
       selectionToastTitle: "Reader Selection",
       selectionToastEmpty: "No reader selection is currently available.",
     }),
     react: Object.freeze({
-      demoCommandLabel: "Open Optional React UI Demo",
-      demoCommandDescription: "Open the default-disabled React UI demo window.",
+      demoCommandLabel: "Open Optional Panel",
+      demoCommandDescription: "Open the default-disabled optional panel.",
       surfaceTitle: "Optional React Host Surface",
       surfaceMessage: "This item pane section proves the optional React lane can mount inside a real Zotero host surface while the JS core keeps ownership of lifecycle and evidence.",
       surfaceStatus: "Mounted through the item pane section",

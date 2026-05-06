@@ -14,7 +14,6 @@ export function createSurfaceDescriptors(config = {}) {
       hostNonce: `${addonRef}.host-nonce`,
       controlPlane: `${addonRef}.control-plane`,
       runtimeBridge: `${addonRef}.runtime-bridge`,
-      reactUIDemo: `${addonRef}.react-ui-demo`,
     }),
     serviceLabels: Object.freeze({
       runtimeCore: "Runtime Core",
@@ -22,7 +21,6 @@ export function createSurfaceDescriptors(config = {}) {
       hostNonce: "Host Nonce Store",
       controlPlane: "Package Control Plane",
       runtimeBridge: "Runtime Bridge",
-      reactUIDemo: "Optional React UI Demo",
     }),
     menuCommand: Object.freeze({
       toolsMenuItemID: "cleanroom-template-menuitem",
@@ -34,7 +32,6 @@ export function createSurfaceDescriptors(config = {}) {
     primaryActionCommandID: `${addonRef}-primary-action`,
     readerSummaryCommandID: `${addonRef}-reader-summary`,
     readerSelectionCommandID: `${addonRef}-reader-selection-snapshot`,
-    reactUIDemoCommandID: `${addonRef}-open-react-ui-demo`,
     contextMenuItemID: `${addonRef}-context-action`,
     readerSummaryMenuItemID: `${addonRef}-reader-summary`,
     demoInfoRowID: `${addonRef}-selection-summary`,
@@ -42,5 +39,12 @@ export function createSurfaceDescriptors(config = {}) {
     demoColumnKey: `${addonRef}-status`,
     demoNotifierID: `${addonRef}-activity`,
     shortcutIDPrefix: `${addonRef}-shortcut`,
+    relationshipGraphCommandID: `${addonRef}-research-graph`,
+    relationshipGraphContextMenuID: `${addonRef}-research-graph-context`,
+    paperMatrixCommandID: `${addonRef}-paper-matrix`,
+    paperMatrixContextMenuID: `${addonRef}-paper-matrix-context`,
+    notesManagerCommandID: `${addonRef}-notes-manager`,
+    notesManagerContextMenuID: `${addonRef}-notes-manager-context`,
+    tabHelperCommandIDPrefix: `${addonRef}-tab-helper`,
   });
 }

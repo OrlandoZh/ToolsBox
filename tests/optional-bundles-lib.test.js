@@ -60,9 +60,8 @@ describe("Optional Bundles Lib", () => {
       "react",
       "react-dom",
     ]);
-    assert.equal(getOptionalBundle(registry, "react-ui")?.build?.artifacts?.length, 2);
-    assert.equal(getOptionalBundle(registry, "react-ui")?.build?.artifacts?.[0]?.kind, "window-shell");
-    assert.equal(getOptionalBundle(registry, "react-ui")?.build?.artifacts?.[1]?.kind, "surface-bridge");
+    assert.equal(getOptionalBundle(registry, "react-ui")?.build?.artifacts?.length, 1);
+    assert.equal(getOptionalBundle(registry, "react-ui")?.build?.artifacts?.[0]?.kind, "surface-bridge");
     assert.equal(isOptionalBundleEnabled(registry, "react-ui"), false);
   });
 

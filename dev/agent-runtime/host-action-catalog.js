@@ -636,39 +636,6 @@ const HOST_ACTION_CATALOG = Object.freeze([
     executable: true,
   },
   {
-    id: HOST_ACTION_IDS.windowOpenReactDemo,
-    label: "Open React Demo Window",
-    status: HOST_ACTION_STATUSES.READY,
-    category: "window",
-    summary: "Open or reuse the standalone example window backed by the optional React UI bundle.",
-    authoritativeSource: [
-      {
-        file: "src/utils/window-shell.js",
-        anchor: "createWindowShellManager()",
-      },
-      {
-        file: "addon-static/content/lib/r/demo.xhtml",
-        anchor: "standalone shell",
-      },
-    ],
-    preconditions: [
-      "Optional bundle `react-ui` is enabled.",
-      "A main Zotero window can open a dialog window.",
-    ],
-    executionEntry: "reactUIDemo.openDemoWindow()",
-    readinessAssertions: [
-      "The example window opens or reuses an existing shell.",
-      "The window is ready and focused.",
-      "A surface-local evidence target is available for the window shell.",
-    ],
-    evidenceTargets: [
-      "window-shell",
-    ],
-    ownerModules: HOST_ACTION_OWNER_MODULES.reactWindowActionBridge,
-    executable: true,
-    requiredBundle: "react-ui",
-  },
-  {
     id: HOST_ACTION_IDS.dialogModalConfirmation,
     label: "Modal Confirmation Dialog",
     status: HOST_ACTION_STATUSES.MANUAL_ONLY,

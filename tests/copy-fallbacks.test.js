@@ -5,9 +5,9 @@ import { createCopyFallbacks as createProtectedCopyFallbacks } from "../src/app/
 describe("Copy Fallbacks", () => {
   it("should keep readable default fallback copy for mainline builds", () => {
     const copy = createDefaultCopyFallbacks();
-    assert.equal(copy.command.label, "Open Cleanroom Action");
-    assert.equal(copy.reader.menuLabel, "Show Reader Demo Summary");
-    assert.equal(copy.demo.statusReady, "Baseline demos ready");
+    assert.equal(copy.command.label, "Open ToolsBox");
+    assert.equal(copy.reader.menuLabel, "Open Current View");
+    assert.equal(copy.demo.statusReady, "Ready");
     assert.equal(copy.react.surfaceTitle, "Optional React Host Surface");
   });
 

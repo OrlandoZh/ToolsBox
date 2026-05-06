@@ -23,7 +23,6 @@ export const HOST_ACTION_IDS = Object.freeze({
   runtimeDeriveWasmKernelDigest: buildToken(["runtime", ".", "derive", "Wasm", "Kernel", "Digest"]),
   runtimeDeriveWasmKernelUnlockToken: buildToken(["runtime", ".", "derive", "Wasm", "Kernel", "Unlock", "Token"]),
   runtimeResolveLegacyEntitlementGate: buildToken(["runtime", ".", "resolve", "Legacy", "Entitlement", "Gate"]),
-  windowOpenReactDemo: buildToken(["window", ".", "open", "React", "Demo"]),
   dialogModalConfirmation: buildToken(["dialog", ".", "modal", ".", "confirmation"]),
   preferencesHelpLink: buildToken(["preferences", ".", "help", "Link"]),
   menuTriggerDestructive: buildToken(["menu", ".", "trigger", ".", "destructive"]),

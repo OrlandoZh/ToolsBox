@@ -26,6 +26,18 @@ const VALID_SPEC = `# Zotero Cleanroom Template Specification
 - 当前模板黑盒基线已冻结。
 `;
 
+const PRODUCTIZED_SPEC = `# ToolsBox Specification
+
+- ToolsBox
+- Zotero 7/8
+- 8.0.2-beta.5+c35d7f21e
+- macOS 已验证
+
+## Acceptance Criteria (Black-Box)
+
+- 当前产品黑盒基线已冻结。
+`;
+
 const PLACEHOLDER_SPEC = `# Behavior Specification (Rewrite Baseline)
 
 Use this file to define *what* the plugin should do, without referencing prior source code.
@@ -287,6 +299,23 @@ describe("Cleanroom Audit", () => {
     assert.equal(report.status, "failed");
     assert.ok(report.blockers.some((item) => item.includes("SPEC")));
     assert.equal(readJSON(root, "dist/cleanroom-audit.json").status, "failed");
+  });
+
+  it("should validate productized SPEC identity from addon config", async () => {
+    const root = createAuditFixture({ specContent: PRODUCTIZED_SPEC });
+    writeJSON(root, "config/addon.config.json", {
+      addonName: "ToolsBox",
+      addonId: "toolsbox@orlandozh.github",
+      addonRef: "toolsbox",
+    });
+
+    const report = await runCleanroomAudit({
+      projectRoot: root,
+      reportDir: path.join(root, "dist"),
+    });
+
+    assert.equal(report.status, "passed");
+    assert.equal(report.checks.find((item) => item.id === "spec-baseline")?.ok, true);
   });
 
   it("should fail audit when Development Gate is incomplete", async () => {

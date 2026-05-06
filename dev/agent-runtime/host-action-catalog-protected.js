@@ -33,12 +33,6 @@ const HOST_ACTION_CATALOG = Object.freeze([
   { id: HOST_ACTION_IDS.runtimeDeriveWasmKernelDigest, status: HOST_ACTION_STATUSES.PROBE_ONLY, executable: true },
   { id: HOST_ACTION_IDS.runtimeDeriveWasmKernelUnlockToken, status: HOST_ACTION_STATUSES.PROBE_ONLY, executable: true },
   { id: HOST_ACTION_IDS.runtimeResolveLegacyEntitlementGate, status: HOST_ACTION_STATUSES.PROBE_ONLY, executable: true },
-  {
-    id: HOST_ACTION_IDS.windowOpenReactDemo,
-    status: HOST_ACTION_STATUSES.READY,
-    executable: true,
-    requiredBundle: "react-ui",
-  },
   { id: HOST_ACTION_IDS.dialogModalConfirmation, status: HOST_ACTION_STATUSES.MANUAL_ONLY, executable: false },
   { id: HOST_ACTION_IDS.preferencesHelpLink, status: HOST_ACTION_STATUSES.MANUAL_ONLY, executable: false },
   { id: HOST_ACTION_IDS.menuTriggerDestructive, status: HOST_ACTION_STATUSES.UNSAFE, executable: false },

@@ -10,7 +10,6 @@ import {
   BUILD_SEMANTIC_SCRUB_PROTECTED,
 } from "./build.mjs";
 import {
-  REACT_UI_DEMO_SHELL_PATH,
   WASM_KERNEL_PROBE_PATH,
   WASM_KERNEL_PROBE_WORKER_PATH,
 } from "../src/utils/optional-bundle-paths.js";
@@ -299,9 +298,9 @@ export const PACKAGE_PROTECTION_ROUTE_AUDIT_BASE_ANCHORS = Object.freeze([
     category: "inner-bundle-semantics",
   },
   {
-    id: "reader-copy-demo-summary",
-    label: "Show Reader Demo Summary",
-    needle: "Show Reader Demo Summary",
+    id: "reader-copy-current-view",
+    label: "Open Current View",
+    needle: "Open Current View",
     category: "inner-bundle-semantics",
   },
   {
@@ -318,14 +317,14 @@ export const PACKAGE_PROTECTION_ROUTE_AUDIT_BASE_ANCHORS = Object.freeze([
   },
   {
     id: "demo-copy-ready",
-    label: "Baseline demos ready",
-    needle: "Baseline demos ready",
+    label: "Ready",
+    needle: "Ready",
     category: "inner-bundle-semantics",
   },
   {
     id: "react-copy-command",
-    label: "Open Optional React UI Demo",
-    needle: "Open Optional React UI Demo",
+    label: "Open Optional Panel",
+    needle: "Open Optional Panel",
     category: "inner-bundle-semantics",
   },
   {
@@ -383,12 +382,6 @@ export const PACKAGE_PROTECTION_ROUTE_AUDIT_BASE_ANCHORS = Object.freeze([
     category: "inner-bundle-semantics",
   },
   {
-    id: "host-action-window-react-demo",
-    label: "window.openReactDemo",
-    needle: "window.openReactDemo",
-    category: "inner-bundle-semantics",
-  },
-  {
     id: "host-action-catalog-authoritative-source",
     label: "authoritativeSource",
     needle: "authoritativeSource",
@@ -410,7 +403,6 @@ export const PACKAGE_PROTECTION_UNPACKED_SURFACE_TARGETS = Object.freeze([
   "content/preference-pane-load-bridge.js",
   "content/theme.js",
   "content/preferences.xhtml",
-  REACT_UI_DEMO_SHELL_PATH,
   WASM_KERNEL_PROBE_PATH,
   WASM_KERNEL_PROBE_WORKER_PATH,
   "locale/en-US/main.ftl",
@@ -430,7 +422,7 @@ const PACKAGE_PROTECTION_UNPACKED_SURFACE_ANCHOR_IDS = new Set([
   "tools-menu-item-id",
   "tools-menu-style-id",
   "command-copy-open-cleanroom-action",
-  "reader-copy-demo-summary",
+  "reader-copy-current-view",
   "reader-copy-selection-snapshot",
   "demo-copy-idle",
   "demo-copy-ready",
@@ -443,7 +435,6 @@ const PACKAGE_PROTECTION_UNPACKED_SURFACE_ANCHOR_IDS = new Set([
   "host-action-open-pane",
   "host-action-runtime-probe-wasm",
   "host-action-runtime-digest-wasm",
-  "host-action-window-react-demo",
   "host-action-catalog-authoritative-source",
   "host-action-catalog-readiness-assertions",
   "bootstrap-log-prefix",
@@ -743,7 +734,6 @@ function buildDynamicAnchors(config = {}) {
       ["primary-action-command-id", `${addonRef}-primary-action`],
       ["reader-summary-entry-id", `${addonRef}-reader-summary`],
       ["reader-selection-command-id", `${addonRef}-reader-selection-snapshot`],
-      ["react-ui-demo-command-id", `${addonRef}-open-react-ui-demo`],
       ["context-action-menu-id", `${addonRef}-context-action`],
       ["demo-info-row-id", `${addonRef}-selection-summary`],
       ["demo-section-id", `${addonRef}-details`],
@@ -753,7 +743,6 @@ function buildDynamicAnchors(config = {}) {
       ["host-signals-service-id", `${addonRef}.host-signals`],
       ["host-nonce-service-id", `${addonRef}.host-nonce`],
       ["runtime-bridge-service-id", `${addonRef}.runtime-bridge`],
-      ["react-ui-demo-service-id", `${addonRef}.react-ui-demo`],
     ].forEach(([id, needle]) => {
       dynamicAnchors.push({
         id,

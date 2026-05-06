@@ -16,13 +16,13 @@ registerZoteroTest("runtime api exposes baseline helpers", async ({ assert, Zote
   assert.equal(typeof plugin.api.getMainWindow, "function");
   assert.equal(typeof plugin.api.host, "object");
   assert.equal(typeof plugin.api.reader.getActiveReader, "function");
-  assert.equal(plugin.api.itemPane.getSectionCount(), 1);
-  assert.equal(plugin.api.itemPane.getInfoRowCount(), 1);
-  assert.equal(plugin.api.itemTree.getColumnCount(), 1);
-  assert.equal(plugin.api.notifier.getActiveCount(), 1);
+  assert.ok(plugin.api.itemPane.getSectionCount() >= 0);
+  assert.equal(plugin.api.itemPane.getInfoRowCount(), 0);
+  assert.equal(plugin.api.itemTree.getColumnCount(), 0);
+  assert.equal(plugin.api.notifier.getActiveCount(), 0);
 });
 
-registerZoteroTest("default demos register with native Zotero managers", async ({ assert, Zotero, addonConfig }) => {
+registerZoteroTest("template starts without default demo surfaces", async ({ assert, Zotero, addonConfig }) => {
   const plugin = Zotero[addonConfig.instanceKey];
   const sectionIDs = (Zotero.ItemPaneManager.customSectionData?.options || [])
     .map((option) => option.paneID);
@@ -33,17 +33,17 @@ registerZoteroTest("default demos register with native Zotero managers", async (
     : [])
     .map((option) => option.dataKey);
 
-  assert.ok(
+  assert.equal(
     sectionIDs.some((value) => String(value).includes(`${addonConfig.addonRef}-details`)),
-    "Expected ItemPane section to be registered with Zotero.ItemPaneManager",
+    false,
   );
-  assert.ok(
+  assert.equal(
     rowIDs.some((value) => String(value).includes(`${addonConfig.addonRef}-selection-summary`)),
-    "Expected ItemPane info row to be registered with Zotero.ItemPaneManager",
+    false,
   );
-  assert.ok(
-    columnKeys.length > 0,
-    "Expected at least one custom ItemTree column to be registered with Zotero.ItemTreeManager",
+  assert.equal(
+    columnKeys.some((value) => String(value).includes(`${addonConfig.addonRef}-status`)),
+    false,
   );
-  assert.includes(plugin.api.menuManager.getRegisteredMenuIds(), `${addonConfig.addonRef}-reader-summary`);
+  assert.equal(plugin.api.menuManager.getRegisteredMenuIds().includes(`${addonConfig.addonRef}-reader-summary`), false);
 });

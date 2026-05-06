@@ -17,10 +17,11 @@ import {
   summarizePackageProtectionUnpackedSurface,
 } from "../scripts/package-protection-anchor-audit.mjs";
 import {
-  REACT_UI_DEMO_SHELL_PATH,
   WASM_KERNEL_PROBE_PATH,
   WASM_KERNEL_PROBE_WORKER_PATH,
 } from "../src/utils/optional-bundle-paths.js";
+
+const SUPPORT_SURFACE_SAMPLE_PATH = "content/theme.js";
 
 function buildVariantReport(variant, source, anchors, unpackedSurface = null) {
   const scan = scanBundleAnchors(source, anchors);
@@ -149,8 +150,8 @@ describe("Package Protection Anchor Audit", () => {
     assert.equal(resolvePackageProtectionAuditOutputSuffix("surface-scrub-wasm-entitlement-legacy"), "shielded-surface-scrub-wasm-entitlement-legacy");
   });
 
-  it("should include the react-ui demo shell in unpacked surface targets", () => {
-    assert.ok(PACKAGE_PROTECTION_UNPACKED_SURFACE_TARGETS.includes(REACT_UI_DEMO_SHELL_PATH));
+  it("should include the support surface sample in unpacked surface targets", () => {
+    assert.ok(PACKAGE_PROTECTION_UNPACKED_SURFACE_TARGETS.includes(SUPPORT_SURFACE_SAMPLE_PATH));
     assert.ok(PACKAGE_PROTECTION_UNPACKED_SURFACE_TARGETS.includes("manifest.json"));
     assert.ok(PACKAGE_PROTECTION_UNPACKED_SURFACE_TARGETS.includes(WASM_KERNEL_PROBE_PATH));
     assert.ok(PACKAGE_PROTECTION_UNPACKED_SURFACE_TARGETS.includes(WASM_KERNEL_PROBE_WORKER_PATH));
@@ -419,7 +420,7 @@ describe("Package Protection Anchor Audit", () => {
       {
         relativePath: "locale/en-US/main.ftl",
         absolutePath: "/tmp/plain/locale/en-US/main.ftl",
-        source: "Show Reader Demo Summary Optional React Host Surface",
+        source: "Open Current View Optional React Host Surface",
       },
     ], surfaceAnchors);
     const protectedSurface = scanPackageProtectionSurfaceFiles([
@@ -599,8 +600,8 @@ describe("Package Protection Anchor Audit", () => {
         source: '<vbox id="demo-addon-preferences-root"></vbox>',
       },
       {
-        relativePath: REACT_UI_DEMO_SHELL_PATH,
-        absolutePath: `/tmp/shielded.xpi#${REACT_UI_DEMO_SHELL_PATH}`,
+        relativePath: SUPPORT_SURFACE_SAMPLE_PATH,
+        absolutePath: `/tmp/shielded.xpi#${SUPPORT_SURFACE_SAMPLE_PATH}`,
         source: '<html data-addon-ref="demo-addon"></html>',
       },
     ], surfaceAnchors);
@@ -621,8 +622,8 @@ describe("Package Protection Anchor Audit", () => {
         source: '<vbox id="crabc123-p0-root"></vbox>',
       },
       {
-        relativePath: REACT_UI_DEMO_SHELL_PATH,
-        absolutePath: `/tmp/pref-bridge.xpi#${REACT_UI_DEMO_SHELL_PATH}`,
+        relativePath: SUPPORT_SURFACE_SAMPLE_PATH,
+        absolutePath: `/tmp/pref-bridge.xpi#${SUPPORT_SURFACE_SAMPLE_PATH}`,
         source: '<html data-addon-ref="demo-addon"></html>',
       },
     ], surfaceAnchors);
@@ -666,8 +667,8 @@ describe("Package Protection Anchor Audit", () => {
         source: '<vbox id="demo-addon-preferences-root"></vbox>',
       },
       {
-        relativePath: REACT_UI_DEMO_SHELL_PATH,
-        absolutePath: `/tmp/shielded.xpi#${REACT_UI_DEMO_SHELL_PATH}`,
+        relativePath: SUPPORT_SURFACE_SAMPLE_PATH,
+        absolutePath: `/tmp/shielded.xpi#${SUPPORT_SURFACE_SAMPLE_PATH}`,
         source: '<html data-addon-ref="demo-addon"></html>',
       },
     ], surfaceAnchors);
@@ -688,8 +689,8 @@ describe("Package Protection Anchor Audit", () => {
         source: '<vbox id="crabc123-p0-root"></vbox>',
       },
       {
-        relativePath: REACT_UI_DEMO_SHELL_PATH,
-        absolutePath: `/tmp/pref-bridge.xpi#${REACT_UI_DEMO_SHELL_PATH}`,
+        relativePath: SUPPORT_SURFACE_SAMPLE_PATH,
+        absolutePath: `/tmp/pref-bridge.xpi#${SUPPORT_SURFACE_SAMPLE_PATH}`,
         source: '<html data-addon-ref="demo-addon"></html>',
       },
     ], surfaceAnchors);
@@ -738,8 +739,8 @@ describe("Package Protection Anchor Audit", () => {
         source: '<vbox id="crabc123-p0-root"></vbox>',
       },
       {
-        relativePath: REACT_UI_DEMO_SHELL_PATH,
-        absolutePath: `/tmp/shielded.xpi#${REACT_UI_DEMO_SHELL_PATH}`,
+        relativePath: SUPPORT_SURFACE_SAMPLE_PATH,
+        absolutePath: `/tmp/shielded.xpi#${SUPPORT_SURFACE_SAMPLE_PATH}`,
         source: '<html data-addon-ref="demo-addon"></html>',
       },
     ], surfaceAnchors);
@@ -765,8 +766,8 @@ describe("Package Protection Anchor Audit", () => {
         source: '<vbox id="crabc123-p0-root"></vbox>',
       },
       {
-        relativePath: REACT_UI_DEMO_SHELL_PATH,
-        absolutePath: `/tmp/surface-scrub.xpi#${REACT_UI_DEMO_SHELL_PATH}`,
+        relativePath: SUPPORT_SURFACE_SAMPLE_PATH,
+        absolutePath: `/tmp/surface-scrub.xpi#${SUPPORT_SURFACE_SAMPLE_PATH}`,
         source: '<html data-addon-ref="tool"></html>',
       },
     ], surfaceAnchors);
@@ -809,8 +810,8 @@ describe("Package Protection Anchor Audit", () => {
         source: 'pref("extensions.zotero.demo-addon.enabled", true);',
       },
       {
-        relativePath: REACT_UI_DEMO_SHELL_PATH,
-        absolutePath: `/tmp/shielded.xpi#${REACT_UI_DEMO_SHELL_PATH}`,
+        relativePath: SUPPORT_SURFACE_SAMPLE_PATH,
+        absolutePath: `/tmp/shielded.xpi#${SUPPORT_SURFACE_SAMPLE_PATH}`,
         source: '<html data-addon-ref="demo-addon"></html>',
       },
     ], surfaceAnchors);
@@ -831,8 +832,8 @@ describe("Package Protection Anchor Audit", () => {
         source: 'pref("extensions.zotero.crabc123-p0.p0", true);',
       },
       {
-        relativePath: REACT_UI_DEMO_SHELL_PATH,
-        absolutePath: `/tmp/surface-scrub.xpi#${REACT_UI_DEMO_SHELL_PATH}`,
+        relativePath: SUPPORT_SURFACE_SAMPLE_PATH,
+        absolutePath: `/tmp/surface-scrub.xpi#${SUPPORT_SURFACE_SAMPLE_PATH}`,
         source: '<html data-addon-ref="tool"></html>',
       },
     ], surfaceAnchors);

@@ -809,7 +809,7 @@ describe("Toolchain Scripts", () => {
     const releaseNotes = fs.readFileSync(path.join(projectRoot, "dist", "release-notes.md"), "utf-8");
 
     assert.equal(releasePlan.status, "passed");
-    assert.equal(releasePlan.addonId, "cleanroom-template@example.com");
+    assert.equal(releasePlan.addonId, "toolsbox@orlandozh.github");
     assert.equal(releasePlan.errorCategory, null);
     assert.equal(releasePlan.failedStage, null);
     assert.ok(Array.isArray(releasePlan.artifactFiles));
@@ -992,7 +992,7 @@ describe("Toolchain Scripts", () => {
     const releaseMatrix = readJSON(path.join(projectRoot, "dist", "release-matrix.json"));
     const releaseMatrixMD = fs.readFileSync(path.join(projectRoot, "dist", "release-matrix.md"), "utf-8");
 
-    assert.equal(releaseMatrix.addonId, "cleanroom-template@example.com");
+    assert.equal(releaseMatrix.addonId, "toolsbox@orlandozh.github");
     assert.equal(releaseMatrix.status, "attention");
     assert.equal(releaseMatrix.artifactPassed, true);
     assert.equal(releaseMatrix.profiles.length, 2);

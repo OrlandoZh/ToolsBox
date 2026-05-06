@@ -1487,7 +1487,6 @@ export function createHostActionRunner({
   menuManager,
   itemPane,
   bundleRuntime,
-  openReactDemoWindow,
   wasmKernelProbe,
   getWasmKernelProbe,
   controlPlane,
@@ -3212,46 +3211,6 @@ export function createHostActionRunner({
     });
   }
 
-  async function runWindowOpenReactDemo(actionId, payload = {}) {
-    const preconditions = [
-      createCheck("openReactDemoWindow", typeof openReactDemoWindow === "function"),
-    ];
-    if (preconditions.some((entry) => entry.ok === false)) {
-      return buildFailureResult(actionId, {
-        preconditions,
-        failureKind: "precondition-failed",
-      });
-    }
-
-    try {
-      const opened = await openReactDemoWindow(payload);
-      return buildResult({
-        actionId,
-        preconditions,
-        observedState: {
-          bundleId: "react-ui",
-          reused: opened?.reused === true,
-          ready: opened?.ready === true,
-          href: toPlainString(opened?.href || opened?.window?.location?.href),
-        },
-        readinessChecks: [
-          createCheck("window-observed", Boolean(opened?.window)),
-          createCheck("window-ready", opened?.ready === true),
-          createCheck("surface-target", Boolean(opened?.surfaceTarget)),
-        ],
-        surfaceTarget: opened?.surfaceTarget || null,
-      });
-    } catch (error) {
-      return buildFailureResult(actionId, {
-        preconditions,
-        observedState: {
-          message: String(error?.message || error),
-        },
-        failureKind: "action-failed",
-      });
-    }
-  }
-
   async function runRuntimeProbeWasmKernel(actionId, payload = {}) {
     const preconditions = [
       createCheck(
@@ -3692,9 +3651,6 @@ export function createHostActionRunner({
         break;
       case HOST_ACTION_IDS.runtimeResolveLegacyEntitlementGate:
         result = await runRuntimeResolveLegacyEntitlementGate(actionId, payload);
-        break;
-      case HOST_ACTION_IDS.windowOpenReactDemo:
-        result = await runWindowOpenReactDemo(actionId, payload);
         break;
       default:
         result = buildFailureResult(actionId, {

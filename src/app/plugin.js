@@ -35,7 +35,6 @@ import { createFeatureComposer } from "./feature-composer.js";
 import { createOptionalBundleRuntime } from "./optional-bundles.js";
 import { createRuntimeCapabilityState } from "./runtime-capabilities.js";
 import { createSurfaceDescriptors } from "./surface-descriptors.js";
-import { createReactUIDemoLauncher } from "../features/react-ui-demo.js";
 import { createWasmKernelProbe } from "../features/wasm-kernel-probe.js";
 import {
   createAgentReviewWorkbench,
@@ -61,10 +60,6 @@ function normalizeLogLevel(input, fallback = "info") {
     return candidate;
   }
   return fallback;
-}
-
-function formatDemoTimestamp(date = new Date()) {
-  return date.toISOString().slice(11, 19);
 }
 
 function cloneLifecycleTelemetrySummary(summary = null) {
@@ -814,15 +809,6 @@ export function createPlugin({
     logger,
     prefs,
   });
-  const reactUIDemo = createReactUIDemoLauncher({
-    config,
-    logger,
-    host,
-    themeManager,
-    bundleRuntime,
-    services: globalScope.Services,
-    rootURI: runtime.rootURI,
-  });
   let wasmKernelProbe = null;
 
   function getWasmKernelProbe() {
@@ -870,28 +856,6 @@ export function createPlugin({
     },
   });
 
-  servicesHub.register({
-    id: surfaceDescriptors.serviceIDs.reactUIDemo,
-    label: surfaceDescriptors.serviceLabels.reactUIDemo,
-    enabledWhen() {
-      return bundleRuntime.isEnabled("react-ui");
-    },
-    async start() {},
-    async stop() {
-      reactUIDemo.close();
-    },
-    healthCheck() {
-      return {
-        ok: true,
-        status: bundleRuntime.isEnabled("react-ui") ? "ready" : "disabled",
-        details: {
-          enabled: bundleRuntime.isEnabled("react-ui"),
-          open: reactUIDemo.isOpen(),
-          hostSurfaceCount: reactUIDemo.getHostSurfaceCount(),
-        },
-      };
-    },
-  });
   const menuManager = createMenuManager({
     logger,
     lifecycle,
@@ -960,243 +924,11 @@ export function createPlugin({
 
       cleanups.push(menuCommand.mount(window));
 
-      const shortcutId = keyboard.registerShortcut({
-        id: `${surfaceDescriptors.shortcutIDPrefix}-${Math.random().toString(16).slice(2)}`,
-        shortcut: "Ctrl+Shift+Y",
-        description: i18n.t(
-          "cleanroom-shortcut-description",
-          copy.shortcut.description,
-        ),
-        window,
-        handler: () => {
-          demoState.shortcutTriggerCount += 1;
-          demoState.lastShortcutAt = formatDemoTimestamp();
-          progress.showToast(
-            i18n.t(
-              "cleanroom-shortcut-toast-body",
-              {
-                shortcut: demoState.shortcutLabel,
-                count: demoState.shortcutTriggerCount,
-              },
-              `Triggered ${demoState.shortcutLabel} ${demoState.shortcutTriggerCount} times.`,
-            ),
-            "info",
-            2500,
-            {
-              title: i18n.t("cleanroom-shortcut-toast-title", copy.shortcut.toastTitle),
-            },
-          );
-          refreshDemoViews();
-        },
-      });
-      if (shortcutId) {
-        cleanups.push(() => keyboard.unregister(shortcutId));
-      }
-
       return () => cleanups.forEach((cleanup) => cleanup());
     },
   });
 
-  const demoSectionRefreshers = new Set();
-  const demoInfoRowID = surfaceDescriptors.demoInfoRowID;
-  const demoSectionID = surfaceDescriptors.demoSectionID;
-  const demoColumnKey = surfaceDescriptors.demoColumnKey;
-  const demoNotifierID = surfaceDescriptors.demoNotifierID;
-  const demoState = {
-    shortcutLabel: keyboard.formatShortcut(
-      "Y",
-      keyboard.normalizeModifiers(["ctrl", "shift"]),
-    ),
-    shortcutTriggerCount: 0,
-    lastShortcutAt: null,
-    lastNotifierEvent: i18n.t(
-      "cleanroom-demo-notifier-idle",
-      copy.demo.notifierIdle,
-    ),
-  };
   let lifecycleTelemetrySummary = cloneLifecycleTelemetrySummary();
-
-  function getItemTypeLabel(item) {
-    if (!item) {
-      return "";
-    }
-
-    if (typeof item.itemType === "string" && item.itemType) {
-      return item.itemType;
-    }
-
-    if (
-      typeof item.itemTypeID === "number"
-      && zotero?.ItemTypes
-      && typeof zotero.ItemTypes.getName === "function"
-    ) {
-      try {
-        const typeName = zotero.ItemTypes.getName(item.itemTypeID);
-        if (typeName) {
-          return typeName;
-        }
-      }
-      catch {}
-    }
-
-    return "item";
-  }
-
-  function getItemTitle(item) {
-    if (!item || typeof item.getField !== "function") {
-      return i18n.t("cleanroom-demo-no-selection", copy.demo.noSelection);
-    }
-
-    const title = item.getField("title");
-    return title || i18n.t("cleanroom-demo-untitled", copy.demo.untitled);
-  }
-
-  function getItemSummary(item) {
-    if (!item) {
-      return i18n.t("cleanroom-demo-no-selection", copy.demo.noSelection);
-    }
-
-    const parts = [
-      getItemTypeLabel(item),
-      `#${item.id ?? "?"}`,
-      getItemTitle(item),
-    ];
-    return parts.join(" · ");
-  }
-
-  function getColumnValue(item) {
-    if (!item) {
-      return "Idle";
-    }
-
-    const title = typeof item.getField === "function" ? item.getField("title") || "" : "";
-    const titleLength = title.trim().length;
-    if (!titleLength) {
-      return `${getItemTypeLabel(item)} · 0`;
-    }
-    return `${getItemTypeLabel(item)} · ${titleLength}`;
-  }
-
-  function refreshDemoViews() {
-    itemPane.refreshInfoRow(demoInfoRowID);
-
-    for (const refresh of demoSectionRefreshers) {
-      try {
-        refresh();
-      }
-      catch (error) {
-        logger.warn("plugin.demo.refresh.failed", {
-          message: String(error?.message || error),
-        });
-      }
-    }
-  }
-
-  function createSectionLine(doc, label, value) {
-    const line = doc.createElement("div");
-    const strong = doc.createElement("strong");
-    strong.textContent = `${label}: `;
-    const span = doc.createElement("span");
-    span.textContent = value;
-    line.appendChild(strong);
-    line.appendChild(span);
-    return line;
-  }
-
-  function updateDemoNotifierState(event, type, ids = []) {
-    const idToken = ids.length > 0 ? `#${ids[0]}` : "#-";
-    demoState.lastNotifierEvent = `${type}:${event} ${idToken} @ ${formatDemoTimestamp()}`;
-    refreshDemoViews();
-  }
-
-  function runReaderDemo() {
-    const summary = reader.getActiveSummary();
-    if (!summary) {
-      progress.showToast(
-        i18n.t("cleanroom-reader-no-active", copy.reader.noActive),
-        "warning",
-        2500,
-        {
-          title: i18n.t("cleanroom-reader-toast-title", copy.reader.toastTitle),
-        },
-      );
-      return false;
-    }
-
-    const readerType = summary.type || "unknown";
-    const annotationCount = summary.annotationCount;
-
-    progress.showToast(
-      i18n.t(
-        "cleanroom-reader-toast-body",
-        {
-          type: readerType,
-          itemID: summary.itemID,
-          annotations: annotationCount,
-        },
-        `${readerType} reader for item #${summary.itemID} with ${annotationCount} annotations.`,
-      ),
-      "info",
-      3000,
-      {
-        title: i18n.t("cleanroom-reader-toast-title", copy.reader.toastTitle),
-      },
-    );
-    return true;
-  }
-
-  async function runReaderSelectionActionDemo(actionId = surfaceDescriptors.readerSelectionCommandID) {
-    const execution = await readerSelectionActions.executeAction(actionId);
-    const result = execution?.result && typeof execution.result === "object"
-      ? execution.result
-      : {};
-    const itemID = result.itemID ?? execution?.selection?.itemID ?? null;
-    const readerType = result.readerType || execution?.selection?.readerType || "unknown";
-    const textLength = Number(result.textLength || execution?.selection?.textLength || 0);
-    const textPreview = typeof result.textPreview === "string" && result.textPreview.trim()
-      ? result.textPreview.trim()
-      : "";
-
-    if (!execution?.ok) {
-      progress.showToast(
-        i18n.t(
-          "cleanroom-reader-selection-toast-empty",
-          copy.reader.selectionToastEmpty,
-        ),
-        "warning",
-        2500,
-        {
-          title: i18n.t(
-            "cleanroom-reader-selection-toast-title",
-            copy.reader.selectionToastTitle,
-          ),
-        },
-      );
-      return false;
-    }
-
-    progress.showToast(
-      i18n.t(
-        "cleanroom-reader-selection-toast-body",
-        {
-          type: readerType,
-          itemID,
-          length: textLength,
-          preview: textPreview,
-        },
-        `${readerType} reader #${itemID} selection (${textLength} chars): ${textPreview}`,
-      ),
-      "info",
-      3000,
-      {
-        title: i18n.t(
-          "cleanroom-reader-selection-toast-title",
-          copy.reader.selectionToastTitle,
-        ),
-      },
-    );
-    return true;
-  }
 
   function applyLogLevelFromPrefs() {
     const desired = normalizeLogLevel(prefs.get("logLevel"), config.defaultPrefs.logLevel);
@@ -1281,7 +1013,6 @@ export function createPlugin({
     menuManager,
     itemPane,
     bundleRuntime,
-    openReactDemoWindow: reactUIDemo.openDemoWindow,
     getWasmKernelProbe,
     controlPlane: entitlementControlPlane,
     getProtectionSummary,
@@ -1311,17 +1042,9 @@ export function createPlugin({
     commandPalette,
     menuManager,
     preferencePanes,
-    demoState,
-    demoInfoRowID,
-    demoSectionID,
-    getItemTypeLabel,
-    getItemSummary,
-    getColumnValue,
-    getItemTitle,
     listHostActions: hostActions.listHostActions,
     runHostAction: hostActions.runHostAction,
     executeAgentAction,
-    updateDemoNotifierState,
     zotero,
     servicesHub,
     runtimeInfo,
@@ -1399,24 +1122,7 @@ export function createPlugin({
     notifier,
     getPrimaryWindow,
     runPrimaryAction,
-    runReaderDemo,
-    runReaderSelectionActionDemo,
-    getColumnValue,
-    getItemSummary,
-    createSectionLine,
-    demoState,
-    demoSectionRefreshers,
-    demoInfoRowID,
-    demoSectionID,
-    demoColumnKey,
-    demoNotifierID,
-    updateDemoNotifierState,
-    bundleRuntime,
-    openReactDemoWindow: reactUIDemo.openDemoWindow,
     surfaceDescriptors,
-    presentReactSurface: reactUIDemo.presentSurface,
-    renderReactItemPaneSurface: reactUIDemo.renderItemPaneSurface,
-    unmountReactItemPaneSurface: reactUIDemo.unmountItemPaneSurface,
   });
 
   const kernel = createPluginKernel({

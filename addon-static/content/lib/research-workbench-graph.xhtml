@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" data-addon-ref="toolsbox" data-addon-name="ToolsBox">
+  <head>
+    <meta charset="utf-8" />
+    <title>Relationship Graph</title>
+    <link rel="stylesheet" type="text/css" href="./research-workbench-graph.css" />
+  </head>
+  <body>
+    <div id="relationship-graph-root" class="rg-shell">
+      <header class="rg-header">
+        <div>
+          <h1 id="rg-title">Relationship Graph</h1>
+          <p id="rg-stats" class="rg-stats"></p>
+        </div>
+        <div class="rg-header-actions">
+          <button id="rg-btn-zoom-in" type="button" class="rg-icon-btn" title="Zoom in">+</button>
+          <button id="rg-btn-zoom-out" type="button" class="rg-icon-btn" title="Zoom out">−</button>
+          <button id="rg-btn-reset" type="button" class="rg-btn" title="Reset view">Reset</button>
+        </div>
+      </header>
+
+      <div class="rg-body">
+        <div class="rg-canvas-wrap" id="rg-canvas-wrap">
+          <canvas id="rg-canvas"></canvas>
+          <p id="rg-empty" class="rg-empty" hidden>Select an item with relationships to view its graph.</p>
+        </div>
+
+        <aside class="rg-sidebar" id="rg-sidebar">
+          <div class="rg-panel-heading">
+            <h2>Detail</h2>
+          </div>
+          <div id="rg-detail-content" class="rg-detail-body">
+            <p class="rg-detail-hint">Click a node to view details.</p>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="rg-legend">
+        <span class="rg-legend-item"><span class="rg-legend-swatch" style="background:#4a90d9"></span> Article</span>
+        <span class="rg-legend-item"><span class="rg-legend-swatch" style="background:#7cb342"></span> Book</span>
+        <span class="rg-legend-item"><span class="rg-legend-swatch" style="background:#ff9800"></span> Attachment</span>
+        <span class="rg-legend-item"><span class="rg-legend-swatch" style="background:#9c27b0"></span> Other</span>
+        <span class="rg-legend-item"><span class="rg-legend-swatch" style="background:#e53935"></span> Root</span>
+      </footer>
+    </div>
+    <script src="./research-workbench-graph.js"></script>
+  </body>
+</html>

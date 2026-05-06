@@ -15,26 +15,21 @@
 - Lane: `ts-isolated`
 - Status: `implemented`
 - Default: disabled
-- Purpose: product-neutral standalone example window plus a host-mounted surface bridge that show how a downstream project can add React/TS without dragging React into the template core path.
+- Purpose: host-mounted surface bridge that shows how a downstream project can add React/TS without dragging React into the template core path.
 - Contract:
   - source entries and shared bridge helpers live under `src/react-ui/`
-  - `demo-window` keeps its host shell under `addon-static/content/lib/r/`
   - `surface-bridge` exposes a global renderer bridge for `loadSubScript + mount/update/unmount`
   - build dependencies (`esbuild`, `react`, `react-dom`) are declared in `package.json` / pure-project export as optional-lane devDependencies
   - build output is produced only by `npm run build:react-ui`
-  - checked-in shell plus built JS/CSS assets are grouped under `content/lib/r/`
+  - built JS/CSS assets are grouped under `content/lib/r/`
   - JS core can keep host lifecycle and geometry in plain JS while the optional TS lane owns only the mounted React tree
-  - downstream projects can replace the example component tree but should keep the bridge contract and current-truth / validation governance intact
+  - downstream projects can replace the mounted component tree but should keep the bridge contract and current-truth / validation governance intact
 
 Current implemented artifacts:
 
-- `demo-window`
-  - kind: `window-shell`
-  - purpose: checked-in XHTML standalone window example
 - `surface-bridge`
   - kind: `surface-bridge`
-  - purpose: host-mounted renderer bridge example backed by `__CleanroomTemplateReactSurface__`
-  - live demo: when the bundle is enabled, the existing `item pane section` appends a product-neutral React surface to prove real host mount/update/unmount
+  - purpose: host-mounted renderer bridge backed by `__CleanroomTemplateReactSurface__`
 
 Indexed reference:
 

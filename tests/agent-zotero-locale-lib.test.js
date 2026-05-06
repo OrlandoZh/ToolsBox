@@ -20,9 +20,9 @@ describe("Agent Zotero Locale Lib", () => {
 cleanroom-dialog-body = Plugin command executed successfully.
 cleanroom-item-pane-info-row-label = Cleanroom Summary
 cleanroom-item-pane-section-header =
-    .label = Cleanroom Demo
+    .label = Cleanroom Panel
 cleanroom-item-pane-section-sidenav =
-    .tooltiptext = Cleanroom Demo
+    .tooltiptext = Cleanroom Panel
 `);
 
     assert.deepEqual(messages.get("cleanroom-dialog-body"), {
@@ -36,13 +36,13 @@ cleanroom-item-pane-section-sidenav =
     assert.deepEqual(messages.get("cleanroom-item-pane-section-header"), {
       value: null,
       attributes: {
-        label: "Cleanroom Demo",
+        label: "Cleanroom Panel",
       },
     });
     assert.deepEqual(messages.get("cleanroom-item-pane-section-sidenav"), {
       value: null,
       attributes: {
-        tooltiptext: "Cleanroom Demo",
+        tooltiptext: "Cleanroom Panel",
       },
     });
   });
@@ -56,21 +56,21 @@ cleanroom-item-pane-section-sidenav =
     fs.writeFileSync(path.join(tempRoot, resolveLocaleMainFTLPath("en-US")), `cleanroom-dialog-body = Plugin command executed successfully.
 cleanroom-item-pane-info-row-label = Cleanroom Summary
 cleanroom-item-pane-section-header =
-    .label = Cleanroom Demo
+    .label = Cleanroom Panel
 cleanroom-item-pane-section-sidenav =
-    .tooltiptext = Cleanroom Demo
+    .tooltiptext = Cleanroom Panel
 `, "utf-8");
     fs.writeFileSync(path.join(tempRoot, resolveLocaleMainFTLPath("zh-CN")), `cleanroom-dialog-body = 插件命令执行成功。
 cleanroom-item-pane-info-row-label = 模板摘要
 cleanroom-item-pane-section-sidenav =
-    .tooltiptext = 模板示例
+    .tooltiptext = 模板面板
 `, "utf-8");
     fs.writeFileSync(path.join(tempRoot, resolveLocaleMainFTLPath("zh-TW")), `cleanroom-dialog-body = 外掛命令已成功執行。
 cleanroom-item-pane-info-row-label = 範本摘要
 cleanroom-item-pane-section-header =
-    .label = 範本示例
+    .label = 範本面板
 cleanroom-item-pane-section-sidenav =
-    .tooltiptext = 範本示例
+    .tooltiptext = 範本面板
 `, "utf-8");
 
     const result = await inspectBaselineItemPaneLocaleFiles(tempRoot);
@@ -95,21 +95,21 @@ cleanroom-item-pane-section-sidenav =
 
     fs.writeFileSync(path.join(tempRoot, resolveLocaleMainFTLPath("en-US")), `cleanroom-item-pane-info-row-label = Cleanroom Summary
 cleanroom-item-pane-section-header =
-    .label = Cleanroom Demo
+    .label = Cleanroom Panel
 cleanroom-item-pane-section-sidenav =
-    .tooltiptext = Cleanroom Demo
+    .tooltiptext = Cleanroom Panel
 `, "utf-8");
     fs.writeFileSync(path.join(tempRoot, resolveLocaleMainFTLPath("zh-CN")), `cleanroom-item-pane-info-row-label = 模板摘要
 cleanroom-item-pane-section-header =
-    .label = 模板示例-错误
+    .label = 模板面板-错误
 cleanroom-item-pane-section-sidenav =
-    .tooltiptext = 模板示例
+    .tooltiptext = 模板面板
 `, "utf-8");
     fs.writeFileSync(path.join(tempRoot, resolveLocaleMainFTLPath("zh-TW")), `cleanroom-item-pane-info-row-label = 範本摘要
 cleanroom-item-pane-section-header =
-    .label = 範本示例
+    .label = 範本面板
 cleanroom-item-pane-section-sidenav =
-    .tooltiptext = 範本示例
+    .tooltiptext = 範本面板
 `, "utf-8");
 
     const result = await inspectBaselineItemPaneLocaleFiles(tempRoot);
@@ -120,11 +120,11 @@ cleanroom-item-pane-section-sidenav =
     assert.equal(result.structureDriftCount, 0);
     assert.equal(result.valueDriftEntries[0].locale, "zh-CN");
     assert.equal(result.valueDriftEntries[0].key, "cleanroom-item-pane-section-header");
-    assert.equal(result.valueDriftEntries[0].expectedValue, "模板示例");
-    assert.equal(result.valueDriftEntries[0].actualValue, "模板示例-错误");
+    assert.equal(result.valueDriftEntries[0].expectedValue, "模板面板");
+    assert.equal(result.valueDriftEntries[0].actualValue, "模板面板-错误");
     assert.equal(
       result.valueDriftEntries[0].actualLine,
-      "cleanroom-item-pane-section-header =\n    .label = 模板示例-错误",
+      "cleanroom-item-pane-section-header =\n    .label = 模板面板-错误",
     );
 
     fs.rmSync(tempRoot, { recursive: true, force: true });
@@ -138,20 +138,20 @@ cleanroom-item-pane-section-sidenav =
 
     fs.writeFileSync(path.join(tempRoot, resolveLocaleMainFTLPath("en-US")), `cleanroom-item-pane-info-row-label = Cleanroom Summary
 cleanroom-item-pane-section-header =
-    .label = Cleanroom Demo
+    .label = Cleanroom Panel
 cleanroom-item-pane-section-sidenav =
-    .tooltiptext = Cleanroom Demo
+    .tooltiptext = Cleanroom Panel
 `, "utf-8");
     fs.writeFileSync(path.join(tempRoot, resolveLocaleMainFTLPath("zh-CN")), `cleanroom-item-pane-info-row-label = 模板摘要
-cleanroom-item-pane-section-header = 模板示例
+cleanroom-item-pane-section-header = 模板面板
 cleanroom-item-pane-section-sidenav =
-    .tooltiptext = 模板示例
+    .tooltiptext = 模板面板
 `, "utf-8");
     fs.writeFileSync(path.join(tempRoot, resolveLocaleMainFTLPath("zh-TW")), `cleanroom-item-pane-info-row-label = 範本摘要
 cleanroom-item-pane-section-header =
-    .label = 範本示例
+    .label = 範本面板
 cleanroom-item-pane-section-sidenav =
-    .tooltiptext = 範本示例
+    .tooltiptext = 範本面板
 `, "utf-8");
 
     const result = await inspectBaselineItemPaneLocaleFiles(tempRoot);
@@ -165,8 +165,8 @@ cleanroom-item-pane-section-sidenav =
     assert.equal(result.structureDriftEntries[0].reason, "direct-value-used");
     assert.equal(result.structureDriftEntries[0].expectedAttribute, "label");
     assert.deepEqual(result.structureDriftEntries[0].actualAttributes, []);
-    assert.equal(result.structureDriftEntries[0].expectedLine, "cleanroom-item-pane-section-header =\n    .label = 模板示例");
-    assert.equal(result.structureDriftEntries[0].actualLine, "cleanroom-item-pane-section-header = 模板示例");
+    assert.equal(result.structureDriftEntries[0].expectedLine, "cleanroom-item-pane-section-header =\n    .label = 模板面板");
+    assert.equal(result.structureDriftEntries[0].actualLine, "cleanroom-item-pane-section-header = 模板面板");
 
     fs.rmSync(tempRoot, { recursive: true, force: true });
   });
@@ -174,23 +174,23 @@ cleanroom-item-pane-section-sidenav =
   it("should build minimal baseline locale main ftl source", () => {
     const source = buildBaselineLocaleMainFTLSource("zh-CN");
 
-    assert.equal(source.includes("cleanroom-menu-label = 打开模板动作"), true);
-    assert.equal(source.includes("cleanroom-reader-menu-label = 显示 Reader 示例摘要"), true);
-    assert.equal(source.includes("cleanroom-dialog-title = 模板插件"), true);
+    assert.equal(source.includes("cleanroom-menu-label = 打开 ToolsBox"), true);
+    assert.equal(source.includes("cleanroom-reader-menu-label = 打开当前视图"), true);
+    assert.equal(source.includes("cleanroom-dialog-title = ToolsBox"), true);
     assert.equal(source.includes("cleanroom-pref-theme-follow-host =\n    .label = 跟随 Zotero"), true);
-    assert.equal(source.includes("cleanroom-item-pane-section-header =\n    .label = 模板示例"), true);
-    assert.equal(source.includes("cleanroom-item-pane-section-sidenav =\n    .tooltiptext = 模板示例"), true);
+    assert.equal(source.includes("cleanroom-item-pane-section-header =\n    .label = 模板面板"), true);
+    assert.equal(source.includes("cleanroom-item-pane-section-sidenav =\n    .tooltiptext = 模板面板"), true);
     assert.equal(source.endsWith("\n"), true);
   });
 
   it("should build attribute-aware FTL blocks for item pane entries", () => {
     assert.equal(
       buildFTLMessageBlock("zh-CN", "cleanroom-item-pane-section-header"),
-      "cleanroom-item-pane-section-header =\n    .label = 模板示例",
+      "cleanroom-item-pane-section-header =\n    .label = 模板面板",
     );
     assert.equal(
       buildExpectedFTLLine("zh-TW", "cleanroom-item-pane-section-sidenav"),
-      "cleanroom-item-pane-section-sidenav =\n    .tooltiptext = 範本示例",
+      "cleanroom-item-pane-section-sidenav =\n    .tooltiptext = 範本面板",
     );
   });
 
@@ -202,7 +202,7 @@ cleanroom-item-pane-section-sidenav =
 
     fs.writeFileSync(path.join(tempRoot, resolveLocaleMainFTLPath("en-US")), buildBaselineLocaleMainFTLSource("en-US"), "utf-8");
     fs.writeFileSync(path.join(tempRoot, resolveLocaleMainFTLPath("zh-CN")), `cleanroom-menu-label = 打开模板动作
-cleanroom-reader-menu-label = 显示 Reader 示例摘要
+cleanroom-reader-menu-label = 打开当前视图
 cleanroom-dialog-title = 模板插件
 cleanroom-dialog-body = 插件命令执行成功。
 cleanroom-pref-enabled =
@@ -229,9 +229,9 @@ cleanroom-pref-theme-dark =
 cleanroom-pref-theme-hint = 仅作用于插件拥有的界面，包括当前偏好设置面板，不会改变 Zotero 的全局外观。
 cleanroom-item-pane-info-row-label = 模板摘要
 cleanroom-item-pane-section-header =
-    .label = 模板示例
+    .label = 模板面板
 cleanroom-item-pane-section-sidenav =
-    .tooltiptext = 模板示例
+    .tooltiptext = 模板面板
 `, "utf-8");
     fs.writeFileSync(path.join(tempRoot, resolveLocaleMainFTLPath("zh-TW")), buildBaselineLocaleMainFTLSource("zh-TW"), "utf-8");
 
@@ -254,15 +254,15 @@ cleanroom-item-pane-section-sidenav =
 
     fs.writeFileSync(path.join(tempRoot, resolveLocaleMainFTLPath("en-US")), `cleanroom-item-pane-info-row-label = Cleanroom Summary
 cleanroom-item-pane-section-header =
-    .label = Cleanroom Demo
+    .label = Cleanroom Panel
 cleanroom-item-pane-section-sidenav =
-    .tooltiptext = Cleanroom Demo
+    .tooltiptext = Cleanroom Panel
 `, "utf-8");
     fs.writeFileSync(path.join(tempRoot, resolveLocaleMainFTLPath("zh-CN")), `cleanroom-item-pane-info-row-label = 模板摘要
 cleanroom-item-pane-section-header =
-    .label = 模板示例
+    .label = 模板面板
 cleanroom-item-pane-section-sidenav =
-    .tooltiptext = 模板示例
+    .tooltiptext = 模板面板
 `, "utf-8");
 
     const result = await inspectBaselineItemPaneLocaleFiles(tempRoot);

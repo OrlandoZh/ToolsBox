@@ -3,7 +3,7 @@ registerZoteroScenario("preference pane control interaction", async ({ assert, a
     windowWidth: 800,
     windowHeight: 600,
   });
-  const rootID = "cleanroomtemplate-preferences-root";
+  const rootID = `${addonConfig.addonRef}-preferences-root`;
   const controlIDs = [
     "cleanroom-menu-label",
     "cleanroom-log-level",

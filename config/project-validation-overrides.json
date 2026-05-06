@@ -117,7 +117,7 @@
     },
     {
       "id": "optional-bundle-wave-001",
-      "summary": "Completed optional bundle baseline: keep the JS core green first, treat react-ui as the only implemented lane, and require bundle-local smoke when the default-disabled react-ui lane or the planned wasm-kernel probe contract changes.",
+      "summary": "Completed optional bundle baseline: keep the JS core green first, treat react-ui surface bridge as the only implemented lane, and require bundle-local smoke when the default-disabled react-ui lane or the planned wasm-kernel probe contract changes.",
       "pathMatchers": [
         "^config/optional-bundles\\.json$",
         "^docs/OPTIONAL_BUNDLES\\.md$",
@@ -126,7 +126,6 @@
         "^src/app/plugin\\.js$",
         "^dev/agent-runtime/(?:host-actions|host-action-(?:catalog|ids|owner-modules|readiness-ids)(?:-protected)?)\\.js$",
         "^src/app/optional-bundles\\.js$",
-        "^src/features/react-ui-demo(?:/|\\.|$)",
         "^src/features/wasm-kernel-probe(?:/|\\.|$)",
         "^src/services/wasm-(?:loader|worker)\\.js$",
         "^src/utils/(?:react-surface-bridge|surface-window-mode)\\.js$",
@@ -134,7 +133,7 @@
         "^addon-static/content/lib/r(?:/|\\.|$)",
         "^addon-static/content/lib/w(?:/|\\.|$)",
         "^zotero-scenarios/wasm-kernel-(?:probe|digest|unlock)\\.scenario\\.js$",
-        "^tests/(?:optional-bundles-lib|build-react-ui|react-surface-bridge|surface-window-mode|react-ui-demo)\\.test\\.js$",
+        "^tests/(?:optional-bundles-lib|build-react-ui|react-surface-bridge|surface-window-mode)\\.test\\.js$",
         "^tests/(?:wasm-kernel-probe|wasm-kernel-smoke|wasm-kernel-performance-report|wasm-kernel-disabled-contract-report|wasm-kernel-matrix-report|wasm-loader|wasm-worker|protected-semantic-ids|plugin)\\.test\\.js$",
         "^tests/(?:feature-composer|host-actions|toolchain|run-all|zotero-script)\\.test\\.js$",
         "^tests/zotero-agent-artifacts\\.test\\.js$",

@@ -710,6 +710,24 @@ export function createReader(options = {}) {
     return readers.find((r) => r.itemID === itemID) || null;
   }
 
+  function getItemByID(itemID) {
+    const normalizedID = toPlainNumber(itemID);
+    if (
+      !Number.isFinite(normalizedID)
+      || typeof Zotero === "undefined"
+      || !Zotero?.Items
+      || typeof Zotero.Items.get !== "function"
+    ) {
+      return null;
+    }
+    try {
+      return Zotero.Items.get(normalizedID) || null;
+    } catch (err) {
+      error("reader.getItemByID.failed", { itemID: normalizedID, message: String(err?.message || err) });
+      return null;
+    }
+  }
+
   /**
    * 获取当前活动的阅读器
    * @returns {Object|null} 当前活动的 Reader 实例
@@ -1935,6 +1953,7 @@ export function createReader(options = {}) {
     getAllReaders,
     getByTabID,
     getByItemID,
+    getItemByID,
     getActiveReader,
     openReader,
     openByURI,

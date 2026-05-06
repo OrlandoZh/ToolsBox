@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" data-addon-ref="toolsbox" data-addon-name="ToolsBox">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paper Matrix</title>
+    <link rel="stylesheet" type="text/css" href="./research-workbench-matrix.css" />
+  </head>
+  <body>
+    <div id="paper-matrix-root" class="pm-shell">
+      <header class="pm-header">
+        <div>
+          <h1>Paper Matrix</h1>
+          <p id="pm-stat-summary" class="pm-stat-summary"></p>
+        </div>
+      </header>
+
+      <div class="pm-toolbar">
+        <input type="search" id="pm-search" class="pm-search" placeholder="Filter papers..." />
+        <div class="pm-toolbar-spacer"></div>
+        <button id="pm-btn-columns" type="button" class="pm-btn">Columns</button>
+        <button id="pm-btn-export" type="button" class="pm-btn pm-btn-export">Export CSV</button>
+      </div>
+
+      <div class="pm-columns-panel" id="pm-columns-panel" hidden>
+        <span class="pm-columns-panel-label">Toggle columns:</span>
+        <div id="pm-columns-toggles" class="pm-columns-toggles"></div>
+      </div>
+
+      <div class="pm-table-wrap" id="pm-table-wrap">
+        <table class="pm-table" id="pm-table">
+          <thead id="pm-thead"></thead>
+          <tbody id="pm-tbody"></tbody>
+        </table>
+        <p id="pm-empty" class="pm-empty" hidden>No papers to display. Select a collection and open the matrix.</p>
+      </div>
+    </div>
+    <script src="./research-workbench-matrix.js"></script>
+  </body>
+</html>
