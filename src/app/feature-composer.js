@@ -9,6 +9,7 @@ import { registerRelationshipGraphFeatures } from "../features/research-workbenc
 import { createCitedCountColumn } from "../features/cited-count-column.js";
 import { createAttachmentPreview } from "../features/attachment-preview.js";
 import { createAnnotationManager } from "../features/annotation-manager.js";
+import { createSidebarToggle } from "../features/sidebar-toggle.js";
 
 const PREFERENCE_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
 const PREFERENCE_INIT_API_KEY = "initCleanroomPreferences";
@@ -299,6 +300,17 @@ export function createFeatureComposer({
         }
         
         logger.info("features.annotationManager.registered");
+      }
+
+      if (prefs.get("sidebarToggle.enabled") !== false) {
+        const sidebarToggle = createSidebarToggle({
+          logger,
+          zotero: Zotero
+        });
+
+        if (sidebarToggle.register()) {
+          logger.info("features.sidebarToggle.registered");
+        }
       }
 
       if (!baselineCleanupTracked && lifecycle && typeof lifecycle.trackCleanup === "function") {

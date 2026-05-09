@@ -194,3 +194,10 @@ toolsbox-annotation-manager-column-text = Text
 toolsbox-annotation-manager-column-page = Page
 toolsbox-annotation-manager-column-type = Type
 toolsbox-annotation-manager-column-item = Item
+# Sidebar Toggle
+toolsbox-pref-sidebar-toggle-section =
+    .label = Sidebar Toggle
+toolsbox-pref-sidebar-toggle-left-shortcut =
+    .value = Left sidebar shortcut
+toolsbox-pref-sidebar-toggle-right-shortcut =
+    .value = Right sidebar shortcut
