@@ -12,7 +12,7 @@
 
 当前仓库已完成 **P0 核心功能** (5个差异化功能):
 
-1. **Cited Count Column** - 引用次数列 (Semantic Scholar API集成)
+1. **Cited Count Column** - 引用次数列 (Semantic Scholar API集成) ✅ 已修复renderCell
 2. **Attachment Preview Panel** - 右侧栏附件预览面板
 3. **Annotation Manager** - 批注管理器面板
 4. **Toggle Sidebar** - 侧边栏快速切换 (Shift + { / })
@@ -25,6 +25,13 @@
 1. **Collection Item Count** - 收藏夹条目计数显示
 2. **Sort Collections** - 收藏夹排序功能 (名称/条目数/日期)
 3. **Favorite Collections** - 收藏夹置顶功能 (星标+自动置顶)
+
+### ✅ 技术债务已清理 (2026-05-09)
+
+- ✅ **cited-count-column renderCell修复** - 完整实现显示逻辑+排序支持
+- ✅ **console.log清理验证** - 所有console使用均为合规降级
+- ✅ **API命名统一** - 全部使用register()方法
+- ✅ **P0功能测试覆盖** - 新增24个单元测试 (总计85+测试)
 
 当前仓库已经完成：
 
