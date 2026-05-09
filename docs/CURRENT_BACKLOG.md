@@ -18,6 +18,14 @@
 4. **Toggle Sidebar** - 侧边栏快速切换 (Shift + { / })
 5. **Tab Manager** - 标签管理器面板
 
+### ✅ P1 阶段一已完成 (2026-05-09)
+
+当前仓库已完成 **P1 Collection管理功能** (3个效率提升功能):
+
+1. **Collection Item Count** - 收藏夹条目计数显示
+2. **Sort Collections** - 收藏夹排序功能 (名称/条目数/日期)
+3. **Favorite Collections** - 收藏夹置顶功能 (星标+自动置顶)
+
 当前仓库已经完成：
 
 - ToolsBox 产品身份初始化
