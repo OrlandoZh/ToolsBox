@@ -208,3 +208,9 @@ toolsbox-tab-manager-column-title = Title
 toolsbox-tab-manager-column-type = Type
 toolsbox-tab-manager-close-tab = Close
 toolsbox-tab-manager-switch-tab = Switch to
+# Collection Item Count
+toolsbox-collection-count-label = { $count } items
+toolsbox-pref-collection-count =
+    .label = Enable collection item count
+toolsbox-pref-collection-count-section =
+    .label = Collection Management

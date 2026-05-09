@@ -11,6 +11,7 @@ import { createAttachmentPreview } from "../features/attachment-preview.js";
 import { createAnnotationManager } from "../features/annotation-manager.js";
 import { createSidebarToggle } from "../features/sidebar-toggle.js";
 import { createTabManagerPanel } from "../features/tab-manager-panel.js";
+import { createCollectionItemCount } from "../features/collection-item-count.js";
 
 const PREFERENCE_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
 const PREFERENCE_INIT_API_KEY = "initCleanroomPreferences";
@@ -332,6 +333,18 @@ export function createFeatureComposer({
         }
 
         logger.info("features.tabManager.registered");
+      }
+
+      if (prefs.get("collectionItemCount.enabled") !== false) {
+        const collectionItemCount = createCollectionItemCount({
+          logger,
+          i18n,
+          zotero: Zotero
+        });
+
+        if (collectionItemCount.enable()) {
+          logger.info("features.collectionItemCount.enabled");
+        }
       }
 
       if (!baselineCleanupTracked && lifecycle && typeof lifecycle.trackCleanup === "function") {

@@ -50,6 +50,7 @@
     "researchWorkbench.tabs.enabled": true,
     "citedCountColumn.enabled": true,
     "citedCountColumn.source": "semantic-scholar",
-    "citedCountColumn.apiKey": ""
+    "citedCountColumn.apiKey": "",
+    "collectionItemCount.enabled": true
   }
 }

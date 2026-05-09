@@ -201,3 +201,9 @@ toolsbox-tab-manager-column-title = 標題
 toolsbox-tab-manager-column-type = 類型
 toolsbox-tab-manager-close-tab = 關閉
 toolsbox-tab-manager-switch-tab = 切換到
+# Collection Item Count
+toolsbox-collection-count-label = { $count } 條
+toolsbox-pref-collection-count =
+    .label = 啟用合集條目計數
+toolsbox-pref-collection-count-section =
+    .label = 合集管理
