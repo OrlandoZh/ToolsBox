@@ -7,6 +7,7 @@ import { registerNotesManagerFeatures } from "../features/research-workbench-not
 import { registerPaperMatrixFeatures } from "../features/research-workbench-matrix.js";
 import { registerRelationshipGraphFeatures } from "../features/research-workbench-graph.js";
 import { createCitedCountColumn } from "../features/cited-count-column.js";
+import { createAttachmentPreview } from "../features/attachment-preview.js";
 
 const PREFERENCE_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
 const PREFERENCE_INIT_API_KEY = "initCleanroomPreferences";
@@ -265,6 +266,17 @@ export function createFeatureComposer({
         });
         if (citedCountColumn.register()) {
           logger.info("features.citedCountColumn.registered");
+        }
+      }
+
+      if (prefs.get("attachmentPreview.enabled") !== false) {
+        const attachmentPreview = createAttachmentPreview({
+          logger,
+          i18n,
+          zotero: Zotero
+        });
+        if (attachmentPreview.register()) {
+          logger.info("features.attachmentPreview.registered");
         }
       }
 

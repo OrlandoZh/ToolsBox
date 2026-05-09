@@ -180,3 +180,8 @@ toolsbox-pref-cited-count-source-semantic-scholar =
     .label = Semantic Scholar
 toolsbox-pref-cited-count-source-cnki =
     .label = CNKI (知网)
+# Attachment Preview Panel
+toolsbox-section-attachment-preview = Attachment Preview
+toolsbox-section-attachment-preview-empty = No attachment available
+toolsbox-pref-attachment-preview =
+    .label = Enable attachment preview panel
