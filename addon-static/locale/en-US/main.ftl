@@ -201,3 +201,10 @@ toolsbox-pref-sidebar-toggle-left-shortcut =
     .value = Left sidebar shortcut
 toolsbox-pref-sidebar-toggle-right-shortcut =
     .value = Right sidebar shortcut
+# Tab Manager
+toolsbox-tab-manager-button = Tab Manager
+toolsbox-tab-manager-title = Tab Manager
+toolsbox-tab-manager-column-title = Title
+toolsbox-tab-manager-column-type = Type
+toolsbox-tab-manager-close-tab = Close
+toolsbox-tab-manager-switch-tab = Switch to

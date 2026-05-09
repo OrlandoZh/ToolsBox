@@ -194,3 +194,10 @@ toolsbox-annotation-manager-column-text = 文本
 toolsbox-annotation-manager-column-page = 页码
 toolsbox-annotation-manager-column-type = 类型
 toolsbox-annotation-manager-column-item = 文献
+# Tab Manager
+toolsbox-tab-manager-button = 标签管理器
+toolsbox-tab-manager-title = 标签管理器
+toolsbox-tab-manager-column-title = 标题
+toolsbox-tab-manager-column-type = 类型
+toolsbox-tab-manager-close-tab = 关闭
+toolsbox-tab-manager-switch-tab = 切换到

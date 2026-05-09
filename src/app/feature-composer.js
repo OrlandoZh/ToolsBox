@@ -10,6 +10,7 @@ import { createCitedCountColumn } from "../features/cited-count-column.js";
 import { createAttachmentPreview } from "../features/attachment-preview.js";
 import { createAnnotationManager } from "../features/annotation-manager.js";
 import { createSidebarToggle } from "../features/sidebar-toggle.js";
+import { createTabManagerPanel } from "../features/tab-manager-panel.js";
 
 const PREFERENCE_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
 const PREFERENCE_INIT_API_KEY = "initCleanroomPreferences";
@@ -311,6 +312,26 @@ export function createFeatureComposer({
         if (sidebarToggle.register()) {
           logger.info("features.sidebarToggle.registered");
         }
+      }
+
+      if (prefs.get("tabManager.enabled") !== false) {
+        const tabManager = createTabManagerPanel({
+          logger,
+          i18n,
+          zotero: Zotero
+        });
+
+        if (menuManager.isOfficialAPIAvailable()) {
+          menuManager.registerItemMenuItem({
+            id: 'toolsbox-open-tab-manager',
+            l10nID: 'toolsbox-tab-manager-button',
+            onCommand: (event, context) => {
+              tabManager.open();
+            }
+          });
+        }
+
+        logger.info("features.tabManager.registered");
       }
 
       if (!baselineCleanupTracked && lifecycle && typeof lifecycle.trackCleanup === "function") {
