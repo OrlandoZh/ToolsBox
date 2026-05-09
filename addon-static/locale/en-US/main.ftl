@@ -214,3 +214,12 @@ toolsbox-pref-collection-count =
     .label = Enable collection item count
 toolsbox-pref-collection-count-section =
     .label = Collection Management
+# Collection Sort
+toolsbox-collection-sort-button = Sort
+toolsbox-collection-sort-prompt = Choose sort method:
+toolsbox-collection-sort-name = Sort by Name (A-Z)
+toolsbox-collection-sort-name-desc = Sort by Name (Z-A)
+toolsbox-collection-sort-item-count = Sort by Item Count (Low-High)
+toolsbox-collection-sort-item-count-desc = Sort by Item Count (High-Low)
+toolsbox-pref-collection-sort =
+    .label = Enable collection sorting
