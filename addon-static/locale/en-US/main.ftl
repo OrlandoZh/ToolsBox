@@ -223,3 +223,10 @@ toolsbox-collection-sort-item-count = Sort by Item Count (Low-High)
 toolsbox-collection-sort-item-count-desc = Sort by Item Count (High-Low)
 toolsbox-pref-collection-sort =
     .label = Enable collection sorting
+# Favorite Collections
+toolsbox-collection-add-favorite = Add to Favorites
+toolsbox-collection-remove-favorite = Remove from Favorites
+toolsbox-pref-favorite-collections =
+    .label = Enable favorite collections
+toolsbox-pref-favorite-collections-list =
+    .value = Favorite collections

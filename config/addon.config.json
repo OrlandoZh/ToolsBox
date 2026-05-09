@@ -51,6 +51,9 @@
     "citedCountColumn.enabled": true,
     "citedCountColumn.source": "semantic-scholar",
     "citedCountColumn.apiKey": "",
-    "collectionItemCount.enabled": true
+    "collectionItemCount.enabled": true,
+    "collectionSort.enabled": true,
+    "favoriteCollections.enabled": true,
+    "favoriteCollections": []
   }
 }
