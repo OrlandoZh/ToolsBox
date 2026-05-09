@@ -173,5 +173,6 @@ import './zotero-watch-report-lib.test.js';
 import './zotero-watch-recovery-lib.test.js';
 import './zotero-watch-recovery-regression-lib.test.js';
 import './features/test-cited-count-column.js';
+import './features/test-annotation-manager.js';
 
 await runTests();

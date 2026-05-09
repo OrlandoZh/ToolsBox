@@ -185,3 +185,12 @@ toolsbox-section-attachment-preview = Attachment Preview
 toolsbox-section-attachment-preview-empty = No attachment available
 toolsbox-pref-attachment-preview =
     .label = Enable attachment preview panel
+# Annotation Manager
+toolsbox-menu-annotation-manager = Annotation Manager
+toolsbox-annotation-manager-title = Annotation Manager
+toolsbox-annotation-manager-search =
+    .placeholder = Search annotations...
+toolsbox-annotation-manager-column-text = Text
+toolsbox-annotation-manager-column-page = Page
+toolsbox-annotation-manager-column-type = Type
+toolsbox-annotation-manager-column-item = Item

@@ -180,3 +180,17 @@ toolsbox-pref-cited-count-source-semantic-scholar =
     .label = Semantic Scholar
 toolsbox-pref-cited-count-source-cnki =
     .label = 知网 (CNKI)
+# Attachment Preview Panel
+toolsbox-section-attachment-preview = 附件预览
+toolsbox-section-attachment-preview-empty = 无可用附件
+toolsbox-pref-attachment-preview =
+    .label = 启用附件预览面板
+# Annotation Manager
+toolsbox-menu-annotation-manager = 批注管理器
+toolsbox-annotation-manager-title = 批注管理器
+toolsbox-annotation-manager-search =
+    .placeholder = 搜索批注...
+toolsbox-annotation-manager-column-text = 文本
+toolsbox-annotation-manager-column-page = 页码
+toolsbox-annotation-manager-column-type = 类型
+toolsbox-annotation-manager-column-item = 文献

@@ -8,6 +8,7 @@ import { registerPaperMatrixFeatures } from "../features/research-workbench-matr
 import { registerRelationshipGraphFeatures } from "../features/research-workbench-graph.js";
 import { createCitedCountColumn } from "../features/cited-count-column.js";
 import { createAttachmentPreview } from "../features/attachment-preview.js";
+import { createAnnotationManager } from "../features/annotation-manager.js";
 
 const PREFERENCE_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
 const PREFERENCE_INIT_API_KEY = "initCleanroomPreferences";
@@ -278,6 +279,26 @@ export function createFeatureComposer({
         if (attachmentPreview.register()) {
           logger.info("features.attachmentPreview.registered");
         }
+      }
+
+      if (prefs.get("annotationManager.enabled") !== false) {
+        const annotationManager = createAnnotationManager({
+          logger,
+          i18n,
+          zotero: Zotero
+        });
+        
+        if (menuManager.isOfficialAPIAvailable()) {
+          menuManager.registerItemMenuItem({
+            id: 'toolsbox-open-annotation-manager',
+            l10nID: 'toolsbox-menu-annotation-manager',
+            onCommand: (event, context) => {
+              annotationManager.open();
+            }
+          });
+        }
+        
+        logger.info("features.annotationManager.registered");
       }
 
       if (!baselineCleanupTracked && lifecycle && typeof lifecycle.trackCleanup === "function") {
