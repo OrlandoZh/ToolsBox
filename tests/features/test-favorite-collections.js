@@ -163,13 +163,13 @@ describe("FavoriteCollections", () => {
       zotero: mockZotero
     });
     
-    const result = favorite.enable();
+    const result = favorite.register();
     
-    assert.equal(result, false, "enable() should return false when Collections API unavailable");
+    assert.equal(result, false, "register() should return false when Collections API unavailable");
     
     const logs = mockLogger.getLogs();
     const errorLog = logs.find(l => l.level === 'error');
-    assert.ok(errorLog, "Should log error when enable fails");
+    assert.ok(errorLog, "Should log error when register fails");
   });
 
   it("should return true when enable succeeds", () => {
@@ -204,9 +204,9 @@ describe("FavoriteCollections", () => {
       zotero: mockZotero
     });
     
-    const result = favorite.enable();
+    const result = favorite.register();
     
-    assert.ok(result, "enable() should return true when successful");
+    assert.ok(result, "register() should return true when successful");
   });
 });
 

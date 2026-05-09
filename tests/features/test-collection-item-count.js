@@ -82,9 +82,9 @@ describe("CollectionItemCount", () => {
       zotero: mockZotero
     });
     
-    const result = counter.enable();
+    const result = counter.register();
     
-    assert.ok(result, "enable() should return true");
+    assert.ok(result, "register() should return true");
   });
   
   it("should return correct count for collection", () => {
@@ -151,13 +151,13 @@ describe("CollectionItemCount", () => {
       zotero: mockZotero
     });
     
-    const result = counter.enable();
+    const result = counter.register();
     
-    assert.equal(result, false, "enable() should return false when Collections API unavailable");
+    assert.equal(result, false, "register() should return false when Collections API unavailable");
     
     const logs = mockLogger.getLogs();
     const errorLog = logs.find(l => l.level === 'error');
-    assert.ok(errorLog, "Should log error when enable fails");
+    assert.ok(errorLog, "Should log error when register fails");
   });
 });
 

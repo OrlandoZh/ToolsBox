@@ -111,9 +111,9 @@ export function createFavoriteCollections(options) {
     });
   }
 
-  function enable() {
+  function register() {
     if (!Zotero || !Zotero.Collections) {
-      logger.error('favoriteCollections.enable.failed', { reason: 'Collections API not available' });
+      logger.error('favoriteCollections.register.failed', { reason: 'Collections API not available' });
       return false;
     }
 
@@ -128,12 +128,12 @@ export function createFavoriteCollections(options) {
       }
     }, ['collection'], 'toolsbox-favorite-collections');
 
-    logger.debug('favoriteCollections.enabled');
+    logger.debug('favoriteCollections.registered');
     return true;
   }
 
   return {
-    enable,
+    register,
     addToFavorites,
     removeFromFavorites,
     isFavorite,

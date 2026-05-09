@@ -103,9 +103,9 @@ export function createCollectionSort(options) {
     }
   }
   
-  function enable() {
+  function register() {
     if (!Zotero || !Zotero.Collections) {
-      logger.error('collectionSort.enable.failed', { reason: 'Collections API not available' });
+      logger.error('collectionSort.register.failed', { reason: 'Collections API not available' });
       return false;
     }
     
@@ -116,12 +116,12 @@ export function createCollectionSort(options) {
       applySort(lastSortBy);
     }
     
-    logger.debug('collectionSort.enabled');
+    logger.debug('collectionSort.registered');
     return true;
   }
   
   return {
-    enable,
+    register,
     sortCollections,
     applySort
   };

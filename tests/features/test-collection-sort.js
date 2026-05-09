@@ -190,13 +190,13 @@ describe("CollectionSort", () => {
       prefs: mockPrefs
     });
     
-    const result = sorter.enable();
+    const result = sorter.register();
     
-    assert.equal(result, false, "enable() should return false when Collections API unavailable");
+    assert.equal(result, false, "register() should return false when Collections API unavailable");
     
     const logs = mockLogger.getLogs();
     const errorLog = logs.find(l => l.level === 'error');
-    assert.ok(errorLog, "Should log error when enable fails");
+    assert.ok(errorLog, "Should log error when register fails");
   });
 });
 

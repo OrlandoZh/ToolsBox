@@ -50,9 +50,9 @@ export function createCollectionItemCount(options) {
     });
   }
   
-  function enable() {
+  function register() {
     if (!Zotero || !Zotero.Collections) {
-      logger.error('collectionItemCount.enable.failed', { reason: 'Collections API not available' });
+      logger.error('collectionItemCount.register.failed', { reason: 'Collections API not available' });
       return false;
     }
     
@@ -66,12 +66,12 @@ export function createCollectionItemCount(options) {
       }
     }, ['item', 'collection-item'], 'toolsbox-collection-count');
     
-    logger.debug('collectionItemCount.enabled');
+    logger.debug('collectionItemCount.registered');
     return true;
   }
   
   return {
-    enable,
+    register,
     getCollectionCount,
     updateAllCounts
   };

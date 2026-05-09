@@ -344,8 +344,8 @@ export function createFeatureComposer({
           zotero: Zotero
         });
 
-        if (collectionItemCount.enable()) {
-          logger.info("features.collectionItemCount.enabled");
+        if (collectionItemCount.register()) {
+          logger.info("features.collectionItemCount.registered");
         }
       }
 
@@ -357,8 +357,8 @@ export function createFeatureComposer({
           prefs
         });
 
-        if (collectionSort.enable()) {
-          logger.info("features.collectionSort.enabled");
+        if (collectionSort.register()) {
+          logger.info("features.collectionSort.registered");
         }
       }
 
@@ -370,8 +370,8 @@ export function createFeatureComposer({
           prefs
         });
 
-        if (favoriteCollections.enable()) {
-          logger.info("features.favoriteCollections.enabled");
+        if (favoriteCollections.register()) {
+          logger.info("features.favoriteCollections.registered");
         }
       }
 
