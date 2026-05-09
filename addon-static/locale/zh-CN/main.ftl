@@ -169,3 +169,14 @@ cleanroom-pm-window-title = 论文矩阵
 cleanroom-rg-command-label = 打开关系图
 cleanroom-rg-window-title = 关系图
 cleanroom-rg-item-menu-label = 显示关系图
+# Cited Count Column
+toolsbox-column-cited-count = 引用次数
+toolsbox-column-cited-count-tooltip = Semantic Scholar 引用总数
+toolsbox-pref-cited-count-section =
+    .label = 引用次数设置
+toolsbox-pref-cited-count-source =
+    .value = 数据源
+toolsbox-pref-cited-count-source-semantic-scholar =
+    .label = Semantic Scholar
+toolsbox-pref-cited-count-source-cnki =
+    .label = 知网 (CNKI)

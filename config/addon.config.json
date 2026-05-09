@@ -47,6 +47,9 @@
     "researchWorkbench.graph.enabled": true,
     "researchWorkbench.matrix.enabled": true,
     "researchWorkbench.notes.enabled": true,
-    "researchWorkbench.tabs.enabled": true
+    "researchWorkbench.tabs.enabled": true,
+    "citedCountColumn.enabled": true,
+    "citedCountColumn.source": "semantic-scholar",
+    "citedCountColumn.apiKey": ""
   }
 }

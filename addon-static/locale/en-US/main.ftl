@@ -169,3 +169,14 @@ cleanroom-pm-window-title = Paper Matrix
 cleanroom-rg-command-label = Open Relationship Graph
 cleanroom-rg-window-title = Relationship Graph
 cleanroom-rg-item-menu-label = Show Relationship Graph
+# Cited Count Column
+toolsbox-column-cited-count = Cited Count
+toolsbox-column-cited-count-tooltip = Total citations from Semantic Scholar
+toolsbox-pref-cited-count-section =
+    .label = Cited Count Settings
+toolsbox-pref-cited-count-source =
+    .value = Data source
+toolsbox-pref-cited-count-source-semantic-scholar =
+    .label = Semantic Scholar
+toolsbox-pref-cited-count-source-cnki =
+    .label = CNKI (知网)
