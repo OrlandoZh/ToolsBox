@@ -267,3 +267,16 @@ toolsbox-pref-publication-tags-section =
     .label = Publication Tags Settings
 toolsbox-pref-publication-tags =
     .label = Enable publication tags column
+# Title Column Enhanced
+toolsbox-column-title-enhanced = Enhanced Title
+toolsbox-column-title-enhanced-tooltip = Title with progress bar and status indicators
+toolsbox-pref-title-enhanced-section =
+    .label = Enhanced Title Settings
+toolsbox-pref-title-enhanced =
+    .label = Enable enhanced title column
+toolsbox-pref-title-enhanced-progress =
+    .label = Show progress bar
+toolsbox-pref-title-enhanced-tags =
+    .label = Show status emojis
+toolsbox-pref-title-enhanced-color =
+    .value = Progress bar color

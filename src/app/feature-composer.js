@@ -17,6 +17,7 @@ import { createFavoriteCollections } from "../features/favorite-collections.js";
 import { createReadingTimeColumn } from "../features/reading-time-column.js";
 import { createAnnotationColumn } from "../features/annotation-column.js";
 import { createPublicationTagsColumn } from "../features/publication-tags-column.js";
+import { createTitleColumnEnhanced } from "../features/title-column-enhanced.js";
 
 const PREFERENCE_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
 const PREFERENCE_INIT_API_KEY = "initCleanroomPreferences";
@@ -414,6 +415,19 @@ export function createFeatureComposer({
 
         if (publicationTagsColumn.register()) {
           logger.info("features.publicationTagsColumn.registered");
+        }
+      }
+
+      if (prefs.get("titleColumnEnhanced.enabled") !== false) {
+        const titleColumnEnhanced = createTitleColumnEnhanced({
+          logger,
+          i18n,
+          zotero: Zotero,
+          prefs
+        });
+
+        if (titleColumnEnhanced.register()) {
+          logger.info("features.titleColumnEnhanced.registered");
         }
       }
 
