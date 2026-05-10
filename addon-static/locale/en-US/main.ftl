@@ -372,3 +372,16 @@ toolsbox-pref-view-groups-max-views =
     .value = Maximum saved views
 toolsbox-pref-view-groups-auto-save =
     .label = Auto-save on column change
+# PDF Background Color
+toolsbox-pdf-background = PDF Background Color
+toolsbox-pdf-background-tooltip = Customize PDF reader background color
+toolsbox-pref-pdf-background-section =
+    .label = PDF Background Settings
+toolsbox-pref-pdf-background-enabled =
+    .label = Enable PDF background color
+toolsbox-pref-pdf-background-color =
+    .value = Background color
+toolsbox-pref-pdf-background-apply-all =
+    .label = Apply to all PDF readers
+toolsbox-pref-pdf-background-preserve-images =
+    .label = Preserve image backgrounds

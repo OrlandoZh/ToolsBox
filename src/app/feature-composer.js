@@ -21,6 +21,7 @@ import { createTitleColumnEnhanced } from "../features/title-column-enhanced.js"
 import { createIFColumn } from "../features/if-column.js";
 import { createEasyScholarClient } from "../services/easyscholar-client.js";
 import { createMarginAnnotation } from "../features/margin-annotation.js";
+import { createPDFBackgroundColor } from "../features/pdf-background-color.js";
 import { createGraphViewEnhanced } from "../features/graph-view-enhanced.js";
 import { createViewGroups } from "../features/view-groups.js";
 
@@ -467,6 +468,19 @@ export function createFeatureComposer({
 
         if (marginAnnotation.register()) {
           logger.info("features.marginAnnotation.registered");
+        }
+      }
+
+      if (prefs.get("pdfBackground.enabled") !== false) {
+        const pdfBackgroundColor = createPDFBackgroundColor({
+          logger,
+          i18n,
+          zotero: Zotero,
+          prefs
+        });
+
+        if (pdfBackgroundColor.register()) {
+          logger.info("features.pdfBackgroundColor.registered");
         }
       }
 
