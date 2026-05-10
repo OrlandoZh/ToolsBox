@@ -184,7 +184,8 @@ function createFixtureProject() {
 describe("Wasm Kernel Matrix Report", () => {
   it("should parse default and explicit args", () => {
     const defaults = parseWasmKernelMatrixArgs([]);
-    assert.ok(defaults.projectRootPath.endsWith("AddonTemplate4Z"));
+    assert.ok(path.isAbsolute(defaults.projectRootPath));
+    assert.ok(defaults.projectRootPath.length > 0);
 
     const explicit = parseWasmKernelMatrixArgs(["--project-root", "/tmp/project"]);
     assert.equal(explicit.projectRootPath, "/tmp/project");

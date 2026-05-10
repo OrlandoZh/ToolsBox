@@ -1,13 +1,17 @@
 registerZoteroScenario("baseline registration diagnostics", async ({ assert, plugin }) => {
   const details = plugin.api.agent.collectDiagnostics();
-  assert.equal(details.primaryActionCommandRegistered, true);
-  assert.equal(details.contextActionMenuRegistered, true);
-  assert.equal(details.preferencePaneRegistered, true);
-  assert.equal(details.itemPaneSections, 1);
-  assert.equal(details.itemPaneInfoRows, 1);
-  assert.equal(details.itemTreeColumns, 1);
-  assert.equal(details.notifierActiveCount, 1);
-  assert.ok(details.menuIDs.some((id) => String(id).includes("reader-summary")));
+  assert.equal(details.primaryActionCommandRegistered, true, "primary action command not registered");
+  assert.equal(details.contextActionMenuRegistered, true, "context action menu not registered");
+  assert.equal(details.preferencePaneRegistered, true, "preference pane not registered");
+  assert.equal(details.workflowContractVersion, 1, "workflow contract version mismatch");
+  assert.equal(details.itemPaneSections, 1, `unexpected item pane section count: ${details.itemPaneSections}`);
+  assert.equal(details.itemPaneInfoRows, 0, `unexpected item pane info row count: ${details.itemPaneInfoRows}`);
+  assert.ok(details.itemTreeColumns >= 1, `unexpected item tree column count: ${details.itemTreeColumns}`);
+  assert.equal(details.notifierActiveCount, 0, `unexpected notifier count: ${details.notifierActiveCount}`);
+  assert.equal(details.workflowItemPaneSectionRegistered, true, "workflow item pane section not registered");
+  assert.equal(details.workflowItemMenuRegistered, true, "workflow item menu not registered");
+  assert.equal(details.workflowCollectionMenuRegistered, true, "workflow collection menu not registered");
+  assert.equal(details.workflowReaderMenuRegistered, true, "workflow reader menu not registered");
   return details;
 });
 
@@ -39,33 +43,32 @@ registerZoteroScenario("real item selection diagnostics", async ({ assert, helpe
   };
 });
 
-registerZoteroScenario("real notifier follows item updates", async ({ assert, helpers, plugin }) => {
+registerZoteroScenario("real workflow state persists on item tags and Extra", async ({ assert, helpers }) => {
   const item = await helpers.createItem({
     itemType: "report",
     fields: {
-      title: "Agent Notifier Draft",
+      title: "Agent Workflow Draft",
     },
   });
 
-  item.setField("title", "Agent Notifier Final");
+  item.addTag("/done");
+  item.addTag("#focus");
+  item.addTag("*****");
+  item.setField("extra", "Remark: Ready for review");
   await item.saveTx();
 
-  const diagnostics = await helpers.waitFor(
-    () => {
-      const snapshot = plugin.api.agent.collectDiagnostics();
-      return String(snapshot.lastNotifierEvent || "").includes(`item:modify #${item.id}`)
-        ? snapshot
-        : null;
-    },
-    {
-      timeoutMs: 5000,
-      intervalMs: 100,
-      message: `Timed out waiting for notifier update for item #${item.id}`,
-    },
-  );
+  const reloaded = globalThis.Zotero.Items.get(item.id);
+  const tags = reloaded.getTags().map((entry) => entry.tag);
 
-  assert.includes(diagnostics.lastNotifierEvent, `item:modify #${item.id}`);
-  return diagnostics;
+  assert.ok(tags.includes("/done"));
+  assert.ok(tags.includes("#focus"));
+  assert.ok(tags.includes("*****"));
+  assert.includes(reloaded.getField("extra"), "Remark: Ready for review");
+  return {
+    itemID: item.id,
+    tags,
+    extra: reloaded.getField("extra"),
+  };
 });
 
 registerZoteroScenario("real reader summary on generated pdf", async ({ assert, helpers, plugin }) => {

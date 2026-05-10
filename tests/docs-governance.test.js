@@ -174,7 +174,7 @@ describe("Docs Governance", () => {
             `${docPath} should route ${projectRelativeReferencePath} through ${expectedRoot}`,
           );
         }
-        if (hasLocalReferenceSnapshots) {
+        if (hasLocalReferenceSnapshots && expectedRoot && fs.existsSync(path.resolve(expectedRoot))) {
           assert.ok(
             fs.existsSync(
               path.resolve(

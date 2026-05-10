@@ -39,11 +39,21 @@ export function normalizeWatchBaselineSnapshot(source = {}) {
     itemPaneSections: toFiniteNumber(record.itemPaneSections),
     itemPaneInfoRows: toFiniteNumber(record.itemPaneInfoRows),
     itemTreeColumns: toFiniteNumber(record.itemTreeColumns),
+    workflowContractVersion: toFiniteNumber(record.workflowContractVersion),
+    workflowItemPaneSectionRegistered: Boolean(record.workflowItemPaneSectionRegistered),
   };
 }
 
 export function isWatchBaselineSettled(source = {}) {
   const snapshot = normalizeWatchBaselineSnapshot(source);
+  if (snapshot.workflowContractVersion >= 1) {
+    return (
+      snapshot.preferencePaneRegistered
+      && snapshot.itemPaneSections >= 1
+      && snapshot.workflowItemPaneSectionRegistered
+      && snapshot.itemTreeColumns >= 1
+    );
+  }
   return (
     snapshot.preferencePaneRegistered
     && snapshot.itemPaneSections >= 1
@@ -68,6 +78,8 @@ export async function readWatchBaselineSnapshot({ rdp, config }) {
       itemPaneSections: Number(selfCheck?.itemPaneSections || 0),
       itemPaneInfoRows: Number(selfCheck?.itemPaneInfoRows || 0),
       itemTreeColumns: Number(selfCheck?.itemTreeColumns || 0),
+      workflowContractVersion: Number(selfCheck?.workflowContractVersion || 0),
+      workflowItemPaneSectionRegistered: Boolean(selfCheck?.workflowItemPaneSectionRegistered),
     });
   })()`);
   return normalizeWatchBaselineSnapshot(JSON.parse(raw));

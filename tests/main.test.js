@@ -128,6 +128,14 @@ describe("Main Bootstrap", () => {
         },
         unregisterMenu() {},
       },
+      ItemPaneManager: {
+        registerSection: () => {},
+        unregisterSection: () => {},
+      },
+      ItemTreeManager: {
+        registerColumn: () => "test-column-key",
+        unregisterColumn: () => {},
+      },
     };
   });
 

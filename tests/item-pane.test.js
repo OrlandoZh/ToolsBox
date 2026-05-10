@@ -26,6 +26,7 @@ describe("ItemPane", () => {
           errors.push({ message, details });
         },
       },
+      rootURI: "chrome://cleanroom/content/",
       zotero: {
         ItemPaneManager: {
           registerSection(options) {
@@ -109,8 +110,8 @@ describe("ItemPane", () => {
   it("should track registered ids returned by Zotero managers", () => {
     const registeredSectionID = itemPane.registerSection({
       paneID: "demo-section",
-      header: { l10nID: "demo-section-header" },
-      sidenav: { l10nID: "demo-section-sidenav" },
+      header: { l10nID: "demo-section-header", icon: "icons/header.svg" },
+      sidenav: { l10nID: "demo-section-sidenav", icon: "chrome://cleanroom/content/icons/sidenav.svg" },
       onRender() {},
     });
     const registeredRowID = itemPane.registerInfoRow({
@@ -133,6 +134,8 @@ describe("ItemPane", () => {
       itemPane.resolveSectionPaneID(registeredSectionID),
       "cleanroom-template@example.com:demo-section",
     );
+    assert.equal(registeredSectionOptions[0].header.icon, "chrome://cleanroom/content/icons/header.svg");
+    assert.equal(registeredSectionOptions[0].sidenav.icon, "chrome://cleanroom/content/icons/sidenav.svg");
     assert.deepEqual(itemPane.getRegistrationSnapshot(), {
       sections: [{
         paneID: "demo-section",

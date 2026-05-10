@@ -1,5 +1,6 @@
 import { describe, it, assert } from "./test-framework.js";
 import { registerRelationshipGraphFeatures } from "../src/features/research-workbench-graph.js";
+import { createWorkbenchShellManager } from "../src/features/research-workbench-common.js";
 
 function createPrefs(values = {}) {
   return { get(key) { return Object.hasOwn(values, key) ? values[key] : null; } };
@@ -147,5 +148,56 @@ describe("Relationship Graph", () => {
     });
     assert.typeOf(result.openRelationshipGraph, "function");
     assert.typeOf(result.getSnapshot, "function");
+  });
+
+  it("should remount payload when reusing an existing workbench window", async () => {
+    const mounted = [];
+    const win = {
+      closed: false,
+      location: { href: "chrome://toolsbox/content/lib/research-graph.html" },
+      document: {
+        readyState: "complete",
+        documentElement: {
+          setAttribute() {},
+        },
+      },
+      addEventListener() {},
+      removeEventListener() {},
+      focus() {
+        this.focused = true;
+      },
+      __toolsbox_WorkbenchBridge__: {
+        mount(payload) {
+          mounted.push(payload);
+        },
+        unmount() {},
+      },
+    };
+    const shell = createWorkbenchShellManager({
+      logger: { debug() {}, warn() {}, error() {} },
+      host: {
+        listWindowsByType() {
+          return [win];
+        },
+        getPrimaryWindow() {
+          throw new Error("should reuse existing window");
+        },
+      },
+      rootURI: "chrome://toolsbox",
+      addonRef: "toolsbox",
+      addonName: "ToolsBox",
+      prefs: createPrefs(),
+      shellFileName: "research-graph.html",
+      windowName: "toolsbox-graph",
+      buildPayload(context) {
+        return context;
+      },
+    });
+
+    const result = await shell.open({ itemID: 42 });
+
+    assert.equal(result.reused, true);
+    assert.equal(win.focused, true);
+    assert.deepEqual(mounted, [{ itemID: 42 }]);
   });
 });

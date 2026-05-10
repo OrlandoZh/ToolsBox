@@ -173,6 +173,50 @@ describe("Feature Composer", () => {
     assert.equal(commandRegistrations[0].id, "cleanroomtemplate-primary-action");
   });
 
+  it("should allow baseline features to register again after lifecycle cleanup", async () => {
+    const cleanups = [];
+    const { deps, calls } = createDeps();
+    deps.lifecycle = {
+      trackCleanup(fn) {
+        cleanups.push(fn);
+      },
+    };
+    const composer = createFeatureComposer(deps);
+
+    await composer.registerBaselineFeatures();
+    assert.equal(calls.panes, 1);
+    assert.equal(calls.columns, 11);
+    assert.equal(calls.sections, 1);
+    assert.equal(cleanups.length, 1);
+
+    cleanups.pop()();
+    await composer.registerBaselineFeatures();
+
+    assert.equal(calls.panes, 2);
+    assert.equal(calls.columns, 22);
+    assert.equal(calls.sections, 2);
+    assert.equal(cleanups.length, 1);
+  });
+
+  it("should wait for baseline host APIs before registering Zotero manager-backed surfaces", async () => {
+    const { deps, calls } = createDeps();
+    let managerReady = false;
+    deps.preferencePanes.isAvailable = () => managerReady;
+    deps.itemPane.isAvailable = () => managerReady;
+    deps.itemTree.isAvailable = () => managerReady;
+    const composer = createFeatureComposer(deps);
+    const registration = composer.registerBaselineFeatures();
+
+    setTimeout(() => {
+      managerReady = true;
+    }, 0);
+
+    await registration;
+    assert.equal(calls.panes, 1);
+    assert.equal(calls.columns, 11);
+    assert.equal(calls.sections, 1);
+  });
+
   it("should initialize preference panes through onPreferenceLoad", async () => {
     const { deps, paneRegistrations } = createDeps();
     const composer = createFeatureComposer(deps);

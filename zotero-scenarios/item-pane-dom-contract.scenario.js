@@ -1,6 +1,6 @@
 registerZoteroScenario("item pane DOM contract advisory", async ({ addonConfig, helpers }) => {
-  const paneID = `${addonConfig.addonRef}-details`;
-  const rootID = `${paneID}-root`;
+  const paneID = `${addonConfig.addonRef}-workflow`;
+  const rootSelector = '[data-toolsbox-workflow-editor="true"]';
   let firstItem = null;
   let secondItem = null;
   let firstResult = null;
@@ -12,12 +12,9 @@ registerZoteroScenario("item pane DOM contract advisory", async ({ addonConfig, 
       return [];
     }
     if (typeof doc.querySelectorAll === "function") {
-      return Array.from(doc.querySelectorAll(`[id="${rootID}"]`));
+      return Array.from(doc.querySelectorAll(rootSelector));
     }
-    const root = typeof doc.getElementById === "function"
-      ? doc.getElementById(rootID)
-      : null;
-    return root ? [root] : [];
+    return [];
   }
 
   try {
@@ -77,8 +74,8 @@ registerZoteroScenario("item pane DOM contract advisory", async ({ addonConfig, 
       }),
       helpers.createDomContractCheck("plugin-root-present", Boolean(root), {
         label: "item pane plugin-owned root marker is present",
-        actual: root ? root.id : null,
-        expected: rootID,
+        actual: root?.getAttribute?.("data-toolsbox-workflow-editor") || null,
+        expected: "true",
       }),
       helpers.createDomContractCheck("plugin-root-unique", rootNodes.length === 1, {
         label: "item pane rerender keeps a single plugin-owned root",
@@ -91,15 +88,15 @@ registerZoteroScenario("item pane DOM contract advisory", async ({ addonConfig, 
       helpers.createDomContractCheck("plugin-root-connected", root?.isConnected === true, {
         label: "item pane root stays connected after repeated render/select",
       }),
-      helpers.createDomContractCheck("plugin-root-marker", root?.dataset?.cleanroomItemPaneRoot === "true", {
+      helpers.createDomContractCheck("plugin-root-marker", root?.dataset?.toolsboxWorkflowEditor === "true", {
         label: "item pane root exposes the plugin-owned marker",
-        actual: root?.dataset?.cleanroomItemPaneRoot || null,
+        actual: root?.dataset?.toolsboxWorkflowEditor || null,
         expected: "true",
       }),
-      helpers.createDomContractCheck("pane-id-marker", root?.dataset?.cleanroomPaneID === paneID, {
-        label: "item pane root keeps the expected pane identifier marker",
-        actual: root?.dataset?.cleanroomPaneID || null,
-        expected: paneID,
+      helpers.createDomContractCheck("status-field-present", Boolean(doc?.getElementById?.("toolsbox-workflow-status")), {
+        label: "item pane workflow status field is present",
+        actual: doc?.getElementById?.("toolsbox-workflow-status") ? "present" : null,
+        expected: "present",
       }),
     ],
     summary: scenarioError
@@ -109,7 +106,7 @@ registerZoteroScenario("item pane DOM contract advisory", async ({ addonConfig, 
 
   return {
     paneID,
-    rootID,
+    rootID: rootSelector,
     firstItemID: firstItem?.id || null,
     secondItemID: secondItem?.id || null,
     firstActionOK: firstResult?.ok ?? null,

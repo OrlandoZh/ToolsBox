@@ -16,6 +16,7 @@ import {
   findManagedRuntimeProcesses,
   formatProcessLogTail,
   getDefaultWatchRoots,
+  getRuntimeRoot,
   installProxyAddon,
   parseDotEnv,
   prepareRuntime,
@@ -158,18 +159,20 @@ ZOTERO_PLUGIN_RDP_PORT=64719
     assert.deepEqual(attempts, ["127.0.0.1"]);
   });
 
-  it("should resolve default runtime paths inside the workspace", () => {
+  it("should resolve default runtime paths inside a project-scoped temp runtime", () => {
     const projectRoot = "/tmp/addon-template";
     const resolved = resolveRuntimePaths(projectRoot, "smoke");
+    const runtimeRoot = getRuntimeRoot(projectRoot);
 
     assert.equal(
       resolved.profilePath,
-      path.join(projectRoot, ".zotero-runtime", "smoke", "profile"),
+      path.join(runtimeRoot, "smoke", "profile"),
     );
     assert.equal(
       resolved.dataDir,
-      path.join(projectRoot, ".zotero-runtime", "smoke", "data"),
+      path.join(runtimeRoot, "smoke", "data"),
     );
+    assert.equal(resolved.dataDir.includes(`${projectRoot}${path.sep}`), false);
   });
 
   it("should serialize user prefs with escaped strings", () => {

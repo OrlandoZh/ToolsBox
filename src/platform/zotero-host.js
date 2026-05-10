@@ -2168,7 +2168,24 @@ export function createZoteroHost({ globalScope, rootURI = "" }) {
       throw lastError || new Error(`Unable to activate pane '${paneID}'`);
     }
 
-    await waitForPaneVisible(itemDetails, paneID, options);
+    let settleStrategy = null;
+    try {
+      await waitForPaneVisible(itemDetails, paneID, options);
+    }
+    catch (error) {
+      if (
+        paneButton
+        && actionDispatched
+        && typeof itemDetails.scrollToPane === "function"
+      ) {
+        await itemDetails.scrollToPane(paneID, options.behavior || "instant");
+        settleStrategy = "host-scroll-after-live-action";
+        await waitForPaneVisible(itemDetails, paneID, options);
+      }
+      else {
+        throw error;
+      }
+    }
     try {
       await waitFor(
         () => {
@@ -2194,6 +2211,7 @@ export function createZoteroHost({ globalScope, rootURI = "" }) {
       button: paneButton,
       activationPolicy,
       activationStrategy,
+      settleStrategy,
       actionElementObserved: Boolean(paneButton),
       actionDispatched,
     };
@@ -2225,11 +2243,21 @@ export function createZoteroHost({ globalScope, rootURI = "" }) {
       throw new Error("Library Item Pane container is unavailable");
     }
 
-    return await selectPaneInContainer(itemDetails, paneID, {
+    const selectOptions = {
       behavior: options.behavior,
       timeoutMs: options.timeoutMs,
       activationPolicy: options.activationPolicy,
-    });
+    };
+    try {
+      return await selectPaneInContainer(itemDetails, paneID, selectOptions);
+    }
+    catch (error) {
+      const refreshedItemDetails = getLibraryItemDetails(window);
+      if (!refreshedItemDetails || refreshedItemDetails === itemDetails) {
+        throw error;
+      }
+      return await selectPaneInContainer(refreshedItemDetails, paneID, selectOptions);
+    }
   }
 
   async function selectContextPane(paneID, options = {}) {

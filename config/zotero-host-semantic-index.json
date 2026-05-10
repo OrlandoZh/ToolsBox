@@ -413,7 +413,7 @@
             "onToggle",
             "sectionButtons"
           ],
-          "notes": "onRender 负责首帧 DOM 构建；header.l10nID 对应 FTL `.label`，sidenav.l10nID 对应 FTL `.tooltiptext`，两者必须已注入；sidenav.orderable 控制 section 是否允许在 Item Pane sidenav 中排序。"
+          "notes": "onRender 负责首帧 DOM 构建；header 与 sidenav 需要同时提供 l10nID 和 icon；header.l10nID 对应 FTL `.label`，sidenav.l10nID 对应 FTL `.tooltiptext`，两者必须已注入；sidenav.orderable 控制 section 是否允许在 Item Pane sidenav 中排序。"
         },
         {
           "name": "InfoRowOptions",
@@ -444,7 +444,9 @@
             "section",
             "info row",
             "header.l10nID",
-            "sidenav.l10nID"
+            "header.icon",
+            "sidenav.l10nID",
+            "sidenav.icon"
           ],
           "notes": [
             "Item Pane 是宿主接口包装层，不因文件名命中就默认转成 visual-required。",
@@ -472,6 +474,7 @@
           "snippets": [
             "registerSection(options: SectionOptions): string | null;",
             "registerInfoRow(options: InfoRowOptions): string | null;",
+            "rootURI?: string;",
             "onRender: (props: {",
             "sidenav?: SectionHeader & { orderable?: boolean };",
             "sectionButtons?: Array<{",
@@ -580,9 +583,11 @@
           "surfaceTerms": [
             "Item Tree",
             "dataKey",
+            "label",
             "enabledTreeIDs"
           ],
           "notes": [
+            "Zotero.ItemTreeManager option 需要 label；模板 wrapper 可接受 l10nID，但必须先解析成 label 再传给宿主。",
             "registerColumn 返回值可能被宿主加 pluginID namespace，验证时不要把输入 dataKey 当成唯一真相。"
           ]
         }

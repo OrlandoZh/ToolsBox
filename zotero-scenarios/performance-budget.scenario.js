@@ -48,7 +48,7 @@ registerZoteroScenario("performance budget diagnostics", async ({ assert, addonC
   const itemPaneActivity = await measureHostAction(
     "itemPane.selectPane",
     {
-      paneID: `${addonConfig.addonRef}-details`,
+      paneID: `${addonConfig.addonRef}-workflow`,
       behavior: "instant",
       activationPolicy: "ui-required",
     },

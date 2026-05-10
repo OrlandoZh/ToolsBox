@@ -211,7 +211,7 @@ registerZoteroScenario("memory diagnostics", async ({ assert, addonConfig, helpe
   const itemPaneActivity = await measureMemoryHostAction(
     "itemPane.selectPane",
     {
-      paneID: `${addonConfig.addonRef}-details`,
+      paneID: `${addonConfig.addonRef}-workflow`,
       behavior: "instant",
       activationPolicy: "ui-required",
     },
@@ -516,7 +516,7 @@ registerZoteroScenario("memory extended diagnostics", async ({ assert, addonConf
         await helpers.selectItem(item.id);
       }
       return await helpers.runHostAction("itemPane.selectPane", {
-        paneID: `${addonConfig.addonRef}-details`,
+        paneID: `${addonConfig.addonRef}-workflow`,
         behavior: "instant",
         activationPolicy: "ui-required",
       });

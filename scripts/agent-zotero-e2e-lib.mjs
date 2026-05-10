@@ -861,10 +861,14 @@ export function evaluateCycle(cycle) {
   if (checks.agentActionResult !== true) {
     issues.push("runAgentAction 执行结果不是 true。");
   }
+  const workflowContractActive = Number(checks.workflowContractVersion || 0) >= 1;
   if (Number(checks.itemPaneSections || 0) < 1) {
     issues.push("ItemPane Section 未注册。");
   }
-  if (Number(checks.itemPaneInfoRows || 0) < 1) {
+  if (workflowContractActive && checks.workflowItemPaneSectionRegistered !== true) {
+    issues.push("Workflow ItemPane Section 未注册。");
+  }
+  if (!workflowContractActive && Number(checks.itemPaneInfoRows || 0) < 1) {
     issues.push("ItemPane InfoRow 未注册。");
   }
   const itemPaneL10nDrifts = Array.isArray(checks.itemPaneL10nDrifts) ? checks.itemPaneL10nDrifts : [];
@@ -957,14 +961,35 @@ export function evaluateCycle(cycle) {
   if (Number(checks.itemTreeColumns || 0) < 1) {
     issues.push("ItemTree 自定义列未注册。");
   }
-  if (Number(checks.notifierActiveCount || 0) < 1) {
+  if (workflowContractActive) {
+    if (checks.workflowItemMenuRegistered !== true) {
+      issues.push("Workflow item menu item 未注册。");
+    }
+    if (checks.officialMenuAPIAvailable === true && checks.workflowCollectionMenuRegistered !== true) {
+      issues.push("Workflow collection menu item 未注册。");
+    }
+    if (checks.officialMenuAPIAvailable === true && checks.workflowReaderMenuRegistered !== true) {
+      issues.push("Workflow Reader View menu item 未注册。");
+    }
+    if (checks.readerEventAPIAvailable === true && checks.workflowReaderToolbarRegistered !== true) {
+      issues.push("Workflow Reader renderToolbar 入口未注册。");
+    }
+    if (checks.readerEventAPIAvailable === true && checks.workflowReaderViewContextRegistered !== true) {
+      issues.push("Workflow Reader view context menu item 未注册。");
+    }
+    if (checks.readerEventAPIAvailable === true && checks.workflowAnnotationContextRegistered !== true) {
+      issues.push("Workflow annotation context menu item 未注册。");
+    }
+  }
+  if (!workflowContractActive && Number(checks.notifierActiveCount || 0) < 1) {
     issues.push("Notifier 未激活。");
   }
-  if (checks.pluginMounted && checks.apiMounted && checks.readerSummaryCommandRegistered === false) {
+  if (!workflowContractActive && checks.pluginMounted && checks.apiMounted && checks.readerSummaryCommandRegistered === false) {
     issues.push("Reader 摘要命令未注册。");
   }
   if (
-    checks.pluginMounted
+    !workflowContractActive
+    && checks.pluginMounted
     && checks.apiMounted
     && checks.officialMenuAPIAvailable === true
     && checks.readerSummaryMenuRegistered === false

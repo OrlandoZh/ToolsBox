@@ -97,8 +97,10 @@ describe("Agent Computer Use Workflows Lib", () => {
       assert.ok(result.prepared[0].acceptanceCriteria.includes(
         "Fallback command registration alone is not treated as proof of a human-visible host entry.",
       ));
-      assert.ok(result.prepared[0].launchRuntime.profilePath.endsWith(".zotero-runtime/dev/profile"));
-      assert.ok(result.prepared[0].launchRuntime.dataDir.endsWith(".zotero-runtime/dev/data"));
+      assert.ok(result.prepared[0].launchRuntime.profilePath.includes("-zotero-runtime-"));
+      assert.ok(result.prepared[0].launchRuntime.profilePath.endsWith("/dev/profile"));
+      assert.ok(result.prepared[0].launchRuntime.dataDir.includes("-zotero-runtime-"));
+      assert.ok(result.prepared[0].launchRuntime.dataDir.endsWith("/dev/data"));
       assert.equal(result.prepared[0].activation.status, "pending-computer-use");
       assert.equal(
         result.prepared[0].artifactsDir,

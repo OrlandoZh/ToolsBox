@@ -2329,6 +2329,7 @@ export function createHostActionRunner({
       const paneSurface = inspectElementSurface(result?.pane || null);
       const paneButtonSurface = inspectElementSurface(paneButton);
       const activationStrategy = toPlainString(result?.activationStrategy);
+      const settleStrategy = toPlainString(result?.settleStrategy);
       const actionDispatched = Boolean(result?.actionDispatched);
       const actionElementObserved = result?.actionElementObserved ?? Boolean(paneButton);
       const liveUiActivation = activationPolicy !== "ui-required" || isLiveClickActivationStrategy(activationStrategy);
@@ -2346,6 +2347,8 @@ export function createHostActionRunner({
         edgeMode: "pane-attached",
         surfaceTarget,
         minimumViableWidth: 240,
+        fallbackWidth: surfaceTarget?.rect?.width,
+        fallbackSource: "surface-target-width",
         active: Boolean(result.visible),
       });
       attachEdgeStateToSurfaceTarget(surfaceTarget, edgeState);
@@ -2358,6 +2361,7 @@ export function createHostActionRunner({
           visible: Boolean(result.visible),
           paneSurface,
           paneButtonSurface,
+          settleStrategy,
           ...edgeState,
         }, {
           activationPolicy,
@@ -2446,6 +2450,7 @@ export function createHostActionRunner({
       const paneButtonSurface = inspectElementSurface(paneButton);
       const contextSidenavSurface = inspectElementSurface(contextSidenav);
       const activationStrategy = toPlainString(result?.activationStrategy);
+      const settleStrategy = toPlainString(result?.settleStrategy);
       const actionDispatched = Boolean(result?.actionDispatched);
       const actionElementObserved = result?.actionElementObserved ?? Boolean(paneButton);
       const liveUiActivation = activationPolicy !== "ui-required" || isLiveClickActivationStrategy(activationStrategy);
@@ -2486,6 +2491,8 @@ export function createHostActionRunner({
         edgeMode: "pane-attached",
         surfaceTarget,
         minimumViableWidth: 240,
+        fallbackWidth: surfaceTarget?.rect?.width,
+        fallbackSource: "surface-target-width",
         active: Boolean(result.visible),
       });
       attachEdgeStateToSurfaceTarget(surfaceTarget, edgeState);
@@ -2499,6 +2506,7 @@ export function createHostActionRunner({
           paneSurface,
           paneButtonSurface,
           contextSidenavSurface,
+          settleStrategy,
           ...edgeState,
         }, {
           activationPolicy,

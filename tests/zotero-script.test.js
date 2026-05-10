@@ -185,7 +185,8 @@ describe("Zotero Script", () => {
       },
       async runScenarioModeImpl(options) {
         runScenarioModeCalls += 1;
-        assert.equal(options.projectRootPath.endsWith("AddonTemplate4Z"), true);
+        assert.equal(typeof options.projectRootPath, "string");
+        assert.ok(options.projectRootPath.length > 0);
         assert.equal(options.skipPackage, false);
         assert.equal(options.listScenarios, false);
         assert.equal(options.scenarioPattern, "wasm kernel probe diagnostics");

@@ -136,7 +136,7 @@ describe("Agent Computer Use Validation Lib", () => {
             mode: "dev",
             isolation: "project-isolated",
             freshness: "reused-project-runtime",
-            summary: "Uses the project-managed .zotero-runtime/dev profile and dataDir.",
+            summary: "Uses the project-scoped Zotero runtime profile and dataDir under the OS temp directory.",
             desktopInstanceMatchRequired: true,
             desktopInstanceMatchSummary: "Record pass only when the observed Zotero window is confirmed to match this project runtime.",
           },
@@ -398,7 +398,7 @@ describe("Agent Computer Use Validation Lib", () => {
             dataDir: "/tmp/fake/dev-data",
             isolation: "project-isolated",
             freshness: "reused-project-runtime",
-            summary: "Uses the project-managed .zotero-runtime/dev profile and dataDir.",
+            summary: "Uses the project-scoped Zotero runtime profile and dataDir under the OS temp directory.",
             desktopInstanceMatchRequired: true,
             desktopInstanceMatchSummary: "Record pass only when the observed Zotero window is confirmed to match this project runtime.",
           },
@@ -416,14 +416,14 @@ describe("Agent Computer Use Validation Lib", () => {
         proofKind: "internal-trigger-window-lifecycle",
         entryRouteObserved: "plugin.api.commandPalette.executeCommand('agent.reviewWorkbench.open')",
         runtimeInstanceMatch: "matched",
-        runtimeInstanceEvidence: "Only the project dev runtime was running and the observed window matched the expected .zotero-runtime/dev profile session.",
+        runtimeInstanceEvidence: "Only the project dev runtime was running and the observed window matched the expected project-scoped Zotero runtime profile session.",
         evidence: "Computer Use observed the standalone window lifecycle in the expected runtime.",
         nextAction: "No follow-up required.",
       });
 
       assert.equal(recorded.status, "completed-pass");
       assert.equal(recorded.result.proof.runtimeInstanceMatch, "matched");
-      assert.ok(recorded.result.proof.runtimeInstanceEvidence.includes(".zotero-runtime/dev"));
+      assert.ok(recorded.result.proof.runtimeInstanceEvidence.includes("project-scoped Zotero runtime"));
     } finally {
       if (previousArtifactsDir === undefined) {
         delete process.env.AGENT_ARTIFACTS_DIR;

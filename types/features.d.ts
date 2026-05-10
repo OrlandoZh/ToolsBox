@@ -313,6 +313,7 @@ export interface ItemPaneOptions {
   uiFactory?: UIFactory;
   i18n?: I18n;
   pluginID: string;
+  rootURI?: string;
   zotero?: unknown;
 }
 
@@ -469,6 +470,7 @@ export interface ItemTree {
   unregisterAll(): void;
   getColumnCount(): number;
   hasColumn(dataKey: string): boolean;
+  refreshColumns(): boolean;
   createFieldDataProvider(field: string): (item: unknown) => string;
   createFormattedDataProvider(
     extractor: (item: unknown) => unknown,

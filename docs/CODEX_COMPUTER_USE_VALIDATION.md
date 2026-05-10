@@ -124,7 +124,7 @@ node scripts/agent-computer-use-validation.mjs inspect
 
 ## Runtime Semantics
 
-- `npm run zotero:dev` 在这条支线里默认使用项目自己的 `.zotero-runtime/dev/{profile,data}`。
+- `npm run zotero:dev` 在这条支线里默认使用项目专属的系统临时 runtime，例如 `/private/tmp/<project>-zotero-runtime-<hash>/dev/{profile,data}`。
 - 这意味着它和个人日常 Zotero profile 隔离，但默认是复用态，不是一次性 fresh/disposable profile。
 - 因此 `review workbench` 与 `surface-local` 这两类 Computer Use 结果，默认只用于确认“当前项目 runtime 下的真实可见面是否成立”，不用于证明 first-run、fresh install、空白 profile 或历史状态完全无污染。
 - 如果本轮问题本身怀疑被历史窗口、历史数据库、旧偏好或其他项目 runtime 残留污染，就不要继续依赖 `zotero:dev`；应切换到 disposable profile 路径重跑，优先使用本地安装态复核批次，或显式准备新的隔离 runtime。
@@ -138,13 +138,13 @@ node scripts/agent-computer-use-validation.mjs inspect
   - 前置命令固定为 `npm run check`
   - 然后执行 `npm run zotero:scenario -- --scenario "agent review workbench window lifecycle"`
   - 桌面接管入口固定为 `npm run zotero:dev`
-  - 该入口默认连接项目隔离但复用的 `.zotero-runtime/dev/`，只验证当前项目 runtime 的 host-visible 语义
+  - 该入口默认连接项目隔离但复用的临时 `dev` runtime，只验证当前项目 runtime 的 host-visible 语义
   - 触发语义固定为“真实 host-visible 入口优先；若当前 runtime 只暴露 plugin-local fallback command，则允许 controller 用最小内部触发拉起窗口，再让 Computer Use 只验证独立窗口的 open / reuse / close 可见语义”
   - 不得把 `commandPalette` 注册成功、fallback 搜索命中或 `executeCommand()` 可执行，直接表述成 Zotero Prompt / command palette 已对人类可达
 - 条件触发批次一固定为本地安装态复核
   - `npm run agent:computer-use:list -- --release-handoff` 或显式 `prepare release-install-local` 会把它标成 triggered
   - 桌面接管入口固定为 `npm run release:install-smoke:stable -- --keep-open`，需要 beta 时改为 `:beta`
-  - 只有 profile/dataDir 位于项目 `.zotero-runtime/` 下的 disposable profile 时才允许落地
+  - 只有 profile/dataDir 位于项目专属 runtime 下的 disposable profile 时才允许落地
 - 条件触发批次二固定为被重新打开的 host-visible surface
   - 默认通过 `git status` 命中的 `ownerPaths` 与最新失败的 `zotero-scenario-last-run.json` 自动触发
   - 若 current truth 明确重开某个 surface，但当前没有 fresh 路径命中，可显式执行 `npm run agent:computer-use:prepare -- surface-local --surface <surface-id>`

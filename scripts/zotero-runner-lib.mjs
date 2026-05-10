@@ -2,6 +2,8 @@ import fs from "node:fs";
 import { promises as fsp } from "node:fs";
 import path from "node:path";
 import net from "node:net";
+import crypto from "node:crypto";
+import os from "node:os";
 import process from "node:process";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
@@ -33,6 +35,8 @@ const DEFAULT_WATCH_ROOTS = [
   "addon-static",
   "config",
 ];
+const LEGACY_RUNTIME_DIR_NAME = ".zotero-runtime";
+const RUNTIME_ROOT_HASH_LENGTH = 12;
 const STALE_RUNTIME_PROFILE_MARKERS = Object.freeze([
   ".parentlock",
   ".startup-incomplete",
@@ -173,8 +177,48 @@ export function buildUserPrefs(overrides = {}) {
   };
 }
 
+function getRuntimeParentDir() {
+  if (process.platform === "darwin" && fs.existsSync("/private/tmp")) {
+    return "/private/tmp";
+  }
+  return os.tmpdir();
+}
+
+function sanitizeRuntimeSegment(value) {
+  return String(value || "zotero-plugin")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/gu, "-")
+    .replace(/^-+|-+$/gu, "")
+    .slice(0, 48)
+    || "zotero-plugin";
+}
+
+function hashRuntimeRoot(projectRoot) {
+  return crypto
+    .createHash("sha256")
+    .update(path.resolve(projectRoot))
+    .digest("hex")
+    .slice(0, RUNTIME_ROOT_HASH_LENGTH);
+}
+
 export function getRuntimeRoot(projectRoot) {
-  return path.join(projectRoot, ".zotero-runtime");
+  const projectName = sanitizeRuntimeSegment(path.basename(path.resolve(projectRoot)));
+  return path.join(
+    getRuntimeParentDir(),
+    `${projectName}-zotero-runtime-${hashRuntimeRoot(projectRoot)}`,
+  );
+}
+
+export function getLegacyRuntimeRoot(projectRoot) {
+  return path.join(projectRoot, LEGACY_RUNTIME_DIR_NAME);
+}
+
+function getManagedRuntimeRoots(projectRoot) {
+  return [
+    getRuntimeRoot(projectRoot),
+    getLegacyRuntimeRoot(projectRoot),
+  ].map((root) => path.resolve(root));
 }
 
 export function getDefaultWatchRoots() {
@@ -268,9 +312,10 @@ export function resolveRuntimePaths(projectRoot, mode, env = {}) {
 }
 
 function isManagedPath(projectRoot, targetPath) {
-  const runtimeRoot = path.resolve(getRuntimeRoot(projectRoot));
   const resolvedTarget = path.resolve(targetPath);
-  return resolvedTarget === runtimeRoot || resolvedTarget.startsWith(`${runtimeRoot}${path.sep}`);
+  return getManagedRuntimeRoots(projectRoot).some((runtimeRoot) => (
+    resolvedTarget === runtimeRoot || resolvedTarget.startsWith(`${runtimeRoot}${path.sep}`)
+  ));
 }
 
 async function removeFileIfPresent(filePath) {
@@ -340,7 +385,7 @@ export function findManagedRuntimeProcesses({
 }) {
   const resolvedProfilePath = path.resolve(profilePath);
   const resolvedDataDir = path.resolve(dataDir);
-  const runtimeRoot = path.resolve(getRuntimeRoot(projectRoot));
+  const runtimeRoots = getManagedRuntimeRoots(projectRoot);
   let output = psOutput;
 
   if (output === null || output === undefined) {
@@ -366,7 +411,7 @@ export function findManagedRuntimeProcesses({
       if (entry.command.includes(resolvedDataDir)) {
         matchReasons.push("data");
       }
-      if (includeProjectRuntime && entry.command.includes(runtimeRoot)) {
+      if (includeProjectRuntime && runtimeRoots.some((runtimeRoot) => entry.command.includes(runtimeRoot))) {
         matchReasons.push("project-runtime");
       }
       return {

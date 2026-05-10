@@ -869,6 +869,7 @@ export function createPlugin({
     uiFactory,
     i18n,
     pluginID: config.addonId,
+    rootURI: runtime.rootURI,
     zotero,
   });
   const itemTree = createItemTree({
@@ -1110,6 +1111,7 @@ export function createPlugin({
     config,
     logger,
     host,
+    lifecycle,
     prefs,
     i18n,
     preferencePanes,

@@ -21,6 +21,15 @@ describe("Zotero Watch Health Lib", () => {
       itemPaneInfoRows: 0,
       itemTreeColumns: 1,
     }), false);
+
+    assert.equal(isWatchBaselineSettled({
+      preferencePaneRegistered: true,
+      itemPaneSections: 1,
+      itemPaneInfoRows: 0,
+      itemTreeColumns: 2,
+      workflowContractVersion: 1,
+      workflowItemPaneSectionRegistered: true,
+    }), true);
   });
 
   it("should settle within the bounded poll window when registrations recover", async () => {

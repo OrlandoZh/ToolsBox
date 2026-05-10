@@ -1997,6 +1997,90 @@ describe("Host Actions", () => {
     assert.equal(result.observedState.paneSurface.childElementCount, 2);
   });
 
+  it("should use a window-anchored item pane width fallback when captured bounds sit outside the window", async () => {
+    const paneElement = createFakeSurfaceElement({
+      localName: "item-pane-custom-section",
+      childElementCount: 2,
+      children: [{}, {}],
+      textContent: "Workflow pane body",
+      selectorMap: {
+        "*": [{}, {}],
+        "button, checkbox, input, select, textarea, radio, menulist, toolbarbutton, menuitem, [role='button'], [role='tab'], [role='menuitem'], [tabindex]": [{}],
+      },
+    });
+    const paneButton = createFakeSurfaceElement({
+      localName: "div",
+      attributes: {
+        "data-pane": "cleanroom-template@example.com:workflow",
+      },
+    });
+    const runner = createHostActionRunner({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+      host: {
+        async selectItemPane() {
+          return {
+            container: {
+              sidenav: {
+                querySelectorAll() {
+                  return [paneButton];
+                },
+              },
+            },
+            pane: paneElement,
+            button: paneButton,
+            visible: true,
+            activationStrategy: "dispatch-click",
+            actionElementObserved: true,
+            actionDispatched: true,
+          };
+        },
+        getMainWindow() {
+          return {
+            focus() {},
+          };
+        },
+        buildSurfaceTarget() {
+          return {
+            ...createSurfaceTargetWithDetails(
+            "item-pane-sidenav",
+            "surface-item-pane-workflow",
+            {},
+            {
+              x: 895,
+              y: 630,
+              width: 289,
+              height: 366,
+              source: "element",
+            },
+            ),
+            windowBounds: {
+              x: 244,
+              y: 30,
+              width: 1000,
+              height: 600,
+              source: "window",
+            },
+          };
+        },
+      },
+      reader: {},
+      menuManager: {},
+    });
+
+    const result = await runner.runHostAction("itemPane.selectPane", {
+      paneID: "workflow",
+      activationPolicy: "ui-required",
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.readiness.ok, true);
+    assert.equal(result.observedState.boundsSource, "surface-target-width+window-bounds");
+    assert.equal(result.observedState.degradedReason, null);
+    assert.equal(result.observedState.bounds.width, 289);
+  });
+
   it("should fail item pane ui-required activation when only the host api path is reported", async () => {
     const runner = createHostActionRunner({
       config: {

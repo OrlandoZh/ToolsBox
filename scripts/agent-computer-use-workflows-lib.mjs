@@ -506,8 +506,8 @@ async function buildManagedRuntimeDescriptor(projectRoot, mode, env = process.en
     isolation: managedProfile && managedDataDir ? "project-isolated" : "externally-overridden",
     freshness: mode === "dev" ? "reused-project-runtime" : "managed-runtime",
     summary: mode === "dev"
-      ? "Uses the project-managed .zotero-runtime/dev profile and dataDir. This is isolated from a personal Zotero profile, but it is reused state by default rather than a disposable fresh profile."
-      : "Uses a project-managed runtime path.",
+      ? "Uses the project-scoped Zotero runtime profile and dataDir under the OS temp directory. This is isolated from a personal Zotero profile, but it is reused state by default rather than a disposable fresh profile."
+      : "Uses a project-scoped Zotero runtime path.",
     desktopInstanceMatchRequired: true,
     desktopInstanceMatchSummary: "Record pass only when the observed Zotero window is confirmed to match this project runtime. If another Zotero instance is open and the observed window cannot be tied to this profile/dataDir, record partial instead of pass.",
     desktopInstancePreflightStatus: runtimeBindingPreflight.status,

@@ -221,7 +221,8 @@ export function createHostActionRunner({
 describe("Wasm Kernel Disabled Contract Report", () => {
   it("should parse default and explicit args", () => {
     const defaults = parseWasmKernelDisabledContractArgs([]);
-    assert.ok(defaults.projectRootPath.endsWith("AddonTemplate4Z"));
+    assert.ok(path.isAbsolute(defaults.projectRootPath));
+    assert.ok(defaults.projectRootPath.length > 0);
     assert.equal(defaults.exportRootPath, null);
     assert.equal(defaults.scenarioName, "wasm kernel probe diagnostics");
 

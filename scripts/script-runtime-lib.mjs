@@ -379,6 +379,110 @@ export function isExecutedAsScript(importMetaUrl, argv = process.argv) {
   return importMetaUrl === pathToFileURL(path.resolve(entryPath)).href;
 }
 
+const JSON_ARTIFACT_FALLBACK_LIMITS = Object.freeze({
+  maxDepth: 18,
+  maxStringLength: 20000,
+  maxArrayItems: 1000,
+  maxObjectEntries: 250,
+});
+
+function truncateArtifactString(value, maxLength) {
+  const text = String(value);
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return `${text.slice(0, maxLength)}...[truncated ${text.length - maxLength} chars]`;
+}
+
+function sanitizeJSONArtifactValue(value, limits = JSON_ARTIFACT_FALLBACK_LIMITS, state = {}) {
+  const depth = Number(state.depth || 0);
+  const seen = state.seen || new WeakSet();
+
+  if (typeof value === "string") {
+    return truncateArtifactString(value, limits.maxStringLength);
+  }
+  if (typeof value === "bigint") {
+    return value.toString();
+  }
+  if (value === null || typeof value !== "object") {
+    if (typeof value === "function") {
+      return "[Function]";
+    }
+    if (typeof value === "symbol") {
+      return String(value);
+    }
+    return value;
+  }
+  if (depth >= limits.maxDepth) {
+    return "[MaxDepth]";
+  }
+  if (seen.has(value)) {
+    return "[Circular]";
+  }
+  seen.add(value);
+
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: truncateArtifactString(value.message || "", limits.maxStringLength),
+      stack: value.stack ? truncateArtifactString(value.stack, limits.maxStringLength) : undefined,
+    };
+  }
+
+  if (ArrayBuffer.isView(value)) {
+    return {
+      type: value.constructor?.name || "TypedArray",
+      length: Number(value.length || value.byteLength || 0),
+      byteLength: Number(value.byteLength || 0),
+    };
+  }
+
+  if (Array.isArray(value)) {
+    const output = value
+      .slice(0, limits.maxArrayItems)
+      .map((item) => sanitizeJSONArtifactValue(item, limits, {
+        depth: depth + 1,
+        seen,
+      }));
+    if (value.length > limits.maxArrayItems) {
+      output.push({
+        artifactTruncated: true,
+        omittedItems: value.length - limits.maxArrayItems,
+      });
+    }
+    return output;
+  }
+
+  const output = {};
+  const entries = Object.entries(value);
+  for (const [index, [key, entryValue]] of entries.entries()) {
+    if (index >= limits.maxObjectEntries) {
+      output.__artifactTruncated = {
+        omittedEntries: entries.length - limits.maxObjectEntries,
+      };
+      break;
+    }
+    output[key] = sanitizeJSONArtifactValue(entryValue, limits, {
+      depth: depth + 1,
+      seen,
+    });
+  }
+  return output;
+}
+
 export async function writeJSONArtifact(filePath, payload) {
-  await fs.writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
+  try {
+    await fs.writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
+    return;
+  }
+  catch (error) {
+    const sanitizedPayload = sanitizeJSONArtifactValue(payload);
+    if (sanitizedPayload && typeof sanitizedPayload === "object" && !Array.isArray(sanitizedPayload)) {
+      sanitizedPayload.__artifactSerialization = {
+        sanitized: true,
+        reason: String(error?.message || error),
+      };
+    }
+    await fs.writeFile(filePath, `${JSON.stringify(sanitizedPayload, null, 2)}\n`, "utf-8");
+  }
 }

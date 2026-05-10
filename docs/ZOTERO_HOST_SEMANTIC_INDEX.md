@@ -142,7 +142,7 @@
   - `SectionOptions`
     - Required: `paneID`, `pluginID`, `header`, `sidenav`, `onRender`
     - Optional: `onInit`, `onDestroy`, `onItemChange`, `onAsyncRender`, `onToggle`, `sectionButtons`
-    - Notes: onRender 负责首帧 DOM 构建；header.l10nID 对应 FTL `.label`，sidenav.l10nID 对应 FTL `.tooltiptext`，两者必须已注入；sidenav.orderable 控制 section 是否允许在 Item Pane sidenav 中排序。
+    - Notes: onRender 负责首帧 DOM 构建；header 与 sidenav 需要同时提供 l10nID 和 icon；header.l10nID 对应 FTL `.label`，sidenav.l10nID 对应 FTL `.tooltiptext`，两者必须已注入；sidenav.orderable 控制 section 是否允许在 Item Pane sidenav 中排序。
   - `InfoRowOptions`
     - Required: `rowID`, `pluginID`, `label`, `onGetData`
     - Optional: `position`, `multiline`, `nowrap`, `editable`, `onSetData`, `onItemChange`
@@ -150,14 +150,14 @@
 - Surface Semantics:
   - `item-pane-section` / `host-wrapper`
     - Host Events: -
-    - Surface Terms: `Item Pane`, `section`, `info row`, `header.l10nID`, `sidenav.l10nID`
+    - Surface Terms: `Item Pane`, `section`, `info row`, `header.l10nID`, `header.icon`, `sidenav.l10nID`, `sidenav.icon`
     - Notes: Item Pane 是宿主接口包装层，不因文件名命中就默认转成 visual-required。；Section 的初始 DOM 必须在 onRender 建立；onAsyncRender 只补异步数据，不替代首帧结构。
   - `item-pane-sidenav` / `host-visible-surface`
     - Host Events: -
     - Surface Terms: `Item Pane`, `sidenav`, `data-pane`, `scrollToPane`
     - Notes: 当验证 Item Pane sidenav 时，先证明目标 pane 已被切换并 visible，再补局部视觉证据。
 - Required Types:
-  - `types/features.d.ts` includes `registerSection(options: SectionOptions): string | null;`, `registerInfoRow(options: InfoRowOptions): string | null;`, `onRender: (props: {`, `sidenav?: SectionHeader & { orderable?: boolean };`, `sectionButtons?: Array<{`, `headerL10nID: string;`, `labelL10nID: string;`, `refreshInfoRow(rowID: string): boolean;`
+  - `types/features.d.ts` includes `registerSection(options: SectionOptions): string | null;`, `registerInfoRow(options: InfoRowOptions): string | null;`, `rootURI?: string;`, `onRender: (props: {`, `sidenav?: SectionHeader & { orderable?: boolean };`, `sectionButtons?: Array<{`, `headerL10nID: string;`, `labelL10nID: string;`, `refreshInfoRow(rowID: string): boolean;`
 - Required Tests:
   - `zotero-host-semantic-index-lib.test.js`
   - `zotero-host-semantic-index.test.js`
@@ -195,8 +195,8 @@
 - Surface Semantics:
   - `item-tree-column` / `host-wrapper`
     - Host Events: -
-    - Surface Terms: `Item Tree`, `dataKey`, `enabledTreeIDs`
-    - Notes: registerColumn 返回值可能被宿主加 pluginID namespace，验证时不要把输入 dataKey 当成唯一真相。
+    - Surface Terms: `Item Tree`, `dataKey`, `label`, `enabledTreeIDs`
+    - Notes: Zotero.ItemTreeManager option 需要 label；模板 wrapper 可接受 l10nID，但必须先解析成 label 再传给宿主。；registerColumn 返回值可能被宿主加 pluginID namespace，验证时不要把输入 dataKey 当成唯一真相。
 - Required Types:
   - `types/features.d.ts` includes `registerColumn(options: ColumnOptions): string | null;`, `enabledTreeIDs?: string[];`, `createConditionalCellRenderer(`
 - Required Tests:

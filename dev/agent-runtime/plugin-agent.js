@@ -280,6 +280,10 @@ export function createPluginAgent({
     const readerSummaryEntryID = descriptors.readerSummaryCommandID;
     const contextActionEntryID = descriptors.contextMenuItemID;
     const preferencePaneID = descriptors.preferencePaneID;
+    const workflowSectionID = `${config.addonRef}-workflow`;
+    const workflowItemMenuID = `${config.addonRef}-workflow-item-menu`;
+    const workflowCollectionMenuID = `${config.addonRef}-workflow-collection-menu`;
+    const workflowReaderMenuID = `${config.addonRef}-workflow-reader-menu`;
     const commandIDs = typeof commandPalette?.getAllCommands === "function"
       ? commandPalette.getAllCommands()
         .map((item) => String(item?.id || "").trim())
@@ -299,6 +303,17 @@ export function createPluginAgent({
       ? Boolean(menuManager.isOfficialAPIAvailable())
       : false;
     const readerEventReport = buildReaderEventReport();
+    const readerEventRegisteredTypes = Array.isArray(readerEventReport.registeredTypes)
+      ? readerEventReport.registeredTypes
+      : [];
+    const itemPaneSnapshot = typeof itemPane?.getRegistrationSnapshot === "function"
+      ? itemPane.getRegistrationSnapshot()
+      : null;
+    const sectionIDs = Array.isArray(itemPaneSnapshot?.sections)
+      ? itemPaneSnapshot.sections
+        .map((entry) => String(entry?.paneID || "").trim())
+        .filter(Boolean)
+      : [];
     const runtimeSummary = runtimeInfo?.capabilitySummary || {
       ok: true,
       status: "unknown",
@@ -548,6 +563,14 @@ export function createPluginAgent({
             : null,
         }
         : null,
+      workflowContractVersion: 1,
+      workflowItemPaneSectionRegistered: sectionIDs.includes(workflowSectionID),
+      workflowItemMenuRegistered: menuIDs.includes(workflowItemMenuID),
+      workflowCollectionMenuRegistered: menuIDs.includes(workflowCollectionMenuID),
+      workflowReaderMenuRegistered: menuIDs.includes(workflowReaderMenuID),
+      workflowReaderToolbarRegistered: readerEventRegisteredTypes.includes("renderToolbar"),
+      workflowReaderViewContextRegistered: readerEventRegisteredTypes.includes("createViewContextMenu"),
+      workflowAnnotationContextRegistered: readerEventRegisteredTypes.includes("createAnnotationContextMenu"),
     };
   }
 

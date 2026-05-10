@@ -106,8 +106,11 @@ export function createWorkbenchShellManager(options) {
   shell.open = async function (context) {
     const live = findLiveWindow();
     if (live && !live.closed) {
-      live.focus();
-      return { window: live, reused: true, ready: true };
+      const result = await shell.refresh(context);
+      return {
+        ...result,
+        reused: true,
+      };
     }
     return originalOpen(context);
   };

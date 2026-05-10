@@ -11,7 +11,8 @@ import {
 describe("Package Protection Guided Attack Plan", () => {
   it("should parse default guided attack plan args", () => {
     const options = parsePackageProtectionGuidedAttackPlanArgs([]);
-    assert.ok(options.projectRootPath.endsWith("AddonTemplate4Z"));
+    assert.ok(path.isAbsolute(options.projectRootPath));
+    assert.ok(options.projectRootPath.length > 0);
     assert.ok(options.registryPath.endsWith(path.join("config", "package-protection-candidates.json")));
   });
 

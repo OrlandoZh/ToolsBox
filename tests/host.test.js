@@ -2060,6 +2060,135 @@ describe("ZoteroHost", () => {
     }]);
   });
 
+  it("should settle item pane visibility with host scroll after replaying a live sidenav click", async () => {
+    const dispatchedEvents = [];
+    let visible = false;
+    let scrolledPaneID = null;
+    class FakeMouseEvent {
+      constructor(type, options = {}) {
+        this.type = type;
+        this.detail = options.detail ?? 0;
+        this.button = options.button ?? 0;
+      }
+    }
+    const registeredPaneID = "cleanroom-template\\@example\\.com-cleanroomtemplate-workflow";
+    const paneElement = {
+      childElementCount: 1,
+      children: [{}],
+      textContent: "Workflow pane",
+      querySelector(selector) {
+        return selector === "*" ? {} : null;
+      },
+      getBoundingClientRect() {
+        return visible
+          ? { top: 10, bottom: 60 }
+          : { top: 260, bottom: 320 };
+      },
+    };
+    const paneButton = {
+      localName: "div",
+      getAttribute(name) {
+        return {
+          "data-pane": registeredPaneID,
+          role: "tab",
+        }[name] || null;
+      },
+      dispatchEvent(event) {
+        dispatchedEvents.push({
+          type: event.type,
+          detail: event.detail,
+          button: event.button,
+        });
+        return true;
+      },
+      ownerGlobal: {
+        MouseEvent: FakeMouseEvent,
+      },
+    };
+    const itemDetails = {
+      sidenav: {
+        querySelectorAll(selector) {
+          return selector === ".btn[data-pane], [data-pane]" ? [paneButton] : [];
+        },
+        querySelector() {
+          return null;
+        },
+      },
+      getPane(paneID) {
+        return paneID === registeredPaneID ? paneElement : null;
+      },
+      isPaneVisible(paneID) {
+        return paneID === registeredPaneID && visible;
+      },
+      async scrollToPane(paneID) {
+        scrolledPaneID = paneID;
+        visible = true;
+      },
+      _paneParent: {
+        getBoundingClientRect() {
+          return { top: 0, bottom: 120 };
+        },
+      },
+    };
+    const mainWindow = {
+      ZoteroPane: {
+        itemPane: {
+          _itemDetails: itemDetails,
+        },
+      },
+      document: {
+        documentElement: {
+          getAttribute() {
+            return "zotero:main";
+          },
+        },
+      },
+    };
+
+    globalThis.Zotero = {
+      getMainWindow() {
+        return mainWindow;
+      },
+      getMainWindows() {
+        return [mainWindow];
+      },
+    };
+
+    globalThis.Services = {
+      wm: {
+        getEnumerator() {
+          return {
+            hasMoreElements() {
+              return false;
+            },
+          };
+        },
+      },
+    };
+
+    const host = createZoteroHost({
+      globalScope: globalThis,
+      rootURI: "chrome://cleanroomtemplate/",
+    });
+
+    const result = await host.selectItemPane(registeredPaneID, {
+      activationPolicy: "ui-required",
+      timeoutMs: 80,
+    });
+
+    assert.equal(result.visible, true);
+    assert.equal(result.button, paneButton);
+    assert.equal(result.activationStrategy, "dispatch-click");
+    assert.equal(result.settleStrategy, "host-scroll-after-live-action");
+    assert.equal(result.actionDispatched, true);
+    assert.equal(scrolledPaneID, registeredPaneID);
+    assert.deepEqual(dispatchedEvents, [{
+      type: "click",
+      detail: 1,
+      button: 0,
+    }]);
+  });
+
   it("should wait for mounted item pane content before returning", async () => {
     let ready = false;
     setTimeout(() => {

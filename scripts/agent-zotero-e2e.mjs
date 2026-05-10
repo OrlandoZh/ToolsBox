@@ -3511,6 +3511,7 @@ async function captureSurfaceEvidenceTarget({
   const currentWindowBounds = stageRelativeBounds
     ? null
     : await ensureZoteroWindowReadyForCapture({
+      rdp,
       geometry: resolveSurfaceCaptureGeometry(surfaceTarget),
       activationDelayMs: 120,
       settleDelayMs: VISUAL_SURFACE_CAPTURE_DELAY_MS,
@@ -3537,6 +3538,29 @@ async function captureSurfaceEvidenceTarget({
     await captureSurfaceFromStageImage({
       filePath,
       stageCapture,
+      cropBounds: bounds,
+    });
+  }
+  else if (rdp && currentWindowBounds) {
+    const windowCapturePath = path.join(captureDir, `cycle-${cycle}-${kind}-window.png`);
+    const windowCaptureBounds = await captureZoteroWindow(windowCapturePath, {
+      rdp,
+      bounds: currentWindowBounds,
+      geometry: {
+        width: currentWindowBounds.width,
+        height: currentWindowBounds.height,
+      },
+      maxAttempts: 1,
+    });
+    const windowCaptureAnalysis = await readPNGAnalysis(windowCapturePath);
+    await captureSurfaceFromStageImage({
+      filePath,
+      stageCapture: {
+        kind: `${kind}-window`,
+        path: windowCapturePath,
+        bounds: windowCaptureBounds || currentWindowBounds,
+        analysis: windowCaptureAnalysis,
+      },
       cropBounds: bounds,
     });
   }
@@ -3628,7 +3652,7 @@ async function captureSurfaceLocalVisuals({
       config,
       actionId: "itemPane.selectPane",
       payload: {
-        paneID: `${config.addonRef}-details`,
+        paneID: `${config.addonRef}-workflow`,
         behavior: "instant",
       },
     }),
@@ -3681,6 +3705,7 @@ async function captureSurfaceLocalVisuals({
   if (toolbarTarget) {
     try {
       const captured = await captureSurfaceEvidenceTarget({
+        rdp,
         cycle,
         captureDir,
         surfaceTarget: toolbarTarget,
@@ -3706,7 +3731,7 @@ async function captureSurfaceLocalVisuals({
       config,
       actionId: "menu.show",
       payload: {
-        menuID: `${config.addonRef}-reader-summary`,
+        menuID: `${config.addonRef}-workflow-reader-menu`,
         target: "reader/menubar/view",
       },
     }),

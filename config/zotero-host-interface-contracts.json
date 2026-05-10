@@ -161,8 +161,11 @@
           "snippets": [
             "function registerSection(sectionOptions) {",
             "error(\"itemPane.registerSection.noOnRender\", { paneID });",
+            "function resolveURI(uri) {",
             "config.header.l10nID = header.l10nID;",
+            "config.header.icon = resolveURI(header.icon);",
             "config.sidenav.l10nID = sidenav.l10nID;",
+            "config.sidenav.icon = resolveURI(sidenav.icon);",
             "config.sidenav.orderable = sidenav.orderable;",
             "config.sectionButtons = sectionButtons;",
             "const registeredPaneID = Zotero.ItemPaneManager.registerSection(config);"
@@ -195,6 +198,7 @@
             "sidenav?: SectionHeader & { orderable?: boolean };",
             "sectionButtons?: Array<{",
             "onRender: (props: {",
+            "rootURI?: string;",
             "headerL10nID: string;",
             "labelL10nID: string;",
             "refreshInfoRow(rowID: string): boolean;",
@@ -224,12 +228,13 @@
       "referenceSources": [
         {
           "file": "chrome/content/zotero/xpcom/pluginAPI/itemTreeManager.js",
-          "requiredSnippets": [
-            "registerColumn(option) {",
-            "registerColumns(options) {",
-            "unregisterColumn(dataKey) {"
-          ]
-        }
+        "requiredSnippets": [
+          "registerColumn(option) {",
+          "registerColumns(options) {",
+          "unregisterColumn(dataKey) {",
+          "refreshColumns() {"
+        ]
+      }
       ],
       "exportedSurface": [
         {
@@ -237,30 +242,41 @@
           "file": "src/features/item-tree.js",
           "snippets": [
             "function registerColumn(columnOptions) {",
+            "config.label = i18n && typeof i18n.t === \"function\"",
             "config.enabledTreeIDs = enabledTreeIDs;",
             "? Zotero.ItemTreeManager.registerColumn(config)",
             ": Zotero.ItemTreeManager.registerColumns(config)?.[0];"
           ]
         },
-        {
-          "label": "cell renderer helpers",
-          "file": "src/features/item-tree.js",
-          "snippets": [
-            "function createConditionalCellRenderer(conditionFn, trueStyle, falseStyle) {"
-          ]
-        }
-      ],
-      "requiredTypes": [
-        {
-          "file": "types/features.d.ts",
-          "snippets": [
-            "registerColumn(options: ColumnOptions): string | null;",
-            "enabledTreeIDs?: string[];",
-            "createConditionalCellRenderer("
-          ]
-        }
+    {
+      "label": "cell renderer helpers",
+      "file": "src/features/item-tree.js",
+      "snippets": [
+        "function createConditionalCellRenderer(conditionFn, trueStyle, falseStyle) {"
+      ]
+    },
+    {
+      "label": "column refresh bridge",
+      "file": "src/features/item-tree.js",
+      "snippets": [
+        "function refreshColumns() {",
+        "Zotero.ItemTreeManager.refreshColumns();"
+      ]
+    }
+  ],
+  "requiredTypes": [
+    {
+      "file": "types/features.d.ts",
+      "snippets": [
+        "registerColumn(options: ColumnOptions): string | null;",
+        "enabledTreeIDs?: string[];",
+        "refreshColumns(): boolean;",
+        "createConditionalCellRenderer("
+      ]
+    }
       ],
       "requiredTests": [
+        "item-tree.test.js",
         "plugin.test.js",
         "toolchain.test.js"
       ],

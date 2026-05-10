@@ -46,6 +46,32 @@ function runAsync(logger, task, details = {}) {
     });
 }
 
+function refreshWorkflowColumns(itemTree, logger) {
+  const candidates = [
+    "refreshColumns",
+    "refresh",
+    "refreshRows",
+  ];
+  for (const method of candidates) {
+    try {
+      if (itemTree && typeof itemTree[method] === "function") {
+        const result = itemTree[method]();
+        if (result !== false) {
+          return true;
+        }
+      }
+    } catch (error) {
+      if (logger && typeof logger.warn === "function") {
+        logger.warn("researchWorkflow.itemTree.refresh.failed", {
+          method,
+          message: String(error?.message || error),
+        });
+      }
+    }
+  }
+  return false;
+}
+
 function createElement(doc, tagName) {
   if (doc && typeof doc.createElement === "function") {
     return doc.createElement(tagName);
@@ -266,7 +292,30 @@ function renderLocalSummary(doc, state, item, i18n) {
   return root;
 }
 
-function renderWorkflowEditor({ doc, body, item, prefs, i18n, logger }) {
+async function persistAndRefreshWorkflowEditor({
+  doc,
+  body,
+  item,
+  prefs,
+  i18n,
+  logger,
+  itemTree,
+  task,
+}) {
+  await task();
+  refreshWorkflowColumns(itemTree, logger);
+  renderWorkflowEditor({
+    doc,
+    body,
+    item,
+    prefs,
+    i18n,
+    logger,
+    itemTree,
+  });
+}
+
+function renderWorkflowEditor({ doc, body, item, prefs, i18n, logger, itemTree }) {
   clearChildren(body);
   const context = buildWorkflowContext(prefs);
   const state = getWorkflowState(item, { context });
@@ -330,14 +379,23 @@ function renderWorkflowEditor({ doc, body, item, prefs, i18n, logger }) {
     id: "save",
     label: t(i18n, "cleanroom-workflow-save", "Save"),
     onCommand() {
-      runAsync(logger, () => applyWorkflowStateToItem(item, {
-        status: status.input.value,
-        rating: rating.input.value,
-        readStatus: readStatus.input.value,
-        progress: progress.input.value,
-        textTags: textTags.input.value,
-        remark: remark.input.value,
-      }, { context }), {
+      runAsync(logger, () => persistAndRefreshWorkflowEditor({
+        doc,
+        body,
+        item,
+        prefs,
+        i18n,
+        logger,
+        itemTree,
+        task: () => applyWorkflowStateToItem(item, {
+          status: status.input.value,
+          rating: rating.input.value,
+          readStatus: readStatus.input.value,
+          progress: progress.input.value,
+          textTags: textTags.input.value,
+          remark: remark.input.value,
+        }, { context }),
+      }), {
         surface: "item-pane",
       });
     },
@@ -346,7 +404,16 @@ function renderWorkflowEditor({ doc, body, item, prefs, i18n, logger }) {
     id: "clear",
     label: t(i18n, "cleanroom-workflow-clear", "Clear"),
     onCommand() {
-      runAsync(logger, () => clearWorkflowStateFromItem(item, { context }), {
+      runAsync(logger, () => persistAndRefreshWorkflowEditor({
+        doc,
+        body,
+        item,
+        prefs,
+        i18n,
+        logger,
+        itemTree,
+        task: () => clearWorkflowStateFromItem(item, { context }),
+      }), {
         surface: "item-pane",
       });
     },
@@ -355,20 +422,23 @@ function renderWorkflowEditor({ doc, body, item, prefs, i18n, logger }) {
   append(body, root);
 }
 
-export function registerWorkflowItemPane({ itemPane, prefs, i18n, logger, addonRef }) {
+export function registerWorkflowItemPane({ itemPane, prefs, i18n, logger, addonRef, itemTree, icon }) {
   if (!itemPane || typeof itemPane.registerSection !== "function") {
     return null;
   }
   if (!isWorkflowEnabled(prefs, RESEARCH_WORKFLOW_PREF_KEYS.itemPaneEnabled)) {
     return null;
   }
+  const sectionIcon = icon || "content/icons/icon-48.png";
   return itemPane.registerSection({
     paneID: `${addonRef || "toolsbox"}-workflow`,
     header: {
       l10nID: "cleanroom-workflow-section-header",
+      icon: sectionIcon,
     },
     sidenav: {
       l10nID: "cleanroom-workflow-section-sidenav",
+      icon: sectionIcon,
       orderable: true,
     },
     onItemChange({ item, setEnabled }) {
@@ -384,6 +454,7 @@ export function registerWorkflowItemPane({ itemPane, prefs, i18n, logger, addonR
         prefs,
         i18n,
         logger,
+        itemTree,
       });
     },
   });
@@ -641,13 +712,33 @@ async function recordReaderProgress({ reader, event, prefs, logger }) {
   });
 }
 
-export function registerWorkflowReaderFeatures({ menuManager, reader, prefs, i18n, logger, addonRef }) {
+const READER_EVENT_FEATURE_IDS = Object.freeze([
+  "reader:renderToolbar",
+  "reader:viewContext",
+  "reader:annotationContext",
+]);
+
+export function registerWorkflowReaderFeatures({
+  menuManager,
+  reader,
+  prefs,
+  i18n,
+  logger,
+  addonRef,
+  includeMenubar = true,
+  skipExisting = null,
+}) {
   if (!reader || !isWorkflowEnabled(prefs, RESEARCH_WORKFLOW_PREF_KEYS.readerEnabled)) {
     return [];
   }
 
   const registered = [];
-  if (menuManager && typeof menuManager.registerReaderMenubarViewSubmenu === "function") {
+  const existing = skipExisting instanceof Set ? skipExisting : new Set();
+  if (
+    includeMenubar
+    && menuManager
+    && typeof menuManager.registerReaderMenubarViewSubmenu === "function"
+  ) {
     const menuTypes = menuManager.MENU_TYPES || {};
     const menuID = menuManager.registerReaderMenubarViewSubmenu({
       id: `${addonRef || "toolsbox"}-workflow-reader-menu`,
@@ -670,7 +761,11 @@ export function registerWorkflowReaderFeatures({ menuManager, reader, prefs, i18
     }
   }
 
-  if (typeof reader.registerEventListener === "function" && reader.READER_EVENT_TYPES) {
+  if (
+    !existing.has("reader:renderToolbar")
+    && typeof reader.registerEventListener === "function"
+    && reader.READER_EVENT_TYPES
+  ) {
     const cleanup = reader.registerEventListener(
       reader.READER_EVENT_TYPES.RENDER_TOOLBAR,
       (event) => {
@@ -692,7 +787,7 @@ export function registerWorkflowReaderFeatures({ menuManager, reader, prefs, i18
     }
   }
 
-  if (typeof reader.registerViewContextMenuItem === "function") {
+  if (!existing.has("reader:viewContext") && typeof reader.registerViewContextMenuItem === "function") {
     const cleanup = reader.registerViewContextMenuItem((event) => ({
       label: t(i18n, "cleanroom-workflow-reader-view-progress", "Record page progress"),
       onCommand() {
@@ -707,7 +802,10 @@ export function registerWorkflowReaderFeatures({ menuManager, reader, prefs, i18
     }
   }
 
-  if (typeof reader.registerAnnotationContextMenuItem === "function") {
+  if (
+    !existing.has("reader:annotationContext")
+    && typeof reader.registerAnnotationContextMenuItem === "function"
+  ) {
     const cleanup = reader.registerAnnotationContextMenuItem((event) => ([
       {
         label: t(i18n, "cleanroom-workflow-annotation-reviewed", "Mark annotation reviewed"),
@@ -755,6 +853,42 @@ export function registerWorkflowReaderFeatures({ menuManager, reader, prefs, i18
   return registered;
 }
 
+function scheduleWorkflowReaderRegistrationRetries({
+  readerFeatureSet,
+  readerFeatures,
+  scheduleRetry,
+  retryDelays = [250, 1000, 2500, 5000, 10000],
+  options,
+}) {
+  if (typeof scheduleRetry !== "function") {
+    return;
+  }
+  if (READER_EVENT_FEATURE_IDS.every((id) => readerFeatureSet.has(id))) {
+    return;
+  }
+
+  const retry = () => {
+    if (READER_EVENT_FEATURE_IDS.every((id) => readerFeatureSet.has(id))) {
+      return;
+    }
+    const next = registerWorkflowReaderFeatures({
+      ...options,
+      includeMenubar: false,
+      skipExisting: readerFeatureSet,
+    });
+    for (const id of next) {
+      if (!readerFeatureSet.has(id)) {
+        readerFeatureSet.add(id);
+        readerFeatures.push(id);
+      }
+    }
+  };
+
+  for (const delay of retryDelays) {
+    scheduleRetry(retry, delay);
+  }
+}
+
 export function registerResearchWorkflowFeatures(options = {}) {
   const {
     config = {},
@@ -764,14 +898,19 @@ export function registerResearchWorkflowFeatures(options = {}) {
     itemPane,
     menuManager,
     reader,
+    itemTree,
+    scheduleRetry = (callback, delay) => globalThis.setTimeout(callback, delay),
   } = options;
   const addonRef = config.addonRef || "toolsbox";
+  const sectionIcon = config.icons?.["48"] || config.icons?.["96"] || "content/icons/icon-48.png";
   const itemPaneSection = registerWorkflowItemPane({
     itemPane,
     prefs,
     i18n,
     logger,
     addonRef,
+    itemTree,
+    icon: sectionIcon,
   });
   const menus = registerWorkflowMenus({
     menuManager,
@@ -787,6 +926,20 @@ export function registerResearchWorkflowFeatures(options = {}) {
     i18n,
     logger,
     addonRef,
+  });
+  const readerFeatureSet = new Set(readerFeatures);
+  scheduleWorkflowReaderRegistrationRetries({
+    readerFeatureSet,
+    readerFeatures,
+    scheduleRetry,
+    options: {
+      menuManager,
+      reader,
+      prefs,
+      i18n,
+      logger,
+      addonRef,
+    },
   });
 
   if (logger && typeof logger.info === "function") {

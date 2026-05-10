@@ -16,14 +16,16 @@ registerZoteroTest("runtime api exposes baseline helpers", async ({ assert, Zote
   assert.equal(typeof plugin.api.getMainWindow, "function");
   assert.equal(typeof plugin.api.host, "object");
   assert.equal(typeof plugin.api.reader.getActiveReader, "function");
-  assert.ok(plugin.api.itemPane.getSectionCount() >= 0);
+  assert.ok(plugin.api.itemPane.getSectionCount() >= 1);
   assert.equal(plugin.api.itemPane.getInfoRowCount(), 0);
-  assert.equal(plugin.api.itemTree.getColumnCount(), 0);
+  assert.ok(plugin.api.itemTree.getColumnCount() >= 1);
   assert.equal(plugin.api.notifier.getActiveCount(), 0);
 });
 
-registerZoteroTest("template starts without default demo surfaces", async ({ assert, Zotero, addonConfig }) => {
+registerZoteroTest("toolsbox starts with workflow surfaces and without default demo surfaces", async ({ assert, Zotero, addonConfig }) => {
   const plugin = Zotero[addonConfig.instanceKey];
+  const itemPaneSnapshot = plugin.api.itemPane.getRegistrationSnapshot();
+  const workflowSectionID = `${addonConfig.addonRef}-workflow`;
   const sectionIDs = (Zotero.ItemPaneManager.customSectionData?.options || [])
     .map((option) => option.paneID);
   const rowIDs = (Zotero.ItemPaneManager.customInfoRowData?.options || [])
@@ -42,8 +44,18 @@ registerZoteroTest("template starts without default demo surfaces", async ({ ass
     false,
   );
   assert.equal(
+    itemPaneSnapshot.sections.some((entry) => (
+      entry.paneID === workflowSectionID
+      || entry.registeredPaneID === workflowSectionID
+      || String(entry.registeredPaneID || "").endsWith(`-${workflowSectionID}`)
+    )),
+    true,
+  );
+  assert.equal(
     columnKeys.some((value) => String(value).includes(`${addonConfig.addonRef}-status`)),
     false,
   );
+  assert.equal(columnKeys.some((value) => String(value).includes("cleanroom-research-status")), true);
   assert.equal(plugin.api.menuManager.getRegisteredMenuIds().includes(`${addonConfig.addonRef}-reader-summary`), false);
+  assert.equal(plugin.api.menuManager.getRegisteredMenuIds().includes(`${addonConfig.addonRef}-workflow-reader-menu`), true);
 });

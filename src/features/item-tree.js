@@ -109,7 +109,9 @@ export function createItemTree(options) {
 
       // 标签配置
       if (l10nID) {
-        config.l10nID = l10nID;
+        config.label = i18n && typeof i18n.t === "function"
+          ? i18n.t(l10nID, l10nID)
+          : l10nID;
       } else if (label) {
         config.label = label;
       } else {
@@ -241,6 +243,32 @@ export function createItemTree(options) {
   }
 
   /**
+   * 刷新宿主 Item Tree 自定义列。
+   * @returns {boolean} 是否触发刷新
+   */
+  function refreshColumns() {
+    if (!isAvailable()) {
+      return false;
+    }
+
+    try {
+      if (typeof Zotero.ItemTreeManager.refreshColumns === "function") {
+        Zotero.ItemTreeManager.refreshColumns();
+        debug("itemTree.refreshColumns.refreshed", {
+          count: registeredColumns.size,
+        });
+        return true;
+      }
+    } catch (err) {
+      error("itemTree.refreshColumns.failed", {
+        message: String(err?.message || err),
+      });
+    }
+
+    return false;
+  }
+
+  /**
    * 获取注册的列数量
    * @returns {number}
    */
@@ -355,6 +383,7 @@ export function createItemTree(options) {
     unregisterColumn,
     hasColumn,
     getColumnCount,
+    refreshColumns,
 
     // 批量操作
     unregisterAll,

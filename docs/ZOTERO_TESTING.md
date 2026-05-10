@@ -50,12 +50,12 @@
 ZOTERO_PLUGIN_ZOTERO_BIN_PATH=/Applications/Zotero.app/Contents/MacOS/zotero
 ```
 
-如果不填写 `ZOTERO_PLUGIN_PROFILE_PATH` 和 `ZOTERO_PLUGIN_DATA_DIR`，runner 会自动使用仓库内的隔离目录：
+如果不填写 `ZOTERO_PLUGIN_PROFILE_PATH` 和 `ZOTERO_PLUGIN_DATA_DIR`，runner 会自动使用按项目路径 hash 命名的系统临时目录，避免 Zotero 把仓库路径误判为云同步数据目录：
 
 ```text
-.zotero-runtime/dev/
-.zotero-runtime/console/
-.zotero-runtime/smoke/
+/private/tmp/<project>-zotero-runtime-<hash>/dev/
+/private/tmp/<project>-zotero-runtime-<hash>/console/
+/private/tmp/<project>-zotero-runtime-<hash>/smoke/
 ```
 
 ## 命令
@@ -235,7 +235,7 @@ npm run agent:zotero:curated-pdf
   - 启动隔离 Zotero
   - 通过 `profile/extensions/<addonId>` proxy file 预装 `build/<addonRef>`
   - 必要时通过 chrome debugger 补 bootstrap fallback
-  - 默认复用项目 `.zotero-runtime/dev/` 下的 profile/dataDir；它与个人日常 profile 隔离，但不是一次性 fresh/disposable profile
+  - 默认复用项目专属临时 runtime 下的 `dev/profile` 与 `dev/data`；它与个人日常 profile 隔离，但不是一次性 fresh/disposable profile
   - 保持 Zotero 打开，适合人工调试
 - `npm run zotero:console`
   - 与 `zotero:dev` 相同

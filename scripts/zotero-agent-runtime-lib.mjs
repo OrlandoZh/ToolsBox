@@ -343,6 +343,14 @@ export async function runFunctionalActions({ rdp, config }) {
       contextActionMenuRegistered: false,
       readerSummaryCommandRegistered: false,
       readerSummaryMenuRegistered: false,
+      workflowContractVersion: 0,
+      workflowItemPaneSectionRegistered: false,
+      workflowItemMenuRegistered: false,
+      workflowCollectionMenuRegistered: false,
+      workflowReaderMenuRegistered: false,
+      workflowReaderToolbarRegistered: false,
+      workflowReaderViewContextRegistered: false,
+      workflowAnnotationContextRegistered: false,
       preferencePaneRegistered: false,
       preferencePaneCount: 0,
       hasMainWindow: false,
@@ -441,6 +449,14 @@ export async function runFunctionalActions({ rdp, config }) {
       checks.contextActionMenuRegistered = Boolean(selfCheck?.contextActionMenuRegistered);
       checks.readerSummaryCommandRegistered = Boolean(selfCheck?.readerSummaryCommandRegistered);
       checks.readerSummaryMenuRegistered = Boolean(selfCheck?.readerSummaryMenuRegistered);
+      checks.workflowContractVersion = Number(selfCheck?.workflowContractVersion || 0);
+      checks.workflowItemPaneSectionRegistered = Boolean(selfCheck?.workflowItemPaneSectionRegistered);
+      checks.workflowItemMenuRegistered = Boolean(selfCheck?.workflowItemMenuRegistered);
+      checks.workflowCollectionMenuRegistered = Boolean(selfCheck?.workflowCollectionMenuRegistered);
+      checks.workflowReaderMenuRegistered = Boolean(selfCheck?.workflowReaderMenuRegistered);
+      checks.workflowReaderToolbarRegistered = Boolean(selfCheck?.workflowReaderToolbarRegistered);
+      checks.workflowReaderViewContextRegistered = Boolean(selfCheck?.workflowReaderViewContextRegistered);
+      checks.workflowAnnotationContextRegistered = Boolean(selfCheck?.workflowAnnotationContextRegistered);
       checks.preferencePaneRegistered = Boolean(selfCheck?.preferencePaneRegistered);
       checks.preferencePaneCount = Number(selfCheck?.preferencePaneCount || 0);
       checks.serviceTotal = Number(selfCheck?.serviceTotal || 0);

@@ -24,7 +24,7 @@ registerZoteroScenario("library item pane surface smoke", async ({ assert, addon
       title: "Host Action Item Pane Smoke",
     },
   });
-  const paneID = `${addonConfig.addonRef}-details`;
+  const paneID = `${addonConfig.addonRef}-workflow`;
 
   await helpers.selectItem(item.id);
 

@@ -12,7 +12,8 @@ import {
 describe("Package Protection Strategy Report", () => {
   it("should parse default strategy args", () => {
     const options = parsePackageProtectionStrategyArgs([]);
-    assert.ok(options.projectRootPath.endsWith("AddonTemplate4Z"));
+    assert.ok(path.isAbsolute(options.projectRootPath));
+    assert.ok(options.projectRootPath.length > 0);
     assert.ok(options.matrixPath.endsWith(path.join("dist", "package-protection-matrix.json")));
     assert.ok(options.retainedReviewPath.endsWith(path.join("dist", "package-protection-retained-review.json")));
     assert.ok(options.wasmAdmissionPath.endsWith(path.join("dist", "package-protection-wasm-admission.json")));

@@ -186,7 +186,7 @@ registerZoteroScenario("profiler diagnostics", async ({ assert, addonConfig, hel
   const itemPaneActivity = await measureProfiledHostAction(
     "itemPane.selectPane",
     {
-      paneID: `${addonConfig.addonRef}-details`,
+      paneID: `${addonConfig.addonRef}-workflow`,
       behavior: "instant",
       activationPolicy: "ui-required",
     },
@@ -484,7 +484,7 @@ registerZoteroScenario("profiler extended diagnostics", async ({ assert, addonCo
         await helpers.selectItem(item.id);
       }
       return await helpers.runHostAction("itemPane.selectPane", {
-        paneID: `${addonConfig.addonRef}-details`,
+        paneID: `${addonConfig.addonRef}-workflow`,
         behavior: "instant",
         activationPolicy: "ui-required",
       });

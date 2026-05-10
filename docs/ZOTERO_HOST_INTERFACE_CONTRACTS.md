@@ -43,11 +43,11 @@
 - Reference Sources:
   - `chrome/content/zotero/xpcom/pluginAPI/itemPaneManager.js` includes `Zotero.ItemPaneManager.registerSection({`, `registerSection(options) {`, `Zotero.ItemPaneManager.registerInfoRow({`, `refreshInfoRow(rowID) {`
 - Exported Surface:
-  - section registration bridge: `src/features/item-pane.js` includes `function registerSection(sectionOptions) {`, `error("itemPane.registerSection.noOnRender", { paneID });`, `config.header.l10nID = header.l10nID;`, `config.sidenav.l10nID = sidenav.l10nID;`, `config.sidenav.orderable = sidenav.orderable;`, `config.sectionButtons = sectionButtons;`, `const registeredPaneID = Zotero.ItemPaneManager.registerSection(config);`
+  - section registration bridge: `src/features/item-pane.js` includes `function registerSection(sectionOptions) {`, `error("itemPane.registerSection.noOnRender", { paneID });`, `function resolveURI(uri) {`, `config.header.l10nID = header.l10nID;`, `config.header.icon = resolveURI(header.icon);`, `config.sidenav.l10nID = sidenav.l10nID;`, `config.sidenav.icon = resolveURI(sidenav.icon);`, `config.sidenav.orderable = sidenav.orderable;`, `config.sectionButtons = sectionButtons;`, `const registeredPaneID = Zotero.ItemPaneManager.registerSection(config);`
   - info row registration bridge: `src/features/item-pane.js` includes `function registerInfoRow(rowOptions) {`, `const registeredRowID = Zotero.ItemPaneManager.registerInfoRow(config);`, `function refreshInfoRow(rowID) {`
   - registration snapshot helpers: `src/features/item-pane.js` includes `function resolveSectionPaneID(paneID) {`, `function getRegistrationSnapshot() {`
 - Required Types:
-  - `types/features.d.ts` includes `registerSection(options: SectionOptions): string | null;`, `registerInfoRow(options: InfoRowOptions): string | null;`, `sidenav?: SectionHeader & { orderable?: boolean };`, `sectionButtons?: Array<{`, `onRender: (props: {`, `headerL10nID: string;`, `labelL10nID: string;`, `refreshInfoRow(rowID: string): boolean;`, `resolveSectionPaneID(paneID: string): string | null;`, `getRegistrationSnapshot(): {`
+  - `types/features.d.ts` includes `registerSection(options: SectionOptions): string | null;`, `registerInfoRow(options: InfoRowOptions): string | null;`, `sidenav?: SectionHeader & { orderable?: boolean };`, `sectionButtons?: Array<{`, `onRender: (props: {`, `rootURI?: string;`, `headerL10nID: string;`, `labelL10nID: string;`, `refreshInfoRow(rowID: string): boolean;`, `resolveSectionPaneID(paneID: string): string | null;`, `getRegistrationSnapshot(): {`
 - Required Tests:
   - `item-pane.test.js`
   - `plugin.test.js`
@@ -64,13 +64,15 @@
 - Owner Files:
   - `src/features/item-tree.js`
 - Reference Sources:
-  - `chrome/content/zotero/xpcom/pluginAPI/itemTreeManager.js` includes `registerColumn(option) {`, `registerColumns(options) {`, `unregisterColumn(dataKey) {`
+  - `chrome/content/zotero/xpcom/pluginAPI/itemTreeManager.js` includes `registerColumn(option) {`, `registerColumns(options) {`, `unregisterColumn(dataKey) {`, `refreshColumns() {`
 - Exported Surface:
-  - column registration bridge: `src/features/item-tree.js` includes `function registerColumn(columnOptions) {`, `config.enabledTreeIDs = enabledTreeIDs;`, `? Zotero.ItemTreeManager.registerColumn(config)`, `: Zotero.ItemTreeManager.registerColumns(config)?.[0];`
+  - column registration bridge: `src/features/item-tree.js` includes `function registerColumn(columnOptions) {`, `config.label = i18n && typeof i18n.t === "function"`, `config.enabledTreeIDs = enabledTreeIDs;`, `? Zotero.ItemTreeManager.registerColumn(config)`, `: Zotero.ItemTreeManager.registerColumns(config)?.[0];`
   - cell renderer helpers: `src/features/item-tree.js` includes `function createConditionalCellRenderer(conditionFn, trueStyle, falseStyle) {`
+  - column refresh bridge: `src/features/item-tree.js` includes `function refreshColumns() {`, `Zotero.ItemTreeManager.refreshColumns();`
 - Required Types:
-  - `types/features.d.ts` includes `registerColumn(options: ColumnOptions): string | null;`, `enabledTreeIDs?: string[];`, `createConditionalCellRenderer(`
+  - `types/features.d.ts` includes `registerColumn(options: ColumnOptions): string | null;`, `enabledTreeIDs?: string[];`, `refreshColumns(): boolean;`, `createConditionalCellRenderer(`
 - Required Tests:
+  - `item-tree.test.js`
   - `plugin.test.js`
   - `toolchain.test.js`
 - Non-Goals:

@@ -96,6 +96,13 @@ describe("Research Workflow Feature", () => {
         return options.paneID;
       },
     };
+    let refreshCount = 0;
+    const itemTree = {
+      refreshColumns() {
+        refreshCount += 1;
+        return true;
+      },
+    };
     const item = createItem();
 
     const paneID = registerWorkflowItemPane({
@@ -103,10 +110,13 @@ describe("Research Workflow Feature", () => {
       prefs: createPrefs(),
       i18n: { t(_key, fallback) { return fallback; } },
       addonRef: "toolsbox",
+      itemTree,
     });
 
     assert.equal(paneID, "toolsbox-workflow");
     assert.equal(sections[0].header.l10nID, "cleanroom-workflow-section-header");
+    assert.equal(sections[0].header.icon, "content/icons/icon-48.png");
+    assert.equal(sections[0].sidenav.icon, "content/icons/icon-48.png");
 
     const doc = createFakeDoc();
     const body = doc.createElement("div");
@@ -123,6 +133,8 @@ describe("Research Workflow Feature", () => {
     assert.deepEqual(item.tags.map((entry) => entry.tag), ["/done", "#focus", "#review", "*****"]);
     assert.equal(item.extra, "Remark: ready");
     assert.equal(item.saved, 1);
+    assert.equal(refreshCount, 1);
+    assert.equal(findElement(body, (node) => node.attributes?.id === "toolsbox-workflow-status").value, "done");
   });
 
   it("should register item and collection workflow menus with batch actions", async () => {
@@ -266,5 +278,57 @@ describe("Research Workflow Feature", () => {
     assert.equal(result.itemPaneSection, "toolsbox-workflow");
     assert.deepEqual(result.menus, ["toolsbox-workflow-item-menu", "toolsbox-workflow-collection-menu"]);
     assert.deepEqual(result.readerFeatures, []);
+  });
+
+  it("should retry Reader event registration when the host API appears after startup", () => {
+    const scheduled = [];
+    const registeredTypes = [];
+    const reader = {};
+    const result = registerResearchWorkflowFeatures({
+      config: { addonRef: "toolsbox" },
+      prefs: createPrefs(),
+      i18n: { t(_key, fallback) { return fallback; } },
+      itemPane: {
+        registerSection(options) {
+          return options.paneID;
+        },
+      },
+      menuManager: {
+        MENU_TARGETS: {
+          LIBRARY_ITEM: "main/library/item",
+          LIBRARY_COLLECTION: "main/library/collection",
+        },
+        MENU_TYPES: {
+          SUBMENU: "submenu",
+        },
+        registerStateDrivenMenu(config) {
+          return config.id;
+        },
+      },
+      reader,
+      scheduleRetry(callback) {
+        scheduled.push(callback);
+      },
+    });
+
+    assert.deepEqual(result.readerFeatures, []);
+    reader.READER_EVENT_TYPES = {
+      RENDER_TOOLBAR: "renderToolbar",
+    };
+    reader.registerEventListener = (type) => {
+      registeredTypes.push(type);
+      return () => {};
+    };
+    reader.registerViewContextMenuItem = () => () => {};
+    reader.registerAnnotationContextMenuItem = () => () => {};
+
+    scheduled[0]();
+
+    assert.deepEqual(registeredTypes, ["renderToolbar"]);
+    assert.deepEqual(result.readerFeatures, [
+      "reader:renderToolbar",
+      "reader:viewContext",
+      "reader:annotationContext",
+    ]);
   });
 });

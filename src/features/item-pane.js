@@ -11,11 +11,12 @@
  * @param {Object} options.uiFactory - UI 工厂实例
  * @param {Object} options.i18n - 国际化实例
  * @param {string} options.pluginID - 插件 ID
+ * @param {string} [options.rootURI] - 插件根 URI（用于解析相对图标路径）
  * @param {Object} [options.zotero] - Zotero 全局对象（用于测试注入）
  * @returns {Object} ItemPane 管理器实例
  */
 export function createItemPane(options) {
-  const { logger, lifecycle, uiFactory, i18n, pluginID, zotero } = options;
+  const { logger, lifecycle, uiFactory, i18n, pluginID, rootURI = "", zotero } = options;
 
   // 获取 Zotero 全局对象
   const Zotero = zotero || (typeof globalThis !== "undefined" && globalThis.Zotero);
@@ -48,6 +49,17 @@ export function createItemPane(options) {
    */
   function isAvailable() {
     return Boolean(Zotero && Zotero.ItemPaneManager);
+  }
+
+  function resolveURI(uri) {
+    if (!uri) {
+      return uri;
+    }
+    const normalized = String(uri);
+    if (/^[a-z][a-z0-9+.-]*:/iu.test(normalized) || normalized.startsWith("/")) {
+      return normalized;
+    }
+    return `${rootURI}${normalized}`;
   }
 
   /**
@@ -116,7 +128,10 @@ export function createItemPane(options) {
         config.header = {};
         config.header.l10nID = header.l10nID;
         if (header.icon) {
-          config.header.icon = header.icon;
+          config.header.icon = resolveURI(header.icon);
+        }
+        if (header.darkIcon) {
+          config.header.darkIcon = resolveURI(header.darkIcon);
         }
       }
 
@@ -127,7 +142,10 @@ export function createItemPane(options) {
           config.sidenav.l10nID = sidenav.l10nID;
         }
         if (sidenav.icon) {
-          config.sidenav.icon = sidenav.icon;
+          config.sidenav.icon = resolveURI(sidenav.icon);
+        }
+        if (sidenav.darkIcon) {
+          config.sidenav.darkIcon = resolveURI(sidenav.darkIcon);
         }
         if (typeof sidenav.orderable === "boolean") {
           config.sidenav.orderable = sidenav.orderable;

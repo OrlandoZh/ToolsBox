@@ -316,6 +316,63 @@ describe("Agent Zotero E2E Lib", () => {
     assert.ok(result.issues.some((item) => item.includes("chrome-evaluation-timeout")));
   });
 
+  it("should accept workflow contract without legacy demo InfoRow and notifier surfaces", () => {
+    const result = evaluateCycle({
+      checks: {
+        pluginMounted: true,
+        apiMounted: true,
+        enabled: true,
+        primaryActionResult: true,
+        agentActionResult: true,
+        preferencePaneRegistered: true,
+        primaryActionCommandRegistered: true,
+        contextActionMenuRegistered: true,
+        officialMenuAPIAvailable: true,
+        itemPaneSections: 1,
+        itemPaneInfoRows: 0,
+        itemTreeColumns: 2,
+        notifierActiveCount: 0,
+        workflowContractVersion: 1,
+        workflowItemPaneSectionRegistered: true,
+        workflowItemMenuRegistered: true,
+        workflowCollectionMenuRegistered: true,
+        workflowReaderMenuRegistered: true,
+        workflowReaderToolbarRegistered: true,
+        workflowReaderViewContextRegistered: true,
+        workflowAnnotationContextRegistered: true,
+        readerEventAPIAvailable: true,
+        readerEventKnownTypeCount: 8,
+        readerEventProbeTypeCount: 8,
+        readerEventSyntheticFallbackAvailable: true,
+        readerEventToolbarHookObserved: true,
+      },
+      tests: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+      },
+      scenarios: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+        results: [],
+      },
+      logs: {
+        errorCount: 0,
+        warnCount: 0,
+        recentErrors: [],
+      },
+      visuals: {
+        attempted: false,
+      },
+    });
+
+    assert.equal(result.passed, true);
+    assert.equal(result.issues.some((issue) => issue.includes("InfoRow")), false);
+    assert.equal(result.issues.some((issue) => issue.includes("Notifier")), false);
+    assert.equal(result.issues.some((issue) => issue.includes("Reader 摘要")), false);
+  });
+
   it("should surface hang probe hints for transport-style stalls", () => {
     const result = evaluateCycle({
       checks: {
