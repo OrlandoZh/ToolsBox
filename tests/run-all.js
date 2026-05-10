@@ -177,5 +177,6 @@ import './features/test-annotation-manager.js';
 import './features/test-tab-manager-panel.js';
 import './features/test-margin-annotation.js';
 import './features/test-graph-view-enhanced.js';
+import './features/test-nested-tags.js';
 
 await runTests();
