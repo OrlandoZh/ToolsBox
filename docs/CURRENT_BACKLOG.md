@@ -36,12 +36,16 @@
 4. **Title Column Enhanced** - 标题列增强 (阅读进度条+状态emoji+背景色)
 5. **IF Column** - 影响因子列 (EasyScholar API集成,多字段显示,7天缓存)
 
-### ✅ P2 阶段一已完成 (2026-05-10)
+### ✅ P2 阶段二已完成 (2026-05-10)
 
-当前仓库已完成 **P2 Reader集成功能** (2个核心功能):
+当前仓库已完成 **P2 中优先级功能** (6个增强功能):
 
-1. **Margin Annotation** - PDF页边距批注显示 (Canvas层渲染,实时同步,文本截断)
-2. **Graph View Enhanced** - 关系图增强 (3种布局模式:force/tree/circular,3种主题,SVG渲染)
+1. **Nested Tags** - 层级标签显示 (#分隔符解析,可视化层级缩进)
+2. **View Groups** - 视图预设保存 (列可见性配置,快速切换)
+3. **PDF Background Color** - PDF背景色自定义 (Reader背景色设置)
+4. **Annotation Colors** - 批注颜色管理 (预定义颜色方案,分组管理)
+5. **AI Generate Tags** - OpenAI标签生成 (摘要提取,AI生成,缓存)
+6. **AI Generate Remark** - AI备注生成 (2-3句摘要,OpenAI集成)
 
 ### ✅ 技术债务已清理 (2026-05-09)
 

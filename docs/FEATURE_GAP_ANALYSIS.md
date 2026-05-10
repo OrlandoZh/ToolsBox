@@ -2,11 +2,11 @@
 
 **生成时间**: 2026-05-10 (最新更新)
 **对比基准**: `reference/zotero-style` (v6.0.4)
-**当前完成度**: 约66% (42/62功能)
+**当前完成度**: 约75% (48/62功能)
 
 ---
 
-## ✅ 已完成功能 (42个)
+## ✅ 已完成功能 (48个)
 
 ### P0 核心功能 (5个) - 已全部完成
 1. ✅ **Cited Count Column** - 引用次数列 (Semantic Scholar集成) - renderCell已修复
@@ -30,6 +30,14 @@
 ### P2 Reader集成 (2个) - 已全部完成
 14. ✅ **Margin Annotation** - PDF页边距批注显示 (Canvas层渲染)
 15. ✅ **Graph View Enhanced** - 关系图增强 (多布局+多主题)
+
+### P2 标签系统和Workflow (6个) - 已全部完成
+16. ✅ **Nested Tags** - 层级标签显示 (#分隔符解析)
+17. ✅ **View Groups** - 视图预设保存 (列可见性配置)
+18. ✅ **PDF Background Color** - PDF背景色自定义
+19. ✅ **Annotation Colors** - 批注颜色管理 (预定义方案)
+20. ✅ **AI Generate Tags** - OpenAI标签生成 (AI集成)
+21. ✅ **AI Generate Remark** - AI备注生成 (摘要生成)
 
 ### 基础设施功能 (25个)
 6. ✅ 插件生命周期管理
