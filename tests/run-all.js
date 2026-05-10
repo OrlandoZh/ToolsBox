@@ -178,5 +178,6 @@ import './features/test-tab-manager-panel.js';
 import './features/test-margin-annotation.js';
 import './features/test-graph-view-enhanced.js';
 import './features/test-nested-tags.js';
+import './features/view-groups.test.js';
 
 await runTests();
