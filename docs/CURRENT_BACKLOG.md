@@ -36,6 +36,13 @@
 4. **Title Column Enhanced** - 标题列增强 (阅读进度条+状态emoji+背景色)
 5. **IF Column** - 影响因子列 (EasyScholar API集成,多字段显示,7天缓存)
 
+### ✅ P2 阶段一已完成 (2026-05-10)
+
+当前仓库已完成 **P2 Reader集成功能** (2个核心功能):
+
+1. **Margin Annotation** - PDF页边距批注显示 (Canvas层渲染,实时同步,文本截断)
+2. **Graph View Enhanced** - 关系图增强 (3种布局模式:force/tree/circular,3种主题,SVG渲染)
+
 ### ✅ 技术债务已清理 (2026-05-09)
 
 - ✅ **cited-count-column renderCell修复** - 完整实现显示逻辑+排序支持

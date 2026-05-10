@@ -2,11 +2,11 @@
 
 **生成时间**: 2026-05-10 (最新更新)
 **对比基准**: `reference/zotero-style` (v6.0.4)
-**当前完成度**: 约63% (40/62功能)
+**当前完成度**: 约66% (42/62功能)
 
 ---
 
-## ✅ 已完成功能 (40个)
+## ✅ 已完成功能 (42个)
 
 ### P0 核心功能 (5个) - 已全部完成
 1. ✅ **Cited Count Column** - 引用次数列 (Semantic Scholar集成) - renderCell已修复
@@ -26,6 +26,10 @@
 11. ✅ **Publication Tags Column** - 期刊标签列 (SCI/SSCI/Q1-Q4徽章)
 12. ✅ **Title Column Enhanced** - 标题列增强 (进度+emoji+背景色)
 13. ✅ **IF Column** - 影响因子列 (EasyScholar API集成)
+
+### P2 Reader集成 (2个) - 已全部完成
+14. ✅ **Margin Annotation** - PDF页边距批注显示 (Canvas层渲染)
+15. ✅ **Graph View Enhanced** - 关系图增强 (多布局+多主题)
 
 ### 基础设施功能 (25个)
 6. ✅ 插件生命周期管理
@@ -56,21 +60,9 @@
 
 ---
 
-## ❌ 未完成功能 (22个)
+## ❌ 未完成功能 (20个)
 
-### 🔴 P2 Reader集成功能 (2个)
-
-#### 待开发功能
-31. ❌ **Margin Annotation** - 页边距批注
-  - PDF页边距显示
-  - 批注同步
-
-32. ❌ **Graph View增强** - 关系图增强
-  - 多种布局模式
-  - 主题切换
-  - 高级配置
-
-### 🟡 P2 中优先级功能 (12个)
+### 🔴 P2 中优先级功能 (12个)
 
 #### 标签系统增强
 41. ❌ **Nested Tags** - 嵌套标签
