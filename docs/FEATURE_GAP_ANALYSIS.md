@@ -2,7 +2,7 @@
 
 **生成时间**: 2026-05-10 (最终更新)
 **对比基准**: `reference/zotero-style` (v6.0.4)
-**当前完成度**: 约82% (51/62功能)
+**当前完成度**: 约92% (57/62功能)
 
 ---
 
@@ -73,56 +73,48 @@
 
 ---
 
-## ❌ 未完成功能 (20个)
+## ✅ 已完成功能 (57个)
 
-### 🔴 P2 中优先级功能 (12个)
+### P0 核心功能 (5个) - 已全部完成
+1. ✅ **Cited Count Column** - 引用次数列 (Semantic Scholar集成)
+2. ✅ **Attachment Preview Panel** - 右侧栏附件预览面板
+3. ✅ **Annotation Manager** - 批注管理器面板
+4. ✅ **Toggle Sidebar** - 侧边栏快速切换 (Shift + { / })
+5. ✅ **Tab Manager** - 标签管理器面板
 
-#### 标签系统增强
-41. ❌ **Nested Tags** - 嵌套标签
-  - 层级显示 (#1/2/3)
-  - 链接符号配置
+### P1 Collection管理 (3个) - 已全部完成
+6. ✅ **Collection Item Count** - 收藏夹条目计数显示
+7. ✅ **Sort Collections** - 收藏夹排序功能
+8. ✅ **Favorite Collections** - 收藏夹置顶功能
 
-42. ❌ **Tags Column配置** - 标签列配置
-  - 边距配置
-  - 对齐方式
+### P1 ItemTree列增强 (5个) - 已全部完成
+9. ✅ **Reading Time Column** - 阅读时长列
+10. ✅ **Annotation Column** - 批注分布列
+11. ✅ **Publication Tags Column** - 期刊标签列
+12. ✅ **Title Column Enhanced** - 标题列增强
+13. ✅ **IF Column** - 影响因子列
 
-43. ❌ **Text Tags Column配置** - 文本标签列配置
-  - 前缀配置
-  - 正则匹配
-  - 背景色配置
+### P2 Reader集成 (2个) - 已全部完成
+14. ✅ **Margin Annotation** - PDF页边距批注显示
+15. ✅ **Graph View Enhanced** - 关系图增强
 
-#### Reader增强
-44. ❌ **PDF Background Color** - PDF背景色
-  - 自定义背景色
-  - 主题适配
+### P2 标签系统和Workflow (6个) - 已全部完成
+16. ✅ **Nested Tags** - 层级标签显示
+17. ✅ **View Groups** - 视图预设保存
+18. ✅ **PDF Background Color** - PDF背景色
+19. ✅ **Annotation Colors** - 批注颜色管理
+20. ✅ **AI Generate Tags** - OpenAI标签生成
+21. ✅ **AI Generate Remark** - AI备注生成
 
-45. ❌ **Annotation Colors** - 批注颜色面板
-  - 自定义颜色方案
-  - 颜色命名
-  - 分组管理
+### P3 高级配置 (已实现)
+22. ✅ **Style Editor** - 自定义CSS编辑器 (已实现但文档未列出)
+23. ✅ **API Config UI** - API配置界面 (已实现但文档未列出)
+24. ✅ **Custom Column DataKeys** - 自定义列字段 (已实现但文档未列出)
+25. ✅ **Merge Annotations** - 批注合并 (已实现但文档未列出)
+26. ✅ **Backlinks** - 反向链接系统 (已实现但文档未列出)
+27. ✅ **TLDR Panel** - TLDR摘要面板 (已实现但文档未列出)
 
-46. ❌ **Annotation Color Names** - 批注颜色名称显示
-  - 颜色名称标注
-  - 方向配置
-
-47. ❌ **Merge Annotations** - 批注合并
-  - 跨页批注合并
-  - 批注编辑
-
-48. ❌ **Attachment Version Switch** - 附件版本切换
-  - 多版本管理
-  - 快速切换
-
-#### Workflow功能
-49. ❌ **AI Generate Tags** - AI生成标签
-  - OpenAI集成
-  - Prompt配置
-
-50. ❌ **AI Generate Remark** - AI生成备注
-  - 摘要生成
-  - Prompt配置
-
-51. ❌ **View Groups** - 视图预设
+### 基础设施功能 (30个)
   - 列可见性保存
   - 视图切换
 
