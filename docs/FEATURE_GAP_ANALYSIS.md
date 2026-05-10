@@ -1,45 +1,50 @@
 # Zotero-Style 功能复刻差距分析
 
-**生成时间**: 2026-05-10 (最新更新)
+**生成时间**: 2026-05-10 (最终更新)
 **对比基准**: `reference/zotero-style` (v6.0.4)
-**当前完成度**: 约75% (48/62功能)
+**当前完成度**: 约82% (51/62功能)
 
 ---
 
-## ✅ 已完成功能 (48个)
+## ✅ 已完成功能 (51个)
 
 ### P0 核心功能 (5个) - 已全部完成
-1. ✅ **Cited Count Column** - 引用次数列 (Semantic Scholar集成) - renderCell已修复
-2. ✅ **Attachment Preview Panel** - 右侧栏附件预览面板 - 测试已补充
-3. ✅ **Annotation Manager** - 批注管理器面板 - 测试已补充
-4. ✅ **Toggle Sidebar** - 侧边栏快速切换 (Shift + { / }) - 测试已补充
-5. ✅ **Tab Manager** - 标签管理器面板 - 测试已补充
+1. ✅ **Cited Count Column** - 引用次数列 (Semantic Scholar集成)
+2. ✅ **Attachment Preview Panel** - 右侧栏附件预览面板
+3. ✅ **Annotation Manager** - 批注管理器面板
+4. ✅ **Toggle Sidebar** - 侧边栏快速切换 (Shift + { / })
+5. ✅ **Tab Manager** - 标签管理器面板
 
 ### P1 Collection管理 (3个) - 已全部完成
-6. ✅ **Collection Item Count** - 收藏夹条目计数显示 - API命名已统一
-7. ✅ **Sort Collections** - 收藏夹排序功能 - API命名已统一
-8. ✅ **Favorite Collections** - 收藏夹置顶功能 - API命名已统一
+6. ✅ **Collection Item Count** - 收藏夹条目计数显示
+7. ✅ **Sort Collections** - 收藏夹排序功能
+8. ✅ **Favorite Collections** - 收藏夹置顶功能
 
 ### P1 ItemTree列增强 (5个) - 已全部完成
-9. ✅ **Reading Time Column** - 阅读时长列 (进度条+文本显示)
-10. ✅ **Annotation Column** - 批注分布列 (条形图/圆点图)
-11. ✅ **Publication Tags Column** - 期刊标签列 (SCI/SSCI/Q1-Q4徽章)
-12. ✅ **Title Column Enhanced** - 标题列增强 (进度+emoji+背景色)
-13. ✅ **IF Column** - 影响因子列 (EasyScholar API集成)
+9. ✅ **Reading Time Column** - 阅读时长列
+10. ✅ **Annotation Column** - 批注分布列
+11. ✅ **Publication Tags Column** - 期刊标签列
+12. ✅ **Title Column Enhanced** - 标题列增强
+13. ✅ **IF Column** - 影响因子列
 
 ### P2 Reader集成 (2个) - 已全部完成
-14. ✅ **Margin Annotation** - PDF页边距批注显示 (Canvas层渲染)
-15. ✅ **Graph View Enhanced** - 关系图增强 (多布局+多主题)
+14. ✅ **Margin Annotation** - PDF页边距批注显示
+15. ✅ **Graph View Enhanced** - 关系图增强
 
 ### P2 标签系统和Workflow (6个) - 已全部完成
-16. ✅ **Nested Tags** - 层级标签显示 (#分隔符解析)
-17. ✅ **View Groups** - 视图预设保存 (列可见性配置)
-18. ✅ **PDF Background Color** - PDF背景色自定义
-19. ✅ **Annotation Colors** - 批注颜色管理 (预定义方案)
-20. ✅ **AI Generate Tags** - OpenAI标签生成 (AI集成)
-21. ✅ **AI Generate Remark** - AI备注生成 (摘要生成)
+16. ✅ **Nested Tags** - 层级标签显示
+17. ✅ **View Groups** - 视图预设保存
+18. ✅ **PDF Background Color** - PDF背景色
+19. ✅ **Annotation Colors** - 批注颜色管理
+20. ✅ **AI Generate Tags** - OpenAI标签生成
+21. ✅ **AI Generate Remark** - AI备注生成
 
-### 基础设施功能 (25个)
+### P3 高级配置 (3个) - 已完成
+22. ✅ **Tags Column Config** - 标签列配置
+23. ✅ **Text Tags Column Config** - 文本标签列配置
+24. ✅ **Date Format Customization** - 日期格式定制
+
+### 基础设施功能 (27个)
 6. ✅ 插件生命周期管理
 7. ✅ 国际化支持 (en-US, zh-CN, zh-TW)
 8. ✅ 偏好设置面板
