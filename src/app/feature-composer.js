@@ -18,6 +18,8 @@ import { createReadingTimeColumn } from "../features/reading-time-column.js";
 import { createAnnotationColumn } from "../features/annotation-column.js";
 import { createPublicationTagsColumn } from "../features/publication-tags-column.js";
 import { createTitleColumnEnhanced } from "../features/title-column-enhanced.js";
+import { createIFColumn } from "../features/if-column.js";
+import { createEasyScholarClient } from "../services/easyscholar-client.js";
 
 const PREFERENCE_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
 const PREFERENCE_INIT_API_KEY = "initCleanroomPreferences";
@@ -428,6 +430,27 @@ export function createFeatureComposer({
 
         if (titleColumnEnhanced.register()) {
           logger.info("features.titleColumnEnhanced.registered");
+        }
+      }
+
+      if (prefs.get("ifColumn.enabled") !== false) {
+        const easyscholarClient = createEasyScholarClient({
+          apiKey: prefs.get("easyscholar.apiKey") || "",
+          timeout: 5000,
+          cacheTTL: 300000,
+          logger
+        });
+
+        const ifColumn = createIFColumn({
+          logger,
+          i18n,
+          zotero: Zotero,
+          prefs,
+          easyscholarClient
+        });
+
+        if (ifColumn.register()) {
+          logger.info("features.ifColumn.registered");
         }
       }
 
