@@ -54,6 +54,12 @@
     "collectionItemCount.enabled": true,
     "collectionSort.enabled": true,
     "favoriteCollections.enabled": true,
-    "favoriteCollections": []
+    "favoriteCollections": [],
+    "readTimeColumn.enabled": true,
+    "readTimeColumn.max": 600,
+    "readTimeColumn.color": "#468B97",
+    "readTimeColumn.opacity": "0.7",
+    "readTimeColumn.progress": true,
+    "readTimeColumn.text": true
   }
 }

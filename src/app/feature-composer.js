@@ -14,6 +14,7 @@ import { createTabManagerPanel } from "../features/tab-manager-panel.js";
 import { createCollectionItemCount } from "../features/collection-item-count.js";
 import { createCollectionSort } from "../features/collection-sort.js";
 import { createFavoriteCollections } from "../features/favorite-collections.js";
+import { createReadingTimeColumn } from "../features/reading-time-column.js";
 
 const PREFERENCE_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
 const PREFERENCE_INIT_API_KEY = "initCleanroomPreferences";
@@ -292,7 +293,7 @@ export function createFeatureComposer({
           i18n,
           zotero: Zotero
         });
-        
+
         if (menuManager.isOfficialAPIAvailable()) {
           menuManager.registerItemMenuItem({
             id: 'toolsbox-open-annotation-manager',
@@ -302,7 +303,7 @@ export function createFeatureComposer({
             }
           });
         }
-        
+
         logger.info("features.annotationManager.registered");
       }
 
@@ -372,6 +373,19 @@ export function createFeatureComposer({
 
         if (favoriteCollections.register()) {
           logger.info("features.favoriteCollections.registered");
+        }
+      }
+
+      if (prefs.get("readTimeColumn.enabled") !== false) {
+        const readingTimeColumn = createReadingTimeColumn({
+          logger,
+          i18n,
+          zotero: Zotero,
+          prefs
+        });
+
+        if (readingTimeColumn.register()) {
+          logger.info("features.readingTimeColumn.registered");
         }
       }
 
