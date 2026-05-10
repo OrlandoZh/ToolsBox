@@ -20,6 +20,7 @@ import { createPublicationTagsColumn } from "../features/publication-tags-column
 import { createTitleColumnEnhanced } from "../features/title-column-enhanced.js";
 import { createIFColumn } from "../features/if-column.js";
 import { createEasyScholarClient } from "../services/easyscholar-client.js";
+import { createMarginAnnotation } from "../features/margin-annotation.js";
 
 const PREFERENCE_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
 const PREFERENCE_INIT_API_KEY = "initCleanroomPreferences";
@@ -451,6 +452,19 @@ export function createFeatureComposer({
 
         if (ifColumn.register()) {
           logger.info("features.ifColumn.registered");
+        }
+      }
+
+      if (prefs.get("marginAnnotation.enabled") !== false) {
+        const marginAnnotation = createMarginAnnotation({
+          logger,
+          i18n,
+          zotero: Zotero,
+          prefs
+        });
+
+        if (marginAnnotation.register()) {
+          logger.info("features.marginAnnotation.registered");
         }
       }
 

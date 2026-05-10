@@ -295,3 +295,16 @@ toolsbox-pref-if-cache-expiry =
     .value = Cache expiry (days)
 toolsbox-pref-if-color-mapping =
     .value = Quartile color mapping
+# Margin Annotation
+toolsbox-margin-annotation = Margin Annotations
+toolsbox-margin-annotation-tooltip = Show annotations in page margin
+toolsbox-pref-margin-section =
+    .label = Margin Annotation Settings
+toolsbox-pref-margin-width =
+    .value = Margin width (px)
+toolsbox-pref-margin-color =
+    .value = Annotation color
+toolsbox-pref-margin-opacity =
+    .value = Opacity
+toolsbox-pref-margin-font-size =
+    .value = Font size
