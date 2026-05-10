@@ -26,6 +26,16 @@
 2. **Sort Collections** - 收藏夹排序功能 (名称/条目数/日期)
 3. **Favorite Collections** - 收藏夹置顶功能 (星标+自动置顶)
 
+### ✅ P1 阶段二已完成 (2026-05-10)
+
+当前仓库已完成 **P1 ItemTree列增强功能** (5个高级列):
+
+1. **Reading Time Column** - 阅读时长列 (进度条+文本显示,支持分钟→小时格式转换)
+2. **Annotation Column** - 批注分布列 (条形图/圆点图两种可视化风格)
+3. **Publication Tags Column** - 期刊标签列 (SCI/SSCI/Q1-Q4排名徽章)
+4. **Title Column Enhanced** - 标题列增强 (阅读进度条+状态emoji+背景色)
+5. **IF Column** - 影响因子列 (EasyScholar API集成,多字段显示,7天缓存)
+
 ### ✅ 技术债务已清理 (2026-05-09)
 
 - ✅ **cited-count-column renderCell修复** - 完整实现显示逻辑+排序支持

@@ -1,12 +1,12 @@
 # Zotero-Style 功能复刻差距分析
 
-**生成时间**: 2026-05-09 (最新更新)
+**生成时间**: 2026-05-10 (最新更新)
 **对比基准**: `reference/zotero-style` (v6.0.4)
-**当前完成度**: 约55% (35/62功能)
+**当前完成度**: 约63% (40/62功能)
 
 ---
 
-## ✅ 已完成功能 (35个)
+## ✅ 已完成功能 (40个)
 
 ### P0 核心功能 (5个) - 已全部完成
 1. ✅ **Cited Count Column** - 引用次数列 (Semantic Scholar集成) - renderCell已修复
@@ -19,6 +19,13 @@
 6. ✅ **Collection Item Count** - 收藏夹条目计数显示 - API命名已统一
 7. ✅ **Sort Collections** - 收藏夹排序功能 - API命名已统一
 8. ✅ **Favorite Collections** - 收藏夹置顶功能 - API命名已统一
+
+### P1 ItemTree列增强 (5个) - 已全部完成
+9. ✅ **Reading Time Column** - 阅读时长列 (进度条+文本显示)
+10. ✅ **Annotation Column** - 批注分布列 (条形图/圆点图)
+11. ✅ **Publication Tags Column** - 期刊标签列 (SCI/SSCI/Q1-Q4徽章)
+12. ✅ **Title Column Enhanced** - 标题列增强 (进度+emoji+背景色)
+13. ✅ **IF Column** - 影响因子列 (EasyScholar API集成)
 
 ### 基础设施功能 (25个)
 6. ✅ 插件生命周期管理
@@ -49,44 +56,16 @@
 
 ---
 
-## ❌ 未完成功能 (27个)
+## ❌ 未完成功能 (22个)
 
-### 🔴 P1 高优先级功能 (5个) - ItemTree列增强
+### 🔴 P2 Reader集成功能 (2个)
 
 #### 待开发功能
-31. ❌ **Reading Time Column** - 阅读时长列 (最简单,优先开发)
-  - 阅读时间统计
-  - 进度条显示
-  - 最大值配置
-
-32. ❌ **Annotation Column** - 批注分布列 (中等)
-  - PDF批注可视化
-  - 条形图/圆点图显示
-  - 颜色自定义
-
-33. ❌ **Publication Tags Column** - 期刊标签列 (中等)
-  - 期刊排名标签 (SCI, SSCI, IF等)
-  - 颜色映射
-  - 排序支持
-
-34. ❌ **Title Column增强** - 标题列增强 (中等)
-  - 阅读进度可视化
-  - 标签显示
-  - 自定义颜色
-  - 翻译切换
-
-35. ❌ **IF Column** - 影响因子列 (最复杂)
-  - EasyScholar API集成
-  - 多字段显示 (SCIIF, SCI, UTD24, AJG等)
-  - 进度条可视化
-  - 颜色映射
-
-#### Reader集成 (2个)
-36. ❌ **Margin Annotation** - 页边距批注
+31. ❌ **Margin Annotation** - 页边距批注
   - PDF页边距显示
   - 批注同步
 
-37. ❌ **Graph View增强** - 关系图增强
+32. ❌ **Graph View增强** - 关系图增强
   - 多种布局模式
   - 主题切换
   - 高级配置
