@@ -260,3 +260,10 @@ toolsbox-pref-annotation-color =
     .value = Color
 toolsbox-pref-annotation-opacity =
     .value = Opacity
+# Publication Tags Column
+toolsbox-column-publication-tags = Publication Tags
+toolsbox-column-publication-tags-tooltip = Journal ranking badges (SCI, SSCI, IF)
+toolsbox-pref-publication-tags-section =
+    .label = Publication Tags Settings
+toolsbox-pref-publication-tags =
+    .label = Enable publication tags column
