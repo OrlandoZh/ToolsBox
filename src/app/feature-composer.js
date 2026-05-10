@@ -24,6 +24,10 @@ import { createMarginAnnotation } from "../features/margin-annotation.js";
 import { createPDFBackgroundColor } from "../features/pdf-background-color.js";
 import { createGraphViewEnhanced } from "../features/graph-view-enhanced.js";
 import { createViewGroups } from "../features/view-groups.js";
+import { createAnnotationColors } from "../features/annotation-colors.js";
+import { createOpenAIClient } from "../services/openai-client.js";
+import { createAIGenerateTags } from "../features/ai-generate-tags.js";
+import { createAIGenerateRemark } from "../features/ai-generate-remark.js";
 
 const PREFERENCE_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
 const PREFERENCE_INIT_API_KEY = "initCleanroomPreferences";
@@ -507,6 +511,59 @@ export function createFeatureComposer({
 
         if (viewGroups.register()) {
           logger.info("features.viewGroups.registered");
+        }
+      }
+
+      if (prefs.get("annotationColors.enabled") !== false) {
+        const annotationColors = createAnnotationColors({
+          logger,
+          zotero: Zotero
+        });
+
+        if (annotationColors.register()) {
+          logger.info("features.annotationColors.registered");
+        }
+      }
+
+      if (prefs.get("aiGenerateTags.enabled") !== false) {
+        const openaiClient = createOpenAIClient({
+          apiKey: prefs.get("openai.apiKey") || "",
+          baseUrl: prefs.get("openai.baseUrl"),
+          model: prefs.get("openai.model") || "gpt-3.5-turbo",
+          timeout: prefs.get("openai.timeout") || 5000,
+          logger
+        });
+
+        const aiGenerateTags = createAIGenerateTags({
+          logger,
+          zotero: Zotero,
+          prefs,
+          client: openaiClient
+        });
+
+        if (aiGenerateTags.register()) {
+          logger.info("features.aiGenerateTags.registered");
+        }
+      }
+
+      if (prefs.get("aiGenerateRemark.enabled") !== false) {
+        const openaiClient = createOpenAIClient({
+          apiKey: prefs.get("openai.apiKey") || "",
+          baseUrl: prefs.get("openai.baseUrl"),
+          model: prefs.get("openai.model") || "gpt-3.5-turbo",
+          timeout: prefs.get("openai.timeout") || 5000,
+          logger
+        });
+
+        const aiGenerateRemark = createAIGenerateRemark({
+          logger,
+          zotero: Zotero,
+          prefs,
+          client: openaiClient
+        });
+
+        if (aiGenerateRemark.register()) {
+          logger.info("features.aiGenerateRemark.registered");
         }
       }
 
