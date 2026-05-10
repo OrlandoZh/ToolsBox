@@ -176,5 +176,6 @@ import './features/test-cited-count-column.js';
 import './features/test-annotation-manager.js';
 import './features/test-tab-manager-panel.js';
 import './features/test-margin-annotation.js';
+import './features/test-graph-view-enhanced.js';
 
 await runTests();

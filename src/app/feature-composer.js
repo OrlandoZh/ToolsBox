@@ -21,6 +21,7 @@ import { createTitleColumnEnhanced } from "../features/title-column-enhanced.js"
 import { createIFColumn } from "../features/if-column.js";
 import { createEasyScholarClient } from "../services/easyscholar-client.js";
 import { createMarginAnnotation } from "../features/margin-annotation.js";
+import { createGraphViewEnhanced } from "../features/graph-view-enhanced.js";
 
 const PREFERENCE_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
 const PREFERENCE_INIT_API_KEY = "initCleanroomPreferences";
@@ -465,6 +466,19 @@ export function createFeatureComposer({
 
         if (marginAnnotation.register()) {
           logger.info("features.marginAnnotation.registered");
+        }
+      }
+
+      if (prefs.get("graphView.enabled") !== false) {
+        const graphViewEnhanced = createGraphViewEnhanced({
+          logger,
+          i18n,
+          zotero: Zotero,
+          prefs
+        });
+
+        if (graphViewEnhanced.register()) {
+          logger.info("features.graphViewEnhanced.registered");
         }
       }
 
