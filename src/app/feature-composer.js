@@ -15,6 +15,7 @@ import { createCollectionItemCount } from "../features/collection-item-count.js"
 import { createCollectionSort } from "../features/collection-sort.js";
 import { createFavoriteCollections } from "../features/favorite-collections.js";
 import { createReadingTimeColumn } from "../features/reading-time-column.js";
+import { createAnnotationColumn } from "../features/annotation-column.js";
 
 const PREFERENCE_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
 const PREFERENCE_INIT_API_KEY = "initCleanroomPreferences";
@@ -386,6 +387,19 @@ export function createFeatureComposer({
 
         if (readingTimeColumn.register()) {
           logger.info("features.readingTimeColumn.registered");
+        }
+      }
+
+      if (prefs.get("annotationColumn.enabled") !== false) {
+        const annotationColumn = createAnnotationColumn({
+          logger,
+          i18n,
+          zotero: Zotero,
+          prefs
+        });
+
+        if (annotationColumn.register()) {
+          logger.info("features.annotationColumn.registered");
         }
       }
 
