@@ -121,17 +121,32 @@
                 return matchesFilter && matchesSearch;
             });
             
-            annotationList.innerHTML = filtered.map(ann => `
-                <div class="annotation-item" data-id="${ann.id}">
-                    <div class="annotation-text">
-                        <span class="annotation-color" style="background: ${ann.color || '#ffd700'}"></span>
-                        ${ann.text}
-                    </div>
-                    <div class="annotation-meta">
-                        Page ${ann.page} • ${ann.type}
-                    </div>
-                </div>
-            `).join('');
+            annotationList.innerHTML = '';
+            filtered.forEach(ann => {
+                const item = document.createElement('div');
+                item.className = 'annotation-item';
+                item.dataset.id = ann.id;
+                
+                const textDiv = document.createElement('div');
+                textDiv.className = 'annotation-text';
+                
+                const colorSpan = document.createElement('span');
+                colorSpan.className = 'annotation-color';
+                colorSpan.style.background = ann.color || '#ffd700';
+                textDiv.appendChild(colorSpan);
+                
+                const textSpan = document.createElement('span');
+                textSpan.textContent = ann.text;
+                textDiv.appendChild(textSpan);
+                
+                const metaDiv = document.createElement('div');
+                metaDiv.className = 'annotation-meta';
+                metaDiv.textContent = `Page ${ann.page} • ${ann.type}`;
+                
+                item.appendChild(textDiv);
+                item.appendChild(metaDiv);
+                annotationList.appendChild(item);
+            });
         }
         
         // Event listeners
