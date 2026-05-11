@@ -61,7 +61,7 @@ export function createOpenAIClient(options = {}) {
       if (!response.ok) {
         const errorText = await response.text();
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-        
+
         try {
           const errorJson = JSON.parse(errorText);
           errorMessage = errorJson.error?.message || errorMessage;
@@ -75,7 +75,7 @@ export function createOpenAIClient(options = {}) {
         return {
           success: false,
           error: errorMessage,
-          errorType: response.status === 401 ? 'auth' : 
+          errorType: response.status === 401 ? 'auth' :
                      response.status === 429 ? 'rate_limit' : 'http'
         };
       }

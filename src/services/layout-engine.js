@@ -10,11 +10,11 @@ export function createLayoutEngine(options) {
 
   function applyForceLayout(nodes, edges) {
     if (nodes.length === 0) return;
-    
+
     const centerX = 400;
     const centerY = 300;
     const spread = 200;
-    
+
     if (nodes.length === 1) {
       nodes[0].x = centerX;
       nodes[0].y = centerY;
@@ -36,11 +36,11 @@ export function createLayoutEngine(options) {
 
         nodes.forEach(other => {
           if (node.id === other.id) return;
-          
+
           const dx = node.x - other.x;
           const dy = node.y - other.y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          
+
           const repulsion = 50 / dist;
           vx += (dx / dist) * repulsion;
           vy += (dy / dist) * repulsion;
@@ -68,7 +68,7 @@ export function createLayoutEngine(options) {
       nodes.forEach(node => {
         node.x += node.vx || 0;
         node.y += node.vy || 0;
-        
+
         node.x = Math.max(50, Math.min(750, node.x));
         node.y = Math.max(50, Math.min(550, node.y));
       });
@@ -97,7 +97,7 @@ export function createLayoutEngine(options) {
     for (let level = 0; level <= maxLevel; level++) {
       const levelNodes = levels[level] || [];
       const count = levelNodes.length;
-      
+
       levelNodes.forEach((node, i) => {
         const offsetX = (count - 1) * nodeSpacing / 2;
         node.x = centerX - offsetX + i * nodeSpacing;

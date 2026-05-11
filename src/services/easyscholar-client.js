@@ -1,6 +1,6 @@
 /**
  * EasyScholar API client for fetching journal impact factor metrics
- * 
+ *
  * API Documentation:
  * - Base URL: https://api.easyscholar.cc
  * - Endpoint: GET /journal/metrics?name={journalName}
@@ -42,7 +42,7 @@ export function createEasyScholarClient(options = {}) {
     while (requestTimestamps.length > 0 && requestTimestamps[0] < windowStart) {
       requestTimestamps.shift();
     }
-    
+
     if (requestTimestamps.length >= RATE_LIMIT_PER_MINUTE) {
       logger?.debug?.('easyscholar.rateLimited', {
         requests: requestTimestamps.length,
@@ -50,7 +50,7 @@ export function createEasyScholarClient(options = {}) {
       });
       return false;
     }
-    
+
     requestTimestamps.push(now);
     return true;
   }
@@ -95,7 +95,7 @@ export function createEasyScholarClient(options = {}) {
    * Get journal metrics from EasyScholar API
    * @param {string} journalName - Journal name to query
    * @returns {Promise<Object|null>} Journal metrics or null if not found
-   * 
+   *
    * Response fields:
    * - sciIF: Science Citation Index Impact Factor (number)
    * - sciQ: SCI Quartile (Q1, Q2, Q3, Q4)
