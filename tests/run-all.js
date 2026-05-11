@@ -179,5 +179,12 @@ import './features/test-margin-annotation.js';
 import './features/test-graph-view-enhanced.js';
 import './features/test-nested-tags.js';
 import './features/view-groups.test.js';
+import './ai-generate-remark.test.js';
+import './ai-generate-tags.test.js';
+import './annotation-colors.test.js';
+import './annotation-manager.test.js';
+import './attachment-preview.test.js';
+import './sidebar-toggle.test.js';
+import './tab-manager-panel.test.js';
 
 await runTests();

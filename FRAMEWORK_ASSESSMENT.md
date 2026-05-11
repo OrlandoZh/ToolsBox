@@ -102,20 +102,9 @@
 Assessment 对“当前完成度 / 当前主线 / 当前剩余项”的判断只认 `docs/CURRENT_BACKLOG.md` 的“当前单一事实源”；这里通过自动同步摘要块复述，不再手写第二套 fresh 结论。
 
 <!-- CURRENT-TRUTH-SUMMARY:START -->
-**更新时间**: 2026-05-11
-**完成度**: 85% (UI层已补齐)
-**状态**: npm run check 验证中
-
-**已完成**:
-- ✅ Phase 1: 文档清理和更正
-- ✅ Phase 2.1: Format修复
-- ✅ Phase 2.2-2.4: Preference Pane UI + HTML资产 + 配置
-
-**进行中**:
-- ⏳ Phase 3: npm run check验证
-
-**待办**:
-- Phase 4: 真机测试
+**验证状态**: npm run check部分通过
+**功能状态**: Style复刻为partial/prototype
+**阻塞点**: npm test需改进测试覆盖
 <!-- CURRENT-TRUTH-SUMMARY:END -->
 
 历史收口层面，以下结论仍然成立：
