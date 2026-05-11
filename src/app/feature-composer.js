@@ -597,3 +597,4 @@ export function createFeatureComposer({
     registerBaselineFeatures,
   };
 }
+
