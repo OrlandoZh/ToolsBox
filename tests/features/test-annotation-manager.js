@@ -44,18 +44,18 @@ describe("AnnotationManager", () => {
         };
       }
     };
-    
+
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const manager = createAnnotationManager({
       logger: mockLogger,
       i18n: mockI18n,
       zotero: mockZotero
     });
-    
+
     await manager.open();
-    
+
     assert.ok(manager.isOpen(), "Manager should be open after open() call");
   });
 
@@ -67,7 +67,7 @@ describe("AnnotationManager", () => {
         focusCalled = true;
       }
     };
-    
+
     const mockZotero = {
       getMainWindow: function() {
         return {
@@ -77,19 +77,19 @@ describe("AnnotationManager", () => {
         };
       }
     };
-    
+
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const manager = createAnnotationManager({
       logger: mockLogger,
       i18n: mockI18n,
       zotero: mockZotero
     });
-    
+
     await manager.open();
     await manager.open();
-    
+
     assert.ok(focusCalled, "Focus should be called on existing window");
   });
 
@@ -103,7 +103,7 @@ describe("AnnotationManager", () => {
       },
       focus: function() {}
     };
-    
+
     const mockZotero = {
       getMainWindow: function() {
         return {
@@ -113,19 +113,19 @@ describe("AnnotationManager", () => {
         };
       }
     };
-    
+
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const manager = createAnnotationManager({
       logger: mockLogger,
       i18n: mockI18n,
       zotero: mockZotero
     });
-    
+
     await manager.open();
     manager.close();
-    
+
     assert.ok(closed, "Window should be closed");
     assert.ok(!manager.isOpen(), "Manager should not be open after close()");
   });

@@ -91,18 +91,18 @@ describe('MarginAnnotation', () => {
       },
       _itemID: 12345
     };
-    
+
     const margin = createMarginAnnotation({
       logger: mockLogger,
       width: 200
     });
-    
+
     const canvas = margin.createLayer(mockReader);
-    
+
     expect(canvas).toBeDefined();
     expect(canvas.width).toBe(200);
   });
-  
+
   it('should render annotations in margin', () => {
     const mockCtx = {
       clearRect: sinon.spy(),
@@ -110,24 +110,24 @@ describe('MarginAnnotation', () => {
       fillRect: sinon.spy(),
       measureText: sinon.stub().returns({ width: 100 })
     };
-    
+
     const margin = createMarginAnnotation({ logger: mockLogger });
-    
+
     const annotations = [
       { position: { pageIndex: 0, rects: [[0, 100, 500, 120]] }, text: 'Important point' },
       { position: { pageIndex: 0, rects: [[0, 200, 500, 220]] }, text: 'Key finding' }
     ];
-    
+
     margin.renderAnnotations(mockCtx, annotations, { width: 200, height: 800 });
-    
+
     expect(mockCtx.fillText.calledTwice).toBe(true);
   });
-  
+
   it('should handle reader resize', () => {
     const margin = createMarginAnnotation({ logger: mockLogger });
-    
+
     margin.resize(300, 900);
-    
+
     expect(margin.getWidth()).toBe(300);
     expect(margin.getHeight()).toBe(900);
   });
@@ -150,26 +150,26 @@ Expected: FAIL with "Cannot find module '../../src/features/margin-annotation.js
 export function createMarginAnnotation(options) {
   const { logger, i18n, zotero, prefs } = options;
   const Zotero = zotero || globalThis.Zotero;
-  
+
   const width = prefs?.get?.('marginAnnotation.width') || 200;
   const color = prefs?.get?.('marginAnnotation.color') || '#86C8BC';
   const opacity = parseFloat(prefs?.get?.('marginAnnotation.opacity') || '0.7');
   const fontSize = parseInt(prefs?.get?.('marginAnnotation.fontSize') || '12');
   const lineHeight = parseInt(prefs?.get?.('marginAnnotation.lineHeight') || '16');
-  
+
   let canvas = null;
   let ctx = null;
   let currentReader = null;
   let height = 0;
-  
+
   function createLayer(reader) {
     if (!reader || !reader._iframeWindow) {
       logger.error('marginAnnotation.create.failed', { reason: 'Invalid reader' });
       return null;
     }
-    
+
     currentReader = reader;
-    
+
     const doc = reader._iframeWindow.document;
     canvas = doc.createElement('canvas');
     canvas.className = 'margin-annotation-layer';
@@ -186,97 +186,97 @@ export function createMarginAnnotation(options) {
       z-index: 9999;
       pointer-events: auto;
     `;
-    
+
     ctx = canvas.getContext('2d');
-    
+
     doc.body.appendChild(canvas);
-    
+
     logger.debug('marginAnnotation.layer.created', { width, height: canvas.height });
     return canvas;
   }
-  
+
   function renderAnnotations(annotations, viewport) {
     if (!ctx || !canvas) return;
-    
+
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
+
     if (!annotations || annotations.length === 0) {
       logger.debug('marginAnnotation.noAnnotations');
       return;
     }
-    
+
     const scale = viewport.height / canvas.height;
-    
+
     ctx.font = `${fontSize}px Arial, sans-serif`;
     ctx.fillStyle = color;
     ctx.globalAlpha = opacity;
-    
+
     annotations.forEach((ann, i) => {
       const y = i * (lineHeight + 5) + 10;
-      
+
       // Draw background
       ctx.fillStyle = 'rgba(134, 200, 188, 0.1)';
       ctx.fillRect(0, y - 5, width, lineHeight + 5);
-      
+
       // Draw text
       ctx.fillStyle = color;
       const text = ann.text.length > 30 ? ann.text.substring(0, 30) + '...' : ann.text;
       ctx.fillText(text, 10, y + fontSize - 2);
     });
-    
+
     logger.debug('marginAnnotation.rendered', { count: annotations.length });
   }
-  
+
   function resize(newWidth, newHeight) {
     if (!canvas) return;
-    
+
     if (newWidth) {
       canvas.width = newWidth;
       canvas.style.width = `${newWidth}px`;
     }
-    
+
     if (newHeight) {
       canvas.height = newHeight;
       canvas.style.height = `${newHeight}px`;
     }
-    
+
     height = newHeight || height;
-    
+
     logger.debug('marginAnnotation.resized', { width: canvas.width, height: canvas.height });
   }
-  
+
   function destroy() {
     if (canvas && canvas.parentNode) {
       canvas.parentNode.removeChild(canvas);
     }
-    
+
     canvas = null;
     ctx = null;
     currentReader = null;
-    
+
     logger.debug('marginAnnotation.destroyed');
   }
-  
+
   function register() {
     // 监听Reader打开事件
     Zotero.Reader.on('open', (reader) => {
       logger.debug('marginAnnotation.reader.opened', { itemID: reader._itemID });
-      
+
       createLayer(reader);
-      
+
       // 获取批注数据
       const annotations = Zotero.Annotations.getByItemID(reader._itemID);
       renderAnnotations(annotations, { width, height: canvas.height });
     });
-    
+
     // 监听Reader关闭事件
     Zotero.Reader.on('close', (reader) => {
       if (currentReader === reader) {
         destroy();
       }
     });
-    
+
     // 监听批注变化
     Zotero.Notifier.registerObserver({
       notify: (event, type, ids) => {
@@ -286,11 +286,11 @@ export function createMarginAnnotation(options) {
         }
       }
     }, ['annotation']);
-    
+
     logger.info('marginAnnotation.registered');
     return true;
   }
-  
+
   return {
     register,
     createLayer,
@@ -349,7 +349,7 @@ if (readBooleanPref(prefs, 'marginAnnotation.enabled', true)) {
     zotero: Zotero,
     prefs
   });
-  
+
   if (marginAnnotation.register()) {
     logger.info('features.marginAnnotation.registered');
   }
@@ -389,40 +389,40 @@ import { createGraphViewEnhanced } from '../../src/features/graph-view-enhanced.
 describe('GraphViewEnhanced', () => {
   it('should support multiple layout modes', () => {
     const graph = createGraphViewEnhanced({ logger: mockLogger });
-    
+
     expect(graph.getLayouts()).toEqual(['force', 'tree', 'circular']);
     expect(graph.getCurrentLayout()).toBe('force');
   });
-  
+
   it('should switch layout dynamically', () => {
     const graph = createGraphViewEnhanced({ logger: mockLogger });
-    
+
     graph.setLayout('tree');
-    
+
     expect(graph.getCurrentLayout()).toBe('tree');
   });
-  
+
   it('should support theme switching', () => {
     const graph = createGraphViewEnhanced({ logger: mockLogger });
-    
+
     expect(graph.getThemes()).toEqual(['light', 'dark', 'colorful']);
-    
+
     graph.setTheme('dark');
-    
+
     expect(graph.getCurrentTheme()).toBe('dark');
   });
-  
+
   it('should render nodes and edges correctly', () => {
     const mockContainer = {
       appendChild: sinon.spy(),
       querySelector: sinon.stub().returns(null)
     };
-    
+
     const graph = createGraphViewEnhanced({
       logger: mockLogger,
       container: mockContainer
     });
-    
+
     const data = {
       nodes: [
         { id: '1', label: 'Paper A' },
@@ -432,9 +432,9 @@ describe('GraphViewEnhanced', () => {
         { source: '1', target: '2' }
       ]
     };
-    
+
     graph.render(data);
-    
+
     expect(mockContainer.appendChild.called).toBe(true);
   });
 });
@@ -455,7 +455,7 @@ Expected: FAIL
 
 export function createLayoutEngine(options) {
   const { logger } = options;
-  
+
   const layouts = {
     force: {
       name: 'force-directed',
@@ -474,16 +474,16 @@ export function createLayoutEngine(options) {
         const root = nodes[0];
         root.x = 400;
         root.y = 50;
-        
+
         let level = 1;
         let levelNodes = nodes.filter(n => n.level === level);
-        
+
         while (levelNodes.length > 0) {
           levelNodes.forEach((node, i) => {
             node.x = 100 + i * 150;
             node.y = level * 100;
           });
-          
+
           level++;
           levelNodes = nodes.filter(n => n.level === level);
         }
@@ -495,7 +495,7 @@ export function createLayoutEngine(options) {
         // Circular layout
         const radius = 200;
         const angleStep = (2 * Math.PI) / nodes.length;
-        
+
         nodes.forEach((node, i) => {
           node.x = 400 + radius * Math.cos(i * angleStep);
           node.y = 300 + radius * Math.sin(i * angleStep);
@@ -503,26 +503,26 @@ export function createLayoutEngine(options) {
       }
     }
   };
-  
+
   function applyLayout(layoutName, nodes, edges) {
     const layout = layouts[layoutName];
     if (!layout) {
       logger.error('layoutEngine.invalid', { layout: layoutName });
       return false;
     }
-    
+
     if (layout.layout) {
       layout.layout(nodes, edges);
     }
-    
+
     logger.debug('layoutEngine.applied', { layout: layoutName, nodes: nodes.length });
     return true;
   }
-  
+
   function getAvailableLayouts() {
     return Object.keys(layouts);
   }
-  
+
   return {
     applyLayout,
     getAvailableLayouts
@@ -543,18 +543,18 @@ import { createLayoutEngine } from '../services/layout-engine.js';
 export function createGraphViewEnhanced(options) {
   const { logger, i18n, zotero, prefs, container } = options;
   const Zotero = zotero || globalThis.Zotero;
-  
+
   const layoutEngine = createLayoutEngine({ logger });
-  
+
   let currentLayout = prefs?.get?.('graphView.layout') || 'force';
   let currentTheme = prefs?.get?.('graphView.theme') || 'light';
   let nodeSize = parseInt(prefs?.get?.('graphView.nodeSize') || '20');
   let edgeWidth = parseFloat(prefs?.get?.('graphView.edgeWidth') || '2');
   let showLabels = prefs?.get?.('graphView.showLabels') !== false;
-  
+
   let svg = null;
   let currentData = null;
-  
+
   const themes = {
     light: {
       background: '#ffffff',
@@ -575,37 +575,37 @@ export function createGraphViewEnhanced(options) {
       text: '#2C3E50'
     }
   };
-  
+
   function render(data) {
     if (!container) {
       logger.error('graphView.noContainer');
       return false;
     }
-    
+
     currentData = data;
-    
+
     // Clear previous
     if (svg && svg.parentNode) {
       svg.parentNode.removeChild(svg);
     }
-    
+
     // Create SVG
     const doc = container.ownerDocument;
     svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('width', '100%');
     svg.setAttribute('height', '400px');
     svg.style.background = themes[currentTheme].background;
-    
+
     // Apply layout
     const nodes = [...data.nodes];
     const edges = [...data.edges];
     layoutEngine.applyLayout(currentLayout, nodes, edges);
-    
+
     // Draw edges
     edges.forEach(edge => {
       const source = nodes.find(n => n.id === edge.source);
       const target = nodes.find(n => n.id === edge.target);
-      
+
       if (source && target) {
         const line = doc.createElementNS('http://www.w3.org/2000/svg', 'line');
         line.setAttribute('x1', source.x);
@@ -617,7 +617,7 @@ export function createGraphViewEnhanced(options) {
         svg.appendChild(line);
       }
     });
-    
+
     // Draw nodes
     nodes.forEach(node => {
       const circle = doc.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -626,14 +626,14 @@ export function createGraphViewEnhanced(options) {
       circle.setAttribute('r', nodeSize);
       circle.setAttribute('fill', themes[currentTheme].node);
       circle.style.cursor = 'pointer';
-      
+
       // Add click handler
       circle.addEventListener('click', () => {
         logger.debug('graphView.node.clicked', { id: node.id });
       });
-      
+
       svg.appendChild(circle);
-      
+
       // Draw label
       if (showLabels && node.label) {
         const text = doc.createElementNS('http://www.w3.org/2000/svg', 'text');
@@ -645,68 +645,68 @@ export function createGraphViewEnhanced(options) {
         svg.appendChild(text);
       }
     });
-    
+
     container.appendChild(svg);
-    
+
     logger.debug('graphView.rendered', { nodes: nodes.length, edges: edges.length });
     return true;
   }
-  
+
   function setLayout(layoutName) {
     if (!layoutEngine.getAvailableLayouts().includes(layoutName)) {
       logger.error('graphView.invalidLayout', { layout: layoutName });
       return false;
     }
-    
+
     currentLayout = layoutName;
-    
+
     // Re-render with new layout
     if (currentData) {
       render(currentData);
     }
-    
+
     logger.debug('graphView.layout.changed', { layout: layoutName });
     return true;
   }
-  
+
   function setTheme(themeName) {
     if (!themes[themeName]) {
       logger.error('graphView.invalidTheme', { theme: themeName });
       return false;
     }
-    
+
     currentTheme = themeName;
-    
+
     // Re-render with new theme
     if (currentData) {
       render(currentData);
     }
-    
+
     logger.debug('graphView.theme.changed', { theme: themeName });
     return true;
   }
-  
+
   function getLayouts() {
     return layoutEngine.getAvailableLayouts();
   }
-  
+
   function getThemes() {
     return Object.keys(themes);
   }
-  
+
   function getCurrentLayout() {
     return currentLayout;
   }
-  
+
   function getCurrentTheme() {
     return currentTheme;
   }
-  
+
   function register() {
     logger.info('graphViewEnhanced.registered');
     return true;
   }
-  
+
   return {
     register,
     render,
@@ -775,7 +775,7 @@ if (readBooleanPref(prefs, 'graphView.enabled', true)) {
     zotero: Zotero,
     prefs
   });
-  
+
   if (graphView.register()) {
     logger.info('features.graphViewEnhanced.registered');
   }

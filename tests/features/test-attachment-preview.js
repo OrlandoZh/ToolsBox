@@ -42,18 +42,18 @@ describe("AttachmentPreview", () => {
         }
       }
     };
-    
+
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const preview = createAttachmentPreview({
       logger: mockLogger,
       i18n: mockI18n,
       zotero: mockZotero
     });
-    
+
     preview.register();
-    
+
     assert.ok(mockZotero.ItemPaneManager.lastRegistration, "Section should be registered");
     assert.equal(mockZotero.ItemPaneManager.lastRegistration.paneID, 'toolsbox-attachment-preview', "paneID should be toolsbox-attachment-preview");
     assert.equal(preview.sectionID, 'toolsbox-attachment-preview', "sectionID should be toolsbox-attachment-preview");
@@ -63,17 +63,17 @@ describe("AttachmentPreview", () => {
     const mockZotero = {};
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const preview = createAttachmentPreview({
       logger: mockLogger,
       i18n: mockI18n,
       zotero: mockZotero
     });
-    
+
     const result = preview.register();
-    
+
     assert.equal(result, false, "register() should return false when ItemPaneManager unavailable");
-    
+
     const logs = mockLogger.getLogs();
     const errorLog = logs.find(l => l.level === 'error');
     assert.ok(errorLog, "Should log error when registration fails");
@@ -87,19 +87,19 @@ describe("AttachmentPreview", () => {
         }
       }
     };
-    
+
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const preview = createAttachmentPreview({
       logger: mockLogger,
       i18n: mockI18n
     });
-    
+
     preview.register();
-    
+
     assert.ok(globalThis.Zotero.ItemPaneManager.lastRegistration, "Should use global Zotero");
-    
+
     // Cleanup
     delete globalThis.Zotero;
   });
@@ -114,7 +114,7 @@ describe("AttachmentPreview", () => {
         };
       }
     };
-    
+
     let capturedOnItemChange = null;
     const mockZotero = {
       ItemPaneManager: {
@@ -123,20 +123,20 @@ describe("AttachmentPreview", () => {
         }
       }
     };
-    
+
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const preview = createAttachmentPreview({
       logger: mockLogger,
       i18n: mockI18n,
       zotero: mockZotero
     });
-    
+
     preview.register();
-    
+
     assert.ok(capturedOnItemChange, "Should have onItemChange handler");
-    
+
     const container = capturedOnItemChange({ item: null, doc: mockDoc });
     assert.ok(container, "Should return container element");
     assert.equal(container.className, 'attachment-preview-container', "Should have correct class name");

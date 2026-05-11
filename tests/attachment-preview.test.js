@@ -62,7 +62,7 @@ describe("Attachment Preview", () => {
 
   beforeEach(() => {
     registeredSections = [];
-    
+
     mockZotero = {
       ItemPaneManager: {
         registerSection(options) {
@@ -70,7 +70,7 @@ describe("Attachment Preview", () => {
         }
       }
     };
-    
+
     globalThis.Zotero = mockZotero;
   });
 
@@ -81,10 +81,10 @@ describe("Attachment Preview", () => {
   it("should register with proper API and return true", () => {
     const logger = createMockLogger();
     const i18n = createMockI18n();
-    
+
     const preview = createAttachmentPreview({ logger, i18n, zotero: mockZotero });
     const result = preview.register();
-    
+
     assert.ok(result, "register should return true");
     assert.equal(registeredSections.length, 1, "should register one section");
     assert.equal(registeredSections[0].paneID, 'toolsbox-attachment-preview');
@@ -96,14 +96,14 @@ describe("Attachment Preview", () => {
   it("should fail registration when ItemPaneManager not available", () => {
     const logger = createMockLogger();
     const i18n = createMockI18n();
-    
-    const preview = createAttachmentPreview({ 
-      logger, 
-      i18n, 
-      zotero: { ItemPaneManager: null } 
+
+    const preview = createAttachmentPreview({
+      logger,
+      i18n,
+      zotero: { ItemPaneManager: null }
     });
     const result = preview.register();
-    
+
     assert.notOk(result, "register should return false");
     assert.equal(registeredSections.length, 0, "should not register any section");
     assert.equal(logger.logs.filter(l => l.level === 'error').length, 1, "should log error");
@@ -114,13 +114,13 @@ describe("Attachment Preview", () => {
     const i18n = createMockI18n();
     const doc = createMockDocument();
     const mockItem = createMockItem(true, '/path/to/file.pdf');
-    
+
     const preview = createAttachmentPreview({ logger, i18n, zotero: mockZotero });
     preview.register();
-    
+
     const section = registeredSections[0];
     const container = section.onItemChange({ item: mockItem, doc });
-    
+
     assert.ok(container, "should return container element");
     assert.equal(container.className, 'attachment-preview-container');
     assert.equal(container.children.length, 1, "should have iframe child");
@@ -133,13 +133,13 @@ describe("Attachment Preview", () => {
     const i18n = createMockI18n();
     const doc = createMockDocument();
     const mockItem = createMockItem(false, null);
-    
+
     const preview = createAttachmentPreview({ logger, i18n, zotero: mockZotero });
     preview.register();
-    
+
     const section = registeredSections[0];
     const container = section.onItemChange({ item: mockItem, doc });
-    
+
     assert.ok(container, "should return container element");
     assert.equal(container.className, 'attachment-preview-container');
     assert.equal(container.children.length, 0, "should have no children for non-attachment");
@@ -150,13 +150,13 @@ describe("Attachment Preview", () => {
     const i18n = createMockI18n();
     const doc = createMockDocument();
     const mockItem = createMockItem(true, null);
-    
+
     const preview = createAttachmentPreview({ logger, i18n, zotero: mockZotero });
     preview.register();
-    
+
     const section = registeredSections[0];
     const container = section.onItemChange({ item: mockItem, doc });
-    
+
     assert.ok(container, "should return container element");
     assert.equal(container.className, 'attachment-preview-container');
     assert.equal(container.children.length, 0, "should have no children when no file path");

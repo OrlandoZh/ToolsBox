@@ -42,7 +42,7 @@
 | Menu wrapper使用 | ✅ 通过 | menu-manager使用 |
 | Reader官方事件 | ❌ 违规 | 使用私有API `_iframeWindow` |
 
-**修复**: 
+**修复**:
 - Collection功能重构为wrapper
 - Reader功能移除私有API
 - 补齐PreferencePanes
@@ -77,7 +77,7 @@
 | Reader context menu | ❌ 缺失 | 无证据 |
 | Annotation header | ❌ 缺失 | 无证据 |
 
-**修复**: 
+**修复**:
 - 创建 `docs/evidence/` 目录
 - 截图每个surface
 - 记录代码位置
@@ -92,7 +92,7 @@
 | 数据可清理 | ⚠️ 检查 | 需验证 |
 | 数据可回滚 | ❌ 缺失 | 无版本管理 |
 
-**修复**: 
+**修复**:
 - 定义数据schema
 - 实现清理函数
 - 添加版本管理
@@ -108,7 +108,7 @@
 | 自定义CSS | ❌ 缺失 | 无style-editor |
 | 独立窗口 | ⚠️ 部分 | 部分有配置 |
 
-**修复**: 
+**修复**:
 - addon.config.json添加default-off配置
 - AI/网络/CSS默认disabled
 
@@ -125,7 +125,7 @@
 | Timer清理 | ⚠️ 检查 | 需验证 |
 | Observer清理 | ⚠️ 检查 | 需验证 |
 
-**修复**: 
+**修复**:
 - 每个功能添加cleanup函数
 - 确保shutdown调用
 
@@ -142,7 +142,7 @@
 | npm run cleanroom:audit | ⚠️ 未知 |
 | npm test | ❌ 失败(Zotero undefined) |
 
-**修复**: 
+**修复**:
 - 修复format问题
 - 修复测试环境
 

@@ -122,7 +122,7 @@ function createMockZotero(overrides = {}) {
   const readers = [];
   const openCallbacks = [];
   const closeCallbacks = [];
-  
+
   return {
     Reader: {
       getActiveReaders() {
@@ -318,7 +318,7 @@ describe("PDFBackgroundColor", () => {
 
     pdfBg.register();
     mockZotero.Reader._triggerOpen(mockReader);
-    
+
     // Should not throw
     pdfBg.destroy();
     assert.ok(true, "destroy should complete without error");
@@ -399,7 +399,7 @@ describe("PDFBackgroundColor", () => {
 
     pdfBg.register();
     mockZotero.Reader._triggerOpen(mockReader);
-    
+
     pdfBg.setColor('#ffffff');
     assert.equal(pdfBg.getColor(), '#ffffff', "Should update color");
   });

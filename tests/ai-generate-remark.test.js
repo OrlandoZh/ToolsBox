@@ -25,7 +25,7 @@ describe("AI Generate Remark", () => {
 
   beforeEach(() => {
     logger = createMockLogger();
-    
+
     items = new Map();
     items.set('item1', {
       id: 'item1',
@@ -41,7 +41,7 @@ describe("AI Generate Remark", () => {
       saveTx: async function() {},
       save: async function() {}
     });
-    
+
     items.set('item2', {
       id: 'item2',
       getField: (field) => {
@@ -101,7 +101,7 @@ describe("AI Generate Remark", () => {
     });
 
     const result = await feature.generateRemark('item1');
-    
+
     assert.ok(result.success);
     assert.ok(result.remark);
     assert.ok(result.remark.length > 0);
@@ -116,7 +116,7 @@ describe("AI Generate Remark", () => {
     });
 
     await feature.generateRemark('item1');
-    
+
     const item = items.get('item1');
     assert.ok(item._extra.includes('aiRemark:'));
   });
@@ -130,7 +130,7 @@ describe("AI Generate Remark", () => {
     });
 
     await feature.generateRemark('item1');
-    
+
     const item = items.get('item1');
     assert.ok(item._extra.includes('aiRemarkGenerated:'));
   });
@@ -155,7 +155,7 @@ describe("AI Generate Remark", () => {
       },
       saveTx: async function() {}
     };
-    
+
     items.set('item-cached', cachedItem);
 
     const feature = createAIGenerateRemark({
@@ -167,7 +167,7 @@ describe("AI Generate Remark", () => {
 
     await feature.generateRemark('item-cached');
     await feature.generateRemark('item-cached');
-    
+
     assert.equal(callCount, 1, "Should only call API once due to caching");
   });
 
@@ -187,7 +187,7 @@ describe("AI Generate Remark", () => {
 
     await feature.generateRemark('item1');
     await feature.generateRemark('item1', { regenerate: true });
-    
+
     assert.equal(callCount, 2, "Should call API twice when regenerating");
   });
 
@@ -200,7 +200,7 @@ describe("AI Generate Remark", () => {
     });
 
     const result = await feature.generateRemark('item2');
-    
+
     assert.notOk(result.success);
     assert.ok(result.error);
   });
@@ -214,7 +214,7 @@ describe("AI Generate Remark", () => {
     });
 
     const result = await feature.generateRemark('item3');
-    
+
     assert.notOk(result.success);
     assert.ok(result.error);
   });
@@ -228,7 +228,7 @@ describe("AI Generate Remark", () => {
     });
 
     const result = await feature.generateRemark('nonexistent');
-    
+
     assert.notOk(result.success);
     assert.ok(result.error);
   });
@@ -248,7 +248,7 @@ describe("AI Generate Remark", () => {
     });
 
     const result = await feature.generateRemark('item1');
-    
+
     assert.notOk(result.success);
     assert.ok(result.error);
     assert.ok(result.errorType);
@@ -268,7 +268,7 @@ describe("AI Generate Remark", () => {
     });
 
     const result = await feature.generateRemark('item1');
-    
+
     assert.notOk(result.success);
     assert.ok(result.error);
   });
@@ -282,7 +282,7 @@ describe("AI Generate Remark", () => {
     });
 
     const result = await feature.generateRemark(null);
-    
+
     assert.notOk(result.success);
   });
 
@@ -301,7 +301,7 @@ describe("AI Generate Remark", () => {
     });
 
     await feature.generateRemark('item1');
-    
+
     assert.ok(capturedPrompt.includes('remark') || capturedPrompt.includes('summary') || capturedPrompt.includes('summarizing'));
   });
 
@@ -314,7 +314,7 @@ describe("AI Generate Remark", () => {
     });
 
     const result = feature.register();
-    
+
     assert.ok(result);
     assert.ok(logger.logs.some(l => l.message === 'aiGenerateRemark.registered'));
   });
@@ -329,7 +329,7 @@ describe("AI Generate Remark", () => {
 
     const item = items.get('item1');
     const abstract = feature.extractAbstract(item);
-    
+
     assert.ok(abstract);
     assert.ok(abstract.length > 20);
   });
@@ -344,7 +344,7 @@ describe("AI Generate Remark", () => {
 
     const item = items.get('item2');
     const abstract = feature.extractAbstract(item);
-    
+
     assert.equal(abstract, null);
   });
 
@@ -356,7 +356,7 @@ describe("AI Generate Remark", () => {
         return '';
       }
     };
-    
+
     const feature = createAIGenerateRemark({
       logger,
       zotero: mockZotero,
@@ -365,7 +365,7 @@ describe("AI Generate Remark", () => {
     });
 
     const cached = feature.getCachedRemark(testItem);
-    
+
     assert.ok(cached);
     assert.ok(cached.remark);
     assert.equal(cached.remark, 'Cached remark text');

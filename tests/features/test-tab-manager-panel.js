@@ -39,7 +39,7 @@ describe("TabManagerPanel", () => {
       { tabID: 'reader-1', title: 'Paper A', itemID: 101 },
       { tabID: 'reader-2', title: 'Paper B', itemID: 102 }
     ];
-    
+
     const mockZotero = {
       getMainWindow: function() {
         return {
@@ -58,18 +58,18 @@ describe("TabManagerPanel", () => {
         open: function(itemID) {}
       }
     };
-    
+
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const manager = createTabManagerPanel({
       logger: mockLogger,
       i18n: mockI18n,
       zotero: mockZotero
     });
-    
+
     const tabs = await manager.getAllTabs();
-    
+
     assert.ok(Array.isArray(tabs), "getAllTabs() should return an array");
     assert.equal(tabs.length, 2, "Should have 2 tabs");
     assert.equal(tabs[0].id, 'reader-1', "First tab should have correct id");
@@ -80,7 +80,7 @@ describe("TabManagerPanel", () => {
 
   it("should open manager window", async () => {
     let windowOpened = false;
-    
+
     const mockZotero = {
       getMainWindow: function() {
         return {
@@ -96,24 +96,24 @@ describe("TabManagerPanel", () => {
         }
       }
     };
-    
+
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const manager = createTabManagerPanel({
       logger: mockLogger,
       i18n: mockI18n,
       zotero: mockZotero
     });
-    
+
     await manager.open();
-    
+
     assert.ok(windowOpened, "Window should be opened");
   });
 
   it("should close manager window", async () => {
     let windowClosed = false;
-    
+
     const mockWindow = {
       closed: false,
       focus: function() {},
@@ -122,7 +122,7 @@ describe("TabManagerPanel", () => {
         windowClosed = true;
       }
     };
-    
+
     const mockZotero = {
       getMainWindow: function() {
         return {
@@ -137,27 +137,27 @@ describe("TabManagerPanel", () => {
         }
       }
     };
-    
+
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const manager = createTabManagerPanel({
       logger: mockLogger,
       i18n: mockI18n,
       zotero: mockZotero
     });
-    
+
     await manager.open();
     manager.close();
-    
+
     assert.ok(windowClosed, "Window should be closed");
   });
 
   it("should switch to tab", async () => {
     let openedItemID = null;
-    
+
     const mockReader = { tabID: 'reader-1', title: 'Paper A', itemID: 101 };
-    
+
     const mockZotero = {
       getMainWindow: function() {
         return {
@@ -178,24 +178,24 @@ describe("TabManagerPanel", () => {
         }
       }
     };
-    
+
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const manager = createTabManagerPanel({
       logger: mockLogger,
       i18n: mockI18n,
       zotero: mockZotero
     });
-    
+
     manager.switchToTab('reader-1');
-    
+
     assert.equal(openedItemID, 101, "Should open correct item");
   });
 
   it("should close tab", async () => {
     let tabClosed = false;
-    
+
     const mockReader = {
       tabID: 'reader-1',
       title: 'Paper A',
@@ -204,7 +204,7 @@ describe("TabManagerPanel", () => {
         tabClosed = true;
       }
     };
-    
+
     const mockZotero = {
       getMainWindow: function() {
         return {
@@ -222,18 +222,18 @@ describe("TabManagerPanel", () => {
         }
       }
     };
-    
+
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const manager = createTabManagerPanel({
       logger: mockLogger,
       i18n: mockI18n,
       zotero: mockZotero
     });
-    
+
     manager.closeTab('reader-1');
-    
+
     assert.ok(tabClosed, "Tab should be closed");
   });
 
@@ -241,7 +241,7 @@ describe("TabManagerPanel", () => {
     const mockReaders = [
       { tabID: 'reader-1', itemID: 101 } // No title
     ];
-    
+
     const mockZotero = {
       getMainWindow: function() {
         return {
@@ -256,32 +256,32 @@ describe("TabManagerPanel", () => {
         }
       }
     };
-    
+
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const manager = createTabManagerPanel({
       logger: mockLogger,
       i18n: mockI18n,
       zotero: mockZotero
     });
-    
+
     const tabs = await manager.getAllTabs();
-    
+
     assert.equal(tabs[0].title, 'Untitled', "Should use Untitled for empty title");
   });
 
   it("should focus existing window instead of opening new one", async () => {
     let openDialogCount = 0;
     let focusCount = 0;
-    
+
     const mockWindow = {
       closed: false,
       focus: function() {
         focusCount++;
       }
     };
-    
+
     const mockZotero = {
       getMainWindow: function() {
         return {
@@ -297,19 +297,19 @@ describe("TabManagerPanel", () => {
         }
       }
     };
-    
+
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const manager = createTabManagerPanel({
       logger: mockLogger,
       i18n: mockI18n,
       zotero: mockZotero
     });
-    
+
     await manager.open(); // First open
     await manager.open(); // Second open - should focus
-    
+
     assert.equal(openDialogCount, 1, "Should only open window once");
     assert.equal(focusCount, 1, "Should focus existing window on second call");
   });
@@ -318,7 +318,7 @@ describe("TabManagerPanel", () => {
     const mockReaders = [
       { tabID: 'reader-1', title: 'Test', itemID: 1 }
     ];
-    
+
     globalThis.Zotero = {
       getMainWindow: function() {
         return {
@@ -333,19 +333,19 @@ describe("TabManagerPanel", () => {
         }
       }
     };
-    
+
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const manager = createTabManagerPanel({
       logger: mockLogger,
       i18n: mockI18n
     });
-    
+
     const tabs = await manager.getAllTabs();
-    
+
     assert.ok(Array.isArray(tabs), "Should work with global Zotero");
-    
+
     // Cleanup
     delete globalThis.Zotero;
   });

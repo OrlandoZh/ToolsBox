@@ -40,7 +40,7 @@ describe("Annotation Manager", () => {
 
   beforeEach(() => {
     openedWindows = [];
-    
+
     mockZotero = {
       getMainWindow() {
         return {
@@ -52,7 +52,7 @@ describe("Annotation Manager", () => {
         };
       }
     };
-    
+
     globalThis.Zotero = mockZotero;
   });
 
@@ -63,10 +63,10 @@ describe("Annotation Manager", () => {
   it("should open annotation manager window with correct parameters", async () => {
     const logger = createMockLogger();
     const i18n = createMockI18n();
-    
+
     const manager = createAnnotationManager({ logger, i18n, zotero: mockZotero });
     await manager.open();
-    
+
     assert.equal(openedWindows.length, 1, "should open one window");
     assert.equal(openedWindows[0].url, 'chrome://toolsbox/content/annotation-manager.html');
     assert.equal(openedWindows[0].name, 'toolsbox-annotation-manager');
@@ -81,31 +81,31 @@ describe("Annotation Manager", () => {
     const existingWindow = createMockWindow(false);
     let focusCalled = false;
     existingWindow.focus = () => { focusCalled = true; };
-    
+
     mockZotero.getMainWindow = () => ({
       openDialog(url, name, features) {
         return existingWindow;
       }
     });
-    
+
     const manager = createAnnotationManager({ logger, i18n, zotero: mockZotero });
     await manager.open();
-    
+
     await manager.open();
-    
+
     assert.ok(focusCalled, "should call focus on existing window");
   });
 
   it("should correctly report window open state", async () => {
     const logger = createMockLogger();
     const i18n = createMockI18n();
-    
+
     const manager = createAnnotationManager({ logger, i18n, zotero: mockZotero });
-    
+
     assert.notOk(manager.isOpen(), "should not be open initially");
-    
+
     await manager.open();
-    
+
     assert.ok(manager.isOpen(), "should be open after open()");
   });
 
@@ -115,18 +115,18 @@ describe("Annotation Manager", () => {
     const mockWin = createMockWindow(false);
     let closeCalled = false;
     mockWin.close = () => { closeCalled = true; };
-    
+
     mockZotero.getMainWindow = () => ({
       openDialog(url, name, features) {
         return mockWin;
       }
     });
-    
+
     const manager = createAnnotationManager({ logger, i18n, zotero: mockZotero });
     await manager.open();
-    
+
     manager.close();
-    
+
     assert.ok(closeCalled, "should call close on window");
     assert.notOk(manager.isOpen(), "should not be open after close");
   });
@@ -134,11 +134,11 @@ describe("Annotation Manager", () => {
   it("should handle close when no window exists", () => {
     const logger = createMockLogger();
     const i18n = createMockI18n();
-    
+
     const manager = createAnnotationManager({ logger, i18n, zotero: mockZotero });
-    
+
     manager.close();
-    
+
     assert.notOk(manager.isOpen(), "should not be open");
   });
 });

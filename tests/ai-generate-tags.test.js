@@ -33,9 +33,9 @@ describe("OpenAI Client", () => {
 
   it("should return error when API key not configured", async () => {
     const client = createOpenAIClient({ logger });
-    
+
     const result = await client.chatCompletion('test prompt', 'test content');
-    
+
     assert.notOk(result.success);
     assert.equal(result.errorType, 'config');
     assert.ok(result.error);
@@ -45,7 +45,7 @@ describe("OpenAI Client", () => {
     globalThis.fetch = async (url, options) => {
       assert.equal(options.method, 'POST');
       assert.ok(options.headers['Authorization'].startsWith('Bearer '));
-      
+
       return {
         ok: true,
         json: async () => ({
@@ -57,7 +57,7 @@ describe("OpenAI Client", () => {
 
     const client = createOpenAIClient({ apiKey: 'test-key', logger });
     const result = await client.chatCompletion('test prompt', 'test content');
-    
+
     assert.ok(result.success);
     assert.ok(result.content);
     assert.ok(result.usage);
@@ -73,7 +73,7 @@ describe("OpenAI Client", () => {
 
     const client = createOpenAIClient({ apiKey: 'test-key', logger });
     const result = await client.chatCompletion('test prompt', 'test content');
-    
+
     assert.notOk(result.success);
     assert.equal(result.errorType, 'auth');
   });
@@ -88,7 +88,7 @@ describe("OpenAI Client", () => {
 
     const client = createOpenAIClient({ apiKey: 'test-key', logger });
     const result = await client.chatCompletion('test prompt', 'test content');
-    
+
     assert.notOk(result.success);
     assert.equal(result.errorType, 'rate_limit');
   });
@@ -107,7 +107,7 @@ describe("OpenAI Client", () => {
 
     const client = createOpenAIClient({ apiKey: 'test-key', timeout: 10, logger });
     const result = await client.chatCompletion('test prompt', 'test content');
-    
+
     assert.notOk(result.success);
     assert.equal(result.errorType, 'timeout');
   });
@@ -117,7 +117,7 @@ describe("OpenAI Client", () => {
 
     const client = createOpenAIClient({ apiKey: 'test-key', logger });
     const result = await client.chatCompletion('test prompt', 'test content');
-    
+
     assert.notOk(result.success);
     assert.equal(result.errorType, 'network');
   });
@@ -130,7 +130,7 @@ describe("OpenAI Client", () => {
 
     const client = createOpenAIClient({ apiKey: 'test-key', logger });
     const result = await client.chatCompletion('test prompt', 'test content');
-    
+
     assert.notOk(result.success);
     assert.equal(result.errorType, 'response');
   });
@@ -147,7 +147,7 @@ describe("OpenAI Client", () => {
 
     const client = createOpenAIClient({ apiKey: 'test-key', model: 'gpt-4', logger });
     await client.chatCompletion('test', 'test');
-    
+
     assert.equal(capturedBody.model, 'gpt-4');
   });
 
@@ -163,21 +163,21 @@ describe("OpenAI Client", () => {
 
     const client = createOpenAIClient({ apiKey: 'test-key', model: 'gpt-3.5-turbo', logger });
     await client.chatCompletion('test', 'test', { model: 'gpt-4-turbo' });
-    
+
     assert.equal(capturedBody.model, 'gpt-4-turbo');
   });
 
   it("should return config", () => {
-    const client = createOpenAIClient({ 
-      apiKey: 'key', 
-      baseUrl: 'https://custom.api', 
+    const client = createOpenAIClient({
+      apiKey: 'key',
+      baseUrl: 'https://custom.api',
       model: 'gpt-4',
       timeout: 10000,
-      logger 
+      logger
     });
-    
+
     const config = client.getConfig();
-    
+
     assert.equal(config.apiKey, 'key');
     assert.equal(config.baseUrl, 'https://custom.api');
     assert.equal(config.model, 'gpt-4');
@@ -195,7 +195,7 @@ describe("AI Generate Tags", () => {
 
   beforeEach(() => {
     logger = createMockLogger();
-    
+
     items = new Map();
     items.set('item1', {
       id: 'item1',
@@ -212,7 +212,7 @@ describe("AI Generate Tags", () => {
       saveTx: async function() {},
       save: async function() {}
     });
-    
+
     items.set('item2', {
       id: 'item2',
       getField: (field) => {
@@ -261,7 +261,7 @@ describe("AI Generate Tags", () => {
     });
 
     const result = await feature.generateTags('item1');
-    
+
     assert.ok(result.success);
     assert.ok(result.tags.length === 3);
     assert.ok(result.tags.includes('machine learning'));
@@ -278,7 +278,7 @@ describe("AI Generate Tags", () => {
     });
 
     await feature.generateTags('item1');
-    
+
     const item = items.get('item1');
     assert.ok(item.tags.length === 3);
   });
@@ -292,7 +292,7 @@ describe("AI Generate Tags", () => {
     });
 
     await feature.generateTags('item1');
-    
+
     const item = items.get('item1');
     assert.ok(item._extra.includes('aiTags:'));
   });
@@ -319,7 +319,7 @@ describe("AI Generate Tags", () => {
       addTag: function(tag) { this.tags.push(tag); },
       saveTx: async function() {}
     };
-    
+
     items.set('item-cached', cachedItem);
 
     const feature = createAIGenerateTags({
@@ -331,7 +331,7 @@ describe("AI Generate Tags", () => {
 
     await feature.generateTags('item-cached');
     await feature.generateTags('item-cached');
-    
+
     assert.equal(callCount, 1, "Should only call API once due to caching");
   });
 
@@ -344,7 +344,7 @@ describe("AI Generate Tags", () => {
     });
 
     const result = await feature.generateTags('item2');
-    
+
     assert.notOk(result.success);
     assert.ok(result.error);
   });
@@ -358,7 +358,7 @@ describe("AI Generate Tags", () => {
     });
 
     const result = await feature.generateTags('nonexistent');
-    
+
     assert.notOk(result.success);
     assert.ok(result.error);
   });
@@ -378,7 +378,7 @@ describe("AI Generate Tags", () => {
     });
 
     const result = await feature.generateTags('item1');
-    
+
     assert.notOk(result.success);
     assert.ok(result.error);
   });
@@ -397,7 +397,7 @@ describe("AI Generate Tags", () => {
     });
 
     const result = await feature.generateTags('item1');
-    
+
     assert.notOk(result.success);
     assert.ok(result.error);
   });
@@ -416,7 +416,7 @@ describe("AI Generate Tags", () => {
     });
 
     const result = await feature.generateTags('item1');
-    
+
     assert.notOk(result.success);
     assert.ok(result.error);
   });
@@ -436,7 +436,7 @@ describe("AI Generate Tags", () => {
     });
 
     await feature.generateTags('item1');
-    
+
     assert.ok(capturedPrompt.includes('tags'));
     assert.ok(capturedPrompt.includes('JSON'));
   });
@@ -450,7 +450,7 @@ describe("AI Generate Tags", () => {
     });
 
     const result = feature.register();
-    
+
     assert.ok(result);
     assert.ok(logger.logs.some(l => l.message === 'aiGenerateTags.registered'));
   });
@@ -471,7 +471,7 @@ describe("AI Generate Tags", () => {
 
     await feature.generateTags('item1');
     await feature.generateTags('item1', { bypassCache: true });
-    
+
     assert.equal(callCount, 2, "Should call API twice when bypassing cache");
   });
 });

@@ -112,7 +112,7 @@ function createMockZotero(overrides = {}) {
   const openCallbacks = [];
   const closeCallbacks = [];
   const annotationCallbacks = [];
-  
+
   return {
     Reader: {
       getActiveReaders() {
@@ -371,7 +371,7 @@ describe("MarginAnnotation", () => {
     });
 
     margin.register();
-    
+
     // Simulate reader opening
     mockZotero.Reader._triggerOpen(mockReader);
 

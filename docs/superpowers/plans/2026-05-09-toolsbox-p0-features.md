@@ -99,15 +99,15 @@ describe('CitedCountColumn', () => {
         registerColumn: sinon.spy()
       }
     };
-    
+
     const column = createCitedCountColumn({
       logger: mockLogger,
       i18n: mockI18n,
       zotero: mockZotero
     });
-    
+
     column.register();
-    
+
     expect(mockZotero.ItemTreeManager.registerColumn.calledOnce).toBe(true);
     expect(mockZotero.ItemTreeManager.registerColumn.firstCall.args[0]).toHaveProperty('dataKey', 'citedCount');
   });
@@ -130,16 +130,16 @@ Expected: FAIL with "Cannot find module '../../src/features/cited-count-column.j
 export function createCitedCountColumn(options) {
   const { logger, i18n, zotero } = options;
   const Zotero = zotero || globalThis.Zotero;
-  
+
   const columnID = 'toolsbox-cited-count';
   const dataKey = 'citedCount';
-  
+
   function register() {
     if (!Zotero.ItemTreeManager) {
       logger.error('citedCountColumn.register.failed', { reason: 'ItemTreeManager not available' });
       return false;
     }
-    
+
     Zotero.ItemTreeManager.registerColumn({
       dataKey,
       label: i18n.t('toolsbox-column-cited-count', 'Cited Count'),
@@ -149,11 +149,11 @@ export function createCitedCountColumn(options) {
         return document.createElement('span');
       }
     });
-    
+
     logger.debug('citedCountColumn.registered', { columnID });
     return true;
   }
-  
+
   return {
     register,
     columnID,
@@ -197,11 +197,11 @@ const API_BASE = 'https://api.semanticscholar.org/graph/v1';
 
 export function createSemanticScholarClient(options = {}) {
   const { apiKey, timeout = 5000 } = options;
-  
+
   async function fetchWithTimeout(url, options = {}) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
-    
+
     try {
       const response = await fetch(url, {
         ...options,
@@ -211,26 +211,26 @@ export function createSemanticScholarClient(options = {}) {
           ...(apiKey ? { 'x-api-key': apiKey } : {})
         }
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
+
       return response.json();
     } catch (error) {
       clearTimeout(timeoutId);
       throw error;
     }
   }
-  
+
   async function getCitedCount(doi) {
     const url = `${API_BASE}/paper/${encodeURIComponent(doi)}?fields=citationCount`;
     const data = await fetchWithTimeout(url);
     return data?.citationCount || 0;
   }
-  
+
   return {
     getCitedCount
   };
@@ -325,15 +325,15 @@ describe('AttachmentPreview', () => {
         registerSection: sinon.spy()
       }
     };
-    
+
     const preview = createAttachmentPreview({
       logger: mockLogger,
       i18n: mockI18n,
       zotero: mockZotero
     });
-    
+
     preview.register();
-    
+
     expect(mockZotero.ItemPaneManager.registerSection.calledOnce).toBe(true);
   });
 });
@@ -355,15 +355,15 @@ Expected: FAIL with "Cannot find module '../../src/features/attachment-preview.j
 export function createAttachmentPreview(options) {
   const { logger, i18n, zotero } = options;
   const Zotero = zotero || globalThis.Zotero;
-  
+
   const sectionID = 'toolsbox-attachment-preview';
-  
+
   function register() {
     if (!Zotero.ItemPaneManager) {
       logger.error('attachmentPreview.register.failed', { reason: 'ItemPaneManager not available' });
       return false;
     }
-    
+
     Zotero.ItemPaneManager.registerSection({
       paneID: sectionID,
       pluginID: 'toolsbox@orlandozh.github',
@@ -372,7 +372,7 @@ export function createAttachmentPreview(options) {
         // 渲染预览内容
         const container = doc.createElement('div');
         container.className = 'attachment-preview-container';
-        
+
         if (item && item.isAttachment()) {
           const attachmentPath = item.getFilePath();
           if (attachmentPath) {
@@ -383,15 +383,15 @@ export function createAttachmentPreview(options) {
             container.appendChild(iframe);
           }
         }
-        
+
         return container;
       }
     });
-    
+
     logger.debug('attachmentPreview.registered', { sectionID });
     return true;
   }
-  
+
   return {
     register,
     sectionID
@@ -481,34 +481,34 @@ Expected: FAIL with "Cannot find module '../../src/features/annotation-manager.j
 export function createAnnotationManager(options) {
   const { logger, i18n, zotero } = options;
   const Zotero = zotero || globalThis.Zotero;
-  
+
   let windowRef = null;
-  
+
   async function open() {
     if (windowRef && !windowRef.closed) {
       windowRef.focus();
       return;
     }
-    
+
     const features = 'chrome,centerscreen,width=800,height=600';
     const url = 'chrome://toolsbox/content/annotation-manager.html';
-    
+
     windowRef = Zotero.getMainWindow().openDialog(url, 'toolsbox-annotation-manager', features);
-    
+
     logger.debug('annotationManager.opened');
   }
-  
+
   function isOpen() {
     return windowRef && !windowRef.closed;
   }
-  
+
   function close() {
     if (windowRef) {
       windowRef.close();
       windowRef = null;
     }
   }
-  
+
   return {
     open,
     close,
@@ -576,7 +576,7 @@ import { createSidebarToggle } from '../../src/features/sidebar-toggle.js';
 describe('SidebarToggle', () => {
   it('should toggle left sidebar visibility', () => {
     const toggle = createSidebarToggle({ logger: mockLogger, zotero: mockZotero });
-    
+
     const initialState = toggle.isLeftSidebarVisible();
     toggle.toggleLeftSidebar();
     expect(toggle.isLeftSidebarVisible()).toBe(!initialState);
@@ -600,13 +600,13 @@ Expected: FAIL with "Cannot find module '../../src/features/sidebar-toggle.js'"
 export function createSidebarToggle(options) {
   const { logger, zotero } = options;
   const Zotero = zotero || globalThis.Zotero;
-  
+
   function isLeftSidebarVisible() {
     const mainWindow = Zotero.getMainWindow();
     const leftSidebar = mainWindow.document.getElementById('zotero-collections-pane');
     return leftSidebar && !leftSidebar.hidden;
   }
-  
+
   function toggleLeftSidebar() {
     const mainWindow = Zotero.getMainWindow();
     const leftSidebar = mainWindow.document.getElementById('zotero-collections-pane');
@@ -615,13 +615,13 @@ export function createSidebarToggle(options) {
       logger.debug('sidebarToggle.leftSidebar.toggled', { visible: !leftSidebar.hidden });
     }
   }
-  
+
   function isRightSidebarVisible() {
     const mainWindow = Zotero.getMainWindow();
     const rightSidebar = mainWindow.document.getElementById('zotero-item-pane');
     return rightSidebar && !rightSidebar.hidden;
   }
-  
+
   function toggleRightSidebar() {
     const mainWindow = Zotero.getMainWindow();
     const rightSidebar = mainWindow.document.getElementById('zotero-item-pane');
@@ -630,11 +630,11 @@ export function createSidebarToggle(options) {
       logger.debug('sidebarToggle.rightSidebar.toggled', { visible: !rightSidebar.hidden });
     }
   }
-  
+
   function register() {
     // 注册快捷键 Shift + { 和 Shift + }
     const mainWindow = Zotero.getMainWindow();
-    
+
     mainWindow.addEventListener('keydown', (event) => {
       if (event.shiftKey && event.key === '{') {
         event.preventDefault();
@@ -644,11 +644,11 @@ export function createSidebarToggle(options) {
         toggleRightSidebar();
       }
     });
-    
+
     logger.debug('sidebarToggle.registered');
     return true;
   }
-  
+
   return {
     register,
     toggleLeftSidebar,
@@ -742,13 +742,13 @@ Expected: FAIL with "Cannot find module '../../src/features/tab-manager-panel.js
 export function createTabManagerPanel(options) {
   const { logger, i18n, zotero } = options;
   const Zotero = zotero || globalThis.Zotero;
-  
+
   let windowRef = null;
-  
+
   async function getAllTabs() {
     const mainWindow = Zotero.getMainWindow();
     const tabs = [];
-    
+
     // 获取所有Reader tabs
     const readers = Zotero.Reader.getActiveReaders();
     readers.forEach(reader => {
@@ -759,36 +759,36 @@ export function createTabManagerPanel(options) {
         itemID: reader.itemID
       });
     });
-    
+
     return tabs;
   }
-  
+
   async function open() {
     if (windowRef && !windowRef.closed) {
       windowRef.focus();
       return;
     }
-    
+
     const features = 'chrome,centerscreen,width=600,height=400';
     const url = 'chrome://toolsbox/content/tab-manager.html';
-    
+
     windowRef = Zotero.getMainWindow().openDialog(url, 'toolsbox-tab-manager', features);
-    
+
     logger.debug('tabManager.opened');
   }
-  
+
   function close() {
     if (windowRef) {
       windowRef.close();
       windowRef = null;
     }
   }
-  
+
   function switchToTab(tabID) {
     Zotero.Reader.open(reader.itemID);
     logger.debug('tabManager.switched', { tabID });
   }
-  
+
   function closeTab(tabID) {
     const reader = Zotero.Reader.getByTabID(tabID);
     if (reader) {
@@ -796,7 +796,7 @@ export function createTabManagerPanel(options) {
       logger.debug('tabManager.closed', { tabID });
     }
   }
-  
+
   return {
     open,
     close,

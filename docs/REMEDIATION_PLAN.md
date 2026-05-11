@@ -56,38 +56,38 @@
    {
      "defaultPrefs": {
        // 现有配置...
-       
+
        // 新增缺失配置
        "annotationManager.enabled": true,
        "annotationManager.ignoreFigureTable": true,
        "annotationManager.replaceTextWithComment": false,
-       
+
        "ifColumn.enabled": true,
        "ifColumn.field": "sciif",
        "ifColumn.text": true,
        "ifColumn.progress": true,
        "ifColumn.color": "#41a1a2",
        "ifColumn.max": 15,
-       
+
        "publicationTagsColumn.enabled": true,
        "publicationTagsColumn.fields": "sciif, sci, utd24, ajg",
-       
+
        "marginAnnotation.enabled": false,  // default-off
        "marginAnnotation.width": 200,
        "marginAnnotation.color": "#86C8BC",
-       
+
        "aiGenerateTags.enabled": false,  // default-off
        "aiGenerateTags.prompt": "Returns 3 tags...",
-       
+
        "aiGenerateRemark.enabled": false,  // default-off
-       
+
        "graphView.enabled": false,  // default-off
        "graphView.theme": "light",
        "graphView.layout": "force",
-       
+
        "styleEditor.enabled": false,  // default-off
        "styleEditor.css": "",
-       
+
        "customColumn.enabled": false,  // default-off
        "customColumn.dataKeys": ""
      }
@@ -267,7 +267,7 @@
    ```javascript
    // 当前: 直接查询DOM
    const tree = doc.querySelector('#zotero-collections-tree');
-   
+
    // 改为: 使用Collection API
    const collection = Zotero.Collections.get(collectionID);
    const count = collection.getChildItems().length;

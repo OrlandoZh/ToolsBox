@@ -25,8 +25,8 @@ P2中优先级包含6个核心功能,按优先级排序:
 
 ## Task 1: Nested Tags (层级标签)
 
-**Complexity**: Simple  
-**Estimated Time**: 1-2 hours  
+**Complexity**: Simple
+**Estimated Time**: 1-2 hours
 **Dependencies**: None
 
 **Architecture:**
@@ -45,21 +45,21 @@ P2中优先级包含6个核心功能,按优先级排序:
 ```javascript
 export function createNestedTags(options) {
   const { logger, prefs } = options;
-  
+
   const separator = prefs?.get?.('nestedTags.separator') || '#';
   const connector = prefs?.get?.('nestedTags.connector') || '→';
   const indentWidth = parseInt(prefs?.get?.('nestedTags.indentWidth') || '10');
-  
+
   function parseNestedTags(tags) {
     // 解析层级标签
     // 输入: ['AI#DeepLearning#CNN', 'Method#CNN']
     // 输出: [{level: 0, text: 'AI'}, {level: 1, text: 'DeepLearning'}, ...]
   }
-  
+
   function renderNestedTags(doc, parsedTags) {
     // 渲染层级标签,带缩进和连接符号
   }
-  
+
   return { parseNestedTags, renderNestedTags };
 }
 ```
@@ -68,8 +68,8 @@ export function createNestedTags(options) {
 
 ## Task 2: View Groups (视图预设)
 
-**Complexity**: Medium  
-**Estimated Time**: 2-3 hours  
+**Complexity**: Medium
+**Estimated Time**: 2-3 hours
 **Dependencies**: None
 
 **Architecture:**
@@ -88,24 +88,24 @@ export function createNestedTags(options) {
 ```javascript
 export function createViewGroups(options) {
   const { logger, zotero, prefs } = options;
-  
+
   function saveView(name, columnVisibility) {
     // 保存当前视图配置
     // columnVisibility: {title: true, date: false, tags: true, ...}
   }
-  
+
   function loadView(name) {
     // 加载视图配置并应用
   }
-  
+
   function getSavedViews() {
     // 返回所有已保存的视图列表
   }
-  
+
   function deleteView(name) {
     // 删除视图
   }
-  
+
   return { saveView, loadView, getSavedViews, deleteView };
 }
 ```
@@ -114,8 +114,8 @@ export function createViewGroups(options) {
 
 ## Task 3: Annotation Colors (批注颜色面板)
 
-**Complexity**: Medium  
-**Estimated Time**: 2-3 hours  
+**Complexity**: Medium
+**Estimated Time**: 2-3 hours
 **Dependencies**: Zotero Annotations API
 
 **Architecture:**
@@ -134,7 +134,7 @@ export function createViewGroups(options) {
 ```javascript
 export function createAnnotationColors(options) {
   const { logger, zotero, prefs } = options;
-  
+
   const colorScheme = [
     { color: '#ffd700', name: 'Important', group: 'Priority' },
     { color: '#ff6b6b', name: 'Key Point', group: 'Priority' },
@@ -142,19 +142,19 @@ export function createAnnotationColors(options) {
     { color: '#45b7d1', name: 'Result', group: 'Content' },
     // ... more colors
   ];
-  
+
   function getColorName(color) {
     // 根据颜色值返回名称
   }
-  
+
   function getColorsByGroup(group) {
     // 返回指定分组的颜色列表
   }
-  
+
   function applyColorToAnnotation(annotationID, color) {
     // 为批注应用颜色
   }
-  
+
   return { getColorName, getColorsByGroup, applyColorToAnnotation };
 }
 ```
@@ -163,8 +163,8 @@ export function createAnnotationColors(options) {
 
 ## Task 4: AI Generate Tags (AI标签生成)
 
-**Complexity**: Medium (需API集成)  
-**Estimated Time**: 3-4 hours  
+**Complexity**: Medium (需API集成)
+**Estimated Time**: 3-4 hours
 **Dependencies**: OpenAI API
 
 **Architecture:**
@@ -185,31 +185,31 @@ export function createAnnotationColors(options) {
 // src/services/openai-client.js
 export function createOpenAIClient(options) {
   const { apiKey, baseUrl } = options;
-  
+
   async function chatCompletion(prompt, content) {
     // 调用OpenAI Chat Completion API
     // POST https://api.openai.com/v1/chat/completions
     // Headers: Authorization: Bearer {apiKey}
     // Body: {model: 'gpt-3.5-turbo', messages: [{role: 'user', content: `${prompt}\n${content}`}]}
   }
-  
+
   return { chatCompletion };
 }
 
 // src/features/ai-generate-tags.js
 export function createAIGenerateTags(options) {
   const { logger, openaiClient, prefs } = options;
-  
-  const prompt = prefs?.get?.('aiGenerateTags.prompt') || 
+
+  const prompt = prefs?.get?.('aiGenerateTags.prompt') ||
     'Returns 3 tags that fit this abstract as a JSON list.';
-  
+
   async function generateTags(item) {
     // 1. 提取摘要 (item.getField('abstractNote'))
     // 2. 调用OpenAI API
     // 3. 解析返回的JSON标签列表
     // 4. 保存到item.tags
   }
-  
+
   return { generateTags };
 }
 ```
@@ -218,8 +218,8 @@ export function createAIGenerateTags(options) {
 
 ## Task 5: AI Generate Remark (AI备注生成)
 
-**Complexity**: Medium (需API集成)  
-**Estimated Time**: 2-3 hours  
+**Complexity**: Medium (需API集成)
+**Estimated Time**: 2-3 hours
 **Dependencies**: OpenAI API (复用Task 4的client)
 
 **Architecture:**
@@ -237,17 +237,17 @@ export function createAIGenerateTags(options) {
 ```javascript
 export function createAIGenerateRemark(options) {
   const { logger, openaiClient, prefs } = options;
-  
-  const prompt = prefs?.get?.('aiGenerateRemark.prompt') || 
+
+  const prompt = prefs?.get?.('aiGenerateRemark.prompt') ||
     'Generate a brief remark (2-3 sentences) summarizing this paper.';
-  
+
   async function generateRemark(item) {
     // 1. 提取标题和摘要
     // 2. 调用OpenAI API
     // 3. 生成备注文本
     // 4. 保存到item.extra
   }
-  
+
   return { generateRemark };
 }
 ```
@@ -256,8 +256,8 @@ export function createAIGenerateRemark(options) {
 
 ## Task 6: PDF Background Color (PDF背景色)
 
-**Complexity**: Simple  
-**Estimated Time**: 1 hour  
+**Complexity**: Simple
+**Estimated Time**: 1 hour
 **Dependencies**: Zotero Reader API
 
 **Architecture:**
@@ -275,14 +275,14 @@ export function createAIGenerateRemark(options) {
 ```javascript
 export function createPDFBackgroundColor(options) {
   const { logger, zotero, prefs } = options;
-  
+
   const backgroundColor = prefs?.get?.('pdfBackground.color') || '#f5f5dc';
-  
+
   function applyBackgroundColor(reader) {
     // 修改Reader的PDF viewer背景色
     // reader._iframeWindow.document.body.style.backgroundColor = backgroundColor
   }
-  
+
   return { applyBackgroundColor };
 }
 ```

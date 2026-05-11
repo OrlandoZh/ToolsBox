@@ -72,89 +72,89 @@ describe("CollectionItemCount", () => {
         registerObserver: function() {}
       }
     };
-    
+
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const counter = createCollectionItemCount({
       logger: mockLogger,
       i18n: mockI18n,
       zotero: mockZotero
     });
-    
+
     const result = counter.register();
-    
+
     assert.ok(result, "register() should return true");
   });
-  
+
   it("should return correct count for collection", () => {
     const mockCollection = {
       id: 1,
       getItems: () => [1, 2, 3, 4, 5]
     };
-    
+
     const mockLogger = createMockLogger();
     const mockZotero = {};
-    
+
     const counter = createCollectionItemCount({
       logger: mockLogger,
       zotero: mockZotero
     });
-    
+
     const count = counter.getCollectionCount(mockCollection);
     assert.equal(count, 5, "Should return 5 items");
   });
-  
+
   it("should return 0 for empty collection", () => {
     const mockCollection = {
       id: 1,
       getItems: () => []
     };
-    
+
     const mockLogger = createMockLogger();
     const mockZotero = {};
-    
+
     const counter = createCollectionItemCount({
       logger: mockLogger,
       zotero: mockZotero
     });
-    
+
     const count = counter.getCollectionCount(mockCollection);
     assert.equal(count, 0, "Should return 0 items");
   });
-  
+
   it("should return 0 for invalid collection", () => {
     const mockLogger = createMockLogger();
     const mockZotero = {};
-    
+
     const counter = createCollectionItemCount({
       logger: mockLogger,
       zotero: mockZotero
     });
-    
+
     const countNull = counter.getCollectionCount(null);
     assert.equal(countNull, 0, "Should return 0 for null collection");
-    
+
     const countUndefined = counter.getCollectionCount(undefined);
     assert.equal(countUndefined, 0, "Should return 0 for undefined collection");
-    
+
     const countNoMethod = counter.getCollectionCount({ id: 1 });
     assert.equal(countNoMethod, 0, "Should return 0 for collection without getItems");
   });
-  
+
   it("should return false when Collections API not available", () => {
     const mockZotero = {};
     const mockLogger = createMockLogger();
-    
+
     const counter = createCollectionItemCount({
       logger: mockLogger,
       zotero: mockZotero
     });
-    
+
     const result = counter.register();
-    
+
     assert.equal(result, false, "register() should return false when Collections API unavailable");
-    
+
     const logs = mockLogger.getLogs();
     const errorLog = logs.find(l => l.level === 'error');
     assert.ok(errorLog, "Should log error when register fails");

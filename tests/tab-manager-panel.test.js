@@ -50,7 +50,7 @@ describe("Tab Manager Panel", () => {
     openedWindows = [];
     activeReaders = [];
     openedReaderItemIDs = [];
-    
+
     mockZotero = {
       getMainWindow() {
         return {
@@ -73,7 +73,7 @@ describe("Tab Manager Panel", () => {
         }
       }
     };
-    
+
     globalThis.Zotero = mockZotero;
   });
 
@@ -84,10 +84,10 @@ describe("Tab Manager Panel", () => {
   it("should open tab manager window with correct parameters", async () => {
     const logger = createMockLogger();
     const i18n = createMockI18n();
-    
+
     const manager = createTabManagerPanel({ logger, i18n, zotero: mockZotero });
     await manager.open();
-    
+
     assert.equal(openedWindows.length, 1, "should open one window");
     assert.equal(openedWindows[0].url, 'chrome://toolsbox/content/tab-manager.html');
     assert.equal(openedWindows[0].name, 'toolsbox-tab-manager');
@@ -102,33 +102,33 @@ describe("Tab Manager Panel", () => {
     const existingWindow = createMockWindow(false);
     let focusCalled = false;
     existingWindow.focus = () => { focusCalled = true; };
-    
+
     mockZotero.getMainWindow = () => ({
       openDialog(url, name, features) {
         return existingWindow;
       }
     });
-    
+
     const manager = createTabManagerPanel({ logger, i18n, zotero: mockZotero });
     await manager.open();
-    
+
     await manager.open();
-    
+
     assert.ok(focusCalled, "should call focus on existing window");
   });
 
   it("should get all active tabs with correct data", async () => {
     const logger = createMockLogger();
     const i18n = createMockI18n();
-    
+
     activeReaders = [
       createMockReader('tab-1', 'Document A', 100),
       createMockReader('tab-2', 'Document B', 101)
     ];
-    
+
     const manager = createTabManagerPanel({ logger, i18n, zotero: mockZotero });
     const tabs = await manager.getAllTabs();
-    
+
     assert.equal(tabs.length, 2, "should return two tabs");
     assert.equal(tabs[0].id, 'tab-1');
     assert.equal(tabs[0].title, 'Document A');
@@ -140,24 +140,24 @@ describe("Tab Manager Panel", () => {
   it("should handle empty tab list", async () => {
     const logger = createMockLogger();
     const i18n = createMockI18n();
-    
+
     activeReaders = [];
-    
+
     const manager = createTabManagerPanel({ logger, i18n, zotero: mockZotero });
     const tabs = await manager.getAllTabs();
-    
+
     assert.equal(tabs.length, 0, "should return empty array");
   });
 
   it("should switch to tab by calling Reader.open", () => {
     const logger = createMockLogger();
     const i18n = createMockI18n();
-    
+
     activeReaders = [createMockReader('tab-1', 'Document A', 100)];
-    
+
     const manager = createTabManagerPanel({ logger, i18n, zotero: mockZotero });
     manager.switchToTab('tab-1');
-    
+
     assert.equal(openedReaderItemIDs.length, 1, "should open reader once");
     assert.equal(openedReaderItemIDs[0], 100, "should open correct item");
     assert.equal(logger.logs.filter(l => l.message === 'tabManager.switched').length, 1);
@@ -166,15 +166,15 @@ describe("Tab Manager Panel", () => {
   it("should close tab by calling reader.close", () => {
     const logger = createMockLogger();
     const i18n = createMockI18n();
-    
+
     let closeCalled = false;
     const mockReader = createMockReader('tab-1', 'Document A', 100);
     mockReader.close = () => { closeCalled = true; };
     activeReaders = [mockReader];
-    
+
     const manager = createTabManagerPanel({ logger, i18n, zotero: mockZotero });
     manager.closeTab('tab-1');
-    
+
     assert.ok(closeCalled, "should call close on reader");
     assert.equal(logger.logs.filter(l => l.message === 'tabManager.closed').length, 1);
   });
@@ -182,12 +182,12 @@ describe("Tab Manager Panel", () => {
   it("should handle switch to non-existent tab gracefully", () => {
     const logger = createMockLogger();
     const i18n = createMockI18n();
-    
+
     activeReaders = [];
-    
+
     const manager = createTabManagerPanel({ logger, i18n, zotero: mockZotero });
     manager.switchToTab('non-existent');
-    
+
     assert.equal(openedReaderItemIDs.length, 0, "should not open any reader");
   });
 
@@ -197,18 +197,18 @@ describe("Tab Manager Panel", () => {
     const mockWin = createMockWindow(false);
     let closeCalled = false;
     mockWin.close = () => { closeCalled = true; };
-    
+
     mockZotero.getMainWindow = () => ({
       openDialog(url, name, features) {
         return mockWin;
       }
     });
-    
+
     const manager = createTabManagerPanel({ logger, i18n, zotero: mockZotero });
     await manager.open();
-    
+
     manager.close();
-    
+
     assert.ok(closeCalled, "should call close on window");
   });
 });

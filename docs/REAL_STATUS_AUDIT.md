@@ -278,7 +278,7 @@ Zotero is not defined
 - 不满足default-off要求
 - 不满足cleanup要求
 
-**建议**: 
+**建议**:
 - 立即停止声称"100%完成"
 - 按上述Phase逐步修复
 - 建立严格的feature验收流程

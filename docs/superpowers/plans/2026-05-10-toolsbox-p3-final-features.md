@@ -25,8 +25,8 @@
 
 ## Task 1: Annotation Color Names
 
-**Complexity**: Simple  
-**Time**: 30 minutes  
+**Complexity**: Simple
+**Time**: 30 minutes
 **Dependencies**: Annotation Colors (已完成)
 
 **Architecture:**
@@ -39,13 +39,13 @@
 // src/features/annotation-color-names.js
 export function createAnnotationColorNames(options) {
   const { logger, zotero, annotationColors, prefs } = options;
-  
+
   const showNames = prefs?.get?.('annotationColorNames.show') !== false;
   const direction = prefs?.get?.('annotationColorNames.direction') || 'right';
-  
+
   function addColorNameToAnnotation(annotationElement, color) {
     const colorName = annotationColors.getColorName(color);
-    
+
     const label = document.createElement('span');
     label.className = 'annotation-color-name';
     label.textContent = colorName;
@@ -54,14 +54,14 @@ export function createAnnotationColorNames(options) {
       color: #666;
       margin-${direction === 'right' ? 'left' : 'right'}: 4px;
     `;
-    
+
     if (direction === 'right') {
       annotationElement.appendChild(label);
     } else {
       annotationElement.insertBefore(label, annotationElement.firstChild);
     }
   }
-  
+
   function register() {
     // Monitor annotation rendering and add color names
     Zotero.Notifier.registerObserver({
@@ -71,10 +71,10 @@ export function createAnnotationColorNames(options) {
         }
       }
     }, ['annotation']);
-    
+
     return true;
   }
-  
+
   return { register, addColorNameToAnnotation };
 }
 ```
@@ -89,8 +89,8 @@ export function createAnnotationColorNames(options) {
 
 ## Task 2: Annotation Manager Config
 
-**Complexity**: Medium  
-**Time**: 45 minutes  
+**Complexity**: Medium
+**Time**: 45 minutes
 **Dependencies**: Annotation Manager (已完成)
 
 **Architecture:**
@@ -103,11 +103,11 @@ export function createAnnotationColorNames(options) {
 // 增强 src/features/annotation-manager.js
 export function createAnnotationManager(options) {
   // ... 现有代码 ...
-  
+
   // 新增配置
   const ignoreFigureTable = prefs?.get?.('annotationManager.ignoreFigureTable') !== false;
   const replaceTextWithComment = prefs?.get?.('annotationManager.replaceTextWithComment') || false;
-  
+
   function filterAnnotations(annotations) {
     if (ignoreFigureTable) {
       return annotations.filter(ann => {
@@ -118,7 +118,7 @@ export function createAnnotationManager(options) {
     }
     return annotations;
   }
-  
+
   function processAnnotationText(annotation) {
     if (replaceTextWithComment && annotation.comment) {
       // 用注释替换批注文本
@@ -126,11 +126,11 @@ export function createAnnotationManager(options) {
     }
     return annotation.annotationText;
   }
-  
-  return { 
+
+  return {
     // ... 现有函数 ...
     filterAnnotations,
-    processAnnotationText 
+    processAnnotationText
   };
 }
 ```
@@ -145,8 +145,8 @@ export function createAnnotationManager(options) {
 
 ## Task 3: Paper Matrix Enhanced
 
-**Complexity**: Medium  
-**Time**: 60 minutes  
+**Complexity**: Medium
+**Time**: 60 minutes
 **Dependencies**: 现有matrix功能
 
 **Architecture:**
@@ -159,16 +159,16 @@ export function createAnnotationManager(options) {
 // src/features/paper-matrix-enhanced.js
 export function createPaperMatrixEnhanced(options) {
   const { logger, zotero, prefs } = options;
-  
+
   const coreFields = (prefs?.get?.('paperMatrix.coreFields') || '').split(',').filter(f => f);
   const auxiliaryFields = (prefs?.get?.('paperMatrix.auxiliaryFields') || 'firstCreator, year').split(',').filter(f => f);
   const direction = prefs?.get?.('paperMatrix.direction') || 'row';
-  
+
   function renderMatrix(items, config) {
     const table = document.createElement('table');
     table.className = 'paper-matrix';
     table.style.direction = direction === 'row' ? 'ltr' : 'ltr';
-    
+
     if (direction === 'row') {
       // Rows = papers, Columns = fields
       items.forEach(item => {
@@ -192,10 +192,10 @@ export function createPaperMatrixEnhanced(options) {
         table.appendChild(row);
       });
     }
-    
+
     return table;
   }
-  
+
   return { renderMatrix, getCoreFields, getAuxiliaryFields, getDirection };
 }
 ```
@@ -211,8 +211,8 @@ export function createPaperMatrixEnhanced(options) {
 
 ## Task 4: Attachment Version Switch
 
-**Complexity**: Medium  
-**Time**: 45 minutes  
+**Complexity**: Medium
+**Time**: 45 minutes
 **Dependencies**: Zotero Attachment API
 
 **Architecture:**
@@ -225,34 +225,34 @@ export function createPaperMatrixEnhanced(options) {
 // src/features/attachment-version-switch.js
 export function createAttachmentVersionSwitch(options) {
   const { logger, zotero, prefs } = options;
-  
+
   function getAttachmentVersions(item) {
     // 获取item的所有附件版本
     const attachments = Zotero.Items.get(item.getAttachments());
     // 按修改时间排序
     return attachments.sort((a, b) => b.dateModified - a.dateModified);
   }
-  
+
   function switchVersion(item, attachmentID) {
     // 切换到指定版本
     const versions = getAttachmentVersions(item);
     const target = versions.find(v => v.id === attachmentID);
-    
+
     if (target) {
       // 打开指定版本
       Zotero.Reader.open(attachmentID);
       logger.debug('attachmentVersion.switched', { attachmentID });
       return true;
     }
-    
+
     return false;
   }
-  
+
   function createVersionMenu(item) {
     // 创建版本切换菜单
     const versions = getAttachmentVersions(item);
     if (versions.length <= 1) return null;
-    
+
     const menu = document.createElement('menupopup');
     versions.forEach((v, i) => {
       const menuItem = document.createElement('menuitem');
@@ -260,10 +260,10 @@ export function createAttachmentVersionSwitch(options) {
       menuItem.onclick = () => switchVersion(item, v.id);
       menu.appendChild(menuItem);
     });
-    
+
     return menu;
   }
-  
+
   return { getAttachmentVersions, switchVersion, createVersionMenu };
 }
 ```
@@ -274,8 +274,8 @@ export function createAttachmentVersionSwitch(options) {
 
 ## Task 5: Custom External API
 
-**Complexity**: High  
-**Time**: 60 minutes  
+**Complexity**: High
+**Time**: 60 minutes
 **Dependencies**: 通用HTTP客户端
 
 **Architecture:**
@@ -288,18 +288,18 @@ export function createAttachmentVersionSwitch(options) {
 // src/features/custom-external-api.js
 export function createCustomExternalAPI(options) {
   const { logger, prefs } = options;
-  
+
   const apiUrl = prefs?.get?.('customApi.url');
   const apiKey = prefs?.get?.('customApi.key');
   const method = prefs?.get?.('customApi.method') || 'GET';
   const headers = JSON.parse(prefs?.get?.('customApi.headers') || '{}');
-  
+
   async function callCustomAPI(params) {
     if (!apiUrl) {
       logger.error('customApi.noUrl');
       return { success: false, error: 'No API URL configured' };
     }
-    
+
     try {
       const response = await fetch(apiUrl, {
         method,
@@ -310,9 +310,9 @@ export function createCustomExternalAPI(options) {
         },
         ...(method === 'POST' && { body: JSON.stringify(params) })
       });
-      
+
       const data = await response.json();
-      
+
       logger.debug('customApi.called', { url: apiUrl, status: response.status });
       return { success: true, data };
     } catch (error) {
@@ -320,11 +320,11 @@ export function createCustomExternalAPI(options) {
       return { success: false, error: error.message };
     }
   }
-  
+
   function testConnection() {
     return callCustomAPI({ test: true });
   }
-  
+
   return { callCustomAPI, testConnection };
 }
 ```

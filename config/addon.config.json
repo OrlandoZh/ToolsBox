@@ -20,6 +20,7 @@
     "menuLabel": "",
     "logLevel": "info",
     "themeMode": "follow-host",
+
     "researchWorkflow.enabled": true,
     "researchWorkflow.itemPane.enabled": true,
     "researchWorkflow.menu.enabled": true,
@@ -44,22 +45,65 @@
     "researchWorkflow.remark.extraLabel": "Remark",
     "researchWorkflow.readStatus.extraLabel": "Read Status",
     "researchWorkflow.progress.extraLabel": "Reading Progress",
+
     "researchWorkbench.graph.enabled": true,
     "researchWorkbench.matrix.enabled": true,
     "researchWorkbench.notes.enabled": true,
     "researchWorkbench.tabs.enabled": true,
-    "citedCountColumn.enabled": true,
-    "citedCountColumn.source": "semantic-scholar",
-    "citedCountColumn.apiKey": "",
-    "collectionItemCount.enabled": true,
-    "collectionSort.enabled": true,
-    "favoriteCollections.enabled": true,
-    "favoriteCollections": [],
+
     "readTimeColumn.enabled": true,
     "readTimeColumn.max": 600,
     "readTimeColumn.color": "#468B97",
     "readTimeColumn.opacity": "0.7",
     "readTimeColumn.progress": true,
-    "readTimeColumn.text": true
+    "readTimeColumn.text": true,
+
+    "annotationDistributionColumn.enabled": true,
+    "publicationTagsColumn.enabled": true,
+
+    "citedCountColumn.enabled": true,
+    "citedCountColumn.source": "semantic-scholar",
+    "citedCountColumn.apiKey": "",
+
+    "ifColumn.enabled": true,
+
+    "collectionItemCount.enabled": true,
+    "collectionSort.enabled": true,
+    "favoriteCollections.enabled": true,
+    "favoriteCollections": [],
+
+    "styleEditor.enabled": false,
+    "styleEditor.css": "",
+
+    "tldrPanel.enabled": false,
+    "openai.apiKey": "",
+
+    "annotationColors.enabled": false,
+    "annotationColors.map": {
+      "yellow": "#ffd700",
+      "red": "#ff4444",
+      "green": "#44ff44",
+      "blue": "#4444ff"
+    },
+
+    "mergeAnnotations.enabled": true,
+
+    "backlinks.enabled": true,
+
+    "attachmentVersion.enabled": true,
+
+    "customColumnDatakeys.enabled": true,
+    "customColumnDatakeys.keys": [],
+
+    "annotationManager.enabled": true,
+    "annotationManager.showImages": true,
+
+    "paperMatrix.enabled": true,
+
+    "customExternalAPI.enabled": false,
+    "customExternalAPI.endpoint": "",
+
+    "easyscholar.apiKey": "",
+    "semanticScholar.apiKey": ""
   }
 }

@@ -57,14 +57,14 @@ describe("FavoriteCollections", () => {
   it("should add collection to favorites", () => {
     const mockPrefs = createMockPrefs([]);
     const mockLogger = createMockLogger();
-    
+
     const favorite = createFavoriteCollections({
       logger: mockLogger,
       prefs: mockPrefs
     });
-    
+
     favorite.addToFavorites(1);
-    
+
     const favorites = favorite.getFavorites();
     assert.ok(favorites.includes(1), "Collection ID 1 should be in favorites");
     assert.equal(favorites.length, 1, "Should have exactly 1 favorite");
@@ -73,14 +73,14 @@ describe("FavoriteCollections", () => {
   it("should remove collection from favorites", () => {
     const mockPrefs = createMockPrefs([1, 2, 3]);
     const mockLogger = createMockLogger();
-    
+
     const favorite = createFavoriteCollections({
       logger: mockLogger,
       prefs: mockPrefs
     });
-    
+
     favorite.removeFromFavorites(2);
-    
+
     const favorites = favorite.getFavorites();
     assert.ok(!favorites.includes(2), "Collection ID 2 should not be in favorites");
     assert.equal(favorites.length, 2, "Should have exactly 2 favorites");
@@ -91,12 +91,12 @@ describe("FavoriteCollections", () => {
   it("should check if collection is favorite", () => {
     const mockPrefs = createMockPrefs([1, 2, 3]);
     const mockLogger = createMockLogger();
-    
+
     const favorite = createFavoriteCollections({
       logger: mockLogger,
       prefs: mockPrefs
     });
-    
+
     assert.ok(favorite.isFavorite(2), "Collection ID 2 should be favorite");
     assert.ok(favorite.isFavorite(1), "Collection ID 1 should be favorite");
     assert.ok(!favorite.isFavorite(4), "Collection ID 4 should not be favorite");
@@ -106,16 +106,16 @@ describe("FavoriteCollections", () => {
   it("should toggle favorite status", () => {
     const mockPrefs = createMockPrefs([1, 2]);
     const mockLogger = createMockLogger();
-    
+
     const favorite = createFavoriteCollections({
       logger: mockLogger,
       prefs: mockPrefs
     });
-    
+
     // Toggle off existing favorite
     favorite.toggleFavorite(1);
     assert.ok(!favorite.isFavorite(1), "Collection ID 1 should no longer be favorite after toggle");
-    
+
     // Toggle on new favorite
     favorite.toggleFavorite(3);
     assert.ok(favorite.isFavorite(3), "Collection ID 3 should be favorite after toggle");
@@ -124,14 +124,14 @@ describe("FavoriteCollections", () => {
   it("should not add duplicate favorites", () => {
     const mockPrefs = createMockPrefs([1]);
     const mockLogger = createMockLogger();
-    
+
     const favorite = createFavoriteCollections({
       logger: mockLogger,
       prefs: mockPrefs
     });
-    
+
     favorite.addToFavorites(1);
-    
+
     const favorites = favorite.getFavorites();
     assert.equal(favorites.length, 1, "Should still have only 1 favorite");
     assert.equal(favorites[0], 1, "Should still have original favorite");
@@ -140,12 +140,12 @@ describe("FavoriteCollections", () => {
   it("should handle empty favorites gracefully", () => {
     const mockPrefs = createMockPrefs(null);
     const mockLogger = createMockLogger();
-    
+
     const favorite = createFavoriteCollections({
       logger: mockLogger,
       prefs: mockPrefs
     });
-    
+
     const favorites = favorite.getFavorites();
     assert.ok(Array.isArray(favorites), "Should return array");
     assert.equal(favorites.length, 0, "Should be empty array");
@@ -156,17 +156,17 @@ describe("FavoriteCollections", () => {
     const mockZotero = {};
     const mockPrefs = createMockPrefs([]);
     const mockLogger = createMockLogger();
-    
+
     const favorite = createFavoriteCollections({
       logger: mockLogger,
       prefs: mockPrefs,
       zotero: mockZotero
     });
-    
+
     const result = favorite.register();
-    
+
     assert.equal(result, false, "register() should return false when Collections API unavailable");
-    
+
     const logs = mockLogger.getLogs();
     const errorLog = logs.find(l => l.level === 'error');
     assert.ok(errorLog, "Should log error when register fails");
@@ -196,16 +196,16 @@ describe("FavoriteCollections", () => {
     const mockPrefs = createMockPrefs([]);
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const favorite = createFavoriteCollections({
       logger: mockLogger,
       i18n: mockI18n,
       prefs: mockPrefs,
       zotero: mockZotero
     });
-    
+
     const result = favorite.register();
-    
+
     assert.ok(result, "register() should return true when successful");
   });
 });

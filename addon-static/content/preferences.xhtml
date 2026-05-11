@@ -2,45 +2,60 @@
 <?xml-stylesheet href="chrome://global/skin/" type="text/css"?>
 <?xml-stylesheet href="chrome://zotero-platform/content/zotero.css"?>
 
-<prefwindow id="toolsbox-prefs"
+<prefwindow id="__PREFERENCE_ROOT_ID__"
            title="ToolsBox Preferences"
-           xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
-    
-    <!-- General Settings -->
+           xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+           data-pref-root="true"
+           data-pref-layout="inline">
+
     <prefpane id="toolsbox-general" label="General">
         <preferences>
             <preference id="pref-enabled" name="extensions.zotero.toolsbox.enabled" type="bool"/>
             <preference id="pref-logLevel" name="extensions.zotero.toolsbox.logLevel" type="string"/>
         </preferences>
-        
+
         <groupbox>
-            <caption label="General Settings"/>
-            <checkbox preference="pref-enabled" label="Enable ToolsBox"/>
-            <hbox align="center">
-                <label value="Log Level:"/>
-                <menulist preference="pref-logLevel">
-                    <menupopup>
-                        <menuitem value="debug" label="Debug"/>
-                        <menuitem value="info" label="Info"/>
-                        <menuitem value="warn" label="Warning"/>
-                        <menuitem value="error" label="Error"/>
-                    </menupopup>
-                </menulist>
-            </hbox>
+            <caption data-l10n-id="cleanroom-pref-caption"/>
+            <checkbox preference="pref-enabled" data-l10n-id="cleanroom-pref-enabled"/>
+            <vbox class="cleanroom-pref-field-row">
+                <hbox class="cleanroom-pref-control-wrap" align="center">
+                    <label value="Log Level:"/>
+                    <menulist preference="pref-logLevel">
+                        <menupopup>
+                            <menuitem value="debug" label="Debug"/>
+                            <menuitem value="info" label="Info"/>
+                            <menuitem value="warn" label="Warning"/>
+                            <menuitem value="error" label="Error"/>
+                        </menupopup>
+                    </menulist>
+                </hbox>
+            </vbox>
+        </groupbox>
+
+        <groupbox>
+            <caption data-l10n-id="cleanroom-pref-menu-section"/>
+        </groupbox>
+
+        <groupbox>
+            <caption data-l10n-id="cleanroom-pref-logging-section"/>
+        </groupbox>
+
+        <groupbox>
+            <caption data-l10n-id="cleanroom-pref-theme-section"/>
+            <checkbox preference="pref-themeFollowHost" data-l10n-id="cleanroom-pref-theme-follow-host"/>
         </groupbox>
     </prefpane>
-    
-    <!-- ItemTree Columns -->
+
     <prefpane id="toolsbox-columns" label="Columns">
         <preferences>
             <preference id="pref-readTime" name="extensions.zotero.toolsbox.readTimeColumn.enabled" type="bool"/>
-            <preference id="pref-annotation" name="extensions.zotero.toolsbox.annotationColumn.enabled" type="bool"/>
+            <preference id="pref-annotation" name="extensions.zotero.toolsbox.annotationDistributionColumn.enabled" type="bool"/>
             <preference id="pref-publication" name="extensions.zotero.toolsbox.publicationTagsColumn.enabled" type="bool"/>
             <preference id="pref-ifColumn" name="extensions.zotero.toolsbox.ifColumn.enabled" type="bool"/>
             <preference id="pref-cited" name="extensions.zotero.toolsbox.citedCountColumn.enabled" type="bool"/>
-            <preference id="pref-custom" name="extensions.zotero.toolsbox.customColumn.enabled" type="bool"/>
+            <preference id="pref-custom" name="extensions.zotero.toolsbox.customColumnDatakeys.enabled" type="bool"/>
         </preferences>
-        
+
         <groupbox>
             <caption label="ItemTree Columns"/>
             <checkbox preference="pref-readTime" label="Reading Time Column"/>
@@ -51,8 +66,7 @@
             <checkbox preference="pref-custom" label="Custom Columns"/>
         </groupbox>
     </prefpane>
-    
-    <!-- Reader Features -->
+
     <prefpane id="toolsbox-reader" label="Reader">
         <preferences>
             <preference id="pref-margin" name="extensions.zotero.toolsbox.marginAnnotation.enabled" type="bool"/>
@@ -60,7 +74,7 @@
             <preference id="pref-merge" name="extensions.zotero.toolsbox.mergeAnnotations.enabled" type="bool"/>
             <preference id="pref-version" name="extensions.zotero.toolsbox.attachmentVersion.enabled" type="bool"/>
         </preferences>
-        
+
         <groupbox>
             <caption label="Reader Features"/>
             <checkbox preference="pref-margin" label="Margin Annotation Display"/>
@@ -69,16 +83,15 @@
             <checkbox preference="pref-version" label="Attachment Version Switch"/>
         </groupbox>
     </prefpane>
-    
-    <!-- AI Features -->
+
     <prefpane id="toolsbox-ai" label="AI Features">
         <preferences>
             <preference id="pref-aiTags" name="extensions.zotero.toolsbox.aiGenerateTags.enabled" type="bool"/>
             <preference id="pref-aiRemark" name="extensions.zotero.toolsbox.aiGenerateRemark.enabled" type="bool"/>
-            <preference id="pref-tldr" name="extensions.zotero.toolsbox.tldr.enabled" type="bool"/>
+            <preference id="pref-tldr" name="extensions.zotero.toolsbox.tldrPanel.enabled" type="bool"/>
             <preference id="pref-openaiKey" name="extensions.zotero.toolsbox.openai.apiKey" type="string"/>
         </preferences>
-        
+
         <groupbox>
             <caption label="AI Features (Default OFF)"/>
             <description>These features require OpenAI API key and are disabled by default.</description>
@@ -91,32 +104,30 @@
             </hbox>
         </groupbox>
     </prefpane>
-    
-    <!-- Style & Customization -->
+
     <prefpane id="toolsbox-style" label="Style">
         <preferences>
             <preference id="pref-styleEditor" name="extensions.zotero.toolsbox.styleEditor.enabled" type="bool"/>
             <preference id="pref-styleCss" name="extensions.zotero.toolsbox.styleEditor.css" type="string"/>
             <preference id="pref-annotationColors" name="extensions.zotero.toolsbox.annotationColors.enabled" type="bool"/>
         </preferences>
-        
+
         <groupbox>
-            <caption label="Style & Customization (Default OFF)"/>
+            <caption label="Style &amp; Customization (Default OFF)"/>
             <checkbox preference="pref-styleEditor" label="Enable Custom CSS"/>
             <label value="Custom CSS:"/>
             <textbox preference="pref-styleCss" multiline="true" rows="10" width="400"/>
             <checkbox preference="pref-annotationColors" label="Annotation Colors Manager"/>
         </groupbox>
     </prefpane>
-    
-    <!-- External APIs -->
+
     <prefpane id="toolsbox-apis" label="External APIs">
         <preferences>
             <preference id="pref-easyscholar" name="extensions.zotero.toolsbox.easyscholar.apiKey" type="string"/>
             <preference id="pref-semantic" name="extensions.zotero.toolsbox.semanticScholar.apiKey" type="string"/>
-            <preference id="pref-customApi" name="extensions.zotero.toolsbox.customAPI.enabled" type="bool"/>
+            <preference id="pref-customApi" name="extensions.zotero.toolsbox.customExternalAPI.enabled" type="bool"/>
         </preferences>
-        
+
         <groupbox>
             <caption label="External API Configuration"/>
             <description>Configure API keys for external services.</description>
@@ -131,5 +142,5 @@
             <checkbox preference="pref-customApi" label="Enable Custom External API"/>
         </groupbox>
     </prefpane>
-    
+
 </prefwindow>

@@ -19,7 +19,7 @@
 2. **缺少单元测试** - P0/P1功能零测试覆盖
 3. **console.log违规** - 违反Zotero专项规则
 
-### 🟡 P0次要问题  
+### 🟡 P0次要问题
 4. **API命名不一致** - register() vs enable()
 5. **未使用doc参数** - sidebar-toggle直接用document
 6. **中文注释混杂** - 影响国际化
@@ -47,7 +47,7 @@ renderCell: (index, data, column) => {
 }
 ```
 
-**根本问题:** 
+**根本问题:**
 - 没有textContent赋值
 - 没有获取item的引用次数数据
 - 没有排序支持
@@ -58,15 +58,15 @@ renderCell: (index, data, column) => {
 // 添加dataProvider实现
 dataProvider: (item, dataKey) => {
   if (!item || !item.id) return '0';
-  
+
   // 从item.extra读取缓存数据
   const extra = item.getField?.('extra') || '';
   const match = extra.match(/Cited Count: (\d+)/);
-  
+
   if (match) {
     return match[1]; // 返回字符串用于排序
   }
-  
+
   // 无数据时返回0
   return '0';
 },
@@ -77,7 +77,7 @@ dataProvider: (item, dataKey) => {
 ```javascript
 renderCell: (index, data, column) => {
   const doc = Zotero.getMainWindow().document;
-  
+
   const cell = doc.createElement('div');
   cell.className = `cell ${column.className}`;
   cell.style.cssText = `
@@ -87,7 +87,7 @@ renderCell: (index, data, column) => {
     width: 100%;
     height: 100%;
   `;
-  
+
   // 显示引用次数
   const count = doc.createElement('span');
   count.textContent = data || '0';
@@ -95,15 +95,15 @@ renderCell: (index, data, column) => {
     font-size: 0.9em;
     opacity: 0.8;
   `;
-  
+
   cell.appendChild(count);
-  
+
   // 如果引用次数大于10,添加高亮样式
   if (parseInt(data) > 10) {
     cell.style.fontWeight = 'bold';
     cell.style.color = '#4682B4';
   }
-  
+
   return cell;
 },
 ```
@@ -126,22 +126,22 @@ getSortValue: (item) => {
 export function createCitedCountColumn(options) {
   const { logger, i18n, zotero, prefs } = options;
   const Zotero = zotero || globalThis.Zotero;
-  
+
   const columnID = 'toolsbox-cited-count';
   const dataKey = 'citedCount';
-  
+
   function dataProvider(item, dataKey) {
     if (!item || !item.id) return '0';
-    
+
     const extra = item.getField?.('extra') || '';
     const match = extra.match(/Cited Count: (\d+)/);
-    
+
     return match ? match[1] : '0';
   }
-  
+
   function renderCell(index, data, column) {
     const doc = Zotero.getMainWindow().document;
-    
+
     const cell = doc.createElement('div');
     cell.className = `cell ${column.className}`;
     cell.style.cssText = `
@@ -151,30 +151,30 @@ export function createCitedCountColumn(options) {
       width: 100%;
       height: 100%;
     `;
-    
+
     const count = doc.createElement('span');
     count.textContent = data || '0';
     count.style.cssText = `
       font-size: 0.9em;
       opacity: 0.8;
     `;
-    
+
     cell.appendChild(count);
-    
+
     if (parseInt(data) > 10) {
       cell.style.fontWeight = 'bold';
       cell.style.color = '#4682B4';
     }
-    
+
     return cell;
   }
-  
+
   function register() {
     if (!Zotero.ItemTreeManager) {
       logger.error('citedCountColumn.register.failed', { reason: 'ItemTreeManager not available' });
       return false;
     }
-    
+
     Zotero.ItemTreeManager.registerColumn({
       dataKey,
       label: i18n.t('toolsbox-column-cited-count', 'Cited Count'),
@@ -183,11 +183,11 @@ export function createCitedCountColumn(options) {
       renderCell: (index, data, column) => renderCell(index, data, column),
       sortReverse: false
     });
-    
+
     logger.debug('citedCountColumn.registered', { columnID });
     return true;
   }
-  
+
   return {
     register,
     columnID,
@@ -222,38 +222,38 @@ describe('CitedCountColumn (Fixed)', () => {
         })
       }
     });
-    
+
     const cell = column.renderCell(0, '15', { className: 'cited-count' });
-    
+
     expect(cell.textContent).toBe('15');
   });
-  
+
   it('should highlight high cited papers', () => {
     const column = createCitedCountColumn({ logger: mockLogger });
-    
+
     const cell = column.renderCell(0, '25', {});
-    
+
     expect(cell.style.fontWeight).toBe('bold');
   });
-  
+
   it('should handle zero citations', () => {
     const column = createCitedCountColumn({ logger: mockLogger });
-    
+
     const cell = column.renderCell(0, '0', {});
-    
+
     expect(cell.textContent).toBe('0');
     expect(cell.style.fontWeight).not.toBe('bold');
   });
-  
+
   it('should extract cached data from item.extra', () => {
     const mockItem = {
       id: 1,
       getField: () => 'Cited Count: 42'
     };
-    
+
     const column = createCitedCountColumn({ logger: mockLogger });
     const count = column.dataProvider(mockItem, 'citedCount');
-    
+
     expect(count).toBe('42');
   });
 });
@@ -316,7 +316,7 @@ logger.debug('menuManager.registered', { id });
 console.log("Host signals initialized");
 console.log("Platform:", platform);
 
-// After  
+// After
 logger.info('zoteroHost.signals.initialized');
 logger.debug('zoteroHost.platform', { platform });
 ```
@@ -357,14 +357,14 @@ git commit -m "refactor: replace console.log with logger per Zotero rules"
 function enable() { /* ... */ }
 return { enable, ... };
 
-// After  
+// After
 function register() { /* ... */ }
 return { register, ... };
 ```
 
 **collection-sort.js:**
 ```javascript
-// Before  
+// Before
 function enable() { /* ... */ }
 return { enable, ... };
 
@@ -481,5 +481,5 @@ git tag -a v0.5.0-tech-debt-fix -m "Technical debt fixed: renderCell, console.lo
 
 **计划完成!准备执行。**
 
-**预计时间:** 1-2天  
+**预计时间:** 1-2天
 **优先级:** 最高 - 必须先修复再继续开发

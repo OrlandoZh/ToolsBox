@@ -69,18 +69,18 @@ describe("CitedCountColumn", () => {
         return { document: mockDoc };
       }
     };
-    
+
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const column = createCitedCountColumn({
       logger: mockLogger,
       i18n: mockI18n,
       zotero: mockZotero
     });
-    
+
     column.register();
-    
+
     assert.ok(mockZotero.ItemTreeManager.lastRegistration, "Column should be registered");
     assert.equal(mockZotero.ItemTreeManager.lastRegistration.dataKey, 'citedCount', "dataKey should be citedCount");
     assert.equal(column.dataKey, 'citedCount', "column.dataKey should be citedCount");
@@ -94,17 +94,17 @@ describe("CitedCountColumn", () => {
     const mockZotero = {};
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const column = createCitedCountColumn({
       logger: mockLogger,
       i18n: mockI18n,
       zotero: mockZotero
     });
-    
+
     const result = column.register();
-    
+
     assert.equal(result, false, "register() should return false when ItemTreeManager unavailable");
-    
+
     const logs = mockLogger.getLogs();
     const errorLog = logs.find(l => l.level === 'error');
     assert.ok(errorLog, "Should log error when registration fails");
@@ -122,17 +122,17 @@ describe("CitedCountColumn", () => {
         return { document: mockDoc };
       }
     };
-    
+
     const mockLogger = createMockLogger();
     const mockI18n = createMockI18n();
-    
+
     const column = createCitedCountColumn({
       logger: mockLogger,
       i18n: mockI18n
     });
-    
+
     column.register();
-    
+
     assert.ok(globalThis.Zotero.ItemTreeManager.lastRegistration, "Should use global Zotero");
     delete globalThis.Zotero;
   });
@@ -144,14 +144,14 @@ describe("CitedCountColumn", () => {
         return { document: mockDoc };
       }
     };
-    
+
     const column = createCitedCountColumn({
       logger: createMockLogger(),
       zotero: mockZotero
     });
-    
+
     const cell = column.renderCell(0, '15', { className: 'cited-count' });
-    
+
     assert.ok(cell, "Cell should be created");
     assert.ok(cell._children, "Cell should have children");
     assert.equal(cell._children[0].textContent, '15', "Cell should display '15'");
@@ -164,14 +164,14 @@ describe("CitedCountColumn", () => {
         return { document: mockDoc };
       }
     };
-    
+
     const column = createCitedCountColumn({
       logger: createMockLogger(),
       zotero: mockZotero
     });
-    
+
     const cell = column.renderCell(0, '25', { className: 'cited-count' });
-    
+
     assert.equal(cell.style.fontWeight, 'bold', "High cited papers should be bold");
     assert.equal(cell.style.color, '#4682B4', "High cited papers should have blue color");
   });
@@ -183,14 +183,14 @@ describe("CitedCountColumn", () => {
         return { document: mockDoc };
       }
     };
-    
+
     const column = createCitedCountColumn({
       logger: createMockLogger(),
       zotero: mockZotero
     });
-    
+
     const cell = column.renderCell(0, '5', { className: 'cited-count' });
-    
+
     assert.ok(cell.style.fontWeight !== 'bold', "Low cited papers should not be bold");
   });
 
@@ -201,14 +201,14 @@ describe("CitedCountColumn", () => {
         return { document: mockDoc };
       }
     };
-    
+
     const column = createCitedCountColumn({
       logger: createMockLogger(),
       zotero: mockZotero
     });
-    
+
     const cell = column.renderCell(0, '0', { className: 'cited-count' });
-    
+
     assert.equal(cell._children[0].textContent, '0', "Cell should display '0'");
     assert.ok(cell.style.fontWeight !== 'bold', "Zero citations should not be bold");
   });
@@ -220,15 +220,15 @@ describe("CitedCountColumn", () => {
         return { document: mockDoc };
       }
     };
-    
+
     const column = createCitedCountColumn({
       logger: createMockLogger(),
       zotero: mockZotero
     });
-    
+
     const cellNull = column.renderCell(0, null, { className: 'cited-count' });
     const cellUndefined = column.renderCell(0, undefined, { className: 'cited-count' });
-    
+
     assert.equal(cellNull._children[0].textContent, '0', "Null data should display '0'");
     assert.equal(cellUndefined._children[0].textContent, '0', "Undefined data should display '0'");
   });
@@ -241,13 +241,13 @@ describe("CitedCountColumn", () => {
         return '';
       }
     };
-    
+
     const column = createCitedCountColumn({
       logger: createMockLogger()
     });
-    
+
     const count = column.dataProvider(mockItem, 'citedCount');
-    
+
     assert.equal(count, '42', "Should extract '42' from extra field");
   });
 
@@ -258,13 +258,13 @@ describe("CitedCountColumn", () => {
         return '';
       }
     };
-    
+
     const column = createCitedCountColumn({
       logger: createMockLogger()
     });
-    
+
     const count = column.dataProvider(mockItem, 'citedCount');
-    
+
     assert.equal(count, '0', "Should return '0' when no cached data");
   });
 
@@ -272,7 +272,7 @@ describe("CitedCountColumn", () => {
     const column = createCitedCountColumn({
       logger: createMockLogger()
     });
-    
+
     assert.equal(column.dataProvider(null, 'citedCount'), '0', "Null item should return '0'");
     assert.equal(column.dataProvider(undefined, 'citedCount'), '0', "Undefined item should return '0'");
     assert.equal(column.dataProvider({}, 'citedCount'), '0', "Item without id should return '0'");

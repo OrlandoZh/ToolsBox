@@ -87,31 +87,31 @@ describe('CollectionItemCount', () => {
         }
       })
     };
-    
+
     const counter = createCollectionItemCount({
       logger: mockLogger,
       zotero: mockZotero
     });
-    
+
     counter.enable();
-    
+
     expect(mockZotero.Collections.get.called).toBe(true);
   });
-  
+
   it('should update count when items added', async () => {
     const mockCollection = {
       id: 1,
       getItems: () => []
     };
-    
+
     const counter = createCollectionItemCount({
       logger: mockLogger,
       zotero: mockZotero
     });
-    
+
     const count = counter.getCollectionCount(mockCollection);
     expect(count).toBe(0);
-    
+
     // Simulate item added
     mockCollection.getItems = () => [1, 2];
     const newCount = counter.getCollectionCount(mockCollection);
@@ -136,19 +136,19 @@ Expected: FAIL with "Cannot find module '../../src/features/collection-item-coun
 export function createCollectionItemCount(options) {
   const { logger, i18n, zotero } = options;
   const Zotero = zotero || globalThis.Zotero;
-  
+
   const countElements = new Map(); // collectionID -> countLabel
-  
+
   function getCollectionCount(collection) {
     if (!collection || !collection.getItems) {
       return 0;
     }
     return collection.getItems().length;
   }
-  
+
   function injectCountLabel(collectionNode, count) {
     if (!collectionNode) return;
-    
+
     // 查找或创建计数标签
     let countLabel = countElements.get(collectionNode.id);
     if (!countLabel) {
@@ -162,22 +162,22 @@ export function createCollectionItemCount(options) {
       collectionNode.appendChild(countLabel);
       countElements.set(collectionNode.id, countLabel);
     }
-    
+
     countLabel.textContent = `(${count})`;
   }
-  
+
   function updateAllCounts() {
     const mainWindow = Zotero.getMainWindow();
     if (!mainWindow) return;
-    
+
     const collectionTree = mainWindow.document.getElementById('zotero-collections-tree');
     if (!collectionTree) return;
-    
+
     const rows = collectionTree.querySelectorAll('.tree-row');
     rows.forEach(row => {
       const collectionID = row.dataset?.id;
       if (!collectionID) return;
-      
+
       const collection = Zotero.Collections.get(collectionID);
       if (collection) {
         const count = getCollectionCount(collection);
@@ -185,16 +185,16 @@ export function createCollectionItemCount(options) {
       }
     });
   }
-  
+
   function enable() {
     if (!Zotero || !Zotero.Collections) {
       logger.error('collectionItemCount.enable.failed', { reason: 'Collections API not available' });
       return false;
     }
-    
+
     // 初始注入
     updateAllCounts();
-    
+
     // 监听条目变化
     Zotero.Notifier.registerObserver({
       notify: (event, type, ids) => {
@@ -203,11 +203,11 @@ export function createCollectionItemCount(options) {
         }
       }
     }, ['item', 'collection-item'], 'toolsbox-collection-count');
-    
+
     logger.debug('collectionItemCount.enabled');
     return true;
   }
-  
+
   return {
     enable,
     getCollectionCount,
@@ -297,25 +297,25 @@ describe('CollectionSort', () => {
       { name: 'A Collection', id: 1 },
       { name: 'M Collection', id: 2 }
     ];
-    
+
     const sorter = createCollectionSort({ logger: mockLogger });
     const sorted = sorter.sortCollections(collections, 'name');
-    
+
     expect(sorted[0].name).toBe('A Collection');
     expect(sorted[1].name).toBe('M Collection');
     expect(sorted[2].name).toBe('Z Collection');
   });
-  
+
   it('should sort collections by item count', () => {
     const collections = [
       { name: 'Small', id: 1, getItems: () => [1] },
       { name: 'Large', id: 2, getItems: () => [1, 2, 3, 4, 5] },
       { name: 'Medium', id: 3, getItems: () => [1, 2, 3] }
     ];
-    
+
     const sorter = createCollectionSort({ logger: mockLogger });
     const sorted = sorter.sortCollections(collections, 'itemCount');
-    
+
     expect(sorted[0].name).toBe('Small');
     expect(sorted[1].name).toBe('Medium');
     expect(sorted[2].name).toBe('Large');
@@ -339,7 +339,7 @@ Expected: FAIL with "Cannot find module '../../src/features/collection-sort.js'"
 export function createCollectionSort(options) {
   const { logger, i18n, zotero, prefs } = options;
   const Zotero = zotero || globalThis.Zotero;
-  
+
   const SORT_OPTIONS = {
     name: (a, b) => (a.name || '').localeCompare(b.name || ''),
     nameDesc: (a, b) => (b.name || '').localeCompare(a.name || ''),
@@ -348,53 +348,53 @@ export function createCollectionSort(options) {
     dateAdded: (a, b) => (a.dateAdded || 0) - (b.dateAdded || 0),
     dateAddedDesc: (a, b) => (b.dateAdded || 0) - (a.dateAdded || 0)
   };
-  
+
   function sortCollections(collections, sortBy = 'name') {
     const sortFn = SORT_OPTIONS[sortBy];
     if (!sortFn) {
       logger.warn('collectionSort.unknownSort', { sortBy });
       return collections;
     }
-    
+
     return [...collections].sort(sortFn);
   }
-  
+
   function applySort(sortBy) {
     const mainWindow = Zotero.getMainWindow();
     if (!mainWindow) return;
-    
+
     const collectionTree = mainWindow.document.getElementById('zotero-collections-tree');
     if (!collectionTree) return;
-    
+
     // 获取所有根级collections
     const rootCollections = Zotero.Collections.getByLibrary(Zotero.Libraries.userLibraryID);
     const sorted = sortCollections(rootCollections, sortBy);
-    
+
     // 重新排列DOM节点
     const rows = Array.from(collectionTree.querySelectorAll('.tree-row'));
-    const sortedRows = sorted.map(col => 
+    const sortedRows = sorted.map(col =>
       rows.find(row => row.dataset?.id === String(col.id))
     ).filter(Boolean);
-    
+
     sortedRows.forEach(row => {
       collectionTree.appendChild(row);
     });
-    
+
     // 保存排序偏好
     if (prefs) {
       prefs.set('collectionItem.sortBy', sortBy);
     }
-    
+
     logger.debug('collectionSort.applied', { sortBy });
   }
-  
+
   function addSortButton() {
     const mainWindow = Zotero.getMainWindow();
     if (!mainWindow) return;
-    
+
     const collectionTree = mainWindow.document.getElementById('zotero-collections-tree');
     if (!collectionTree) return;
-    
+
     // 创建排序按钮
     const sortButton = mainWindow.document.createElement('button');
     sortButton.id = 'toolsbox-collection-sort-button';
@@ -408,19 +408,19 @@ export function createCollectionSort(options) {
       font-size: 12px;
       cursor: pointer;
     `;
-    
+
     // 点击显示排序菜单
     sortButton.addEventListener('click', (e) => {
       e.preventDefault();
       showSortMenu(mainWindow);
     });
-    
+
     collectionTree.parentElement.style.position = 'relative';
     collectionTree.parentElement.appendChild(sortButton);
-    
+
     logger.debug('collectionSort.buttonAdded');
   }
-  
+
   function showSortMenu(window) {
     // 简化实现: 使用prompt选择排序方式
     // 实际产品中应该使用XUL menupopup
@@ -432,36 +432,36 @@ export function createCollectionSort(options) {
       'dateAdded: Sort by Date Added (Old-New)',
       'dateAddedDesc: Sort by Date Added (New-Old)'
     ];
-    
+
     const choice = window.prompt(
       i18n.t('toolsbox-collection-sort-prompt', 'Choose sort method:'),
       options.join('\n')
     );
-    
+
     if (choice) {
       const sortBy = choice.split(':')[0];
       applySort(sortBy);
     }
   }
-  
+
   function enable() {
     if (!Zotero || !Zotero.Collections) {
       logger.error('collectionSort.enable.failed', { reason: 'Collections API not available' });
       return false;
     }
-    
+
     addSortButton();
-    
+
     // 恢复上次排序
     const lastSortBy = prefs?.get('collectionItem.sortBy');
     if (lastSortBy) {
       applySort(lastSortBy);
     }
-    
+
     logger.debug('collectionSort.enabled');
     return true;
   }
-  
+
   return {
     enable,
     sortCollections,
@@ -540,43 +540,43 @@ describe('FavoriteCollections', () => {
       get: sinon.stub().returns([]),
       set: sinon.spy()
     };
-    
+
     const favorite = createFavoriteCollections({
       logger: mockLogger,
       prefs: mockPrefs
     });
-    
+
     favorite.addToFavorites(1);
-    
+
     expect(mockPrefs.set.calledWith('favoriteCollections', [1])).toBe(true);
   });
-  
+
   it('should remove collection from favorites', () => {
     const mockPrefs = {
       get: sinon.stub().returns([1, 2, 3]),
       set: sinon.spy()
     };
-    
+
     const favorite = createFavoriteCollections({
       logger: mockLogger,
       prefs: mockPrefs
     });
-    
+
     favorite.removeFromFavorites(2);
-    
+
     expect(mockPrefs.set.calledWith('favoriteCollections', [1, 3])).toBe(true);
   });
-  
+
   it('should check if collection is favorite', () => {
     const mockPrefs = {
       get: sinon.stub().returns([1, 2, 3])
     };
-    
+
     const favorite = createFavoriteCollections({
       logger: mockLogger,
       prefs: mockPrefs
     });
-    
+
     expect(favorite.isFavorite(2)).toBe(true);
     expect(favorite.isFavorite(4)).toBe(false);
   });
@@ -599,14 +599,14 @@ Expected: FAIL with "Cannot find module '../../src/features/favorite-collections
 export function createFavoriteCollections(options) {
   const { logger, i18n, zotero, prefs } = options;
   const Zotero = zotero || globalThis.Zotero;
-  
+
   const PREF_KEY = 'favoriteCollections';
-  
+
   function getFavorites() {
     if (!prefs) return [];
     return prefs.get(PREF_KEY) || [];
   }
-  
+
   function addToFavorites(collectionID) {
     const favorites = getFavorites();
     if (!favorites.includes(collectionID)) {
@@ -616,7 +616,7 @@ export function createFavoriteCollections(options) {
       updateCollectionTree();
     }
   }
-  
+
   function removeFromFavorites(collectionID) {
     const favorites = getFavorites();
     const index = favorites.indexOf(collectionID);
@@ -627,11 +627,11 @@ export function createFavoriteCollections(options) {
       updateCollectionTree();
     }
   }
-  
+
   function isFavorite(collectionID) {
     return getFavorites().includes(collectionID);
   }
-  
+
   function toggleFavorite(collectionID) {
     if (isFavorite(collectionID)) {
       removeFromFavorites(collectionID);
@@ -639,15 +639,15 @@ export function createFavoriteCollections(options) {
       addToFavorites(collectionID);
     }
   }
-  
+
   function updateCollectionTree() {
     const mainWindow = Zotero?.getMainWindow();
     if (!mainWindow) return;
-    
+
     const favorites = getFavorites();
     const collectionTree = mainWindow.document.getElementById('zotero-collections-tree');
     if (!collectionTree) return;
-    
+
     // 标记收藏的collection
     const rows = collectionTree.querySelectorAll('.tree-row');
     rows.forEach(row => {
@@ -655,7 +655,7 @@ export function createFavoriteCollections(options) {
       if (favorites.includes(collectionID)) {
         row.classList.add('favorite-collection');
         row.style.fontWeight = 'bold';
-        
+
         // 添加星标图标
         if (!row.querySelector('.favorite-icon')) {
           const icon = mainWindow.document.createElement('span');
@@ -671,56 +671,56 @@ export function createFavoriteCollections(options) {
         if (icon) icon.remove();
       }
     });
-    
+
     // 置顶收藏的collections
-    const favoriteRows = Array.from(rows).filter(row => 
+    const favoriteRows = Array.from(rows).filter(row =>
       favorites.includes(parseInt(row.dataset?.id))
     );
-    
+
     favoriteRows.forEach(row => {
       collectionTree.insertBefore(row, collectionTree.firstChild);
     });
-    
+
     logger.debug('favoriteCollections.treeUpdated', { count: favorites.length });
   }
-  
+
   function addContextMenu() {
     const mainWindow = Zotero?.getMainWindow();
     if (!mainWindow) return;
-    
+
     // 监听右键菜单
     const collectionTree = mainWindow.document.getElementById('zotero-collections-tree');
     if (!collectionTree) return;
-    
+
     collectionTree.addEventListener('contextmenu', (e) => {
       const row = e.target.closest('.tree-row');
       if (!row) return;
-      
+
       const collectionID = parseInt(row.dataset?.id);
-      
+
       // 添加收藏菜单项
       // 注意: 实际实现应该使用Zotero.MenuManager API
       const isFav = isFavorite(collectionID);
-      const label = isFav 
+      const label = isFav
         ? i18n.t('toolsbox-collection-remove-favorite', 'Remove from Favorites')
         : i18n.t('toolsbox-collection-add-favorite', 'Add to Favorites');
-      
+
       // 简化实现: 双击切换收藏
       row.addEventListener('dblclick', () => {
         toggleFavorite(collectionID);
       }, { once: true });
     });
   }
-  
+
   function enable() {
     if (!Zotero || !Zotero.Collections) {
       logger.error('favoriteCollections.enable.failed', { reason: 'Collections API not available' });
       return false;
     }
-    
+
     updateCollectionTree();
     addContextMenu();
-    
+
     // 监听collection变化
     Zotero.Notifier.registerObserver({
       notify: (event, type, ids) => {
@@ -729,11 +729,11 @@ export function createFavoriteCollections(options) {
         }
       }
     }, ['collection'], 'toolsbox-favorite-collections');
-    
+
     logger.debug('favoriteCollections.enabled');
     return true;
   }
-  
+
   return {
     enable,
     addToFavorites,

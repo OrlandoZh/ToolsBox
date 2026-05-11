@@ -79,7 +79,7 @@
 
 ## Task 1: Tags Column Config
 
-**Complexity**: Simple  
+**Complexity**: Simple
 **Time**: 30 minutes
 
 - [ ] **Implement Tags Column Config**
@@ -92,15 +92,15 @@
 ```javascript
 export function createTagsColumnConfig(options) {
   const { logger, prefs } = options;
-  
+
   const margin = prefs?.get?.('tagsColumn.margin') || '0.08';
   const padding = prefs?.get?.('tagsColumn.padding') || '0.455';
   const align = prefs?.get?.('tagsColumn.align') || 'left';
-  
+
   function applyConfig(cell) {
     // Apply margin, padding, alignment to tag cells
   }
-  
+
   return { applyConfig, getMargin, getPadding, getAlign };
 }
 ```
@@ -109,7 +109,7 @@ export function createTagsColumnConfig(options) {
 
 ## Task 2: Text Tags Column Config
 
-**Complexity**: Simple  
+**Complexity**: Simple
 **Time**: 30 minutes
 
 - [ ] **Implement Text Tags Column Config**
@@ -122,19 +122,19 @@ export function createTagsColumnConfig(options) {
 ```javascript
 export function createTextTagsColumnConfig(options) {
   const { logger, prefs } = options;
-  
+
   const prefix = prefs?.get?.('textTagsColumn.prefix') || '';
   const regex = prefs?.get?.('textTagsColumn.regex') || '';
   const bgColor = prefs?.get?.('textTagsColumn.bgColor') || '#f0f0f0';
-  
+
   function filterByTextRegex(tags, regex) {
     // Filter tags by regex pattern
   }
-  
+
   function addPrefix(tag, prefix) {
     // Add prefix to tag text
   }
-  
+
   return { filterByTextRegex, addPrefix };
 }
 ```
@@ -143,7 +143,7 @@ export function createTextTagsColumnConfig(options) {
 
 ## Task 3: Date Format Customization
 
-**Complexity**: Medium  
+**Complexity**: Medium
 **Time**: 1 hour
 
 - [ ] **Implement Date Format Customization**
@@ -156,21 +156,21 @@ export function createTextTagsColumnConfig(options) {
 ```javascript
 export function createDateFormatCustomization(options) {
   const { logger, prefs } = options;
-  
+
   const dateType = prefs?.get?.('dateFormat.type') || 'absolute'; // absolute, relative
   const format = prefs?.get?.('dateFormat.format') || 'YYYY/M/D H:m:s';
   const deltaHour = parseInt(prefs?.get?.('dateFormat.deltaHour') || '8');
-  
+
   function formatDate(date, options) {
     // Format date based on preferences
     // Support absolute: 2026/05/10 15:30:00
     // Support relative: 2 hours ago
   }
-  
+
   function applyTimezone(date, deltaHour) {
     // Apply timezone offset
   }
-  
+
   return { formatDate, applyTimezone };
 }
 ```
@@ -179,7 +179,7 @@ export function createDateFormatCustomization(options) {
 
 ## Task 4: Paper Matrix Enhanced
 
-**Complexity**: Medium  
+**Complexity**: Medium
 **Time**: 1 hour
 
 - [ ] **Implement Paper Matrix Enhanced**
@@ -192,16 +192,16 @@ export function createDateFormatCustomization(options) {
 ```javascript
 export function createPaperMatrixEnhanced(options) {
   const { logger, prefs } = options;
-  
+
   const coreFields = prefs?.get?.('paperMatrix.coreFields') || '';
   const auxiliaryFields = prefs?.get?.('paperMatrix.auxiliaryFields') || 'firstCreator, year';
   const paperDirection = prefs?.get?.('paperMatrix.paperDirection') || 'row';
-  
+
   function renderMatrix(items, config) {
     // Render paper matrix with custom fields
     // Direction: row or column
   }
-  
+
   return { renderMatrix };
 }
 ```
@@ -210,7 +210,7 @@ export function createPaperMatrixEnhanced(options) {
 
 ## Task 5: Merge Annotations
 
-**Complexity**: Medium  
+**Complexity**: Medium
 **Time**: 1.5 hours
 
 - [ ] **Implement Merge Annotations**
@@ -223,21 +223,21 @@ export function createPaperMatrixEnhanced(options) {
 ```javascript
 export function createMergeAnnotations(options) {
   const { logger, zotero } = options;
-  
+
   function mergeAnnotations(annotations) {
     // Merge consecutive annotations on same page
     // Combine text: "text1...text2"
   }
-  
+
   function canMerge(ann1, ann2) {
     // Check if annotations can be merged
     // Same page, similar position, consecutive
   }
-  
+
   function splitMergedAnnotation(annotation) {
     // Split merged annotation back to original
   }
-  
+
   return { mergeAnnotations, canMerge, splitMergedAnnotation };
 }
 ```
@@ -246,7 +246,7 @@ export function createMergeAnnotations(options) {
 
 ## Task 6: Style Editor
 
-**Complexity**: Medium  
+**Complexity**: Medium
 **Time**: 1.5 hours
 
 - [ ] **Implement Style Editor**
@@ -259,24 +259,24 @@ export function createMergeAnnotations(options) {
 ```javascript
 export function createStyleEditor(options) {
   const { logger, zotero, prefs } = options;
-  
+
   const cssCode = prefs?.get?.('styleEditor.value') || '';
-  
+
   function applyCSS(css) {
     // Inject CSS into Zotero document
     const style = document.createElement('style');
     style.textContent = css;
     document.head.appendChild(style);
   }
-  
+
   function previewCSS(css) {
     // Preview CSS without saving
   }
-  
+
   function saveCSS(css) {
     // Save CSS to preferences
   }
-  
+
   return { applyCSS, previewCSS, saveCSS };
 }
 ```
@@ -285,7 +285,7 @@ export function createStyleEditor(options) {
 
 ## Task 7: Annotation Manager Config
 
-**Complexity**: Simple  
+**Complexity**: Simple
 **Time**: 30 minutes
 
 - [ ] **Implement Annotation Manager Config**
@@ -298,7 +298,7 @@ Enhance existing `annotation-manager.js` with:
 
 ## Task 8: Custom Column DataKeys
 
-**Complexity**: Medium  
+**Complexity**: Medium
 **Time**: 1 hour
 
 - [ ] **Implement Custom Column DataKeys**
@@ -311,19 +311,19 @@ Enhance existing `annotation-manager.js` with:
 ```javascript
 export function createCustomColumnDataKeys(options) {
   const { logger, zotero, prefs } = options;
-  
+
   const dataKeys = prefs?.get?.('customColumn.dataKeys') || 'numPages, price';
-  
+
   function registerCustomColumns(dataKeys) {
     // Parse dataKeys string
     // Register each as ItemTree column
   }
-  
+
   function parseDataKeys(dataKeysStr) {
     // Parse "field1, field2, field3"
     // Return array of field names
   }
-  
+
   return { registerCustomColumns, parseDataKeys };
 }
 ```
@@ -332,7 +332,7 @@ export function createCustomColumnDataKeys(options) {
 
 ## Task 9-11: API Config UI
 
-**Complexity**: Simple  
+**Complexity**: Simple
 **Time**: 1 hour total
 
 - [ ] **Implement API Configuration UI**
@@ -348,7 +348,7 @@ All use existing API clients, just add UI for configuration.
 
 ## Task 12: Backlinks
 
-**Complexity**: High  
+**Complexity**: High
 **Time**: 2 hours
 
 - [ ] **Implement Backlinks**
@@ -361,19 +361,19 @@ All use existing API clients, just add UI for configuration.
 ```javascript
 export function createBacklinks(options) {
   const { logger, zotero } = options;
-  
+
   function createBacklink(annotation, note) {
     // Create bidirectional link between annotation and note
   }
-  
+
   function getBacklinks(item) {
     // Get all backlinks for an item
   }
-  
+
   function jumpToBacklink(link) {
     // Navigate to linked annotation/note
   }
-  
+
   return { createBacklink, getBacklinks, jumpToBacklink };
 }
 ```
@@ -382,7 +382,7 @@ export function createBacklinks(options) {
 
 ## Task 13: TLDR Panel
 
-**Complexity**: Medium  
+**Complexity**: Medium
 **Time**: 1.5 hours
 
 - [ ] **Implement TLDR Panel**
@@ -395,16 +395,16 @@ export function createBacklinks(options) {
 ```javascript
 export function createTLDRPanel(options) {
   const { logger, zotero, i18n } = options;
-  
+
   function showTLDR(item) {
     // Show TLDR summary panel
     // Auto-translate if enabled
   }
-  
+
   function generateTLDR(abstract) {
     // Use AI to generate TLDR (3 bullet points)
   }
-  
+
   return { showTLDR, generateTLDR };
 }
 ```
@@ -413,7 +413,7 @@ export function createTLDRPanel(options) {
 
 ## Task 14: Custom External API
 
-**Complexity**: High  
+**Complexity**: High
 **Time**: 2 hours
 
 - [ ] **Implement Custom External API**
@@ -426,17 +426,17 @@ export function createTLDRPanel(options) {
 ```javascript
 export function createCustomExternalAPI(options) {
   const { logger, prefs } = options;
-  
+
   const apiUrl = prefs?.get?.('customApi.url');
   const apiKey = prefs?.get?.('customApi.key');
   const method = prefs?.get?.('customApi.method') || 'GET';
-  
+
   async function callCustomAPI(params) {
     // Generic API caller
     // Support GET/POST
     // Handle authentication
   }
-  
+
   return { callCustomAPI };
 }
 ```

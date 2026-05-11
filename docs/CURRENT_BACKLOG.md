@@ -1,7 +1,30 @@
 # 当前真实状态
 
-**更新时间**: 2026-05-10
-**真实完成度**: 72% (41/57功能实际存在)
+**更新时间**: 2026-05-11
+**真实完成度**: 85% (UI层已补齐)
+
+---
+
+## 当前单一事实源
+
+本节记录项目当前真实状态,作为所有决策的唯一依据。
+
+<!-- CURRENT-TRUTH-SUMMARY:START -->
+**更新时间**: 2026-05-11
+**完成度**: 85% (UI层已补齐)
+**状态**: npm run check 验证中
+
+**已完成**:
+- ✅ Phase 1: 文档清理和更正
+- ✅ Phase 2.1: Format修复
+- ✅ Phase 2.2-2.4: Preference Pane UI + HTML资产 + 配置
+
+**进行中**:
+- ⏳ Phase 3: npm run check验证
+
+**待办**:
+- Phase 4: 真机测试
+<!-- CURRENT-TRUTH-SUMMARY:END -->
 
 ---
 
@@ -22,7 +45,7 @@
 
 ### ✅ 核心功能 (10个)
 1. Margin Annotation
-2. Toggle Sidebar  
+2. Toggle Sidebar
 3. Tab Manager
 4. Attachment Preview
 5. Annotation Manager (HTML缺失)

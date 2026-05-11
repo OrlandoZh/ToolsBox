@@ -32,7 +32,7 @@ describe("SidebarToggle", () => {
       hidden: false,
       id: 'zotero-collections-pane'
     };
-    
+
     const mockDocument = {
       getElementById: function(id) {
         if (id === 'zotero-collections-pane') return mockLeftSidebar;
@@ -41,31 +41,31 @@ describe("SidebarToggle", () => {
       },
       addEventListener: function() {}
     };
-    
+
     const mockMainWindow = {
       document: mockDocument,
       addEventListener: function() {}
     };
-    
+
     const mockZotero = {
       getMainWindow: function() {
         return mockMainWindow;
       }
     };
-    
+
     const mockLogger = createMockLogger();
-    
+
     const toggle = createSidebarToggle({
       logger: mockLogger,
       zotero: mockZotero
     });
-    
+
     const initialState = toggle.isLeftSidebarVisible();
     assert.equal(initialState, true, "Initial state should be visible");
-    
+
     toggle.toggleLeftSidebar();
     assert.equal(toggle.isLeftSidebarVisible(), false, "After toggle, should be hidden");
-    
+
     toggle.toggleLeftSidebar();
     assert.equal(toggle.isLeftSidebarVisible(), true, "After second toggle, should be visible again");
   });
@@ -75,7 +75,7 @@ describe("SidebarToggle", () => {
       hidden: false,
       id: 'zotero-item-pane'
     };
-    
+
     const mockDocument = {
       getElementById: function(id) {
         if (id === 'zotero-collections-pane') return { hidden: false, id: 'zotero-collections-pane' };
@@ -84,67 +84,67 @@ describe("SidebarToggle", () => {
       },
       addEventListener: function() {}
     };
-    
+
     const mockMainWindow = {
       document: mockDocument,
       addEventListener: function() {}
     };
-    
+
     const mockZotero = {
       getMainWindow: function() {
         return mockMainWindow;
       }
     };
-    
+
     const mockLogger = createMockLogger();
-    
+
     const toggle = createSidebarToggle({
       logger: mockLogger,
       zotero: mockZotero
     });
-    
+
     const initialState = toggle.isRightSidebarVisible();
     assert.equal(initialState, true, "Initial state should be visible");
-    
+
     toggle.toggleRightSidebar();
     assert.equal(toggle.isRightSidebarVisible(), false, "After toggle, should be hidden");
-    
+
     toggle.toggleRightSidebar();
     assert.equal(toggle.isRightSidebarVisible(), true, "After second toggle, should be visible again");
   });
 
   it("should register keyboard shortcuts", () => {
     const eventListeners = [];
-    
+
     const mockDocument = {
       getElementById: function(id) {
         return { hidden: false, id };
       },
       addEventListener: function() {}
     };
-    
+
     const mockMainWindow = {
       document: mockDocument,
       addEventListener: function(type, handler) {
         eventListeners.push({ type, handler });
       }
     };
-    
+
     const mockZotero = {
       getMainWindow: function() {
         return mockMainWindow;
       }
     };
-    
+
     const mockLogger = createMockLogger();
-    
+
     const toggle = createSidebarToggle({
       logger: mockLogger,
       zotero: mockZotero
     });
-    
+
     const result = toggle.register();
-    
+
     assert.equal(result, true, "register() should return true");
     assert.ok(eventListeners.length > 0, "Should register event listeners");
     assert.includes(eventListeners.map(e => e.type), 'keydown', "Should register keydown listener");
@@ -157,25 +157,25 @@ describe("SidebarToggle", () => {
       },
       addEventListener: function() {}
     };
-    
+
     const mockMainWindow = {
       document: mockDocument,
       addEventListener: function() {}
     };
-    
+
     const mockZotero = {
       getMainWindow: function() {
         return mockMainWindow;
       }
     };
-    
+
     const mockLogger = createMockLogger();
-    
+
     const toggle = createSidebarToggle({
       logger: mockLogger,
       zotero: mockZotero
     });
-    
+
     assert.equal(toggle.isLeftSidebarVisible(), false, "Should return false when sidebar is null");
     assert.equal(toggle.isRightSidebarVisible(), false, "Should return false when sidebar is null");
   });
@@ -187,26 +187,26 @@ describe("SidebarToggle", () => {
       },
       addEventListener: function() {}
     };
-    
+
     const mockMainWindow = {
       document: mockDocument,
       addEventListener: function() {}
     };
-    
+
     globalThis.Zotero = {
       getMainWindow: function() {
         return mockMainWindow;
       }
     };
-    
+
     const mockLogger = createMockLogger();
-    
+
     const toggle = createSidebarToggle({
       logger: mockLogger
     });
-    
+
     assert.equal(toggle.isLeftSidebarVisible(), true, "Should use global Zotero");
-    
+
     // Cleanup
     delete globalThis.Zotero;
   });

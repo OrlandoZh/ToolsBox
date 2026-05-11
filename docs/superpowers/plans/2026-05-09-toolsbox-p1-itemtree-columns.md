@@ -86,28 +86,28 @@ describe('ReadingTimeColumn', () => {
         registerColumn: sinon.spy()
       }
     };
-    
+
     const column = createReadingTimeColumn({
       logger: mockLogger,
       i18n: mockI18n,
       zotero: mockZotero
     });
-    
+
     column.register();
-    
+
     expect(mockZotero.ItemTreeManager.registerColumn.calledOnce).toBe(true);
     expect(mockZotero.ItemTreeManager.registerColumn.firstCall.args[0]).toHaveProperty('dataKey', 'readingTime');
   });
-  
+
   it('should format reading time correctly', () => {
     const column = createReadingTimeColumn({ logger: mockLogger });
-    
+
     expect(column.formatTime(0)).toBe('0m');
     expect(column.formatTime(60)).toBe('1h');
     expect(column.formatTime(125)).toBe('2h 5m');
     expect(column.formatTime(600)).toBe('10h');
   });
-  
+
   it('should render progress bar with correct width', () => {
     const mockDoc = {
       createElement: sinon.stub().callsFake((tag) => ({
@@ -117,14 +117,14 @@ describe('ReadingTimeColumn', () => {
         textContent: ''
       }))
     };
-    
+
     const column = createReadingTimeColumn({
       logger: mockLogger,
       maxTime: 600
     });
-    
+
     const cell = column.renderCell(mockDoc, 300, {});
-    
+
     expect(cell).toBeDefined();
     expect(mockDoc.createElement.calledWith('div')).toBe(true);
   });
@@ -147,14 +147,14 @@ Expected: FAIL with "Cannot find module '../../src/features/reading-time-column.
 export function createReadingTimeColumn(options) {
   const { logger, i18n, zotero, prefs } = options;
   const Zotero = zotero || globalThis.Zotero;
-  
+
   const dataKey = 'readingTime';
   const maxTime = prefs?.get?.('readTime.max') || 600;
   const color = prefs?.get?.('readTime.color') || '#468B97';
   const opacity = parseFloat(prefs?.get?.('readTime.opacity') || '0.7');
   const showProgress = prefs?.get?.('readTime.progress') !== false;
   const showText = prefs?.get?.('readTime.text') !== false;
-  
+
   function formatTime(minutes) {
     if (minutes < 60) {
       return `${minutes}m`;
@@ -163,7 +163,7 @@ export function createReadingTimeColumn(options) {
     const mins = minutes % 60;
     return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
   }
-  
+
   function renderCell(doc, minutes, column) {
     const container = doc.createElement('div');
     container.className = 'reading-time-cell';
@@ -174,7 +174,7 @@ export function createReadingTimeColumn(options) {
       height: 100%;
       padding: 0 4px;
     `;
-    
+
     // 进度条
     if (showProgress && minutes > 0) {
       const progressBar = doc.createElement('div');
@@ -190,7 +190,7 @@ export function createReadingTimeColumn(options) {
       `;
       container.appendChild(progressBar);
     }
-    
+
     // 文本
     if (showText) {
       const label = doc.createElement('span');
@@ -202,35 +202,35 @@ export function createReadingTimeColumn(options) {
       `;
       container.appendChild(label);
     }
-    
+
     return container;
   }
-  
+
   function getReadingTime(item) {
     if (!item || !item.id) {
       return 0;
     }
-    
+
     // 从Reader实例获取阅读时间
     const readers = Zotero.Reader?.getActiveReaders?.() || [];
     const reader = readers.find(r => r.itemID === item.id);
-    
+
     if (reader && reader._readTimeMinutes) {
       return reader._readTimeMinutes;
     }
-    
+
     // 从item.extra读取缓存的阅读时间
     const extra = item.getField?.('extra') || '';
     const match = extra.match(/Reading Time: (\d+)/);
     return match ? parseInt(match[1]) : 0;
   }
-  
+
   function register() {
     if (!Zotero || !Zotero.ItemTreeManager) {
       logger.error('readingTimeColumn.register.failed', { reason: 'ItemTreeManager not available' });
       return false;
     }
-    
+
     Zotero.ItemTreeManager.registerColumn({
       dataKey,
       label: i18n?.t?.('toolsbox-column-reading-time', 'Reading Time') || 'Reading Time',
@@ -241,11 +241,11 @@ export function createReadingTimeColumn(options) {
       },
       getSortValue: (item) => getReadingTime(item)
     });
-    
+
     logger.debug('readingTimeColumn.registered', { dataKey });
     return true;
   }
-  
+
   return {
     register,
     renderCell,
@@ -304,7 +304,7 @@ if (readBooleanPref(prefs, 'readTimeColumn.enabled', true)) {
     zotero: Zotero,
     prefs
   });
-  
+
   if (readingTimeColumn.register()) {
     logger.info('features.readingTimeColumn.registered');
   }
@@ -353,30 +353,30 @@ describe('AnnotationColumn', () => {
         })
       }))
     };
-    
+
     const column = createAnnotationColumn({ logger: mockLogger });
-    
+
     // 模拟批注数据: [{page: 1, type: 'highlight'}, {page: 3, type: 'note'}]
     const annotations = [
       { page: 1, type: 'highlight' },
       { page: 3, type: 'note' },
       { page: 5, type: 'highlight' }
     ];
-    
+
     const cell = column.renderCell(mockDoc, annotations, { totalPages: 10 });
-    
+
     expect(cell).toBeDefined();
   });
-  
+
   it('should handle empty annotations', () => {
     const column = createAnnotationColumn({ logger: mockLogger });
-    
+
     const cell = column.renderCell(
       { createElement: sinon.stub().returns({}) },
       [],
       { totalPages: 10 }
     );
-    
+
     expect(cell).toBeDefined();
   });
 });
@@ -398,13 +398,13 @@ Expected: FAIL
 export function createAnnotationColumn(options) {
   const { logger, i18n, zotero, prefs } = options;
   const Zotero = zotero || globalThis.Zotero;
-  
+
   const dataKey = 'annotationDist';
   const style = prefs?.get?.('annotationColumn.style') || 'bar';
   const color = prefs?.get?.('annotationColumn.color') || '#86C8BC';
   const opacity = parseFloat(prefs?.get?.('annotationColumn.opacity') || '0.7');
   const showCircle = prefs?.get?.('annotationColumn.circle') !== false;
-  
+
   function renderCell(doc, annotations, column) {
     if (!annotations || annotations.length === 0) {
       const empty = doc.createElement('span');
@@ -412,7 +412,7 @@ export function createAnnotationColumn(options) {
       empty.style.opacity = '0.3';
       return empty;
     }
-    
+
     const container = doc.createElement('div');
     container.className = 'annotation-column-cell';
     container.style.cssText = `
@@ -422,38 +422,38 @@ export function createAnnotationColumn(options) {
       display: flex;
       align-items: center;
     `;
-    
+
     if (style === 'bar') {
       // 条形图显示
       const canvas = doc.createElement('canvas');
       canvas.width = 100;
       canvas.height = 20;
       const ctx = canvas.getContext('2d');
-      
+
       const totalPages = column.totalPages || 50;
       const barWidth = canvas.width / totalPages;
-      
+
       // 绘制背景条
       ctx.fillStyle = `rgba(200, 200, 200, 0.2)`;
       ctx.fillRect(0, 5, canvas.width, 10);
-      
+
       // 绘制批注分布
       ctx.fillStyle = hexToRgba(color, opacity);
       annotations.forEach(ann => {
         const x = (ann.page - 1) * barWidth;
         ctx.fillRect(x, 5, Math.max(barWidth - 1, 1), 10);
       });
-      
+
       container.appendChild(canvas);
     } else if (style === 'circle' && showCircle) {
       // 圆点图显示
       const totalPages = column.totalPages || 50;
       const dotSize = 4;
       const maxDots = Math.floor(container.clientWidth / (dotSize + 1));
-      
+
       annotations.forEach((ann, i) => {
         if (i >= maxDots) return;
-        
+
         const dot = doc.createElement('span');
         dot.className = 'annotation-dot';
         dot.style.cssText = `
@@ -468,32 +468,32 @@ export function createAnnotationColumn(options) {
         container.appendChild(dot);
       });
     }
-    
+
     return container;
   }
-  
+
   function hexToRgba(hex, opacity) {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
     return `rgba(${r}, ${g}, ${b}, ${opacity})`;
   }
-  
+
   function getAnnotations(item) {
     if (!item || !item.isAttachment?.()) {
       return [];
     }
-    
+
     // 从Zotero.Annotations API获取
     return Zotero.Annotations.getByItemID?.(item.id) || [];
   }
-  
+
   function register() {
     if (!Zotero || !Zotero.ItemTreeManager) {
       logger.error('annotationColumn.register.failed', { reason: 'API not available' });
       return false;
     }
-    
+
     Zotero.ItemTreeManager.registerColumn({
       dataKey,
       label: i18n?.t?.('toolsbox-column-annotation', 'Annotations') || 'Annotations',
@@ -503,11 +503,11 @@ export function createAnnotationColumn(options) {
         return renderCell(doc, data, column);
       }
     });
-    
+
     logger.debug('annotationColumn.registered', { dataKey });
     return true;
   }
-  
+
   return {
     register,
     renderCell,
@@ -547,7 +547,7 @@ if (readBooleanPref(prefs, 'annotationColumn.enabled', true)) {
   const annotationColumn = createAnnotationColumn({
     logger, i18n, zotero: Zotero, prefs
   });
-  
+
   if (annotationColumn.register()) {
     logger.info('features.annotationColumn.registered');
   }
@@ -563,8 +563,8 @@ git commit -m "feat: add annotation distribution column with bar and circle styl
 
 ## Task 3: Publication Tags Column (期刊标签列)
 
-**Complexity**: Medium  
-**Estimated Time**: 2 days  
+**Complexity**: Medium
+**Estimated Time**: 2 days
 **Dependencies**: None
 
 **Architecture:**
@@ -578,8 +578,8 @@ git commit -m "feat: add annotation distribution column with bar and circle styl
 
 ## Task 4: Title Column Enhanced (标题列增强)
 
-**Complexity**: Medium  
-**Estimated Time**: 2-3 days  
+**Complexity**: Medium
+**Estimated Time**: 2-3 days
 **Dependencies**: Reading Time Column
 
 **Architecture:**
@@ -594,8 +594,8 @@ git commit -m "feat: add annotation distribution column with bar and circle styl
 
 ## Task 5: IF Column (影响因子列)
 
-**Complexity**: High  
-**Estimated Time**: 2-3 days  
+**Complexity**: High
+**Estimated Time**: 2-3 days
 **Dependencies**: EasyScholar API
 
 **Architecture:**
