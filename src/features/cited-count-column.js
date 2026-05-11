@@ -86,8 +86,19 @@ export function createCitedCountColumn(options) {
     return true;
   }
 
+  function cleanup() {
+    if (Zotero?.ItemTreeManager) {
+      Zotero.ItemTreeManager.unregisterColumn(columnID);
+    }
+    return {
+      stopped: true,
+      resources: ['column:' + columnID]
+    };
+  }
+
   return {
     register,
+    cleanup,
     columnID,
     dataKey,
     dataProvider,
