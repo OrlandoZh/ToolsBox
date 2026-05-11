@@ -20,10 +20,10 @@ export function createAnnotationColors(options = {}) {
 
   function getColorName(hexColor) {
     if (!hexColor || typeof hexColor !== 'string') return null;
-    
+
     const normalized = hexColor.toLowerCase().trim();
     if (!normalized.match(/^#[0-9a-f]{6}$/i)) return null;
-    
+
     for (const [name, config] of Object.entries(COLOR_SCHEME)) {
       if (config.hex.toLowerCase() === normalized) {
         return name;
@@ -34,7 +34,7 @@ export function createAnnotationColors(options = {}) {
 
   function getColorsByGroup(groupName) {
     if (!groupName || typeof groupName !== 'string') return [];
-    
+
     const colors = [];
     for (const [name, config] of Object.entries(COLOR_SCHEME)) {
       if (config.group === groupName) {
@@ -61,7 +61,7 @@ export function createAnnotationColors(options = {}) {
     if (!annotationID) {
       return { success: false, error: 'Invalid annotation ID' };
     }
-    
+
     if (!isValidHexColor(color)) {
       return { success: false, error: 'Invalid color format' };
     }

@@ -22,7 +22,7 @@ export function createAIGenerateRemark(options = {}) {
 
   function extractAbstract(item) {
     if (!item) return null;
-    
+
     const abstract = item.getField?.('abstractNote') || '';
     if (!abstract || abstract.trim().length < MIN_ABSTRACT_LENGTH) {
       return null;
@@ -32,12 +32,12 @@ export function createAIGenerateRemark(options = {}) {
 
   function getCachedRemark(item) {
     const extra = item?.getField?.('extra') || '';
-    
+
     const remarkMatch = extra.match(/aiRemark: (.+?)(?:\n|$)/);
     const timestampMatch = extra.match(/aiRemarkGenerated: (.+?)(?:\n|$)/);
-    
+
     if (!remarkMatch) return null;
-    
+
     return {
       remark: remarkMatch[1].trim(),
       timestamp: timestampMatch ? timestampMatch[1].trim() : null
@@ -47,13 +47,13 @@ export function createAIGenerateRemark(options = {}) {
   async function saveRemarkToItem(item, remark) {
     const extra = item.getField?.('extra') || '';
     const timestamp = new Date().toISOString();
-    
+
     const cleanedExtra = extra
       .replace(/aiRemark: .+?\n?/g, '')
       .replace(/aiRemarkGenerated: .+?\n?/g, '');
-    
+
     const newExtra = `${cleanedExtra}aiRemark: ${remark}\naiRemarkGenerated: ${timestamp}\n`;
-    
+
     if (typeof item.setField === 'function') {
       item.setField('extra', newExtra);
     }

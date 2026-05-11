@@ -66,7 +66,7 @@ export function createViewGroups(options) {
 
   function getCurrentColumns() {
     const columns = {};
-    
+
     const mainWindow = Zotero?.getMainWindow?.();
     if (!mainWindow) {
       DEFAULT_COLUMNS.forEach(col => columns[col] = true);
@@ -126,14 +126,14 @@ export function createViewGroups(options) {
 
   function saveView(name, columnVisibility = null) {
     const trimmedName = String(name).trim();
-    
+
     if (!trimmedName) {
       return { success: false, error: 'View name cannot be empty' };
     }
 
     const views = getStoredViews();
     const normalized = normalizeName(trimmedName);
-    
+
     if (views.some(v => normalizeName(v.name) === normalized)) {
       return { success: false, error: 'Duplicate view name' };
     }
@@ -154,7 +154,7 @@ export function createViewGroups(options) {
 
     setStoredViews(views);
     logger?.debug?.('viewGroups.saveView.saved', { name: trimmedName });
-    
+
     return { success: true, name: trimmedName };
   }
 
@@ -168,7 +168,7 @@ export function createViewGroups(options) {
     }
 
     const applied = applyColumns(view.columns);
-    
+
     if (!applied) {
       return { success: false, error: 'Could not apply columns' };
     }
@@ -202,7 +202,7 @@ export function createViewGroups(options) {
 
   function renameView(oldName, newName) {
     const trimmedNewName = String(newName).trim();
-    
+
     if (!trimmedNewName) {
       return { success: false, error: 'New name cannot be empty' };
     }

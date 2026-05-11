@@ -18,10 +18,10 @@ export function createCitedCountColumn(options) {
    */
   function dataProvider(item, dataKey) {
     if (!item || !item.id) return '0';
-    
+
     const extra = item.getField?.('extra') || '';
     const match = extra.match(/Cited Count: (\d+)/);
-    
+
     return match ? match[1] : '0';
   }
 
@@ -34,7 +34,7 @@ export function createCitedCountColumn(options) {
    */
   function renderCell(index, data, column) {
     const doc = Zotero.getMainWindow().document;
-    
+
     const cell = doc.createElement('div');
     cell.className = `cell ${column.className}`;
     cell.style.cssText = `
@@ -44,22 +44,22 @@ export function createCitedCountColumn(options) {
       width: 100%;
       height: 100%;
     `;
-    
+
     const count = doc.createElement('span');
     count.textContent = data || '0';
     count.style.cssText = `
       font-size: 0.9em;
       opacity: 0.8;
     `;
-    
+
     cell.appendChild(count);
-    
+
     // Highlight high-cited papers (>10 citations)
     if (parseInt(data) > 10) {
       cell.style.fontWeight = 'bold';
       cell.style.color = '#4682B4';
     }
-    
+
     return cell;
   }
 

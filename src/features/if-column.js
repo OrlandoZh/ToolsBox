@@ -73,10 +73,10 @@ export function createIFColumn(options) {
    */
   function extractCachedIF(extra) {
     if (!extra || typeof extra !== 'string') return null;
-    
+
     const match = extra.match(/IF-Data: (\{[^}]+\})/);
     if (!match) return null;
-    
+
     try {
       const data = JSON.parse(match[1]);
       return data;
@@ -103,17 +103,17 @@ export function createIFColumn(options) {
    */
   async function updateItemExtra(item, data) {
     if (!item || !data) return;
-    
+
     const extra = item.getField?.('extra') || '';
     const cleanedExtra = extra.replace(/IF-Data: \{[^}]+\}\n?/g, '').trim();
-    
+
     const cacheData = {
       ...data,
       timestamp: Date.now()
     };
-    
+
     const newExtra = `${cleanedExtra}\nIF-Data: ${JSON.stringify(cacheData)}`.trim();
-    
+
     try {
       item.setField('extra', newExtra);
       await item.saveTx();
@@ -133,27 +133,27 @@ export function createIFColumn(options) {
    */
   async function getIFData(item) {
     if (!item || !item.id) return null;
-    
+
     const journal = item.getField?.('publicationTitle');
     if (!journal) return null;
-    
+
     const cached = extractCachedIF(item.getField?.('extra'));
     if (cached && !isExpired(cached.timestamp)) {
       logger?.debug?.('ifColumn.usingCache', { itemID: item.id, journal });
       return cached;
     }
-    
+
     if (!easyscholarClient) {
       logger?.warn?.('ifColumn.noClient', { itemID: item.id });
       return cached || null;
     }
-    
+
     try {
       const metrics = await easyscholarClient.getJournalMetrics(journal);
       if (!metrics) {
         return cached || null;
       }
-      
+
       await updateItemExtra(item, metrics);
       return metrics;
     } catch (error) {
@@ -186,7 +186,7 @@ export function createIFColumn(options) {
   function renderCell(doc, ifData, column) {
     const container = doc.createElement('div');
     container.className = 'if-column-cell';
-    
+
     Object.assign(container.style, {
       display: 'flex',
       alignItems: 'center',
@@ -196,7 +196,7 @@ export function createIFColumn(options) {
       padding: '2px 4px',
       gap: '4px'
     });
-    
+
     if (!ifData) {
       const emptyLabel = doc.createElement('span');
       emptyLabel.textContent = '-';
@@ -204,14 +204,14 @@ export function createIFColumn(options) {
       container.appendChild(emptyLabel);
       return container;
     }
-    
+
     for (const field of configFields) {
       const fieldEl = renderField(doc, field, ifData);
       if (fieldEl) {
         container.appendChild(fieldEl);
       }
     }
-    
+
     return container;
   }
 
@@ -225,7 +225,7 @@ export function createIFColumn(options) {
   function renderField(doc, field, ifData) {
     const fieldKey = field.trim().toUpperCase();
     let value = null;
-    
+
     if (fieldKey === 'SCIIF' || fieldKey === 'IF') {
       value = ifData.sciIF;
     } else if (fieldKey === 'SCI-Q' || fieldKey === 'Q') {
@@ -239,12 +239,12 @@ export function createIFColumn(options) {
     } else if (fieldKey === 'CCS') {
       value = ifData.ccs;
     }
-    
+
     if (value === null || value === undefined) return null;
-    
+
     const fieldContainer = doc.createElement('div');
     fieldContainer.className = `if-field if-field-${fieldKey.toLowerCase()}`;
-    
+
     Object.assign(fieldContainer.style, {
       display: 'flex',
       alignItems: 'center',
@@ -255,17 +255,17 @@ export function createIFColumn(options) {
       backgroundColor: 'rgba(0, 0, 0, 0.05)',
       marginRight: '4px'
     });
-    
+
     const label = doc.createElement('span');
     label.className = 'if-field-label';
     label.textContent = FIELD_LABELS[fieldKey] || fieldKey;
     label.style.marginRight = '4px';
     label.style.opacity = '0.7';
     fieldContainer.appendChild(label);
-    
+
     const valueEl = doc.createElement('span');
     valueEl.className = 'if-field-value';
-    
+
     if (typeof value === 'boolean') {
       valueEl.textContent = value ? '✓' : '✗';
       valueEl.style.color = value ? '#4caf50' : '#9e9e9e';
@@ -273,7 +273,7 @@ export function createIFColumn(options) {
       valueEl.textContent = String(value);
       valueEl.style.color = getColorForValue(String(value));
       valueEl.style.fontWeight = 'bold';
-      
+
       if (configShowProgress && (fieldKey === 'SCIIF' || fieldKey === 'IF') && typeof value === 'number') {
         const progressBar = doc.createElement('div');
         const percentage = Math.min(value / 20, 1) * 100;
@@ -295,7 +295,7 @@ export function createIFColumn(options) {
     } else {
       valueEl.textContent = String(value);
     }
-    
+
     fieldContainer.appendChild(valueEl);
     return fieldContainer;
   }
@@ -317,7 +317,7 @@ export function createIFColumn(options) {
       dataProvider: async (item) => {
         const data = await getIFData(item);
         if (!data) return null;
-        
+
         if (data.sciIF) return data.sciIF;
         if (data.sciQ) return data.sciQ;
         if (data.ssci) return 'SSCI';

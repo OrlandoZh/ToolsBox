@@ -23,10 +23,10 @@ export function createPDFBackgroundColor(options) {
     const rgbRegex = /^rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)$/;
     const rgbaRegex = /^rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*[\d.]+\s*\)$/;
     const namedColors = /^(white|black|red|green|blue|yellow|cyan|magenta|gray|grey|silver|maroon|olive|navy|purple|teal|fuchsia|aqua|lime|orange|pink|beige)$/i;
-    
-    return hex3Regex.test(colorValue) || 
-           hex6Regex.test(colorValue) || 
-           rgbRegex.test(colorValue) || 
+
+    return hex3Regex.test(colorValue) ||
+           hex6Regex.test(colorValue) ||
+           rgbRegex.test(colorValue) ||
            rgbaRegex.test(colorValue) ||
            namedColors.test(colorValue);
   }
@@ -40,18 +40,18 @@ export function createPDFBackgroundColor(options) {
     currentReader = reader;
 
     const doc = reader._iframeWindow.document;
-    
-    const viewer = doc.querySelector('#viewer') || 
-                   doc.querySelector('.viewer') || 
+
+    const viewer = doc.querySelector('#viewer') ||
+                   doc.querySelector('.viewer') ||
                    doc.body;
 
     if (viewer && viewer.style) {
       viewer.style.backgroundColor = color;
     }
 
-    logger?.debug?.('pdfBackground.applied', { 
-      color: color, 
-      itemID: reader._itemID 
+    logger?.debug?.('pdfBackground.applied', {
+      color: color,
+      itemID: reader._itemID
     });
     return true;
   }
@@ -62,11 +62,11 @@ export function createPDFBackgroundColor(options) {
       return false;
     }
     color = newColor;
-    
+
     if (currentReader) {
       applyBackgroundColor(currentReader);
     }
-    
+
     return true;
   }
 
@@ -78,14 +78,14 @@ export function createPDFBackgroundColor(options) {
     if (currentReader) {
       return currentReader;
     }
-    
+
     if (Zotero?.Reader) {
       const readers = Zotero.Reader.getActiveReaders();
       if (readers && readers.length > 0) {
         return readers[0];
       }
     }
-    
+
     return null;
   }
 
@@ -98,8 +98,8 @@ export function createPDFBackgroundColor(options) {
 
   function register() {
     if (!Zotero || !Zotero.Reader) {
-      logger?.error?.('pdfBackground.register.failed', { 
-        reason: 'Zotero.Reader not available' 
+      logger?.error?.('pdfBackground.register.failed', {
+        reason: 'Zotero.Reader not available'
       });
       return false;
     }

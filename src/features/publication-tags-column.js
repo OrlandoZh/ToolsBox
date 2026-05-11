@@ -141,10 +141,10 @@ export function createPublicationTagsColumn(options) {
 
   function dataProvider(item, key) {
     if (!item || !item.id) return [];
-    
+
     const publicationTitle = item.getField?.('publicationTitle');
     if (!publicationTitle) return [];
-    
+
     return getJournalTags(publicationTitle);
   }
 

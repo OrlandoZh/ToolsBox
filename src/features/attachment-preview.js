@@ -6,15 +6,15 @@
 export function createAttachmentPreview(options) {
   const { logger, i18n, zotero } = options;
   const Zotero = zotero || globalThis.Zotero;
-  
+
   const sectionID = 'toolsbox-attachment-preview';
-  
+
   function register() {
     if (!Zotero.ItemPaneManager) {
       logger.error('attachmentPreview.register.failed', { reason: 'ItemPaneManager not available' });
       return false;
     }
-    
+
     Zotero.ItemPaneManager.registerSection({
       paneID: sectionID,
       pluginID: 'toolsbox@orlandozh.github',
@@ -22,7 +22,7 @@ export function createAttachmentPreview(options) {
       onItemChange: ({ item, doc }) => {
         const container = doc.createElement('div');
         container.className = 'attachment-preview-container';
-        
+
         if (item && item.isAttachment()) {
           const attachmentPath = item.getFilePath();
           if (attachmentPath) {
@@ -33,15 +33,15 @@ export function createAttachmentPreview(options) {
             container.appendChild(iframe);
           }
         }
-        
+
         return container;
       }
     });
-    
+
     logger.debug('attachmentPreview.registered', { sectionID });
     return true;
   }
-  
+
   return {
     register,
     sectionID

@@ -20,7 +20,7 @@ export function createAIGenerateTags(options = {}) {
 
   function extractAbstract(item) {
     if (!item) return null;
-    
+
     const abstract = item.getField?.('abstractNote') || '';
     if (!abstract || abstract.trim().length < 20) {
       return null;
@@ -47,9 +47,9 @@ export function createAIGenerateTags(options = {}) {
     try {
       const trimmed = content.trim();
       const parsed = JSON.parse(trimmed);
-      
+
       if (!Array.isArray(parsed)) return null;
-      
+
       return parsed
         .filter(tag => typeof tag === 'string' && tag.trim().length > 0)
         .map(tag => tag.trim());
@@ -72,7 +72,7 @@ export function createAIGenerateTags(options = {}) {
     const newExtra = extra
       .replace(/aiTags: \[[^\]]+\]\n?/g, '')
       .concat(`aiTags: ${cachedTagsJson}\n`);
-    
+
     if (typeof item.setField === 'function') {
       item.setField('extra', newExtra);
     }
