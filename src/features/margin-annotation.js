@@ -18,25 +18,69 @@ export function createMarginAnnotation(options) {
   let currentReader = null;
   let currentHeight = 0;
   let notifierID = null;
+  let registered = false;
+  let active = false;
 
   function truncateText(text, maxLen = 30) {
     if (!text || text.length <= maxLen) return text || '';
     return text.substring(0, maxLen) + '...';
   }
 
+  function resolveReaderFrame(reader) {
+    const frameWindow = reader?._internalReader?._primaryView?._iframeWindow
+      || reader?._iframeWindow
+      || null;
+    const doc = frameWindow?.document || null;
+    const body = doc?.body || null;
+    if (!frameWindow || !doc || !body) {
+      return {
+        available: false,
+        reason: !frameWindow ? 'Reader frame window not available' : (!doc ? 'Reader frame document not available' : 'Reader frame body not available'),
+        frameWindow,
+        doc,
+        body,
+      };
+    }
+    return {
+      available: true,
+      frameWindow,
+      doc,
+      body,
+    };
+  }
+
+  function removeLayer() {
+    if (canvas && canvas.parentNode) {
+      canvas.parentNode.removeChild(canvas);
+    }
+
+    canvas = null;
+    ctx = null;
+    currentReader = null;
+    currentHeight = 0;
+  }
+
   function createLayer(reader) {
-    if (!reader || !reader._iframeWindow) {
-      logger?.error?.('marginAnnotation.create.failed', { reason: 'Invalid reader' });
+    const frame = resolveReaderFrame(reader);
+    if (!frame.available) {
+      logger?.warn?.('marginAnnotation.create.unavailable', { reason: frame.reason });
       return null;
     }
 
+    removeLayer();
     currentReader = reader;
 
-    const doc = reader._iframeWindow.document;
+    const { doc, body } = frame;
     canvas = doc.createElement('canvas');
     canvas.className = 'margin-annotation-layer';
+    if (canvas.dataset) {
+      canvas.dataset.toolsboxOwner = 'toolsbox-margin-annotation';
+    }
+    if (typeof canvas.setAttribute === 'function') {
+      canvas.setAttribute('data-toolsbox-owner', 'toolsbox-margin-annotation');
+    }
     canvas.width = width;
-    canvas.height = doc.body.scrollHeight || 800;
+    canvas.height = body.scrollHeight || 800;
     currentHeight = canvas.height;
 
     canvas.style.cssText = `
@@ -51,9 +95,14 @@ export function createMarginAnnotation(options) {
       pointer-events: auto;
     `;
 
-    ctx = canvas.getContext('2d');
+    ctx = typeof canvas.getContext === 'function' ? canvas.getContext('2d') : null;
+    if (!ctx) {
+      logger?.warn?.('marginAnnotation.create.unavailable', { reason: 'Canvas 2D context not available' });
+      removeLayer();
+      return null;
+    }
 
-    doc.body.appendChild(canvas);
+    body.appendChild(canvas);
 
     logger?.debug?.('marginAnnotation.layer.created', { width, height: canvas.height });
     return canvas;
@@ -105,35 +154,38 @@ export function createMarginAnnotation(options) {
   }
 
   function destroy() {
-    if (canvas && canvas.parentNode) {
-      canvas.parentNode.removeChild(canvas);
-    }
+    removeLayer();
 
-    canvas = null;
-    ctx = null;
-    currentReader = null;
-    currentHeight = 0;
-
-    if (notifierID && Zotero?.Notifier) {
+    if (notifierID && Zotero?.Notifier?.unregisterObserver) {
       Zotero.Notifier.unregisterObserver(notifierID);
       notifierID = null;
     }
 
+    registered = false;
+    active = false;
     logger?.debug?.('marginAnnotation.destroyed');
   }
 
   function register() {
-    if (!Zotero || !Zotero.Reader) {
-      logger?.error?.('marginAnnotation.register.failed', { reason: 'Zotero.Reader not available' });
+    if (!Zotero?.Reader || typeof Zotero.Reader.on !== 'function') {
+      logger?.warn?.('marginAnnotation.register.skipped', { reason: 'Zotero.Reader not available' });
       return false;
     }
 
+    if (registered) {
+      active = true;
+      return true;
+    }
+
     Zotero.Reader.on('open', (reader) => {
+      if (!active) {
+        return;
+      }
       logger?.debug?.('marginAnnotation.reader.opened', { itemID: reader._itemID });
 
       createLayer(reader);
 
-      if (Zotero.Annotations) {
+      if (canvas && Zotero.Annotations) {
         const annotations = Zotero.Annotations.getByItemID(reader._itemID);
         renderAnnotations(annotations, { width, height: canvas?.height || 800 });
       }
@@ -141,21 +193,23 @@ export function createMarginAnnotation(options) {
 
     Zotero.Reader.on('close', (reader) => {
       if (currentReader === reader) {
-        destroy();
+        removeLayer();
       }
     });
 
     if (Zotero.Notifier) {
       notifierID = Zotero.Notifier.registerObserver({
         notify: (event, type, ids) => {
-          if (type === 'annotation' && currentReader && Zotero.Annotations) {
+          if (active && type === 'annotation' && currentReader && Zotero.Annotations) {
             const annotations = Zotero.Annotations.getByItemID(currentReader._itemID);
             renderAnnotations(annotations, { width, height: canvas?.height || currentHeight });
           }
         }
-      }, ['annotation']);
+      }, ['annotation']) || null;
     }
 
+    registered = true;
+    active = true;
     logger?.info?.('marginAnnotation.registered');
     return true;
   }
@@ -166,6 +220,7 @@ export function createMarginAnnotation(options) {
     renderAnnotations,
     resize,
     destroy,
+    resolveReaderFrame,
     truncateText,
     getWidth: () => canvas?.width || width,
     getHeight: () => canvas?.height || currentHeight,

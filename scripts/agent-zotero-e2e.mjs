@@ -977,6 +977,24 @@ function normalizeMaybeString(value) {
   return normalized || null;
 }
 
+function normalizeWindowTitleForComparison(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isCaptureWindowTitleCompatible(bounds, expectedTitle) {
+  const normalizedExpected = normalizeWindowTitleForComparison(expectedTitle);
+  if (!normalizedExpected) {
+    return true;
+  }
+  const normalizedActual = normalizeWindowTitleForComparison(bounds?.title);
+  if (!normalizedActual) {
+    return false;
+  }
+  return normalizedActual === normalizedExpected
+    || normalizedActual.includes(normalizedExpected)
+    || normalizedExpected.includes(normalizedActual);
+}
+
 function normalizeCommandExitCode(value) {
   return Number.isFinite(Number(value))
     ? Number(value)
@@ -1928,6 +1946,7 @@ async function prepareVisualState({ rdp, config, stage }) {
       const normalization = {
         selectedLibraryTab: false,
         closedTrackedReader: false,
+        closedOtherReaders: 0,
         contextPaneClosed: null,
         stepResults: [],
       };
@@ -1991,6 +2010,46 @@ async function prepareVisualState({ rdp, config, stage }) {
         normalization.closedTrackedReader = closeTrackedReaderOutcome.ok === true
           && closeTrackedReaderOutcome.timedOut !== true
           && closeTrackedReaderOutcome.value === true;
+      }
+
+      if (state.attachmentID && Zotero?.Reader) {
+        const closeOtherReadersOutcome = await runTimedStep("close-other-readers", async () => {
+          const readers = Array.isArray(Zotero.Reader._readers)
+            ? [...Zotero.Reader._readers]
+            : [];
+          let closedCount = 0;
+          for (const reader of readers) {
+            if (!reader || Number(reader.itemID || 0) === Number(state.attachmentID)) {
+              continue;
+            }
+            if (typeof reader.close === "function") {
+              reader.close();
+              closedCount += 1;
+            }
+          }
+          if (closedCount > 0) {
+            await waitFor(() => {
+              const remainingReaders = Array.isArray(Zotero.Reader._readers)
+                ? Zotero.Reader._readers
+                : [];
+              return remainingReaders.some((reader) => {
+                return reader && Number(reader.itemID || 0) !== Number(state.attachmentID);
+              })
+                ? null
+                : true;
+            }, {
+              timeoutMs: 2000,
+              intervalMs: 50,
+            });
+          }
+          return closedCount;
+        }, {
+          timeoutMs: 2400,
+        });
+        recordStep(closeOtherReadersOutcome);
+        if (closeOtherReadersOutcome.ok === true && closeOtherReadersOutcome.timedOut !== true) {
+          normalization.closedOtherReaders = Number(closeOtherReadersOutcome.value || 0);
+        }
       }
 
       if (typeof plugin?.api?.host?.setContextPaneOpen === "function") {
@@ -2190,7 +2249,7 @@ async function prepareVisualState({ rdp, config, stage }) {
         selectedTabID: readSelectedTabID(),
       };
     }, {
-      timeoutMs: 2500,
+      timeoutMs: 6000,
     });
     const readerTabID = typeof reader?.tabID === "string" && reader.tabID
       ? reader.tabID
@@ -3202,6 +3261,15 @@ function resolveSurfaceCaptureBounds(surfaceTarget, currentWindowBounds = null) 
       return null;
     }
 
+    if (previousWindowBounds) {
+      for (const candidate of candidates) {
+        const clippedCandidate = clipCaptureBoundsToWindow(candidate, previousWindowBounds);
+        if (clippedCandidate) {
+          return clippedCandidate;
+        }
+      }
+    }
+
     return candidates[0] || null;
   }
 
@@ -3367,6 +3435,123 @@ async function captureScreenRect(filePath, bounds) {
   return captureBounds;
 }
 
+async function captureSurfaceTargetViaRdp({
+  rdp,
+  filePath,
+  surfaceTarget,
+  bounds,
+}) {
+  if (!rdp) {
+    return null;
+  }
+  const captureBounds = normalizeCaptureWindowBounds(bounds);
+  const windowBounds = normalizeCaptureWindowBounds(surfaceTarget?.windowBounds || null);
+  const expectedTitle = normalizeMaybeString(windowBounds?.title || captureBounds?.title);
+  if (!captureBounds || !windowBounds || !expectedTitle) {
+    return null;
+  }
+
+  const rawResult = await evaluateCaptureInChrome(rdp, `(async () => {
+    try {
+      const normalizeText = (value) => String(value || "").trim().toLowerCase();
+      const expectedTitle = normalizeText(${JSON.stringify(expectedTitle)});
+      const ServicesAPI = typeof Services !== "undefined"
+        ? Services
+        : ChromeUtils.importESModule("resource://gre/modules/Services.sys.mjs").Services;
+      const windows = [];
+      const enumerator = ServicesAPI.wm.getEnumerator(null);
+      while (enumerator.hasMoreElements()) {
+        windows.push(enumerator.getNext());
+      }
+      const targetWindow = windows.find((win) => {
+        const title = normalizeText(win?.document?.title);
+        return title
+          && (title === expectedTitle || title.includes(expectedTitle) || expectedTitle.includes(title));
+      }) || null;
+      if (!targetWindow?.document?.createElement) {
+        return JSON.stringify({ ok: false, error: "surface-window-missing" });
+      }
+
+      const offsetX = Math.max(0, Number(${captureBounds.x} - ${windowBounds.x}));
+      const offsetY = Math.max(0, Number(${captureBounds.y} - ${windowBounds.y}));
+      const width = Math.max(1, Number(${captureBounds.width}));
+      const height = Math.max(1, Number(${captureBounds.height}));
+      const scale = Number(targetWindow.devicePixelRatio || 1) > 0
+        ? Number(targetWindow.devicePixelRatio || 1)
+        : 1;
+      const canvas = targetWindow.document.createElement("canvas");
+      canvas.width = Math.max(1, Math.ceil(width * scale));
+      canvas.height = Math.max(1, Math.ceil(height * scale));
+      const ctx = canvas.getContext("2d");
+      if (!ctx || typeof ctx.drawWindow !== "function") {
+        return JSON.stringify({ ok: false, error: "drawWindow-unavailable" });
+      }
+
+      ctx.scale(scale, scale);
+      ctx.drawWindow(targetWindow, offsetX, offsetY, width, height, "rgb(255,255,255)");
+      const dataUrl = canvas.toDataURL("image/png");
+      const base64 = String(dataUrl || "").split(",")[1] || "";
+      if (!base64) {
+        return JSON.stringify({ ok: false, error: "png-encode-failed" });
+      }
+
+      const decodeBase64 = typeof atob === "function"
+        ? atob
+        : globalThis.atob;
+      const binary = decodeBase64(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) {
+        bytes[index] = binary.charCodeAt(index);
+      }
+
+      const IOUtilsAPI = typeof IOUtils !== "undefined"
+        ? IOUtils
+        : ChromeUtils.importESModule("resource://gre/modules/IOUtils.sys.mjs").IOUtils;
+      await IOUtilsAPI.write(${JSON.stringify(filePath)}, bytes);
+
+      return JSON.stringify({
+        ok: true,
+        x: Number(${captureBounds.x}),
+        y: Number(${captureBounds.y}),
+        width,
+        height,
+        title: String(targetWindow.document?.title || ${JSON.stringify(expectedTitle)}),
+        source: "rdp-draw-surface-window",
+      });
+    } catch (error) {
+      return JSON.stringify({
+        ok: false,
+        error: error?.message || String(error),
+      });
+    }
+  })()`, {
+    label: "visual:capture-surface-window-rdp",
+    timeoutMs: VISUAL_CAPTURE_EVAL_TIMEOUT_MS.hostAction,
+  });
+
+  const payload = parseChromeEvalResult(rawResult);
+  if (!payload || payload.ok !== true) {
+    throw attachVisualCaptureFailure(
+      new Error(normalizeMaybeString(payload?.error) || "Unable to capture surface window via RDP"),
+      {
+        failureKind: "capture-command-failed",
+        failureCategory: "capture-command-failed",
+        failureStage: "capture-surface-window-rdp",
+        failureMessage: normalizeMaybeString(payload?.error) || "Unable to capture surface window via RDP",
+        bounds: captureBounds,
+        boundsSource: "rdp-draw-surface-window",
+        windowTitle: expectedTitle,
+        command: "rdp-draw-surface-window",
+      },
+    );
+  }
+
+  return normalizeCaptureWindowBounds(payload) || {
+    ...captureBounds,
+    source: "rdp-draw-surface-window",
+  };
+}
+
 async function runHostActionInChrome({
   rdp,
   config,
@@ -3498,6 +3683,7 @@ async function captureSurfaceEvidenceTarget({
   actionId = null,
   stageCapture = null,
 }) {
+  const kind = String(surfaceTarget?.captureKind || actionId || "surface").trim() || "surface";
   const useReferenceStage = Boolean(
     stageCapture?.path
     && shouldCaptureSurfaceFromReferenceStage(surfaceTarget),
@@ -3508,15 +3694,21 @@ async function captureSurfaceEvidenceTarget({
   const stageRelativeBounds = normalizedStageBounds
     ? resolveStageRelativeSurfaceBounds(surfaceTarget, normalizedStageBounds)
     : null;
-  const currentWindowBounds = stageRelativeBounds
+  const expectedWindowTitle = surfaceTarget?.windowBounds?.title || null;
+  const shouldResolveLiveWindowBounds = !kind.startsWith("surface-preference-");
+  const resolvedCurrentWindowBounds = stageRelativeBounds
+    || !shouldResolveLiveWindowBounds
     ? null
     : await ensureZoteroWindowReadyForCapture({
       rdp,
       geometry: resolveSurfaceCaptureGeometry(surfaceTarget),
       activationDelayMs: 120,
       settleDelayMs: VISUAL_SURFACE_CAPTURE_DELAY_MS,
-      targetTitle: surfaceTarget?.windowBounds?.title || null,
+      targetTitle: expectedWindowTitle,
     }).catch(() => null);
+  const currentWindowBounds = isCaptureWindowTitleCompatible(resolvedCurrentWindowBounds, expectedWindowTitle)
+    ? resolvedCurrentWindowBounds
+    : null;
   const liveRelativeBounds = currentWindowBounds
     ? resolveStageRelativeSurfaceBounds(surfaceTarget, currentWindowBounds)
     : null;
@@ -3532,7 +3724,6 @@ async function captureSurfaceEvidenceTarget({
     };
   }
 
-  const kind = String(surfaceTarget?.captureKind || actionId || "surface").trim() || "surface";
   const filePath = path.join(captureDir, `cycle-${cycle}-${kind}.png`);
   if (useReferenceStage && normalizedStageBounds && stageCapture?.path && stageRelativeBounds) {
     await captureSurfaceFromStageImage({
@@ -3540,6 +3731,17 @@ async function captureSurfaceEvidenceTarget({
       stageCapture,
       cropBounds: bounds,
     });
+  }
+  else if (rdp && kind.startsWith("surface-preference-")) {
+    await captureSurfaceTargetViaRdp({
+      rdp,
+      filePath,
+      surfaceTarget,
+      bounds,
+    });
+  }
+  else if (process.platform === "darwin") {
+    await captureScreenRect(filePath, bounds);
   }
   else if (rdp && currentWindowBounds) {
     const windowCapturePath = path.join(captureDir, `cycle-${cycle}-${kind}-window.png`);

@@ -3,7 +3,7 @@
  * Task 3 of P1 collection features plan
  */
 
-import { describe, it, assert, runTests } from "../test-framework.js";
+import { describe, it, assert, runTestsIfMain } from "../test-framework.js";
 import { createFavoriteCollections } from "../../src/features/favorite-collections.js";
 
 // Mock dependencies
@@ -168,8 +168,8 @@ describe("FavoriteCollections", () => {
     assert.equal(result, false, "register() should return false when Collections API unavailable");
 
     const logs = mockLogger.getLogs();
-    const errorLog = logs.find(l => l.level === 'error');
-    assert.ok(errorLog, "Should log error when register fails");
+    const warnLog = logs.find(l => l.level === 'warn');
+    assert.ok(warnLog, "Should warn when register skips");
   });
 
   it("should return true when enable succeeds", () => {
@@ -208,7 +208,100 @@ describe("FavoriteCollections", () => {
 
     assert.ok(result, "register() should return true when successful");
   });
+
+  it("should avoid duplicate listeners and clean up favorite DOM and observer", () => {
+    const removedListeners = [];
+    const unregistered = [];
+    const icon = {
+      className: 'favorite-icon',
+      dataset: { toolsboxOwner: 'toolsbox-favorite-collections' },
+      style: {},
+      remove() {
+        this.removed = true;
+      }
+    };
+    const row = {
+      dataset: { id: '1' },
+      style: {},
+      firstChild: null,
+      classList: {
+        added: [],
+        removed: [],
+        add(value) {
+          this.added.push(value);
+        },
+        remove(value) {
+          this.removed.push(value);
+        }
+      },
+      querySelector() {
+        return this.icon || null;
+      },
+      insertBefore(child) {
+        this.icon = child;
+      }
+    };
+    const collectionTree = {
+      firstChild: row,
+      listeners: [],
+      querySelectorAll() {
+        return [row];
+      },
+      addEventListener(type, handler) {
+        this.listeners.push({ type, handler });
+      },
+      removeEventListener(type, handler) {
+        removedListeners.push({ type, handler });
+        this.listeners = this.listeners.filter((entry) => entry.type !== type || entry.handler !== handler);
+      },
+      insertBefore() {}
+    };
+    const mockZotero = {
+      Collections: {
+        getByLibrary: function() { return []; }
+      },
+      getMainWindow: function() {
+        return {
+          document: {
+            createElement() {
+              return icon;
+            },
+            getElementById: function() {
+              return collectionTree;
+            }
+          }
+        };
+      },
+      Notifier: {
+        registerObserver: function(observer, types, id) {
+          return id;
+        },
+        unregisterObserver(id) {
+          unregistered.push(id);
+        }
+      }
+    };
+    const favorite = createFavoriteCollections({
+      logger: createMockLogger(),
+      i18n: createMockI18n(),
+      prefs: createMockPrefs([1]),
+      zotero: mockZotero
+    });
+
+    assert.equal(favorite.register(), true);
+    assert.equal(favorite.register(), true);
+    assert.equal(collectionTree.listeners.length, 1, "should add one listener");
+    assert.equal(row.icon.dataset.toolsboxOwner, 'toolsbox-favorite-collections');
+
+    favorite.destroy();
+    favorite.destroy();
+
+    assert.equal(collectionTree.listeners.length, 0, "destroy should remove listener");
+    assert.equal(removedListeners.length, 1, "listener removal should be idempotent");
+    assert.equal(icon.removed, true, "destroy should remove owned icon");
+    assert.deepEqual(unregistered, ['toolsbox-favorite-collections']);
+  });
 });
 
-// Run all tests
-runTests();
+// Run all tests when this file is executed directly.
+await runTestsIfMain(import.meta.url);

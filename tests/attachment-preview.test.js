@@ -15,6 +15,9 @@ function createMockLogger() {
     error(message, data) {
       logs.push({ level: 'error', message, data });
     },
+    warn(message, data) {
+      logs.push({ level: 'warn', message, data });
+    },
     info(message, data) {
       logs.push({ level: 'info', message, data });
     }
@@ -38,8 +41,13 @@ function createMockDocument() {
         className: '',
         style: {},
         children: [],
+        textContent: '',
+        src: '',
         appendChild(child) {
           this.children.push(child);
+        },
+        remove() {
+          this.removed = true;
         }
       };
       elements.push(element);
@@ -106,7 +114,7 @@ describe("Attachment Preview", () => {
 
     assert.notOk(result, "register should return false");
     assert.equal(registeredSections.length, 0, "should not register any section");
-    assert.equal(logger.logs.filter(l => l.level === 'error').length, 1, "should log error");
+    assert.equal(logger.logs.filter(l => l.level === 'warn').length, 1, "should log warning");
   });
 
   it("should create preview container for attachment items with file path", () => {
@@ -125,7 +133,7 @@ describe("Attachment Preview", () => {
     assert.equal(container.className, 'attachment-preview-container');
     assert.equal(container.children.length, 1, "should have iframe child");
     assert.equal(container.children[0].tagName, 'IFRAME');
-    assert.match(container.children[0].src, /file:\/\/\/path\/to\/file.pdf/);
+    assert.equal(container.children[0].src, 'moz-file://%2Fpath%2Fto%2Ffile.pdf');
   });
 
   it("should handle non-attachment items gracefully", () => {
@@ -142,7 +150,9 @@ describe("Attachment Preview", () => {
 
     assert.ok(container, "should return container element");
     assert.equal(container.className, 'attachment-preview-container');
-    assert.equal(container.children.length, 0, "should have no children for non-attachment");
+    assert.equal(container.children.length, 1, "should render an empty-state child for non-attachment");
+    assert.equal(container.children[0].className, 'attachment-preview-empty');
+    assert.equal(container.children[0].textContent, 'No attachment selected');
   });
 
   it("should handle attachment items without file path", () => {
@@ -159,6 +169,45 @@ describe("Attachment Preview", () => {
 
     assert.ok(container, "should return container element");
     assert.equal(container.className, 'attachment-preview-container');
-    assert.equal(container.children.length, 0, "should have no children when no file path");
+    assert.equal(container.children.length, 1, "should render an empty-state child when no file path");
+    assert.equal(container.children[0].className, 'attachment-preview-empty');
+    assert.equal(container.children[0].textContent, 'File not found');
+  });
+
+  it("should cleanup old iframe before rendering a new preview", () => {
+    const logger = createMockLogger();
+    const i18n = createMockI18n();
+    const doc = createMockDocument();
+    const firstItem = createMockItem(true, '/path/to/first.pdf');
+    const secondItem = createMockItem(true, '/path/to/second.pdf');
+
+    const preview = createAttachmentPreview({ logger, i18n, zotero: mockZotero });
+    preview.register();
+
+    const section = registeredSections[0];
+    const firstContainer = section.onItemChange({ item: firstItem, doc });
+    const firstIframe = firstContainer.children[0];
+    const secondContainer = section.onItemChange({ item: secondItem, doc });
+
+    assert.equal(firstIframe.src, 'about:blank');
+    assert.equal(firstIframe.removed, true);
+    assert.equal(secondContainer.children[0].src, 'moz-file://%2Fpath%2Fto%2Fsecond.pdf');
+  });
+
+  it("should make cleanup idempotent", () => {
+    const logger = createMockLogger();
+    const i18n = createMockI18n();
+    const doc = createMockDocument();
+    const mockItem = createMockItem(true, '/path/to/file.pdf');
+
+    const preview = createAttachmentPreview({ logger, i18n, zotero: mockZotero });
+    preview.register();
+
+    registeredSections[0].onItemChange({ item: mockItem, doc });
+    const first = preview.cleanup();
+    const second = preview.cleanup();
+
+    assert.deepEqual(first, { stopped: true, resources: ['iframe'] });
+    assert.deepEqual(second, { stopped: true, resources: ['iframe'] });
   });
 });

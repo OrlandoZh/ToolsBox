@@ -3,7 +3,7 @@
  * Task - Hierarchical tag display with separators
  */
 
-import { describe, it, assert, runTests } from "../test-framework.js";
+import { describe, it, assert, runTestsIfMain } from "../test-framework.js";
 import { createNestedTags } from "../../src/features/nested-tags.js";
 
 function createMockLogger() {
@@ -440,4 +440,4 @@ describe("NestedTags Edge Cases", () => {
   });
 });
 
-runTests();
+await runTestsIfMain(import.meta.url);

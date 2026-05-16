@@ -3,7 +3,7 @@
  * Displays reading progress bar, status emojis, and tags in title column
  */
 
-import { describe, it, assert, runTests } from "../test-framework.js";
+import { describe, it, assert, runTestsIfMain } from "../test-framework.js";
 import { createTitleColumnEnhanced } from "../../src/features/title-column-enhanced.js";
 
 function createMockLogger() {
@@ -618,4 +618,4 @@ describe("TitleColumnEnhanced", () => {
   });
 });
 
-runTests();
+await runTestsIfMain(import.meta.url);

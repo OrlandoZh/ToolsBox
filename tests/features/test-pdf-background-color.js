@@ -3,7 +3,7 @@
  * Task: Implement PDF background color customization for Reader
  */
 
-import { describe, it, assert, runTests } from "../test-framework.js";
+import { describe, it, assert, runTestsIfMain } from "../test-framework.js";
 import { createPDFBackgroundColor } from "../../src/features/pdf-background-color.js";
 
 function createMockLogger() {
@@ -14,6 +14,9 @@ function createMockLogger() {
     },
     error(message, data) {
       logs.push({ level: 'error', message, data });
+    },
+    warn(message, data) {
+      logs.push({ level: 'warn', message, data });
     },
     info(message, data) {
       logs.push({ level: 'info', message, data });
@@ -218,7 +221,7 @@ describe("PDFBackgroundColor", () => {
     assert.equal(result2, false, "Should return false for reader without iframeWindow");
   });
 
-  it("should log error when applyBackgroundColor fails", () => {
+  it("should warn when applyBackgroundColor is unavailable", () => {
     const mockLogger = createMockLogger();
     const mockPrefs = createMockPrefs();
 
@@ -231,8 +234,8 @@ describe("PDFBackgroundColor", () => {
     pdfBg.applyBackgroundColor(null);
 
     const logs = mockLogger.getLogs();
-    const errorLog = logs.find(l => l.level === 'error');
-    assert.ok(errorLog, "Should log error when applyBackgroundColor fails");
+    const warnLog = logs.find(l => l.level === 'warn');
+    assert.ok(warnLog, "Should warn when applyBackgroundColor is unavailable");
   });
 
   it("should register Zotero.Reader event listeners", () => {
@@ -303,7 +306,7 @@ describe("PDFBackgroundColor", () => {
     delete globalThis.Zotero;
   });
 
-  it("should remove background color on destroy", () => {
+  it("should restore background color on destroy", () => {
     const mockReader = createMockReader();
     const mockZotero = createMockZotero();
     const mockLogger = createMockLogger();
@@ -316,12 +319,14 @@ describe("PDFBackgroundColor", () => {
       prefs: mockPrefs
     });
 
-    pdfBg.register();
-    mockZotero.Reader._triggerOpen(mockReader);
+    const viewer = mockReader._iframeWindow.document.body;
+    viewer.style.backgroundColor = 'white';
+    pdfBg.applyBackgroundColor(mockReader);
+    assert.equal(viewer.style.backgroundColor, '#f5f5dc');
 
-    // Should not throw
     pdfBg.destroy();
-    assert.ok(true, "destroy should complete without error");
+    pdfBg.destroy();
+    assert.equal(viewer.style.backgroundColor, 'white');
   });
 
   it("should handle multiple reader instances", () => {
@@ -444,6 +449,22 @@ describe("PDFBackgroundColor", () => {
 
     assert.ok(currentReader !== undefined, "Should return current reader if available");
   });
+
+  it("should resolve unavailable reader frames without throwing", () => {
+    const pdfBg = createPDFBackgroundColor({
+      logger: createMockLogger(),
+      prefs: createMockPrefs()
+    });
+
+    const frame = pdfBg.resolveReaderFrame({
+      _iframeWindow: {
+        document: {}
+      }
+    });
+
+    assert.equal(frame.available, false);
+    assert.includes(frame.reason, 'body');
+  });
 });
 
-runTests();
+await runTestsIfMain(import.meta.url);

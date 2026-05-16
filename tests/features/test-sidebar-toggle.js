@@ -3,7 +3,7 @@
  * Task 4 of P0 features plan
  */
 
-import { describe, it, assert, runTests } from "../test-framework.js";
+import { describe, it, assert, runTestsIfMain } from "../test-framework.js";
 import { createSidebarToggle } from "../../src/features/sidebar-toggle.js";
 
 // Mock dependencies
@@ -212,5 +212,5 @@ describe("SidebarToggle", () => {
   });
 });
 
-// Run all tests
-runTests();
+// Run all tests when this file is executed directly.
+await runTestsIfMain(import.meta.url);

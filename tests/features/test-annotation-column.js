@@ -3,7 +3,7 @@
  * Task 2 of P1 ItemTree columns plan
  */
 
-import { describe, it, assert, runTests } from "../test-framework.js";
+import { describe, it, assert, runTestsIfMain } from "../test-framework.js";
 import { createAnnotationColumn } from "../../src/features/annotation-column.js";
 
 function createMockLogger() {
@@ -463,4 +463,4 @@ describe("AnnotationColumn", () => {
   });
 });
 
-runTests();
+await runTestsIfMain(import.meta.url);

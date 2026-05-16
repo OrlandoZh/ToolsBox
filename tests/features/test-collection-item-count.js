@@ -3,7 +3,7 @@
  * Task 1 of P1 collection features plan
  */
 
-import { describe, it, assert, runTests } from "../test-framework.js";
+import { describe, it, assert, runTestsIfMain } from "../test-framework.js";
 import { createCollectionItemCount } from "../../src/features/collection-item-count.js";
 
 // Mock dependencies
@@ -156,10 +156,101 @@ describe("CollectionItemCount", () => {
     assert.equal(result, false, "register() should return false when Collections API unavailable");
 
     const logs = mockLogger.getLogs();
-    const errorLog = logs.find(l => l.level === 'error');
-    assert.ok(errorLog, "Should log error when register fails");
+    const warnLog = logs.find(l => l.level === 'warn');
+    assert.ok(warnLog, "Should warn when register skips");
+  });
+
+  it("should avoid duplicate labels and clean up owned labels and observer", () => {
+    const created = [];
+    const row = {
+      id: 'row-1',
+      dataset: { id: '1' },
+      children: [],
+      ownerDocument: {
+        createElement(tagName) {
+          const element = {
+            tagName,
+            className: '',
+            dataset: {},
+            style: {},
+            textContent: '',
+            parentNode: null,
+            setAttribute(name, value) {
+              this.attributes = this.attributes || {};
+              this.attributes[name] = value;
+            },
+            getAttribute(name) {
+              return this.attributes?.[name];
+            },
+            remove() {
+              this.removed = true;
+              if (this.parentNode) {
+                this.parentNode.children = this.parentNode.children.filter((child) => child !== this);
+                this.parentNode = null;
+              }
+            }
+          };
+          created.push(element);
+          return element;
+        }
+      },
+      appendChild(child) {
+        this.children.push(child);
+        child.parentNode = this;
+      },
+      querySelector(selector) {
+        return this.children.find((child) => child.className === 'collection-item-count') || null;
+      }
+    };
+    const unregistered = [];
+    const mockZotero = {
+      Collections: {
+        get: function(id) {
+          return { id: id, getItems: () => [1, 2, 3] };
+        }
+      },
+      getMainWindow: function() {
+        return {
+          document: {
+            getElementById: function() {
+              return {
+                querySelectorAll: function() {
+                  return [row];
+                }
+              };
+            }
+          }
+        };
+      },
+      Notifier: {
+        registerObserver: function(observer, types, id) {
+          return id;
+        },
+        unregisterObserver(id) {
+          unregistered.push(id);
+        }
+      }
+    };
+
+    const counter = createCollectionItemCount({
+      logger: createMockLogger(),
+      i18n: createMockI18n(),
+      zotero: mockZotero
+    });
+
+    assert.equal(counter.register(), true);
+    assert.equal(counter.register(), true);
+    assert.equal(created.length, 1, "should inject one owned label");
+    assert.equal(row.children.length, 1, "row should contain one count label");
+    assert.equal(row.children[0].dataset.toolsboxOwner, 'toolsbox-collection-item-count');
+
+    counter.destroy();
+    counter.destroy();
+
+    assert.equal(row.children.length, 0, "destroy should remove owned label");
+    assert.deepEqual(unregistered, ['toolsbox-collection-count']);
   });
 });
 
-// Run all tests
-runTests();
+// Run all tests when this file is executed directly.
+await runTestsIfMain(import.meta.url);

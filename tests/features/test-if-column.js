@@ -1,4 +1,4 @@
-import { describe, it, assert, beforeEach, afterEach, runTests } from "../test-framework.js";
+import { describe, it, assert, beforeEach, afterEach, runTestsIfMain } from "../test-framework.js";
 import { createEasyScholarClient } from "../../src/services/easyscholar-client.js";
 import { createIFColumn } from "../../src/features/if-column.js";
 
@@ -819,4 +819,4 @@ describe("IF Column - edge cases", () => {
   });
 });
 
-await runTests();
+await runTestsIfMain(import.meta.url);

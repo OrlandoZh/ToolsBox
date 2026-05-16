@@ -185,6 +185,29 @@ toolsbox-section-attachment-preview = Attachment Preview
 toolsbox-section-attachment-preview-empty = No attachment available
 toolsbox-pref-attachment-preview =
     .label = Enable attachment preview panel
+# Backlinks
+toolsbox-section-backlinks = Backlinks
+toolsbox-backlinks-count = Local backlinks
+toolsbox-backlinks-empty = No local backlinks
+toolsbox-backlinks-no-item = No item selected
+toolsbox-backlinks-loading = Loading local backlinks...
+toolsbox-backlinks-api-unavailable = Backlink scanner unavailable
+toolsbox-backlinks-open-source = Open source
+toolsbox-backlinks-open-running = Selecting source...
+toolsbox-backlinks-open-success = Source selected
+toolsbox-backlinks-open-failed = Unable to select source
+# Merge Annotations
+toolsbox-section-merge-annotations = Merge Annotations
+toolsbox-merge-annotations-count = mergeable annotations
+toolsbox-merge-annotations-no-item = No item selected
+toolsbox-merge-annotations-no-attachments = No attachment annotations
+toolsbox-merge-annotations-api-unavailable = Annotation API unavailable
+toolsbox-merge-annotations-no-annotations = No annotations found
+toolsbox-merge-annotations-no-text = No text annotations to merge
+toolsbox-merge-annotations-write-note = Write merged note
+toolsbox-merge-annotations-write-running = Writing merged note...
+toolsbox-merge-annotations-write-success = Merged note written
+toolsbox-merge-annotations-write-failed = Unable to write merged note
 # Annotation Manager
 toolsbox-menu-annotation-manager = Annotation Manager
 toolsbox-annotation-manager-title = Annotation Manager

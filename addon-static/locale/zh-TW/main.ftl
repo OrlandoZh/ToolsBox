@@ -185,6 +185,29 @@ toolsbox-section-attachment-preview = 附件預覽
 toolsbox-section-attachment-preview-empty = 無可用附件
 toolsbox-pref-attachment-preview =
     .label = 啟用附件預覽面板
+# Backlinks
+toolsbox-section-backlinks = 反向連結
+toolsbox-backlinks-count = 本地反向連結
+toolsbox-backlinks-empty = 無本地反向連結
+toolsbox-backlinks-no-item = 未選擇條目
+toolsbox-backlinks-loading = 正在載入本地反向連結...
+toolsbox-backlinks-api-unavailable = 反向連結掃描不可用
+toolsbox-backlinks-open-source = 開啟來源
+toolsbox-backlinks-open-running = 正在選擇來源...
+toolsbox-backlinks-open-success = 已選擇來源
+toolsbox-backlinks-open-failed = 無法選擇來源
+# Merge Annotations
+toolsbox-section-merge-annotations = 合併批註
+toolsbox-merge-annotations-count = 可合併批註
+toolsbox-merge-annotations-no-item = 未選擇條目
+toolsbox-merge-annotations-no-attachments = 無附件批註
+toolsbox-merge-annotations-api-unavailable = 批註 API 不可用
+toolsbox-merge-annotations-no-annotations = 未找到批註
+toolsbox-merge-annotations-no-text = 沒有可合併的文字批註
+toolsbox-merge-annotations-write-note = 寫入合併筆記
+toolsbox-merge-annotations-write-running = 正在寫入合併筆記...
+toolsbox-merge-annotations-write-success = 已寫入合併筆記
+toolsbox-merge-annotations-write-failed = 無法寫入合併筆記
 # Annotation Manager
 toolsbox-menu-annotation-manager = 批註管理器
 toolsbox-annotation-manager-title = 批註管理器

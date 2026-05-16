@@ -1,6 +1,160 @@
 import { describe, it, assert } from "./test-framework.js";
 import { createFeatureComposer } from "../src/app/feature-composer.js";
 
+const DIRECT_STYLE_FEATURE_PREFS = new Set([
+  "aiGenerateRemark.enabled",
+  "aiGenerateTags.enabled",
+  "annotationColors.enabled",
+  "annotationColumn.enabled",
+  "annotationDistributionColumn.enabled",
+  "annotationManager.enabled",
+  "attachmentPreview.enabled",
+  "backlinks.enabled",
+  "citedCountColumn.enabled",
+  "collectionItemCount.enabled",
+  "collectionSort.enabled",
+  "favoriteCollections.enabled",
+  "graphView.enabled",
+  "ifColumn.enabled",
+  "marginAnnotation.enabled",
+  "mergeAnnotations.enabled",
+  "pdfBackground.enabled",
+  "publicationTagsColumn.enabled",
+  "readTimeColumn.enabled",
+  "sidebarToggle.enabled",
+  "tabManager.enabled",
+  "titleColumnEnhanced.enabled",
+  "viewGroups.enabled",
+]);
+
+function createMockElement(id = "") {
+  return {
+    id,
+    dataset: {},
+    style: {},
+    classList: {
+      add() {},
+      remove() {},
+    },
+    appendChild() {},
+    insertBefore() {},
+    querySelector() {
+      return null;
+    },
+    querySelectorAll() {
+      return [];
+    },
+    addEventListener() {},
+    remove() {
+      this.removed = true;
+    },
+  };
+}
+
+function createMockZotero() {
+  const itemTreeColumns = [];
+  const itemPaneSections = [];
+  const notifierObservers = [];
+  const unregisteredObservers = [];
+  const readerHandlers = [];
+  const document = {
+    createElement(tagName) {
+      return createMockElement(tagName);
+    },
+    createElementNS(_namespace, tagName) {
+      return createMockElement(tagName);
+    },
+    getElementById() {
+      return null;
+    },
+    querySelector() {
+      return null;
+    },
+  };
+
+  return {
+    itemTreeColumns,
+    itemPaneSections,
+    notifierObservers,
+    unregisteredObservers,
+    readerHandlers,
+    ItemTreeManager: {
+      registerColumn(column) {
+        itemTreeColumns.push(column);
+      },
+      unregisterColumn() {},
+      getColumns() {
+        return itemTreeColumns;
+      },
+    },
+    ItemPaneManager: {
+      registerSection(section) {
+        itemPaneSections.push(section);
+      },
+    },
+    Collections: {
+      get() {
+        return null;
+      },
+      getByLibrary() {
+        return [];
+      },
+    },
+    Libraries: {
+      userLibraryID: 1,
+    },
+    Reader: {
+      on(eventName, handler) {
+        readerHandlers.push({ eventName, handler });
+      },
+      getActiveReaders() {
+        return [];
+      },
+      getByTabID() {
+        return null;
+      },
+      open() {},
+    },
+    Notifier: {
+      registerObserver(observer, types, id = "mock-observer") {
+        notifierObservers.push({ observer, types, id });
+        return id;
+      },
+      unregisterObserver(id) {
+        unregisteredObservers.push(id);
+      },
+    },
+    Annotations: {
+      getByItemID() {
+        return [];
+      },
+      get() {
+        return null;
+      },
+    },
+    Items: {
+      get() {
+        return null;
+      },
+    },
+    getMainWindow() {
+      return {
+        document,
+        addEventListener() {},
+        openDialog() {
+          return {
+            closed: false,
+            focus() {},
+            close() {
+              this.closed = true;
+            },
+          };
+        },
+      };
+    },
+  };
+}
+
 function createDeps() {
   const calls = {
     panes: 0,
@@ -8,9 +162,11 @@ function createDeps() {
     columns: 0,
     rows: 0,
     sections: 0,
+    sectionUnregisters: 0,
     notifier: 0,
     primary: 0,
   };
+  const sectionUnregistrations = [];
   const paneRegistrations = [];
   const commandRegistrations = [];
 
@@ -28,6 +184,9 @@ function createDeps() {
       },
       logger: {
         info() {},
+        debug() {},
+        warn() {},
+        error() {},
       },
       host: {
         resolveContentUrl(path) {
@@ -35,13 +194,24 @@ function createDeps() {
         },
       },
       prefs: {
+        values: new Map(),
         get(key) {
           if (key === "enabled") {
             return true;
           }
+          if (this.values.has(key)) {
+            return this.values.get(key);
+          }
+          if (DIRECT_STYLE_FEATURE_PREFS.has(key)) {
+            return false;
+          }
           return null;
         },
+        set(key, value) {
+          this.values.set(key, value);
+        },
       },
+      zotero: createMockZotero(),
       i18n: {
         locale: "en-US",
         t(_key, _paramsOrFallback, fallbackMaybe) {
@@ -104,8 +274,14 @@ function createDeps() {
         registerInfoRow() {
           calls.rows += 1;
         },
-        registerSection() {
+        registerSection(options = {}) {
           calls.sections += 1;
+          return options.paneID || `section-${calls.sections}`;
+        },
+        unregisterSection(paneID) {
+          calls.sectionUnregisters += 1;
+          sectionUnregistrations.push(paneID);
+          return true;
         },
         getInfoRowCount() {
           return calls.rows;
@@ -150,6 +326,7 @@ function createDeps() {
     },
     paneRegistrations,
     commandRegistrations,
+    sectionUnregistrations,
   };
 }
 
@@ -196,6 +373,34 @@ describe("Feature Composer", () => {
     assert.equal(calls.columns, 22);
     assert.equal(calls.sections, 2);
     assert.equal(cleanups.length, 1);
+  });
+
+  it("should cleanup explicitly enabled prototype features through lifecycle cleanup", async () => {
+    const cleanups = [];
+    const { deps, calls, sectionUnregistrations } = createDeps();
+    deps.prefs.values.set("backlinks.enabled", true);
+    deps.prefs.values.set("mergeAnnotations.enabled", true);
+    deps.prefs.values.set("collectionItemCount.enabled", true);
+    deps.prefs.values.set("marginAnnotation.enabled", true);
+    deps.lifecycle = {
+      trackCleanup(fn) {
+        cleanups.push(fn);
+      },
+    };
+    const composer = createFeatureComposer(deps);
+
+    await composer.registerBaselineFeatures();
+    assert.equal(deps.zotero.notifierObservers.some((entry) => entry.id === "toolsbox-collection-count"), true);
+    assert.equal(deps.zotero.notifierObservers.some((entry) => entry.id === "mock-observer"), true);
+    assert.equal(calls.sections, 3);
+
+    cleanups[0]();
+    cleanups[0]();
+
+    assert.equal(deps.zotero.unregisteredObservers.includes("toolsbox-collection-count"), true);
+    assert.equal(deps.zotero.unregisteredObservers.includes("mock-observer"), true);
+    assert.deepEqual(sectionUnregistrations, ["toolsbox-merge-annotations", "toolsbox-backlinks"]);
+    assert.equal(calls.sectionUnregisters, 2);
   });
 
   it("should wait for baseline host APIs before registering Zotero manager-backed surfaces", async () => {

@@ -3,7 +3,7 @@
  * Task 1 of P2 Reader integration plan
  */
 
-import { describe, it, assert, runTests } from "../test-framework.js";
+import { describe, it, assert, runTestsIfMain } from "../test-framework.js";
 import { createMarginAnnotation } from "../../src/features/margin-annotation.js";
 
 function createMockLogger() {
@@ -14,6 +14,9 @@ function createMockLogger() {
     },
     error(message, data) {
       logs.push({ level: 'error', message, data });
+    },
+    warn(message, data) {
+      logs.push({ level: 'warn', message, data });
     },
     info(message, data) {
       logs.push({ level: 'info', message, data });
@@ -142,6 +145,10 @@ function createMockZotero(overrides = {}) {
         if (types.includes('annotation')) {
           annotationCallbacks.push(observer);
         }
+        return 'margin-annotation-observer';
+      },
+      unregisterObserver(id) {
+        overrides.unregisteredObserverID = id;
       },
       _triggerAnnotationChange(event, type, ids) {
         annotationCallbacks.forEach(obs => obs.notify(event, type, ids));
@@ -526,7 +533,7 @@ describe("MarginAnnotation", () => {
     assert.equal(result, false, "register should return false when Zotero unavailable");
   });
 
-  it("should log error when createLayer fails", () => {
+  it("should warn when createLayer is unavailable", () => {
     const mockLogger = createMockLogger();
     const mockPrefs = createMockPrefs();
 
@@ -539,8 +546,62 @@ describe("MarginAnnotation", () => {
     margin.createLayer(null);
 
     const logs = mockLogger.getLogs();
-    const errorLog = logs.find(l => l.level === 'error');
-    assert.ok(errorLog, "Should log error when createLayer fails");
+    const warnLog = logs.find(l => l.level === 'warn');
+    assert.ok(warnLog, "Should warn when createLayer is unavailable");
+  });
+
+  it("should resolve internal primary reader frame before legacy iframe", () => {
+    const doc = createMockDocument();
+    const margin = createMarginAnnotation({
+      logger: createMockLogger(),
+      prefs: createMockPrefs()
+    });
+    const reader = {
+      _internalReader: {
+        _primaryView: {
+          _iframeWindow: {
+            document: doc
+          }
+        }
+      },
+      _iframeWindow: null
+    };
+
+    const frame = margin.resolveReaderFrame(reader);
+
+    assert.equal(frame.available, true);
+    assert.equal(frame.doc, doc);
+  });
+
+  it("should return unavailable when reader frame body is missing", () => {
+    const margin = createMarginAnnotation({
+      logger: createMockLogger(),
+      prefs: createMockPrefs()
+    });
+    const frame = margin.resolveReaderFrame({
+      _iframeWindow: {
+        document: {}
+      }
+    });
+
+    assert.equal(frame.available, false);
+    assert.includes(frame.reason, 'body');
+  });
+
+  it("should unregister notifier observer on destroy", () => {
+    const overrides = {};
+    const mockZotero = createMockZotero(overrides);
+    const margin = createMarginAnnotation({
+      logger: createMockLogger(),
+      prefs: createMockPrefs(),
+      zotero: mockZotero
+    });
+
+    margin.register();
+    margin.destroy();
+    margin.destroy();
+
+    assert.equal(overrides.unregisteredObserverID, 'margin-annotation-observer');
   });
 
   it("should expose all public methods", () => {
@@ -564,4 +625,4 @@ describe("MarginAnnotation", () => {
   });
 });
 
-runTests();
+await runTestsIfMain(import.meta.url);

@@ -115,9 +115,10 @@ function evaluateReviewWorkbenchWaveAcceptance(validationDecision, reviewWorkben
     ? validationDecision.matchedProjectOverride
     : [];
   if (!matchedProjectOverrides.includes(AGENT_REVIEW_WORKBENCH_WAVE_ID)) {
+    const status = String(reviewWorkbenchAcceptance?.status || "").trim().toLowerCase();
     return {
       blocking: false,
-      status: String(reviewWorkbenchAcceptance?.status || "unavailable").trim().toLowerCase() || "unavailable",
+      status: status === "passed" || status === "failed" ? status : "not-required",
       issue: null,
       recommendation: null,
     };
@@ -965,7 +966,7 @@ function evaluateGate(summary, policy, watchStatus = null, obsidianGuard = null,
     provenance: summary.provenance || null,
     deadChainAudit: summary.deadChainAudit || null,
     reviewWorkbenchAcceptance: summary.reviewWorkbenchAcceptance || null,
-    reviewWorkbenchAcceptanceStatus: frontpageSummary.reviewWorkbenchAcceptanceStatus,
+    reviewWorkbenchAcceptanceStatus: reviewWorkbenchWaveAcceptance.status,
     reviewWorkbenchExternalBlockers: frontpageSummary.reviewWorkbenchExternalBlockers,
     reviewWorkbenchLastLifecycleScenario: frontpageSummary.reviewWorkbenchLastLifecycleScenario,
     agentContext: contextSummary,

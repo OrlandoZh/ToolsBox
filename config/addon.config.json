@@ -28,21 +28,21 @@
     "openai.timeout": 5000,
 
     "annotationColumn.enabled": false,
-    "attachmentPreview.enabled": true,
-    "graphView.enabled": true,
-    "marginAnnotation.enabled": true,
+    "attachmentPreview.enabled": false,
+    "graphView.enabled": false,
+    "marginAnnotation.enabled": false,
     "marginAnnotation.width": 200,
     "marginAnnotation.color": "#86C8BC",
     "marginAnnotation.opacity": "0.7",
     "marginAnnotation.fontSize": 12,
     "marginAnnotation.lineHeight": 16,
-    "pdfBackground.enabled": true,
+    "pdfBackground.enabled": false,
     "pdfBackground.color": "#f5f5f5",
-    "sidebarToggle.enabled": true,
-    "tabManager.enabled": true,
+    "sidebarToggle.enabled": false,
+    "tabManager.enabled": false,
     "tabManager.width": 400,
-    "titleColumnEnhanced.enabled": true,
-    "viewGroups.enabled": true,
+    "titleColumnEnhanced.enabled": false,
+    "viewGroups.enabled": false,
 
     "researchWorkflow.enabled": true,
     "researchWorkflow.itemPane.enabled": true,
@@ -74,25 +74,25 @@
     "researchWorkbench.notes.enabled": true,
     "researchWorkbench.tabs.enabled": true,
 
-    "readTimeColumn.enabled": true,
+    "readTimeColumn.enabled": false,
     "readTimeColumn.max": 600,
     "readTimeColumn.color": "#468B97",
     "readTimeColumn.opacity": "0.7",
     "readTimeColumn.progress": true,
     "readTimeColumn.text": true,
 
-    "annotationDistributionColumn.enabled": true,
-    "publicationTagsColumn.enabled": true,
+    "annotationDistributionColumn.enabled": false,
+    "publicationTagsColumn.enabled": false,
 
-    "citedCountColumn.enabled": true,
+    "citedCountColumn.enabled": false,
     "citedCountColumn.source": "semantic-scholar",
     "citedCountColumn.apiKey": "",
 
-    "ifColumn.enabled": true,
+    "ifColumn.enabled": false,
 
-    "collectionItemCount.enabled": true,
-    "collectionSort.enabled": true,
-    "favoriteCollections.enabled": true,
+    "collectionItemCount.enabled": false,
+    "collectionSort.enabled": false,
+    "favoriteCollections.enabled": false,
     "favoriteCollections": [],
 
     "styleEditor.enabled": false,
@@ -109,19 +109,19 @@
       "blue": "#4444ff"
     },
 
-    "mergeAnnotations.enabled": true,
+    "mergeAnnotations.enabled": false,
 
-    "backlinks.enabled": true,
+    "backlinks.enabled": false,
 
-    "attachmentVersion.enabled": true,
+    "attachmentVersion.enabled": false,
 
-    "customColumnDatakeys.enabled": true,
+    "customColumnDatakeys.enabled": false,
     "customColumnDatakeys.keys": [],
 
-    "annotationManager.enabled": true,
+    "annotationManager.enabled": false,
     "annotationManager.showImages": true,
 
-    "paperMatrix.enabled": true,
+    "paperMatrix.enabled": false,
 
     "customExternalAPI.enabled": false,
     "customExternalAPI.endpoint": "",

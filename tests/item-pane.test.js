@@ -179,4 +179,57 @@ describe("ItemPane", () => {
     assert.equal(registeredSectionOptions[0].sidenav.orderable, false);
     assert.deepEqual(registeredSectionOptions[0].sectionButtons, sectionButtons);
   });
+
+  it("should preserve explicit empty bodyXHTML for dynamic section rendering", () => {
+    const registeredSectionID = itemPane.registerSection({
+      paneID: "demo-section-dynamic-body",
+      header: { l10nID: "demo-section-header" },
+      sidenav: { l10nID: "demo-section-sidenav" },
+      bodyXHTML: "",
+      onRender() {},
+    });
+
+    assert.equal(registeredSectionID, "cleanroom-template@example.com:demo-section-dynamic-body");
+    assert.equal(registeredSectionOptions[0].bodyXHTML, "");
+  });
+
+  it("should normalize positional section render hook arguments from the host", () => {
+    const doc = {
+      createElement() {},
+    };
+    const body = {
+      ownerDocument: doc,
+      appendChild() {},
+    };
+    const item = {
+      id: 42,
+      getField() {
+        return "demo";
+      },
+    };
+    let renderProps = null;
+    let itemChangeProps = null;
+
+    itemPane.registerSection({
+      paneID: "demo-section-positional",
+      header: { l10nID: "demo-section-header" },
+      sidenav: { l10nID: "demo-section-sidenav" },
+      onItemChange(props) {
+        itemChangeProps = props;
+      },
+      onRender(props) {
+        renderProps = props;
+      },
+    });
+
+    const section = registeredSectionOptions[0];
+    section.onItemChange(item, () => {});
+    section.onRender(body, item);
+
+    assert.equal(renderProps.body, body);
+    assert.equal(renderProps.doc, doc);
+    assert.equal(renderProps.item, item);
+    assert.equal(itemChangeProps.item, item);
+    assert.equal(typeof itemChangeProps.setEnabled, "function");
+  });
 });

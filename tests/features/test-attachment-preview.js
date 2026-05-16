@@ -3,7 +3,7 @@
  * Task 2 of P0 features plan
  */
 
-import { describe, it, assert, runTests } from "../test-framework.js";
+import { describe, it, assert, runTestsIfMain } from "../test-framework.js";
 import { createAttachmentPreview } from "../../src/features/attachment-preview.js";
 
 // Mock dependencies
@@ -15,6 +15,9 @@ function createMockLogger() {
     },
     error(message, data) {
       logs.push({ level: 'error', message, data });
+    },
+    warn(message, data) {
+      logs.push({ level: 'warn', message, data });
     },
     info(message, data) {
       logs.push({ level: 'info', message, data });
@@ -75,8 +78,8 @@ describe("AttachmentPreview", () => {
     assert.equal(result, false, "register() should return false when ItemPaneManager unavailable");
 
     const logs = mockLogger.getLogs();
-    const errorLog = logs.find(l => l.level === 'error');
-    assert.ok(errorLog, "Should log error when registration fails");
+    const warnLog = logs.find(l => l.level === 'warn');
+    assert.ok(warnLog, "Should warn when registration skips");
   });
 
   it("should use globalThis.Zotero when zotero option not provided", () => {
@@ -143,5 +146,5 @@ describe("AttachmentPreview", () => {
   });
 });
 
-// Run all tests
-runTests();
+// Run all tests when this file is executed directly.
+await runTestsIfMain(import.meta.url);

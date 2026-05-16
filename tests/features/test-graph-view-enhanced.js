@@ -3,7 +3,7 @@
  * Task 2 of P2 Reader integration plan
  */
 
-import { describe, it, assert, runTests } from "../test-framework.js";
+import { describe, it, assert, runTestsIfMain } from "../test-framework.js";
 import { createLayoutEngine } from "../../src/services/layout-engine.js";
 import { createGraphViewEnhanced } from "../../src/features/graph-view-enhanced.js";
 
@@ -817,4 +817,4 @@ describe("GraphViewEnhanced", () => {
   });
 });
 
-runTests();
+await runTestsIfMain(import.meta.url);

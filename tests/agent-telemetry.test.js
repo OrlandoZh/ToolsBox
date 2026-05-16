@@ -6763,7 +6763,7 @@ describe("Agent Telemetry", () => {
     assert.ok(gateMD.includes("阶段: `gate-evaluation`"));
   });
 
-  it("should fail active workbench wave gate without acceptance evidence", () => {
+  it("should not require workbench acceptance evidence outside the active workbench wave", () => {
     writeWatchStatus({
       generatedAt: new Date().toISOString(),
       latestStatus: "healthy",
@@ -6776,26 +6776,24 @@ describe("Agent Telemetry", () => {
 
     execNode(["scripts/agent-runner.mjs", "gate-ok-case", "--", "node", "-e", "process.exit(0)"]);
     execNode(["scripts/agent-monitor.mjs"]);
-    assert.throws(() => {
-      execNode([
-        "scripts/agent-gate.mjs",
-        "--profile",
-        "dev",
-        "--require",
-        "gate-ok-case",
-        "--min-pass-rate",
-        "0",
-        "--max-recent-failed",
-        "999",
-      ]);
-    });
+    execNode([
+      "scripts/agent-gate.mjs",
+      "--profile",
+      "dev",
+      "--require",
+      "gate-ok-case",
+      "--min-pass-rate",
+      "0",
+      "--max-recent-failed",
+      "999",
+    ]);
 
     const gateJSON = readArtifactJSON("agent-gate.json");
 
-    assert.equal(gateJSON.gatePassed, false);
-    assert.equal(gateJSON.reviewWorkbenchAcceptanceStatus, "unavailable");
-    assert.ok(gateJSON.issues.some((item) => String(item).includes("Agent Review Workbench")));
-    assert.ok(gateJSON.recommendations.some((item) => String(item).includes("agent review workbench window lifecycle")));
+    assert.equal(gateJSON.gatePassed, true);
+    assert.equal(gateJSON.reviewWorkbenchAcceptanceStatus, "not-required");
+    assert.equal(gateJSON.issues.some((item) => String(item).includes("Agent Review Workbench")), false);
+    assert.equal(gateJSON.recommendations.some((item) => String(item).includes("agent review workbench window lifecycle")), false);
   });
 
   it("should set error fields to null on successful gate evaluation", () => {

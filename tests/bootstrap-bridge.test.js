@@ -334,4 +334,41 @@ describe("Bootstrap Bridge", () => {
     assert.equal(harness.chromeGlobal.Zotero.CleanroomTemplate, undefined);
     assert.ok(harness.errorLogs.some((item) => item.includes("shutdown.failed")));
   });
+
+  it("should not remove a replacement instance mounted during hot reload shutdown", async () => {
+    const replacementRuntime = { rootURI: "resource://cleanroom-next/" };
+    const replacementConfig = { instanceKey: "CleanroomTemplate", generation: "next" };
+    const replacementEntry = {
+      api: { generation: "next" },
+      async shutdown() {},
+    };
+    const harness = createBootstrapHarness({
+      loadSubScript({ scope, chromeGlobal, onBootstrap, onPluginShutdown }) {
+        scope.__CLEANROOM_TEMPLATE_CONFIG__ = {
+          instanceKey: "CleanroomTemplate",
+        };
+        scope.bootstrapPlugin = async () => {
+          onBootstrap();
+          chromeGlobal.Zotero.CleanroomTemplate = {
+            api: { generation: "old" },
+            async shutdown() {
+              onPluginShutdown();
+              chromeGlobal.__CLEANROOM_TEMPLATE_RUNTIME__ = replacementRuntime;
+              chromeGlobal.__CLEANROOM_TEMPLATE_CONFIG__ = replacementConfig;
+              chromeGlobal.Zotero.CleanroomTemplate = replacementEntry;
+            },
+          };
+        };
+      },
+    });
+
+    await harness.context.startup({ rootURI: "resource://cleanroom/" }, 0);
+    await harness.context.shutdown({}, 0);
+
+    assert.equal(harness.pluginShutdowns, 1);
+    assert.equal(harness.destructCalls, 1);
+    assert.equal(harness.chromeGlobal.__CLEANROOM_TEMPLATE_RUNTIME__, replacementRuntime);
+    assert.equal(harness.chromeGlobal.__CLEANROOM_TEMPLATE_CONFIG__, replacementConfig);
+    assert.equal(harness.chromeGlobal.Zotero.CleanroomTemplate, replacementEntry);
+  });
 });

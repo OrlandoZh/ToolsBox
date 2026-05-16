@@ -1,3 +1,6 @@
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 /**
  * 简易测试框架
  * 无外部依赖，自包含测试运行器
@@ -288,6 +291,23 @@ export async function runTests() {
   } else {
     console.log('\n🎉 所有测试通过！');
     process.exit(0);
+  }
+}
+
+/**
+ * 判断当前测试模块是否作为 node 入口直接执行。
+ * 被 tests/run-all.js 导入时只注册测试，不启动运行器。
+ */
+export function isDirectTestRun(metaUrl) {
+  if (!process.argv[1]) {
+    return false;
+  }
+  return fileURLToPath(metaUrl) === resolve(process.argv[1]);
+}
+
+export async function runTestsIfMain(metaUrl) {
+  if (isDirectTestRun(metaUrl)) {
+    await runTests();
   }
 }
 

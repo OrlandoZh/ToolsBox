@@ -1,145 +1,448 @@
-<?xml-stylesheet href="chrome://global/skin/" type="text/css"?>
-<?xml-stylesheet href="chrome://zotero-platform/content/zotero.css"?>
+<vbox
+  xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+  id="__PREFERENCE_ROOT_ID__"
+  flex="1"
+  class="cleanroom-pref-root"
+  data-pref-root="true"
+  data-pref-layout="inline"
+  data-pref-width-bucket="regular"
+>
+  <preferences id="cleanroom-preferences">
+    <preference id="pref-enabled" name="__PREF_ENABLED_NAME__" type="bool" />
+    <preference id="pref-menuLabel" name="__PREF_MENU_LABEL_NAME__" type="string" />
+    <preference id="pref-logLevel" name="__PREF_LOG_LEVEL_NAME__" type="string" />
+    <preference id="pref-themeMode" name="__PREF_THEME_MODE_NAME__" type="string" />
+    <preference id="pref-rw-enabled" name="__PREF_RESEARCHWORKFLOW_ENABLED_NAME__" type="bool" />
+    <preference id="pref-rw-item-pane-enabled" name="__PREF_RESEARCHWORKFLOW_ITEMPANE_ENABLED_NAME__" type="bool" />
+    <preference id="pref-rw-menu-enabled" name="__PREF_RESEARCHWORKFLOW_MENU_ENABLED_NAME__" type="bool" />
+    <preference id="pref-rw-reader-enabled" name="__PREF_RESEARCHWORKFLOW_READER_ENABLED_NAME__" type="bool" />
+    <preference id="pref-rw-status-available" name="__PREF_RESEARCHWORKFLOW_STATUS_AVAILABLE_NAME__" type="string" />
+    <preference id="pref-rw-read-status-available" name="__PREF_RESEARCHWORKFLOW_READSTATUS_AVAILABLE_NAME__" type="string" />
+    <preference id="pref-rw-item-tree-tags-enabled" name="__PREF_RESEARCHWORKFLOW_ITEMTREE_TAGS_ENABLED_NAME__" type="bool" />
+    <preference id="pref-rw-item-tree-text-tags-enabled" name="__PREF_RESEARCHWORKFLOW_ITEMTREE_TEXTTAGS_ENABLED_NAME__" type="bool" />
+    <preference id="pref-rw-item-tree-status-enabled" name="__PREF_RESEARCHWORKFLOW_ITEMTREE_STATUS_ENABLED_NAME__" type="bool" />
+    <preference id="pref-rw-item-tree-rating-enabled" name="__PREF_RESEARCHWORKFLOW_ITEMTREE_RATING_ENABLED_NAME__" type="bool" />
+    <preference id="pref-rw-item-tree-remark-enabled" name="__PREF_RESEARCHWORKFLOW_ITEMTREE_REMARK_ENABLED_NAME__" type="bool" />
+    <preference id="pref-rw-item-tree-creator-enabled" name="__PREF_RESEARCHWORKFLOW_ITEMTREE_CREATOR_ENABLED_NAME__" type="bool" />
+    <preference id="pref-rw-item-tree-publication-enabled" name="__PREF_RESEARCHWORKFLOW_ITEMTREE_PUBLICATION_ENABLED_NAME__" type="bool" />
+    <preference id="pref-rw-item-tree-date-added-enabled" name="__PREF_RESEARCHWORKFLOW_ITEMTREE_DATEADDED_ENABLED_NAME__" type="bool" />
+    <preference id="pref-rw-item-tree-date-modified-enabled" name="__PREF_RESEARCHWORKFLOW_ITEMTREE_DATEMODIFIED_ENABLED_NAME__" type="bool" />
+    <preference id="pref-rw-item-tree-read-status-enabled" name="__PREF_RESEARCHWORKFLOW_ITEMTREE_READSTATUS_ENABLED_NAME__" type="bool" />
+    <preference id="pref-rw-item-tree-custom-fields-enabled" name="__PREF_RESEARCHWORKFLOW_ITEMTREE_CUSTOMFIELDS_ENABLED_NAME__" type="bool" />
+    <preference id="pref-rw-item-tree-custom-fields-keys" name="__PREF_RESEARCHWORKFLOW_ITEMTREE_CUSTOMFIELDS_KEYS_NAME__" type="string" />
+    <preference id="pref-rw-text-tags-prefix" name="__PREF_RESEARCHWORKFLOW_TEXTTAGS_PREFIX_NAME__" type="string" />
+    <preference id="pref-rw-status-tags-prefix" name="__PREF_RESEARCHWORKFLOW_STATUSTAGS_PREFIX_NAME__" type="string" />
+    <preference id="pref-rw-rating-selected-mark" name="__PREF_RESEARCHWORKFLOW_RATING_SELECTEDMARK_NAME__" type="string" />
+    <preference id="pref-rw-remark-extra-label" name="__PREF_RESEARCHWORKFLOW_REMARK_EXTRALABEL_NAME__" type="string" />
+    <preference id="pref-rw-read-status-extra-label" name="__PREF_RESEARCHWORKFLOW_READSTATUS_EXTRALABEL_NAME__" type="string" />
+    <preference id="pref-rw-progress-extra-label" name="__PREF_RESEARCHWORKFLOW_PROGRESS_EXTRALABEL_NAME__" type="string" />
+    <preference id="pref-workbench-graph-enabled" name="__PREF_RESEARCHWORKBENCH_GRAPH_ENABLED_NAME__" type="bool" />
+    <preference id="pref-workbench-matrix-enabled" name="__PREF_RESEARCHWORKBENCH_MATRIX_ENABLED_NAME__" type="bool" />
+    <preference id="pref-workbench-notes-enabled" name="__PREF_RESEARCHWORKBENCH_NOTES_ENABLED_NAME__" type="bool" />
+    <preference id="pref-workbench-tabs-enabled" name="__PREF_RESEARCHWORKBENCH_TABS_ENABLED_NAME__" type="bool" />
+  </preferences>
 
-<prefwindow id="__PREFERENCE_ROOT_ID__"
-           title="ToolsBox Preferences"
-           xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-           data-pref-root="true"
-           data-pref-layout="inline">
+  <groupbox class="cleanroom-pref-section">
+    <caption id="cleanroom-pref-caption" data-l10n-id="cleanroom-pref-caption" />
+    <vbox class="cleanroom-pref-section-body">
+      <checkbox
+        id="cleanroom-enabled"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-enabled"
+        preference="pref-enabled"
+      />
+    </vbox>
+  </groupbox>
 
-    <prefpane id="toolsbox-general" label="General">
-        <preferences>
-            <preference id="pref-enabled" name="extensions.zotero.toolsbox.enabled" type="bool"/>
-            <preference id="pref-logLevel" name="extensions.zotero.toolsbox.logLevel" type="string"/>
-        </preferences>
+  <groupbox class="cleanroom-pref-section">
+    <caption id="cleanroom-pref-menu-section" data-l10n-id="cleanroom-pref-menu-section" />
+    <vbox class="cleanroom-pref-section-body">
+      <hbox class="cleanroom-pref-field-row" align="center" orient="horizontal">
+        <label
+          id="cleanroom-pref-menu-label-text"
+          class="cleanroom-pref-label"
+          data-l10n-id="cleanroom-pref-menu-label"
+          control="cleanroom-menu-label"
+        />
+        <vbox class="cleanroom-pref-control-wrap" flex="1">
+          <textbox
+            id="cleanroom-menu-label"
+            class="cleanroom-pref-control cleanroom-pref-textbox"
+            preference="pref-menuLabel"
+            flex="1"
+          />
+        </vbox>
+      </hbox>
+      <description
+        id="cleanroom-pref-menu-hint"
+        class="cleanroom-pref-hint"
+        data-l10n-id="cleanroom-pref-menu-hint"
+      />
+    </vbox>
+  </groupbox>
 
-        <groupbox>
-            <caption data-l10n-id="cleanroom-pref-caption"/>
-            <checkbox preference="pref-enabled" data-l10n-id="cleanroom-pref-enabled"/>
-            <vbox class="cleanroom-pref-field-row">
-                <hbox class="cleanroom-pref-control-wrap" align="center">
-                    <label value="Log Level:"/>
-                    <menulist preference="pref-logLevel">
-                        <menupopup>
-                            <menuitem value="debug" label="Debug"/>
-                            <menuitem value="info" label="Info"/>
-                            <menuitem value="warn" label="Warning"/>
-                            <menuitem value="error" label="Error"/>
-                        </menupopup>
-                    </menulist>
-                </hbox>
-            </vbox>
-        </groupbox>
+  <groupbox class="cleanroom-pref-section">
+    <caption id="cleanroom-pref-logging-section" data-l10n-id="cleanroom-pref-logging-section" />
+    <vbox class="cleanroom-pref-section-body">
+      <hbox class="cleanroom-pref-field-row" align="center" orient="horizontal">
+        <label
+          id="cleanroom-pref-log-level-text"
+          class="cleanroom-pref-label"
+          data-l10n-id="cleanroom-pref-log-level"
+          control="cleanroom-log-level"
+        />
+        <vbox class="cleanroom-pref-control-wrap" flex="1">
+          <menulist
+            id="cleanroom-log-level"
+            class="cleanroom-pref-control cleanroom-pref-menulist"
+            preference="pref-logLevel"
+            flex="1"
+          >
+            <menupopup>
+              <menuitem label="debug" value="debug" />
+              <menuitem label="info" value="info" />
+              <menuitem label="warn" value="warn" />
+              <menuitem label="error" value="error" />
+            </menupopup>
+          </menulist>
+        </vbox>
+      </hbox>
+    </vbox>
+  </groupbox>
 
-        <groupbox>
-            <caption data-l10n-id="cleanroom-pref-menu-section"/>
-        </groupbox>
+  <groupbox class="cleanroom-pref-section">
+    <caption id="cleanroom-pref-theme-section" data-l10n-id="cleanroom-pref-theme-section" />
+    <vbox class="cleanroom-pref-section-body">
+      <hbox class="cleanroom-pref-field-row" align="center" orient="horizontal">
+        <label
+          id="cleanroom-pref-theme-mode-text"
+          class="cleanroom-pref-label"
+          data-l10n-id="cleanroom-pref-theme-mode"
+          control="cleanroom-theme-mode"
+        />
+        <vbox class="cleanroom-pref-control-wrap" flex="1">
+          <menulist
+            id="cleanroom-theme-mode"
+            class="cleanroom-pref-control cleanroom-pref-menulist"
+            preference="pref-themeMode"
+            flex="1"
+          >
+            <menupopup>
+              <menuitem
+                id="cleanroom-pref-theme-follow-host"
+                data-l10n-id="cleanroom-pref-theme-follow-host"
+                value="follow-host"
+              />
+              <menuitem
+                id="cleanroom-pref-theme-light"
+                data-l10n-id="cleanroom-pref-theme-light"
+                value="light"
+              />
+              <menuitem
+                id="cleanroom-pref-theme-dark"
+                data-l10n-id="cleanroom-pref-theme-dark"
+                value="dark"
+              />
+            </menupopup>
+          </menulist>
+        </vbox>
+      </hbox>
+      <description
+        id="cleanroom-pref-theme-hint"
+        class="cleanroom-pref-hint"
+        data-l10n-id="cleanroom-pref-theme-hint"
+      />
+    </vbox>
+  </groupbox>
 
-        <groupbox>
-            <caption data-l10n-id="cleanroom-pref-logging-section"/>
-        </groupbox>
+  <groupbox class="cleanroom-pref-section">
+    <caption id="cleanroom-pref-workflow-section" data-l10n-id="cleanroom-pref-workflow-section" />
+    <vbox class="cleanroom-pref-section-body">
+      <description
+        id="cleanroom-pref-workflow-hint"
+        class="cleanroom-pref-hint"
+        data-l10n-id="cleanroom-pref-workflow-hint"
+      />
+      <checkbox
+        id="cleanroom-rw-enabled"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-rw-enabled"
+        preference="pref-rw-enabled"
+      />
+      <checkbox
+        id="cleanroom-rw-item-pane-enabled"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-rw-item-pane-enabled"
+        preference="pref-rw-item-pane-enabled"
+      />
+      <checkbox
+        id="cleanroom-rw-menu-enabled"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-rw-menu-enabled"
+        preference="pref-rw-menu-enabled"
+      />
+      <checkbox
+        id="cleanroom-rw-reader-enabled"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-rw-reader-enabled"
+        preference="pref-rw-reader-enabled"
+      />
+      <hbox class="cleanroom-pref-field-row" align="center" orient="horizontal">
+        <label
+          id="cleanroom-pref-rw-status-available-text"
+          class="cleanroom-pref-label"
+          data-l10n-id="cleanroom-pref-rw-status-available"
+          control="cleanroom-rw-status-available"
+        />
+        <vbox class="cleanroom-pref-control-wrap" flex="1">
+          <textbox
+            id="cleanroom-rw-status-available"
+            class="cleanroom-pref-control cleanroom-pref-textbox"
+            preference="pref-rw-status-available"
+            flex="1"
+          />
+        </vbox>
+      </hbox>
+      <hbox class="cleanroom-pref-field-row" align="center" orient="horizontal">
+        <label
+          id="cleanroom-pref-rw-read-status-available-text"
+          class="cleanroom-pref-label"
+          data-l10n-id="cleanroom-pref-rw-read-status-available"
+          control="cleanroom-rw-read-status-available"
+        />
+        <vbox class="cleanroom-pref-control-wrap" flex="1">
+          <textbox
+            id="cleanroom-rw-read-status-available"
+            class="cleanroom-pref-control cleanroom-pref-textbox"
+            preference="pref-rw-read-status-available"
+            flex="1"
+          />
+        </vbox>
+      </hbox>
+    </vbox>
+  </groupbox>
 
-        <groupbox>
-            <caption data-l10n-id="cleanroom-pref-theme-section"/>
-            <checkbox preference="pref-themeFollowHost" data-l10n-id="cleanroom-pref-theme-follow-host"/>
-        </groupbox>
-    </prefpane>
+  <groupbox class="cleanroom-pref-section">
+    <caption id="cleanroom-pref-research-columns-section" data-l10n-id="cleanroom-pref-research-columns-section" />
+    <vbox class="cleanroom-pref-section-body">
+      <description
+        id="cleanroom-pref-research-columns-hint"
+        class="cleanroom-pref-hint"
+        data-l10n-id="cleanroom-pref-research-columns-hint"
+      />
+      <checkbox
+        id="cleanroom-rw-item-tree-tags"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-rw-tags-column"
+        preference="pref-rw-item-tree-tags-enabled"
+      />
+      <checkbox
+        id="cleanroom-rw-item-tree-text-tags"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-rw-text-tags-column"
+        preference="pref-rw-item-tree-text-tags-enabled"
+      />
+      <checkbox
+        id="cleanroom-rw-item-tree-status"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-rw-status-column"
+        preference="pref-rw-item-tree-status-enabled"
+      />
+      <checkbox
+        id="cleanroom-rw-item-tree-rating"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-rw-rating-column"
+        preference="pref-rw-item-tree-rating-enabled"
+      />
+      <checkbox
+        id="cleanroom-rw-item-tree-remark"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-rw-remark-column"
+        preference="pref-rw-item-tree-remark-enabled"
+      />
+      <checkbox
+        id="cleanroom-rw-item-tree-creator"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-rw-creator-column"
+        preference="pref-rw-item-tree-creator-enabled"
+      />
+      <checkbox
+        id="cleanroom-rw-item-tree-publication"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-rw-publication-column"
+        preference="pref-rw-item-tree-publication-enabled"
+      />
+      <checkbox
+        id="cleanroom-rw-item-tree-date-added"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-rw-date-added-column"
+        preference="pref-rw-item-tree-date-added-enabled"
+      />
+      <checkbox
+        id="cleanroom-rw-item-tree-date-modified"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-rw-date-modified-column"
+        preference="pref-rw-item-tree-date-modified-enabled"
+      />
+      <checkbox
+        id="cleanroom-rw-item-tree-read-status"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-rw-read-status-column"
+        preference="pref-rw-item-tree-read-status-enabled"
+      />
+      <checkbox
+        id="cleanroom-rw-item-tree-custom-fields"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-rw-custom-fields-column"
+        preference="pref-rw-item-tree-custom-fields-enabled"
+      />
+      <hbox class="cleanroom-pref-field-row" align="center" orient="horizontal">
+        <label
+          id="cleanroom-pref-rw-custom-fields-text"
+          class="cleanroom-pref-label"
+          data-l10n-id="cleanroom-pref-rw-custom-fields"
+          control="cleanroom-rw-custom-fields"
+        />
+        <vbox class="cleanroom-pref-control-wrap" flex="1">
+          <textbox
+            id="cleanroom-rw-custom-fields"
+            class="cleanroom-pref-control cleanroom-pref-textbox"
+            preference="pref-rw-item-tree-custom-fields-keys"
+            flex="1"
+          />
+        </vbox>
+      </hbox>
+      <hbox class="cleanroom-pref-field-row" align="center" orient="horizontal">
+        <label
+          id="cleanroom-pref-rw-text-tag-prefix-text"
+          class="cleanroom-pref-label"
+          data-l10n-id="cleanroom-pref-rw-text-tag-prefix"
+          control="cleanroom-rw-text-tag-prefix"
+        />
+        <vbox class="cleanroom-pref-control-wrap" flex="1">
+          <textbox
+            id="cleanroom-rw-text-tag-prefix"
+            class="cleanroom-pref-control cleanroom-pref-textbox"
+            preference="pref-rw-text-tags-prefix"
+            flex="1"
+          />
+        </vbox>
+      </hbox>
+      <hbox class="cleanroom-pref-field-row" align="center" orient="horizontal">
+        <label
+          id="cleanroom-pref-rw-status-tag-prefix-text"
+          class="cleanroom-pref-label"
+          data-l10n-id="cleanroom-pref-rw-status-tag-prefix"
+          control="cleanroom-rw-status-tag-prefix"
+        />
+        <vbox class="cleanroom-pref-control-wrap" flex="1">
+          <textbox
+            id="cleanroom-rw-status-tag-prefix"
+            class="cleanroom-pref-control cleanroom-pref-textbox"
+            preference="pref-rw-status-tags-prefix"
+            flex="1"
+          />
+        </vbox>
+      </hbox>
+      <hbox class="cleanroom-pref-field-row" align="center" orient="horizontal">
+        <label
+          id="cleanroom-pref-rw-rating-mark-text"
+          class="cleanroom-pref-label"
+          data-l10n-id="cleanroom-pref-rw-rating-mark"
+          control="cleanroom-rw-rating-mark"
+        />
+        <vbox class="cleanroom-pref-control-wrap" flex="1">
+          <textbox
+            id="cleanroom-rw-rating-mark"
+            class="cleanroom-pref-control cleanroom-pref-textbox"
+            preference="pref-rw-rating-selected-mark"
+            flex="1"
+          />
+        </vbox>
+      </hbox>
+      <hbox class="cleanroom-pref-field-row" align="center" orient="horizontal">
+        <label
+          id="cleanroom-pref-rw-remark-label-text"
+          class="cleanroom-pref-label"
+          data-l10n-id="cleanroom-pref-rw-remark-label"
+          control="cleanroom-rw-remark-label"
+        />
+        <vbox class="cleanroom-pref-control-wrap" flex="1">
+          <textbox
+            id="cleanroom-rw-remark-label"
+            class="cleanroom-pref-control cleanroom-pref-textbox"
+            preference="pref-rw-remark-extra-label"
+            flex="1"
+          />
+        </vbox>
+      </hbox>
+      <hbox class="cleanroom-pref-field-row" align="center" orient="horizontal">
+        <label
+          id="cleanroom-pref-rw-read-status-label-text"
+          class="cleanroom-pref-label"
+          data-l10n-id="cleanroom-pref-rw-read-status-label"
+          control="cleanroom-rw-read-status-label"
+        />
+        <vbox class="cleanroom-pref-control-wrap" flex="1">
+          <textbox
+            id="cleanroom-rw-read-status-label"
+            class="cleanroom-pref-control cleanroom-pref-textbox"
+            preference="pref-rw-read-status-extra-label"
+            flex="1"
+          />
+        </vbox>
+      </hbox>
+      <hbox class="cleanroom-pref-field-row" align="center" orient="horizontal">
+        <label
+          id="cleanroom-pref-rw-progress-label-text"
+          class="cleanroom-pref-label"
+          data-l10n-id="cleanroom-pref-rw-progress-label"
+          control="cleanroom-rw-progress-label"
+        />
+        <vbox class="cleanroom-pref-control-wrap" flex="1">
+          <textbox
+            id="cleanroom-rw-progress-label"
+            class="cleanroom-pref-control cleanroom-pref-textbox"
+            preference="pref-rw-progress-extra-label"
+            flex="1"
+          />
+        </vbox>
+      </hbox>
+    </vbox>
+  </groupbox>
 
-    <prefpane id="toolsbox-columns" label="Columns">
-        <preferences>
-            <preference id="pref-readTime" name="extensions.zotero.toolsbox.readTimeColumn.enabled" type="bool"/>
-            <preference id="pref-annotation" name="extensions.zotero.toolsbox.annotationDistributionColumn.enabled" type="bool"/>
-            <preference id="pref-publication" name="extensions.zotero.toolsbox.publicationTagsColumn.enabled" type="bool"/>
-            <preference id="pref-ifColumn" name="extensions.zotero.toolsbox.ifColumn.enabled" type="bool"/>
-            <preference id="pref-cited" name="extensions.zotero.toolsbox.citedCountColumn.enabled" type="bool"/>
-            <preference id="pref-custom" name="extensions.zotero.toolsbox.customColumnDatakeys.enabled" type="bool"/>
-        </preferences>
-
-        <groupbox>
-            <caption label="ItemTree Columns"/>
-            <checkbox preference="pref-readTime" label="Reading Time Column"/>
-            <checkbox preference="pref-annotation" label="Annotation Distribution Column"/>
-            <checkbox preference="pref-publication" label="Publication Tags Column"/>
-            <checkbox preference="pref-ifColumn" label="Impact Factor Column"/>
-            <checkbox preference="pref-cited" label="Cited Count Column"/>
-            <checkbox preference="pref-custom" label="Custom Columns"/>
-        </groupbox>
-    </prefpane>
-
-    <prefpane id="toolsbox-reader" label="Reader">
-        <preferences>
-            <preference id="pref-margin" name="extensions.zotero.toolsbox.marginAnnotation.enabled" type="bool"/>
-            <preference id="pref-pdfBg" name="extensions.zotero.toolsbox.pdfBackground.enabled" type="bool"/>
-            <preference id="pref-merge" name="extensions.zotero.toolsbox.mergeAnnotations.enabled" type="bool"/>
-            <preference id="pref-version" name="extensions.zotero.toolsbox.attachmentVersion.enabled" type="bool"/>
-        </preferences>
-
-        <groupbox>
-            <caption label="Reader Features"/>
-            <checkbox preference="pref-margin" label="Margin Annotation Display"/>
-            <checkbox preference="pref-pdfBg" label="PDF Background Color"/>
-            <checkbox preference="pref-merge" label="Merge Annotations"/>
-            <checkbox preference="pref-version" label="Attachment Version Switch"/>
-        </groupbox>
-    </prefpane>
-
-    <prefpane id="toolsbox-ai" label="AI Features">
-        <preferences>
-            <preference id="pref-aiTags" name="extensions.zotero.toolsbox.aiGenerateTags.enabled" type="bool"/>
-            <preference id="pref-aiRemark" name="extensions.zotero.toolsbox.aiGenerateRemark.enabled" type="bool"/>
-            <preference id="pref-tldr" name="extensions.zotero.toolsbox.tldrPanel.enabled" type="bool"/>
-            <preference id="pref-openaiKey" name="extensions.zotero.toolsbox.openai.apiKey" type="string"/>
-        </preferences>
-
-        <groupbox>
-            <caption label="AI Features (Default OFF)"/>
-            <description>These features require OpenAI API key and are disabled by default.</description>
-            <checkbox preference="pref-aiTags" label="AI Generate Tags"/>
-            <checkbox preference="pref-aiRemark" label="AI Generate Remark"/>
-            <checkbox preference="pref-tldr" label="TLDR Panel"/>
-            <hbox align="center">
-                <label value="OpenAI API Key:"/>
-                <textbox preference="pref-openaiKey" type="password" width="300"/>
-            </hbox>
-        </groupbox>
-    </prefpane>
-
-    <prefpane id="toolsbox-style" label="Style">
-        <preferences>
-            <preference id="pref-styleEditor" name="extensions.zotero.toolsbox.styleEditor.enabled" type="bool"/>
-            <preference id="pref-styleCss" name="extensions.zotero.toolsbox.styleEditor.css" type="string"/>
-            <preference id="pref-annotationColors" name="extensions.zotero.toolsbox.annotationColors.enabled" type="bool"/>
-        </preferences>
-
-        <groupbox>
-            <caption label="Style &amp; Customization (Default OFF)"/>
-            <checkbox preference="pref-styleEditor" label="Enable Custom CSS"/>
-            <label value="Custom CSS:"/>
-            <textbox preference="pref-styleCss" multiline="true" rows="10" width="400"/>
-            <checkbox preference="pref-annotationColors" label="Annotation Colors Manager"/>
-        </groupbox>
-    </prefpane>
-
-    <prefpane id="toolsbox-apis" label="External APIs">
-        <preferences>
-            <preference id="pref-easyscholar" name="extensions.zotero.toolsbox.easyscholar.apiKey" type="string"/>
-            <preference id="pref-semantic" name="extensions.zotero.toolsbox.semanticScholar.apiKey" type="string"/>
-            <preference id="pref-customApi" name="extensions.zotero.toolsbox.customExternalAPI.enabled" type="bool"/>
-        </preferences>
-
-        <groupbox>
-            <caption label="External API Configuration"/>
-            <description>Configure API keys for external services.</description>
-            <hbox align="center">
-                <label value="EasyScholar API Key:"/>
-                <textbox preference="pref-easyscholar" type="password" width="300"/>
-            </hbox>
-            <hbox align="center">
-                <label value="Semantic Scholar API Key:"/>
-                <textbox preference="pref-semantic" type="password" width="300"/>
-            </hbox>
-            <checkbox preference="pref-customApi" label="Enable Custom External API"/>
-        </groupbox>
-    </prefpane>
-
-</prefwindow>
+  <groupbox class="cleanroom-pref-section">
+    <caption id="cleanroom-pref-workbench-section" data-l10n-id="cleanroom-pref-workbench-section" />
+    <vbox class="cleanroom-pref-section-body">
+      <description
+        id="cleanroom-pref-workbench-hint"
+        class="cleanroom-pref-hint"
+        data-l10n-id="cleanroom-pref-workbench-hint"
+      />
+      <checkbox
+        id="cleanroom-workbench-graph"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-workbench-graph"
+        preference="pref-workbench-graph-enabled"
+      />
+      <checkbox
+        id="cleanroom-workbench-matrix"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-workbench-matrix"
+        preference="pref-workbench-matrix-enabled"
+      />
+      <checkbox
+        id="cleanroom-workbench-notes"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-workbench-notes"
+        preference="pref-workbench-notes-enabled"
+      />
+      <checkbox
+        id="cleanroom-workbench-tabs"
+        class="cleanroom-pref-checkbox"
+        data-l10n-id="cleanroom-pref-workbench-tabs"
+        preference="pref-workbench-tabs-enabled"
+      />
+    </vbox>
+  </groupbox>
+</vbox>

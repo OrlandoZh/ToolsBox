@@ -7,10 +7,22 @@ export function createFavoriteCollections(options) {
   const Zotero = zotero || globalThis.Zotero;
 
   const PREF_KEY = 'favoriteCollections';
+  const OWNER = 'toolsbox-favorite-collections';
+  let observerID = null;
+  let collectionTree = null;
+  let dblClickHandler = null;
+  let registered = false;
 
   function getFavorites() {
     if (!prefs) return [];
-    return prefs.get(PREF_KEY) || [];
+    const value = prefs.get(PREF_KEY) || [];
+    if (Array.isArray(value)) {
+      return value;
+    }
+    if (typeof value === 'string' && value.trim()) {
+      return value.split(',').map((entry) => Number(entry.trim())).filter(Number.isFinite);
+    }
+    return [];
   }
 
   function addToFavorites(collectionID) {
@@ -51,19 +63,28 @@ export function createFavoriteCollections(options) {
     if (!mainWindow) return;
 
     const favorites = getFavorites();
-    const collectionTree = mainWindow.document.getElementById('zotero-collections-tree');
-    if (!collectionTree) return;
+    const activeCollectionTree = mainWindow.document?.getElementById?.('zotero-collections-tree');
+    if (!activeCollectionTree) return;
 
-    const rows = collectionTree.querySelectorAll('.tree-row');
+    const rows = activeCollectionTree.querySelectorAll?.('.tree-row') || [];
     rows.forEach(row => {
       const collectionID = parseInt(row.dataset?.id);
       if (favorites.includes(collectionID)) {
         row.classList.add('favorite-collection');
         row.style.fontWeight = 'bold';
+        if (row.dataset) {
+          row.dataset.toolsboxFavoriteCollection = 'true';
+        }
 
-        if (!row.querySelector('.favorite-icon')) {
+        if (!row.querySelector?.(`.favorite-icon[data-toolsbox-owner="${OWNER}"]`)) {
           const icon = mainWindow.document.createElement('span');
           icon.className = 'favorite-icon';
+          if (icon.dataset) {
+            icon.dataset.toolsboxOwner = OWNER;
+          }
+          if (typeof icon.setAttribute === 'function') {
+            icon.setAttribute('data-toolsbox-owner', OWNER);
+          }
           icon.textContent = '⭐';
           icon.style.marginRight = '4px';
           row.insertBefore(icon, row.firstChild);
@@ -71,7 +92,10 @@ export function createFavoriteCollections(options) {
       } else {
         row.classList.remove('favorite-collection');
         row.style.fontWeight = '';
-        const icon = row.querySelector('.favorite-icon');
+        if (row.dataset) {
+          delete row.dataset.toolsboxFavoriteCollection;
+        }
+        const icon = row.querySelector?.(`.favorite-icon[data-toolsbox-owner="${OWNER}"]`) || row.querySelector?.('.favorite-icon');
         if (icon) icon.remove();
       }
     });
@@ -81,7 +105,7 @@ export function createFavoriteCollections(options) {
     );
 
     favoriteRows.forEach(row => {
-      collectionTree.insertBefore(row, collectionTree.firstChild);
+      activeCollectionTree.insertBefore(row, activeCollectionTree.firstChild);
     });
 
     logger.debug('favoriteCollections.treeUpdated', { count: favorites.length });
@@ -89,51 +113,95 @@ export function createFavoriteCollections(options) {
 
   function addContextMenu() {
     const mainWindow = Zotero?.getMainWindow();
-    if (!mainWindow) return;
+    if (!mainWindow) return false;
 
-    const collectionTree = mainWindow.document.getElementById('zotero-collections-tree');
-    if (!collectionTree) return;
+    collectionTree = mainWindow.document?.getElementById?.('zotero-collections-tree');
+    if (!collectionTree?.addEventListener) {
+      logger?.warn?.('favoriteCollections.listener.skipped', { reason: 'Collection tree not available' });
+      return false;
+    }
 
-    collectionTree.addEventListener('contextmenu', (e) => {
-      const row = e.target.closest('.tree-row');
+    dblClickHandler = (e) => {
+      const row = e.target?.closest?.('.tree-row');
       if (!row) return;
 
       const collectionID = parseInt(row.dataset?.id);
-
-      const isFav = isFavorite(collectionID);
-      const label = isFav
-        ? i18n.t('toolsbox-collection-remove-favorite', 'Remove from Favorites')
-        : i18n.t('toolsbox-collection-add-favorite', 'Add to Favorites');
-
-      row.addEventListener('dblclick', () => {
+      if (Number.isFinite(collectionID)) {
         toggleFavorite(collectionID);
-      }, { once: true });
-    });
+      }
+    };
+    collectionTree.addEventListener('dblclick', dblClickHandler);
+    return true;
   }
 
   function register() {
     if (!Zotero || !Zotero.Collections) {
-      logger.error('favoriteCollections.register.failed', { reason: 'Collections API not available' });
+      logger.warn?.('favoriteCollections.register.skipped', { reason: 'Collections API not available' });
       return false;
+    }
+
+    if (registered) {
+      updateCollectionTree();
+      return true;
     }
 
     updateCollectionTree();
     addContextMenu();
 
-    Zotero.Notifier.registerObserver({
-      notify: (event, type, ids) => {
-        if (type === 'collection') {
-          updateCollectionTree();
+    if (Zotero.Notifier?.registerObserver) {
+      observerID = Zotero.Notifier.registerObserver({
+        notify: (event, type, ids) => {
+          if (type === 'collection') {
+            updateCollectionTree();
+          }
         }
-      }
-    }, ['collection'], 'toolsbox-favorite-collections');
+      }, ['collection'], 'toolsbox-favorite-collections') || 'toolsbox-favorite-collections';
+    } else {
+      logger.warn?.('favoriteCollections.notifier.skipped', { reason: 'Notifier API not available' });
+    }
 
+    registered = true;
     logger.debug('favoriteCollections.registered');
     return true;
   }
 
+  function destroy() {
+    if (collectionTree && dblClickHandler && typeof collectionTree.removeEventListener === 'function') {
+      collectionTree.removeEventListener('dblclick', dblClickHandler);
+    }
+    if (observerID && Zotero?.Notifier?.unregisterObserver) {
+      Zotero.Notifier.unregisterObserver(observerID);
+    }
+    const mainWindow = Zotero?.getMainWindow?.();
+    const activeCollectionTree = mainWindow?.document?.getElementById?.('zotero-collections-tree');
+    const rows = activeCollectionTree?.querySelectorAll?.('.tree-row') || [];
+    rows.forEach((row) => {
+      row.classList?.remove?.('favorite-collection');
+      if (row.style) {
+        row.style.fontWeight = '';
+      }
+      if (row.dataset) {
+        delete row.dataset.toolsboxFavoriteCollection;
+      }
+      const icon = row.querySelector?.(`.favorite-icon[data-toolsbox-owner="${OWNER}"]`) || row.querySelector?.('.favorite-icon');
+      if (icon) {
+        if (typeof icon.remove === 'function') {
+          icon.remove();
+        } else if (icon.parentNode?.removeChild) {
+          icon.parentNode.removeChild(icon);
+        }
+      }
+    });
+    observerID = null;
+    collectionTree = null;
+    dblClickHandler = null;
+    registered = false;
+    logger?.debug?.('favoriteCollections.destroyed');
+  }
+
   return {
     register,
+    destroy,
     addToFavorites,
     removeFromFavorites,
     isFavorite,

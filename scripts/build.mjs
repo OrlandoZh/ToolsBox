@@ -541,6 +541,12 @@ const PROTECTED_SOURCE_LITERAL_REPLACEMENTS = Object.freeze({
     ["ToolsBox", "Tool"],
     ["tab-helper", "w3"],
   ]),
+  "features/margin-annotation.js": Object.freeze([
+    ["marginAnnotation.reader.opened", "feature.r0"],
+  ]),
+  "features/pdf-background-color.js": Object.freeze([
+    ["pdfBackground.reader.opened", "feature.r1"],
+  ]),
   "../dev/agent-runtime/host-actions.js": Object.freeze([
     ["reader.openReader", "reader.r0"],
   ]),
@@ -888,6 +894,23 @@ function preferencePlaceholderToken(key) {
     .toUpperCase()}_NAME__`;
 }
 
+function preferenceElementID(key) {
+  return `pref-${String(key || "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase()}`;
+}
+
+function preferenceElementType(value) {
+  if (typeof value === "boolean") {
+    return "bool";
+  }
+  if (typeof value === "number" && Number.isInteger(value)) {
+    return "int";
+  }
+  return "string";
+}
+
 function buildPreferencePlaceholderNameMap(surfaceDescriptors = null, config = {}) {
   const paneScope = String(surfaceDescriptors?.preferencePaneID || "").trim() || "crp0";
   const prefsPrefix = `extensions.zotero.${paneScope}`;
@@ -919,6 +942,25 @@ function patchPreferences(
     .replaceAll("__PREFERENCE_ROOT_ID__", surfaceDescriptors.preferenceRootID);
   for (const [key, name] of Object.entries(prefNames)) {
     patched = patched.replaceAll(preferencePlaceholderToken(key), name);
+  }
+  const defaultPrefs = {
+    enabled: config.defaultPrefs?.enabled,
+    menuLabel: config.defaultPrefs?.menuLabel,
+    logLevel: config.defaultPrefs?.logLevel,
+    themeMode: config.defaultPrefs?.themeMode,
+    ...(config.defaultPrefs || {}),
+  };
+  const missingPreferenceElements = Object.entries(prefNames)
+    .filter(([, name]) => !patched.includes(name))
+    .map(([key, name]) => {
+      const value = defaultPrefs[key];
+      return `    <preference id="${escapeXHTML(preferenceElementID(key))}" name="${escapeXHTML(name)}" type="${preferenceElementType(value)}" />`;
+    });
+  if (missingPreferenceElements.length > 0) {
+    patched = patched.replace(
+      /(\s*<\/preferences>)/u,
+      `\n${missingPreferenceElements.join("\n")}$1`,
+    );
   }
   return patched;
 }

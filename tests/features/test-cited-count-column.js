@@ -3,7 +3,7 @@
  * Task 1 of P0 features plan - renderCell fix
  */
 
-import { describe, it, assert, runTests } from "../test-framework.js";
+import { describe, it, assert, runTestsIfMain } from "../test-framework.js";
 import { createCitedCountColumn } from "../../src/features/cited-count-column.js";
 import { createSemanticScholarClient } from "../../src/services/semantic-scholar-client.js";
 
@@ -303,4 +303,4 @@ describe("SemanticScholarClient", () => {
   });
 });
 
-runTests();
+await runTestsIfMain(import.meta.url);

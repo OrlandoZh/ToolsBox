@@ -28,6 +28,8 @@ import { createAnnotationColors } from "../features/annotation-colors.js";
 import { createOpenAIClient } from "../services/openai-client.js";
 import { createAIGenerateTags } from "../features/ai-generate-tags.js";
 import { createAIGenerateRemark } from "../features/ai-generate-remark.js";
+import { createBacklinks } from "../features/backlinks.js";
+import { createMergeAnnotations } from "../features/merge-annotations.js";
 
 const PREFERENCE_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
 const PREFERENCE_INIT_API_KEY = "initCleanroomPreferences";
@@ -70,16 +72,19 @@ export function createFeatureComposer({
   itemTree,
   itemPane,
   notifier,
+  zotero = null,
   getPrimaryWindow,
   runPrimaryAction,
   surfaceDescriptors = null,
 }) {
+  const ZoteroAPI = zotero || globalThis.Zotero;
   const copy = createCopyFallbacks();
   const descriptors = surfaceDescriptors && typeof surfaceDescriptors === "object"
     ? surfaceDescriptors
     : createSurfaceDescriptors(config);
   let baselineReady = false;
   let baselineCleanupTracked = false;
+  const prototypeCleanups = [];
 
   function isFeatureAPIAvailable(manager) {
     return !manager
@@ -98,6 +103,27 @@ export function createFeatureComposer({
       .map(([name]) => name);
   }
 
+  function getPreferenceValue(key) {
+    const value = prefs?.get?.(key);
+    return value === null || value === undefined || value === "undefined" ? undefined : value;
+  }
+
+  function isPreferenceEnabled(primaryKey, { legacyKeys = [], defaultValue = true } = {}) {
+    const primaryValue = getPreferenceValue(primaryKey);
+    if (primaryValue !== undefined) {
+      return primaryValue !== false;
+    }
+
+    for (const legacyKey of legacyKeys) {
+      const legacyValue = getPreferenceValue(legacyKey);
+      if (legacyValue !== undefined) {
+        return legacyValue !== false;
+      }
+    }
+
+    return defaultValue;
+  }
+
   async function waitForBaselineHostAPIs() {
     const deadline = Date.now() + BASELINE_HOST_API_TIMEOUT_MS;
     let missing = collectMissingBaselineHostAPIs();
@@ -113,10 +139,16 @@ export function createFeatureComposer({
   function assertBaselineRegistrationComplete() {
     const missing = [];
     const workflowPaneID = `${config.addonRef || "toolsbox"}-workflow`;
+    const workflowItemPanePref = getPreferenceValue("researchWorkflow.itemPane.enabled");
     if (typeof preferencePanes?.hasPane === "function" && !preferencePanes.hasPane(descriptors.preferencePaneID)) {
       missing.push("preference pane");
     }
-    if (typeof itemPane?.hasSection === "function" && !itemPane.hasSection(workflowPaneID)) {
+    if (
+      workflowItemPanePref !== undefined
+      && workflowItemPanePref !== false
+      && typeof itemPane?.hasSection === "function"
+      && !itemPane.hasSection(workflowPaneID)
+    ) {
       missing.push("workflow item pane section");
     }
     if (typeof itemTree?.getColumnCount === "function" && itemTree.getColumnCount() <= 0) {
@@ -140,6 +172,30 @@ export function createFeatureComposer({
       return Services.scriptloader;
     }
     return null;
+  }
+
+  function trackPrototypeCleanup(feature, label) {
+    const cleanup = typeof feature?.destroy === "function"
+      ? () => feature.destroy()
+      : (typeof feature?.cleanup === "function" ? () => feature.cleanup() : null);
+    if (!cleanup) {
+      return;
+    }
+    prototypeCleanups.push({ label, cleanup });
+  }
+
+  function cleanupRegisteredPrototypes() {
+    while (prototypeCleanups.length > 0) {
+      const entry = prototypeCleanups.pop();
+      try {
+        entry.cleanup();
+      } catch (error) {
+        logger?.warn?.("features.prototype.cleanup.failed", {
+          feature: entry.label,
+          error: error?.message || String(error),
+        });
+      }
+    }
   }
 
   async function registerBaselineFeatures() {
@@ -278,33 +334,65 @@ export function createFeatureComposer({
         surfaceDescriptors: descriptors,
       });
 
-      if (prefs.get("citedCountColumn.enabled") !== false) {
+      if (isPreferenceEnabled("citedCountColumn.enabled", { defaultValue: false })) {
         const citedCountColumn = createCitedCountColumn({
           logger,
           i18n,
-          zotero: Zotero
+          zotero: ZoteroAPI
         });
         if (citedCountColumn.register()) {
+          trackPrototypeCleanup(citedCountColumn, "citedCountColumn");
           logger.info("features.citedCountColumn.registered");
         }
       }
 
-      if (prefs.get("attachmentPreview.enabled") !== false) {
+      if (isPreferenceEnabled("attachmentPreview.enabled", { defaultValue: false })) {
         const attachmentPreview = createAttachmentPreview({
           logger,
           i18n,
-          zotero: Zotero
+          zotero: ZoteroAPI
         });
         if (attachmentPreview.register()) {
+          trackPrototypeCleanup(attachmentPreview, "attachmentPreview");
           logger.info("features.attachmentPreview.registered");
         }
       }
 
-      if (prefs.get("annotationManager.enabled") !== false) {
+      if (isPreferenceEnabled("backlinks.enabled", { defaultValue: false })) {
+        const backlinks = createBacklinks({
+          logger,
+          i18n,
+          zotero: ZoteroAPI,
+          itemPane,
+          host
+        });
+
+        if (backlinks.register()) {
+          trackPrototypeCleanup(backlinks, "backlinks");
+          logger.info("features.backlinks.registered");
+        }
+      }
+
+      if (isPreferenceEnabled("mergeAnnotations.enabled", { defaultValue: false })) {
+        const mergeAnnotations = createMergeAnnotations({
+          logger,
+          i18n,
+          zotero: ZoteroAPI,
+          reader,
+          itemPane
+        });
+
+        if (mergeAnnotations.register()) {
+          trackPrototypeCleanup(mergeAnnotations, "mergeAnnotations");
+          logger.info("features.mergeAnnotations.registered");
+        }
+      }
+
+      if (isPreferenceEnabled("annotationManager.enabled", { defaultValue: false })) {
         const annotationManager = createAnnotationManager({
           logger,
           i18n,
-          zotero: Zotero
+          zotero: ZoteroAPI
         });
 
         if (menuManager.isOfficialAPIAvailable()) {
@@ -320,10 +408,10 @@ export function createFeatureComposer({
         logger.info("features.annotationManager.registered");
       }
 
-      if (prefs.get("sidebarToggle.enabled") !== false) {
+      if (isPreferenceEnabled("sidebarToggle.enabled", { defaultValue: false })) {
         const sidebarToggle = createSidebarToggle({
           logger,
-          zotero: Zotero
+          zotero: ZoteroAPI
         });
 
         if (sidebarToggle.register()) {
@@ -331,11 +419,11 @@ export function createFeatureComposer({
         }
       }
 
-      if (prefs.get("tabManager.enabled") !== false) {
+      if (isPreferenceEnabled("tabManager.enabled", { defaultValue: false })) {
         const tabManager = createTabManagerPanel({
           logger,
           i18n,
-          zotero: Zotero
+          zotero: ZoteroAPI
         });
 
         if (menuManager.isOfficialAPIAvailable()) {
@@ -351,49 +439,52 @@ export function createFeatureComposer({
         logger.info("features.tabManager.registered");
       }
 
-      if (prefs.get("collectionItemCount.enabled") !== false) {
+      if (isPreferenceEnabled("collectionItemCount.enabled", { defaultValue: false })) {
         const collectionItemCount = createCollectionItemCount({
           logger,
           i18n,
-          zotero: Zotero
+          zotero: ZoteroAPI
         });
 
         if (collectionItemCount.register()) {
+          trackPrototypeCleanup(collectionItemCount, "collectionItemCount");
           logger.info("features.collectionItemCount.registered");
         }
       }
 
-      if (prefs.get("collectionSort.enabled") !== false) {
+      if (isPreferenceEnabled("collectionSort.enabled", { defaultValue: false })) {
         const collectionSort = createCollectionSort({
           logger,
           i18n,
-          zotero: Zotero,
+          zotero: ZoteroAPI,
           prefs
         });
 
         if (collectionSort.register()) {
+          trackPrototypeCleanup(collectionSort, "collectionSort");
           logger.info("features.collectionSort.registered");
         }
       }
 
-      if (prefs.get("favoriteCollections.enabled") !== false) {
+      if (isPreferenceEnabled("favoriteCollections.enabled", { defaultValue: false })) {
         const favoriteCollections = createFavoriteCollections({
           logger,
           i18n,
-          zotero: Zotero,
+          zotero: ZoteroAPI,
           prefs
         });
 
         if (favoriteCollections.register()) {
+          trackPrototypeCleanup(favoriteCollections, "favoriteCollections");
           logger.info("features.favoriteCollections.registered");
         }
       }
 
-      if (prefs.get("readTimeColumn.enabled") !== false) {
+      if (isPreferenceEnabled("readTimeColumn.enabled", { defaultValue: false })) {
         const readingTimeColumn = createReadingTimeColumn({
           logger,
           i18n,
-          zotero: Zotero,
+          zotero: ZoteroAPI,
           prefs
         });
 
@@ -402,11 +493,14 @@ export function createFeatureComposer({
         }
       }
 
-      if (prefs.get("annotationColumn.enabled") !== false) {
+      if (isPreferenceEnabled("annotationColumn.enabled", {
+        legacyKeys: ["annotationDistributionColumn.enabled"],
+        defaultValue: false,
+      })) {
         const annotationColumn = createAnnotationColumn({
           logger,
           i18n,
-          zotero: Zotero,
+          zotero: ZoteroAPI,
           prefs
         });
 
@@ -415,11 +509,11 @@ export function createFeatureComposer({
         }
       }
 
-      if (prefs.get("publicationTagsColumn.enabled") !== false) {
+      if (isPreferenceEnabled("publicationTagsColumn.enabled", { defaultValue: false })) {
         const publicationTagsColumn = createPublicationTagsColumn({
           logger,
           i18n,
-          zotero: Zotero,
+          zotero: ZoteroAPI,
           prefs
         });
 
@@ -428,11 +522,11 @@ export function createFeatureComposer({
         }
       }
 
-      if (prefs.get("titleColumnEnhanced.enabled") !== false) {
+      if (isPreferenceEnabled("titleColumnEnhanced.enabled", { defaultValue: false })) {
         const titleColumnEnhanced = createTitleColumnEnhanced({
           logger,
           i18n,
-          zotero: Zotero,
+          zotero: ZoteroAPI,
           prefs
         });
 
@@ -441,7 +535,7 @@ export function createFeatureComposer({
         }
       }
 
-      if (prefs.get("ifColumn.enabled") !== false) {
+      if (isPreferenceEnabled("ifColumn.enabled", { defaultValue: false })) {
         const easyscholarClient = createEasyScholarClient({
           apiKey: prefs.get("easyscholar.apiKey") || "",
           timeout: 5000,
@@ -452,7 +546,7 @@ export function createFeatureComposer({
         const ifColumn = createIFColumn({
           logger,
           i18n,
-          zotero: Zotero,
+          zotero: ZoteroAPI,
           prefs,
           easyscholarClient
         });
@@ -462,37 +556,39 @@ export function createFeatureComposer({
         }
       }
 
-      if (prefs.get("marginAnnotation.enabled") !== false) {
+      if (isPreferenceEnabled("marginAnnotation.enabled", { defaultValue: false })) {
         const marginAnnotation = createMarginAnnotation({
           logger,
           i18n,
-          zotero: Zotero,
+          zotero: ZoteroAPI,
           prefs
         });
 
         if (marginAnnotation.register()) {
+          trackPrototypeCleanup(marginAnnotation, "marginAnnotation");
           logger.info("features.marginAnnotation.registered");
         }
       }
 
-      if (prefs.get("pdfBackground.enabled") !== false) {
+      if (isPreferenceEnabled("pdfBackground.enabled", { defaultValue: false })) {
         const pdfBackgroundColor = createPDFBackgroundColor({
           logger,
           i18n,
-          zotero: Zotero,
+          zotero: ZoteroAPI,
           prefs
         });
 
         if (pdfBackgroundColor.register()) {
+          trackPrototypeCleanup(pdfBackgroundColor, "pdfBackgroundColor");
           logger.info("features.pdfBackgroundColor.registered");
         }
       }
 
-      if (prefs.get("graphView.enabled") !== false) {
+      if (isPreferenceEnabled("graphView.enabled", { defaultValue: false })) {
         const graphViewEnhanced = createGraphViewEnhanced({
           logger,
           i18n,
-          zotero: Zotero,
+          zotero: ZoteroAPI,
           prefs
         });
 
@@ -501,11 +597,11 @@ export function createFeatureComposer({
         }
       }
 
-      if (prefs.get("viewGroups.enabled") !== false) {
+      if (isPreferenceEnabled("viewGroups.enabled", { defaultValue: false })) {
         const viewGroups = createViewGroups({
           logger,
           i18n,
-          zotero: Zotero,
+          zotero: ZoteroAPI,
           prefs
         });
 
@@ -514,10 +610,10 @@ export function createFeatureComposer({
         }
       }
 
-      if (prefs.get("annotationColors.enabled") !== false) {
+      if (isPreferenceEnabled("annotationColors.enabled", { defaultValue: false })) {
         const annotationColors = createAnnotationColors({
           logger,
-          zotero: Zotero
+          zotero: ZoteroAPI
         });
 
         if (annotationColors.register()) {
@@ -525,7 +621,7 @@ export function createFeatureComposer({
         }
       }
 
-      if (prefs.get("aiGenerateTags.enabled") !== false) {
+      if (isPreferenceEnabled("aiGenerateTags.enabled", { defaultValue: false })) {
         const openaiClient = createOpenAIClient({
           apiKey: prefs.get("openai.apiKey") || "",
           baseUrl: prefs.get("openai.baseUrl"),
@@ -536,7 +632,7 @@ export function createFeatureComposer({
 
         const aiGenerateTags = createAIGenerateTags({
           logger,
-          zotero: Zotero,
+          zotero: ZoteroAPI,
           prefs,
           client: openaiClient
         });
@@ -546,7 +642,7 @@ export function createFeatureComposer({
         }
       }
 
-      if (prefs.get("aiGenerateRemark.enabled") !== false) {
+      if (isPreferenceEnabled("aiGenerateRemark.enabled", { defaultValue: false })) {
         const openaiClient = createOpenAIClient({
           apiKey: prefs.get("openai.apiKey") || "",
           baseUrl: prefs.get("openai.baseUrl"),
@@ -557,7 +653,7 @@ export function createFeatureComposer({
 
         const aiGenerateRemark = createAIGenerateRemark({
           logger,
-          zotero: Zotero,
+          zotero: ZoteroAPI,
           prefs,
           client: openaiClient
         });
@@ -570,6 +666,7 @@ export function createFeatureComposer({
       if (!baselineCleanupTracked && lifecycle && typeof lifecycle.trackCleanup === "function") {
         baselineCleanupTracked = true;
         lifecycle.trackCleanup(() => {
+          cleanupRegisteredPrototypes();
           baselineReady = false;
           baselineCleanupTracked = false;
         });
@@ -588,6 +685,7 @@ export function createFeatureComposer({
       });
     }
     catch (error) {
+      cleanupRegisteredPrototypes();
       baselineReady = false;
       throw error;
     }
@@ -597,4 +695,3 @@ export function createFeatureComposer({
     registerBaselineFeatures,
   };
 }
-

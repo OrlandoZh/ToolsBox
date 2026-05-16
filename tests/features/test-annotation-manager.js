@@ -3,7 +3,7 @@
  * Task 3 of P0 features plan
  */
 
-import { describe, it, assert, runTests } from "../test-framework.js";
+import { describe, it, assert, runTestsIfMain } from "../test-framework.js";
 import { createAnnotationManager } from "../../src/features/annotation-manager.js";
 
 // Mock dependencies
@@ -131,5 +131,5 @@ describe("AnnotationManager", () => {
   });
 });
 
-// Run all tests
-runTests();
+// Run all tests when this file is executed directly.
+await runTestsIfMain(import.meta.url);

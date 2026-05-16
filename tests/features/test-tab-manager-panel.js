@@ -3,7 +3,7 @@
  * Task 5 of P0 features plan
  */
 
-import { describe, it, assert, runTests } from "../test-framework.js";
+import { describe, it, assert, runTestsIfMain } from "../test-framework.js";
 import { createTabManagerPanel } from "../../src/features/tab-manager-panel.js";
 
 // Mock dependencies
@@ -351,5 +351,5 @@ describe("TabManagerPanel", () => {
   });
 });
 
-// Run all tests
-runTests();
+// Run all tests when this file is executed directly.
+await runTestsIfMain(import.meta.url);

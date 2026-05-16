@@ -3,7 +3,7 @@
  * Task 1 of P1 ItemTree columns plan
  */
 
-import { describe, it, assert, runTests } from "../test-framework.js";
+import { describe, it, assert, runTestsIfMain } from "../test-framework.js";
 import { createReadingTimeColumn } from "../../src/features/reading-time-column.js";
 
 function createMockLogger() {
@@ -370,4 +370,4 @@ describe("ReadingTimeColumn", () => {
   });
 });
 
-runTests();
+await runTestsIfMain(import.meta.url);

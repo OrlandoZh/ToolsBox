@@ -3,7 +3,7 @@
  * Task 2 of P1 collection features plan
  */
 
-import { describe, it, assert, runTests } from "../test-framework.js";
+import { describe, it, assert, runTestsIfMain } from "../test-framework.js";
 import { createCollectionSort } from "../../src/features/collection-sort.js";
 
 // Mock dependencies
@@ -195,10 +195,110 @@ describe("CollectionSort", () => {
     assert.equal(result, false, "register() should return false when Collections API unavailable");
 
     const logs = mockLogger.getLogs();
-    const errorLog = logs.find(l => l.level === 'error');
-    assert.ok(errorLog, "Should log error when register fails");
+    const warnLog = logs.find(l => l.level === 'warn');
+    assert.ok(warnLog, "Should warn when register skips");
+  });
+
+  it("should avoid duplicate sort buttons and destroy owned button", () => {
+    const buttons = [];
+    const parent = {
+      style: {},
+      children: [],
+      appendChild(child) {
+        this.children.push(child);
+        child.parentNode = this;
+      },
+      removeChild(child) {
+        this.children = this.children.filter((item) => item !== child);
+        child.parentNode = null;
+      }
+    };
+    const collectionTree = {
+      parentElement: parent,
+      querySelectorAll() {
+        return [];
+      }
+    };
+    const document = {
+      getElementById(id) {
+        if (id === 'toolsbox-collection-sort-button') {
+          return buttons.find((button) => !button.removed) || null;
+        }
+        return collectionTree;
+      },
+      createElement(tagName) {
+        const listeners = new Map();
+        const button = {
+          tagName,
+          id: '',
+          className: '',
+          dataset: {},
+          style: {},
+          textContent: '',
+          parentNode: null,
+          setAttribute(name, value) {
+            this.attributes = this.attributes || {};
+            this.attributes[name] = value;
+          },
+          addEventListener(type, handler) {
+            listeners.set(type, handler);
+          },
+          removeEventListener(type, handler) {
+            if (listeners.get(type) === handler) {
+              listeners.delete(type);
+            }
+          },
+          remove() {
+            this.removed = true;
+            if (this.parentNode) {
+              this.parentNode.removeChild(this);
+            }
+          },
+          getListenerCount() {
+            return listeners.size;
+          }
+        };
+        buttons.push(button);
+        return button;
+      }
+    };
+    const sorter = createCollectionSort({
+      logger: createMockLogger(),
+      i18n: createMockI18n(),
+      prefs: createMockPrefs(),
+      zotero: {
+        Collections: {
+          getByLibrary() {
+            return [];
+          }
+        },
+        Libraries: {
+          userLibraryID: 1
+        },
+        getMainWindow() {
+          return {
+            document,
+            prompt() {
+              return null;
+            }
+          };
+        }
+      }
+    });
+
+    assert.equal(sorter.register(), true);
+    assert.equal(sorter.register(), true);
+    assert.equal(buttons.length, 1, "should create one sort button");
+    assert.equal(parent.children.length, 1, "parent should contain one sort button");
+    assert.equal(buttons[0].dataset.toolsboxOwner, 'toolsbox-collection-sort');
+
+    sorter.destroy();
+    sorter.destroy();
+
+    assert.equal(parent.children.length, 0, "destroy should remove sort button");
+    assert.equal(buttons[0].getListenerCount(), 0, "destroy should remove click listener");
   });
 });
 
-// Run all tests
-runTests();
+// Run all tests when this file is executed directly.
+await runTestsIfMain(import.meta.url);

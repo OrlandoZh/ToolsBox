@@ -126,7 +126,92 @@ Scenario flags:
   --list-scenarios          Load and list matching scenarios without executing them
   --scenario <pattern>      Filter by scenario name (substring or glob)
   --scenario-file <pattern> Filter by scenario file path (substring or glob)
+  --addon-pref <key=value>  Set a known add-on preference in the isolated scenario profile
 `);
+}
+
+export function parseAddonPrefValue(rawValue) {
+  const value = String(rawValue ?? "").trim();
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+  if (/^-?\d+(?:\.\d+)?$/u.test(value)) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+      return numeric;
+    }
+  }
+  return value;
+}
+
+export function parseAddonPrefAssignment(rawAssignment) {
+  const assignment = String(rawAssignment ?? "").trim();
+  const separatorIndex = assignment.indexOf("=");
+  if (separatorIndex < 1) {
+    throw createScriptError("args", "--addon-pref requires key=value", {
+      failedStage: "parse-args",
+    });
+  }
+
+  const key = assignment.slice(0, separatorIndex).trim();
+  if (!key) {
+    throw createScriptError("args", "--addon-pref requires a non-empty key", {
+      failedStage: "parse-args",
+    });
+  }
+
+  return {
+    key,
+    value: parseAddonPrefValue(assignment.slice(separatorIndex + 1)),
+  };
+}
+
+export function buildAddonPrefUserPrefs(config, addonPrefs = []) {
+  const entries = Array.isArray(addonPrefs) ? addonPrefs : [];
+  if (entries.length === 0) {
+    return {};
+  }
+
+  const prefsPrefix = String(config?.prefsPrefix || "").trim();
+  const defaultPrefs = config?.defaultPrefs && typeof config.defaultPrefs === "object"
+    ? config.defaultPrefs
+    : {};
+  if (!prefsPrefix) {
+    throw createScriptError("args", "--addon-pref requires config.prefsPrefix", {
+      failedStage: "prepare-runtime",
+    });
+  }
+
+  const userPrefs = {};
+  for (const entry of entries) {
+    const parsed = entry && typeof entry === "object"
+      ? entry
+      : parseAddonPrefAssignment(entry);
+    const key = String(parsed?.key || "").trim();
+    if (!Object.prototype.hasOwnProperty.call(defaultPrefs, key)) {
+      throw createScriptError("args", `Unknown add-on preference for --addon-pref: ${key}`, {
+        failedStage: "prepare-runtime",
+        details: { key },
+      });
+    }
+
+    const defaultType = typeof defaultPrefs[key];
+    if (!["boolean", "number", "string"].includes(defaultType)) {
+      throw createScriptError("args", `Unsupported add-on preference type for --addon-pref: ${key}`, {
+        failedStage: "prepare-runtime",
+        details: {
+          key,
+          defaultType,
+        },
+      });
+    }
+
+    userPrefs[`${prefsPrefix}.${key}`] = parsed.value;
+  }
+  return userPrefs;
 }
 
 export function parseCli(argv) {
@@ -151,6 +236,7 @@ export function parseCli(argv) {
     listScenarios: false,
     scenarioPattern: null,
     scenarioFilePattern: null,
+    addonPrefs: [],
   };
 
   for (let index = 0; index < flags.length; index += 1) {
@@ -195,6 +281,20 @@ export function parseCli(argv) {
         else {
           parsed.scenarioFilePattern = flags[index];
         }
+        break;
+      case "--addon-pref":
+        if (mode !== "scenario") {
+          throw createScriptError("args", `${flag} is only supported in scenario mode`, {
+            failedStage: "parse-args",
+          });
+        }
+        index += 1;
+        if (index >= flags.length) {
+          throw createScriptError("args", `${flag} requires a value`, {
+            failedStage: "parse-args",
+          });
+        }
+        parsed.addonPrefs.push(parseAddonPrefAssignment(flags[index]));
         break;
       default:
         throw createScriptError("args", `Unknown option: ${flag}`, {
@@ -708,6 +808,7 @@ export async function runScenarioMode({
   scenarioPattern = null,
   scenarioFilePattern = null,
   scenarioRuntimeOptions = null,
+  addonPrefs = [],
   quiet = false,
 } = {}) {
   const mode = "scenario";
@@ -740,11 +841,13 @@ export async function runScenarioMode({
       failedStage: "resolve-rdp-port",
     });
   });
+  const addonPrefUserPrefs = buildAddonPrefUserPrefs(config, addonPrefs);
   const runtimeSanitization = await prepareRuntime({
     projectRoot: projectRootPath,
     profilePath: runnerConfig.profilePath,
     dataDir: runnerConfig.dataDir,
     fresh: baseMode.fresh,
+    userPrefs: addonPrefUserPrefs,
   }).catch((error) => {
     throw wrapScriptError(error, {
       failedStage: "prepare-runtime",
@@ -778,6 +881,9 @@ export async function runScenarioMode({
       console.log(`[zotero:${mode}] Package: ${xpiPath}`);
     }
     console.log(`[zotero:${mode}] RDP Port: ${rdpPort}`);
+    if (Object.keys(addonPrefUserPrefs).length > 0) {
+      console.log(`[zotero:${mode}] Add-on Pref Overrides: ${Object.keys(addonPrefUserPrefs).join(", ")}`);
+    }
   }
 
   const processLogs = [];
@@ -878,6 +984,7 @@ export async function main(argv = process.argv.slice(2), options = {}) {
     listScenarios,
     scenarioPattern,
     scenarioFilePattern,
+    addonPrefs,
   } = parseCli(argv);
   const baseMode = MODES[mode];
 
@@ -888,6 +995,7 @@ export async function main(argv = process.argv.slice(2), options = {}) {
       listScenarios,
       scenarioPattern,
       scenarioFilePattern,
+      addonPrefs,
     });
     if (!listScenarios) {
       assertScenarioBatchPassedImpl(scenarioRun.scenarioResult);

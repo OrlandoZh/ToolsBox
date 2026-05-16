@@ -18,6 +18,10 @@ export function createPreferenceStore({ prefBranch, defaults }) {
     const target = prefKey(key);
     const fallback = defaults[key];
 
+    if (fallback === undefined && !Services.prefs.prefHasUserValue(target)) {
+      return undefined;
+    }
+
     if (typeof fallback === "boolean") {
       return Services.prefs.getBoolPref(target, fallback);
     }

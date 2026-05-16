@@ -3,7 +3,7 @@
  * Displays journal ranking badges (SCI, SSCI, IF quartile, etc.)
  */
 
-import { describe, it, assert, runTests } from "../test-framework.js";
+import { describe, it, assert, runTestsIfMain } from "../test-framework.js";
 import { createPublicationTagsColumn } from "../../src/features/publication-tags-column.js";
 
 function createMockLogger() {
@@ -328,4 +328,4 @@ describe("PublicationTagsColumn", () => {
   });
 });
 
-runTests();
+await runTestsIfMain(import.meta.url);

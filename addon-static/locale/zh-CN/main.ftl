@@ -185,6 +185,29 @@ toolsbox-section-attachment-preview = 附件预览
 toolsbox-section-attachment-preview-empty = 无可用附件
 toolsbox-pref-attachment-preview =
     .label = 启用附件预览面板
+# Backlinks
+toolsbox-section-backlinks = 反向链接
+toolsbox-backlinks-count = 本地反向链接
+toolsbox-backlinks-empty = 无本地反向链接
+toolsbox-backlinks-no-item = 未选择条目
+toolsbox-backlinks-loading = 正在加载本地反向链接...
+toolsbox-backlinks-api-unavailable = 反向链接扫描不可用
+toolsbox-backlinks-open-source = 打开来源
+toolsbox-backlinks-open-running = 正在选择来源...
+toolsbox-backlinks-open-success = 已选择来源
+toolsbox-backlinks-open-failed = 无法选择来源
+# Merge Annotations
+toolsbox-section-merge-annotations = 合并批注
+toolsbox-merge-annotations-count = 可合并批注
+toolsbox-merge-annotations-no-item = 未选择条目
+toolsbox-merge-annotations-no-attachments = 无附件批注
+toolsbox-merge-annotations-api-unavailable = 批注 API 不可用
+toolsbox-merge-annotations-no-annotations = 未找到批注
+toolsbox-merge-annotations-no-text = 没有可合并的文本批注
+toolsbox-merge-annotations-write-note = 写入合并笔记
+toolsbox-merge-annotations-write-running = 正在写入合并笔记...
+toolsbox-merge-annotations-write-success = 已写入合并笔记
+toolsbox-merge-annotations-write-failed = 无法写入合并笔记
 # Annotation Manager
 toolsbox-menu-annotation-manager = 批注管理器
 toolsbox-annotation-manager-title = 批注管理器

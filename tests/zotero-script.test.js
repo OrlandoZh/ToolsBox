@@ -2,7 +2,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, it, assert } from "./test-framework.js";
-import { createScenarioLastRunReport, main, parseCli } from "../scripts/zotero.mjs";
+import {
+  buildAddonPrefUserPrefs,
+  createScenarioLastRunReport,
+  main,
+  parseCli,
+} from "../scripts/zotero.mjs";
 import {
   buildScenarioLastRunMarkdown,
   filterRegisteredScenarios,
@@ -25,6 +30,53 @@ describe("Zotero Script", () => {
     assert.equal(parsed.listScenarios, true);
     assert.equal(parsed.scenarioPattern, "menu surface smoke");
     assert.equal(parsed.scenarioFilePattern, "reader-*");
+  });
+
+  it("should parse scenario add-on pref overrides with primitive values", () => {
+    const parsed = parseCli([
+      "scenario",
+      "--addon-pref",
+      "mergeAnnotations.enabled=true",
+      "--addon-pref",
+      "openai.timeout=7500",
+      "--addon-pref",
+      "logLevel=debug",
+    ]);
+
+    assert.deepEqual(parsed.addonPrefs, [
+      { key: "mergeAnnotations.enabled", value: true },
+      { key: "openai.timeout", value: 7500 },
+      { key: "logLevel", value: "debug" },
+    ]);
+    assert.deepEqual(
+      buildAddonPrefUserPrefs({
+        prefsPrefix: "extensions.zotero.toolsbox",
+        defaultPrefs: {
+          "mergeAnnotations.enabled": false,
+          "openai.timeout": 5000,
+          logLevel: "info",
+        },
+      }, parsed.addonPrefs),
+      {
+        "extensions.zotero.toolsbox.mergeAnnotations.enabled": true,
+        "extensions.zotero.toolsbox.openai.timeout": 7500,
+        "extensions.zotero.toolsbox.logLevel": "debug",
+      },
+    );
+  });
+
+  it("should reject unknown scenario add-on pref override keys", () => {
+    assert.throws(
+      () => buildAddonPrefUserPrefs({
+        prefsPrefix: "extensions.zotero.toolsbox",
+        defaultPrefs: {
+          "mergeAnnotations.enabled": false,
+        },
+      }, [
+        { key: "unknown.enabled", value: true },
+      ]),
+      /Unknown add-on preference/,
+    );
   });
 
   it("should reject scenario-only flags outside scenario mode", () => {
@@ -191,6 +243,7 @@ describe("Zotero Script", () => {
         assert.equal(options.listScenarios, false);
         assert.equal(options.scenarioPattern, "wasm kernel probe diagnostics");
         assert.equal(options.scenarioFilePattern, null);
+        assert.deepEqual(options.addonPrefs, []);
         return {
           scenarioResult: {
             failed: 0,

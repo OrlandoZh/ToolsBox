@@ -62,6 +62,119 @@ export function createItemPane(options) {
     return `${rootURI}${normalized}`;
   }
 
+  function isHookProps(value) {
+    return Boolean(
+      value
+      && typeof value === "object"
+      && (
+        Object.prototype.hasOwnProperty.call(value, "body")
+        || Object.prototype.hasOwnProperty.call(value, "doc")
+        || Object.prototype.hasOwnProperty.call(value, "item")
+        || Object.prototype.hasOwnProperty.call(value, "setEnabled")
+      ),
+    );
+  }
+
+  function isBodyCandidate(value) {
+    return Boolean(
+      value
+      && typeof value === "object"
+      && typeof value.appendChild === "function"
+      && !isDocumentCandidate(value),
+    );
+  }
+
+  function isDocumentCandidate(value) {
+    return Boolean(
+      value
+      && typeof value === "object"
+      && typeof value.createElement === "function",
+    );
+  }
+
+  function isItemCandidate(value) {
+    return Boolean(
+      value
+      && typeof value === "object"
+      && value.nodeType === undefined
+      && !isDocumentCandidate(value)
+      && !isBodyCandidate(value)
+      && (
+        typeof value.getField === "function"
+        || typeof value.isAttachment === "function"
+        || typeof value.isNote === "function"
+        || Number.isFinite(value.id)
+      ),
+    );
+  }
+
+  function resolveSelectedItemFromHost() {
+    const paneCandidates = [
+      () => Zotero?.getActiveZoteroPane?.(),
+      () => Zotero?.getMainWindow?.()?.ZoteroPane,
+    ];
+
+    for (const resolvePane of paneCandidates) {
+      try {
+        const pane = resolvePane();
+        if (!pane || typeof pane.getSelectedItems !== "function") {
+          continue;
+        }
+
+        const selectedItems = pane.getSelectedItems();
+        if (Array.isArray(selectedItems)) {
+          const item = selectedItems.find(isItemCandidate);
+          if (item) {
+            return item;
+          }
+        }
+
+        const selectedIDs = pane.getSelectedItems(true);
+        if (Array.isArray(selectedIDs) && selectedIDs.length > 0 && Zotero?.Items?.get) {
+          const item = Zotero.Items.get(selectedIDs[0]);
+          if (isItemCandidate(item)) {
+            return item;
+          }
+        }
+      } catch {}
+    }
+
+    return null;
+  }
+
+  function normalizeSectionHookArgs(args) {
+    const list = Array.from(args || []);
+    const first = list[0];
+    if (isHookProps(first)) {
+      const body = first.body || list.find(isBodyCandidate) || null;
+      const hasItemProp = Object.prototype.hasOwnProperty.call(first, "item");
+      return {
+        ...first,
+        body,
+        doc: first.doc || body?.ownerDocument || list.find(isDocumentCandidate) || null,
+        item: hasItemProp ? first.item : (list.find(isItemCandidate) || resolveSelectedItemFromHost()),
+        setEnabled: typeof first.setEnabled === "function"
+          ? first.setEnabled
+          : list.find((value) => typeof value === "function"),
+      };
+    }
+
+    const body = list.find(isBodyCandidate) || null;
+    return {
+      body,
+      doc: body?.ownerDocument || list.find(isDocumentCandidate) || null,
+      item: list.find(isItemCandidate) || resolveSelectedItemFromHost(),
+      setEnabled: list.find((value) => typeof value === "function"),
+    };
+  }
+
+  function wrapSectionHook(hook) {
+    if (typeof hook !== "function") {
+      return undefined;
+    }
+    return (...args) => hook(normalizeSectionHookArgs(args));
+  }
+
   /**
    * 注册自定义面板 Section
    * @param {Object} sectionOptions - Section 配置
@@ -152,8 +265,9 @@ export function createItemPane(options) {
         }
       }
 
-      // Body XHTML
-      if (bodyXHTML) {
+      // Body XHTML. Zotero uses an explicit empty string as the dynamic-body
+      // signal for sections whose DOM is built entirely in onRender().
+      if (Object.prototype.hasOwnProperty.call(sectionOptions, "bodyXHTML")) {
         config.bodyXHTML = bodyXHTML;
       }
 
@@ -167,13 +281,13 @@ export function createItemPane(options) {
       }
 
       if (typeof onItemChange === "function") {
-        config.onItemChange = onItemChange;
+        config.onItemChange = wrapSectionHook(onItemChange);
       }
 
-      config.onRender = onRender;
+      config.onRender = wrapSectionHook(onRender);
 
       if (typeof onAsyncRender === "function") {
-        config.onAsyncRender = onAsyncRender;
+        config.onAsyncRender = wrapSectionHook(onAsyncRender);
       }
 
       if (typeof onToggle === "function") {

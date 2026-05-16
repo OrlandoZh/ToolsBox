@@ -2,7 +2,7 @@
  * View Groups Tests
  * Tests for column visibility preset management
  */
-import { describe, it, beforeEach, afterEach, assert, runTests } from "../test-framework.js";
+import { describe, it, beforeEach, afterEach, assert, runTestsIfMain } from "../test-framework.js";
 
 // Will import after implementation
 let createViewGroups = null;
@@ -442,4 +442,4 @@ describe("View Groups", () => {
   });
 });
 
-runTests();
+await runTestsIfMain(import.meta.url);

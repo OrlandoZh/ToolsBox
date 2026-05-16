@@ -1,18 +1,35 @@
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function isPluginReady(rdp, instanceKey) {
+  const expression = `Boolean(Zotero[${JSON.stringify(instanceKey)}] && Zotero[${JSON.stringify(instanceKey)}].api)`;
+  return await rdp.evaluateInChrome(expression);
+}
+
 export async function pollPluginReady({
   rdp,
   instanceKey,
   timeoutMs = 15000,
   pollIntervalMs = 250,
+  stableDurationMs = 0,
 }) {
-  const expression = `Boolean(Zotero[${JSON.stringify(instanceKey)}] && Zotero[${JSON.stringify(instanceKey)}].api)`;
   const deadline = Date.now() + timeoutMs;
+  const stableDelay = Math.max(0, Number(stableDurationMs || 0));
 
   while (Date.now() < deadline) {
-    const ready = await rdp.evaluateInChrome(expression);
+    const ready = await isPluginReady(rdp, instanceKey);
     if (ready === true) {
+      if (stableDelay > 0) {
+        await sleep(stableDelay);
+        const stillReady = await isPluginReady(rdp, instanceKey);
+        if (stillReady !== true) {
+          return false;
+        }
+      }
       return true;
     }
-    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    await sleep(pollIntervalMs);
   }
 
   return false;
@@ -22,6 +39,7 @@ export async function ensurePluginReady({ rdp, config }) {
   const ready = await pollPluginReady({
     rdp,
     instanceKey: config.instanceKey,
+    stableDurationMs: 900,
   });
   if (ready) {
     return { mode: "native" };
@@ -33,6 +51,7 @@ export async function ensurePluginReady({ rdp, config }) {
       rdp,
       instanceKey: config.instanceKey,
       timeoutMs: 5000,
+      stableDurationMs: 900,
     });
     if (readyAfterPluginsInit) {
       return { mode: "plugins-init" };
@@ -52,6 +71,7 @@ export async function ensurePluginReady({ rdp, config }) {
     rdp,
     instanceKey: config.instanceKey,
     timeoutMs: 5000,
+    stableDurationMs: 900,
   });
   if (!readyAfterFallback) {
     throw new Error(`Timed out waiting for plugin readiness: ${config.instanceKey}`);
