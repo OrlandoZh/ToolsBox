@@ -9,6 +9,7 @@ const DIRECT_STYLE_FEATURE_PREFS = new Set([
   "annotationDistributionColumn.enabled",
   "annotationManager.enabled",
   "attachmentPreview.enabled",
+  "attachmentVersion.enabled",
   "backlinks.enabled",
   "citedCountColumn.enabled",
   "collectionItemCount.enabled",
@@ -380,6 +381,7 @@ describe("Feature Composer", () => {
     const { deps, calls, sectionUnregistrations } = createDeps();
     deps.prefs.values.set("backlinks.enabled", true);
     deps.prefs.values.set("mergeAnnotations.enabled", true);
+    deps.prefs.values.set("attachmentVersion.enabled", true);
     deps.prefs.values.set("collectionItemCount.enabled", true);
     deps.prefs.values.set("marginAnnotation.enabled", true);
     deps.lifecycle = {
@@ -392,15 +394,19 @@ describe("Feature Composer", () => {
     await composer.registerBaselineFeatures();
     assert.equal(deps.zotero.notifierObservers.some((entry) => entry.id === "toolsbox-collection-count"), true);
     assert.equal(deps.zotero.notifierObservers.some((entry) => entry.id === "mock-observer"), true);
-    assert.equal(calls.sections, 3);
+    assert.equal(calls.sections, 4);
 
     cleanups[0]();
     cleanups[0]();
 
     assert.equal(deps.zotero.unregisteredObservers.includes("toolsbox-collection-count"), true);
     assert.equal(deps.zotero.unregisteredObservers.includes("mock-observer"), true);
-    assert.deepEqual(sectionUnregistrations, ["toolsbox-merge-annotations", "toolsbox-backlinks"]);
-    assert.equal(calls.sectionUnregisters, 2);
+    assert.deepEqual(sectionUnregistrations, [
+      "toolsbox-attachment-version",
+      "toolsbox-merge-annotations",
+      "toolsbox-backlinks",
+    ]);
+    assert.equal(calls.sectionUnregisters, 3);
   });
 
   it("should wait for baseline host APIs before registering Zotero manager-backed surfaces", async () => {

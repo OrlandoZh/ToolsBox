@@ -176,6 +176,7 @@ import './zotero-watch-recovery-regression-lib.test.js';
 import './features/test-cited-count-column.js';
 import './features/test-backlinks.js';
 import './features/test-merge-annotations.js';
+import './features/test-attachment-version.js';
 import './features/test-annotation-manager.js';
 import './features/test-tab-manager-panel.js';
 import './features/test-margin-annotation.js';

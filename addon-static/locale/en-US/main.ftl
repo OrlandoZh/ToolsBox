@@ -208,6 +208,17 @@ toolsbox-merge-annotations-write-note = Write merged note
 toolsbox-merge-annotations-write-running = Writing merged note...
 toolsbox-merge-annotations-write-success = Merged note written
 toolsbox-merge-annotations-write-failed = Unable to write merged note
+# Attachment Version
+toolsbox-section-attachment-version = Attachment Versions
+toolsbox-attachment-version-count = local attachment versions
+toolsbox-attachment-version-no-item = No item selected
+toolsbox-attachment-version-api-unavailable = Attachment API unavailable
+toolsbox-attachment-version-no-attachments = No local attachments
+toolsbox-attachment-version-single = Only one local attachment
+toolsbox-attachment-version-empty = No attachment versions
+toolsbox-attachment-version-modified = Modified
+toolsbox-attachment-version-selected = Selected
+toolsbox-attachment-version-omitted = attachments omitted
 # Annotation Manager
 toolsbox-menu-annotation-manager = Annotation Manager
 toolsbox-annotation-manager-title = Annotation Manager

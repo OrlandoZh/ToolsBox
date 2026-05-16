@@ -208,6 +208,17 @@ toolsbox-merge-annotations-write-note = 写入合并笔记
 toolsbox-merge-annotations-write-running = 正在写入合并笔记...
 toolsbox-merge-annotations-write-success = 已写入合并笔记
 toolsbox-merge-annotations-write-failed = 无法写入合并笔记
+# Attachment Version
+toolsbox-section-attachment-version = 附件版本
+toolsbox-attachment-version-count = 本地附件版本
+toolsbox-attachment-version-no-item = 未选择条目
+toolsbox-attachment-version-api-unavailable = 附件 API 不可用
+toolsbox-attachment-version-no-attachments = 无本地附件
+toolsbox-attachment-version-single = 只有一个本地附件
+toolsbox-attachment-version-empty = 无附件版本
+toolsbox-attachment-version-modified = 修改时间
+toolsbox-attachment-version-selected = 当前选中
+toolsbox-attachment-version-omitted = 个附件已省略
 # Annotation Manager
 toolsbox-menu-annotation-manager = 批注管理器
 toolsbox-annotation-manager-title = 批注管理器

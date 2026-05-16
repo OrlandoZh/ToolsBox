@@ -3,19 +3,35 @@
 **更新时间**: 2026-05-17
 **权威入口**: [../CURRENT_BACKLOG.md](../CURRENT_BACKLOG.md)
 
-本文档记录 Style prototype 与当前 release freeze wave 的证据口径。它不是完成度百分比表，也不替代 fresh 命令输出。
+本文档记录 Style prototype、当前 Attachment Version wave 与 release freeze 边界的证据口径。它不是完成度百分比表，也不替代 fresh 命令输出。
 
 ## Evidence Contract
 
 | 证据类型 | 当前要求 |
 | --- | --- |
-| Targeted tests | 当前 release freeze wave 不触达 Style runtime；docs-consistency 必须保持 truth 与 mirror 同步 |
-| Full tests | 冻结期间沿用上一波 `npm run agent:check` passed telemetry；如果改代码或 release config，再重跑 `npm run agent:check` |
-| Zotero E2E | 本波不触达 runtime UI；沿用上一波 full UI capture 分类与 no-ui E2E baseline，若 gate 判 stale 再补最小复验 |
+| Targeted tests | 当前 wave 触达 Attachment Version runtime；必须覆盖 Attachment Version helper/render/register cleanup、feature-composer pref gate、docs-consistency |
+| Full tests | 改动 runtime 后需重跑 `npm run agent:check` |
+| Zotero E2E | Attachment Version 保持 default-off；本波不强制完整 UI baseline 更新，若 gate 判 stale 再补最小 no-ui / monitor 复验 |
 | Monitor / Gate | 开发门禁继续使用 `npm run agent:monitor` / `npm run agent:gate`；冻结期间不运行 `npm run agent:gate:release` |
 | Release distribution | 发布已按用户要求冻结；保留 plan-only artifacts 与 readiness blockers，不执行 `gh release create/upload`、remote verify 或远端 asset mutation |
 
 ## Fresh Evidence Snapshot
+
+截至 `2026-05-17`，`STYLE-FEATURE-MATRIX-AND-ATTACHMENT-VERSION-WAVE-001` 正在推进 feature matrix 与 Attachment Version local preview closure：
+
+| 命令 / 证据 | 结果 |
+| --- | --- |
+| Attachment Version scope | default-off、本地只读 Item Pane prototype；不切换、不覆盖、不删除、不写回 attachment/note/annotation |
+| Feature matrix | 新增 `docs/evidence/STYLE_FEATURE_MATRIX.md`，作为 evidence/matrix，不替代 current truth |
+| Targeted Attachment Version / feature-composer / docs-consistency | passed；`21/21` |
+| `npm run docs:sync-current-truth -- --check` | passed；current truth marker blocks in sync |
+| `npm run agent:check` | passed；full check 链单轮结束，`1590/1590` tests |
+| `npm run agent:zotero:e2e -- --no-ui-capture` | passed；2 cycles，scenario failed `0`，issues `[]` |
+| `npm run zotero:watch` | startup health passed；fresh watch status 写入 gate，随后停止常驻 watch |
+| `npm run agent:monitor` | stable；failed `0` |
+| `npm run agent:gate` | passed；issues `[]`，matched override `style-feature-matrix-and-attachment-version-wave-001`，validation level `visual-recommended` 且非阻断 |
+| `npm run agent:sync` | passed；gate chain、agent-context、Obsidian handoff、evidence chain 与 strict Obsidian guard aligned |
+| Release freeze | 继续有效；不运行 remote upload、remote verify、release gate，不改 updateURL/git remote |
 
 截至 `2026-05-15T20:02:44.723Z`，`STYLE-PROTOTYPE-HARDENING-WAVE-001` 已完成 hardening evidence 刷新并通过 gate：
 

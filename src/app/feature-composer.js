@@ -30,6 +30,7 @@ import { createAIGenerateTags } from "../features/ai-generate-tags.js";
 import { createAIGenerateRemark } from "../features/ai-generate-remark.js";
 import { createBacklinks } from "../features/backlinks.js";
 import { createMergeAnnotations } from "../features/merge-annotations.js";
+import { createAttachmentVersion } from "../features/attachment-version.js";
 
 const PREFERENCE_BRIDGE_KEY = "__CLEANROOM_PREFERENCE_BRIDGE__";
 const PREFERENCE_INIT_API_KEY = "initCleanroomPreferences";
@@ -385,6 +386,20 @@ export function createFeatureComposer({
         if (mergeAnnotations.register()) {
           trackPrototypeCleanup(mergeAnnotations, "mergeAnnotations");
           logger.info("features.mergeAnnotations.registered");
+        }
+      }
+
+      if (isPreferenceEnabled("attachmentVersion.enabled", { defaultValue: false })) {
+        const attachmentVersion = createAttachmentVersion({
+          logger,
+          i18n,
+          zotero: ZoteroAPI,
+          itemPane
+        });
+
+        if (attachmentVersion.register()) {
+          trackPrototypeCleanup(attachmentVersion, "attachmentVersion");
+          logger.info("features.attachmentVersion.registered");
         }
       }
 

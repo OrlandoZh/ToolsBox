@@ -315,7 +315,7 @@ describe("Documentation Consistency", () => {
     });
   });
 
-  it("should keep current truth aligned with the release freeze state", () => {
+  it("should keep current truth aligned with the Attachment Version wave under release freeze", () => {
     const summary = readCurrentTruthSummary(process.cwd());
     const backlog = readDoc("docs/CURRENT_BACKLOG.md");
     const readme = readDoc("README.md");
@@ -325,43 +325,36 @@ describe("Documentation Consistency", () => {
     const legal = readDoc("LEGAL_RISK_CHECKLIST.md");
 
     [
-      "`RELEASE-FREEZE-WAVE-001`",
-      "`release-frozen-no-remote-mutation`",
+      "`STYLE-FEATURE-MATRIX-AND-ATTACHMENT-VERSION-WAVE-001`",
+      "`planned-feature-matrix-and-local-attachment-version-preview`",
+      "`docs/evidence/STYLE_FEATURE_MATRIX.md`",
+      "`Attachment Version`",
+      "`planned/not implemented`",
+      "默认关闭、本地只读、Item Pane 预览型 prototype",
+      "`attachmentVersion.enabled=false`",
+      "`toolsbox-attachment-version`",
+      "选中 regular item 时列出 child attachments",
+      "选中 attachment 时列出同 parent 下的 sibling attachments",
+      "owner-tagged DOM",
+      "`cleanup()` / `destroy()`",
+      "不切换附件",
+      "不覆盖文件",
+      "不删除附件",
+      "不重命名附件",
+      "不创建 note",
+      "不改 annotation",
+      "不接网络/AI",
       "用户已要求“先冻结发布”",
-      "发布冻结期间只允许读取/保留现有 release artifacts",
       "禁止执行 `gh release create`",
       "`gh release upload`",
       "真实远端 asset mutation",
       "`npm run release:preflight -- --verify-remote`",
       "`npm run agent:gate:release`",
       "也不改 git remote 或 `config/addon.config.json` 的 `updateURL`",
-      "只有用户明确解冻并确认远端目标与认证方式后",
+      "`RELEASE-FREEZE-WAVE-001`",
       "`RELEASE-REMOTE-DISTRIBUTION-WAVE-001` 已完成安全 readiness 检查但未执行发布",
       "`STYLE-CLOSURE-AND-RELEASE-PREFLIGHT-WAVE-001`",
-      "上一波 `STYLE-CLOSURE-AND-RELEASE-PREFLIGHT-WAVE-001` 已完成合并前 closure 与本地 release preflight",
-      "`dist/toolsbox-0.1.0.xpi`",
-      "`dist/update.json`",
-      "`dist/release-manifest.json`",
-      "`executionMode=\"plan-only\"`",
-      "`networkActionsPerformed=false`",
-      "Release artifact identity 已对齐",
-      "addonId `toolsbox@orlandozh.github`",
-      "XPI `dist/toolsbox-0.1.0.xpi` 的 SHA256",
-      "`dist/release-matrix.json` 当前为 `attention`",
-      "stable / beta profile 均等待真实远端验证",
-      "冻结期间该状态只作为 retained release readiness debt",
-      "HTTP `404`",
-      "`gh` CLI 已安装在 `/opt/homebrew/bin/gh`",
-      "`gh auth status -h github.com` 显示未登录",
-      "`git remote -v` 仍指向 `https://github.com/OrlandoZh/AddonTemplate4Z.git`",
-      "release config 指向 `OrlandoZh/ToolsBox`",
-      "冻结期间不再执行三选一发布决策",
-      "冻结未解除前，不运行真实 `gh release upload`",
-      "不改远端仓库",
-      "不运行 `npm run release:preflight -- --verify-remote` 覆盖本地 passed preflight",
-      "`STYLE-BACKLINKS-VISUAL-EVIDENCE-CLOSURE-WAVE-001`",
-      "视觉差异记录为 `visual-recommended` 非阻断 debt",
-      "`STYLE-BACKLINKS-LOCAL-GRAPH-E2E-WAVE-001`",
+      "本波不继续三选一远端发布决策",
       "`createFeatureComposer({ ..., zotero })`",
       "`globalThis.Zotero`",
       "`annotationColumn.enabled`",
@@ -371,21 +364,17 @@ describe("Documentation Consistency", () => {
       "live Item Pane local graph/list",
       ".toolsbox-backlinks-drilldown-button",
       "Backlinks section 不注册",
-      "local graph/list",
       "不写 Zotero relation",
       "不修改 item/note/annotation 数据",
       "`backlinks.enabled=false`",
       "`collectBacklinksForItemAsync`",
       "`buildBacklinkGraphForItem`",
       "`selectBacklinkSource`",
-      "`onAsyncRender`",
-      "ZoteroPane.selectItem",
-      "`npm run release:plan`",
-      "`npm run release:upload -- --provider github-release --release-tag release --target-base-url https://github.com/OrlandoZh/ToolsBox/releases/download/release/`",
+      "Merge Annotations 继续作为历史 baseline",
+      "`mergeAnnotations.enabled=false`",
       "`planned/default-off`",
       "`Style Editor`",
       "`TLDR`",
-      "`Attachment Version`",
       "`Custom External API`",
       "`Paper Matrix Enhanced`",
       "Backlinks semantic search / relation writeback / cross-library sync",
@@ -406,17 +395,10 @@ describe("Documentation Consistency", () => {
       "`ZOTERO-HOST-POLISH-WAVE-001`",
       "`OPTIONAL-BUNDLE-WAVE-001`",
       "`P2` 上下文感知记忆与趋势层深化已完成并保留为背景",
-      "上一波 enabled E2E fresh 证据已刷新并通过 dev gate",
-      "combined targeted Backlinks / feature-composer / docs-consistency tests 为 `27/27`",
-      "`npm run agent:check` 通过并写入 fresh telemetry",
-      "`npm run agent:monitor` 为 `12/12`",
-      "上一波完整 UI capture 视觉证据已刷新并分类",
-      "`npm run agent:zotero:e2e`",
-      "不刷新视觉 baseline",
-      "`npm run agent:zotero:e2e -- --no-ui-capture` fresh 通过",
-      "`sectionRegistered=false`",
-      "视觉差异记录为 `visual-recommended` 非阻断 debt",
-      "本波只冻结 release，不新增功能",
+      "Backlinks full UI visual evidence 分类",
+      "release local preflight 与 release freeze closure",
+      "本波不追 `zotero-style` 100% 复刻",
+      "default-off local Attachment Version prototype 与 feature matrix",
     ].forEach((snippet) => {
       assert.ok(summary.includes(snippet), `Missing current-truth snippet: ${snippet}`);
     });
@@ -436,6 +418,10 @@ describe("Documentation Consistency", () => {
       "本波只在绿色 baseline 上推进一个 default-off local Merge Annotations note writeback workflow",
       "本波已在绿色 baseline 上完成一个 default-off local Merge Annotations note writeback workflow",
       "本波只补 enabled Merge Annotations 真实 Zotero Item Pane writeback/upsert E2E 证据",
+      "当前主线固定为 `RELEASE-FREEZE-WAVE-001`",
+      "当前 active expansion wave: `RELEASE-FREEZE-WAVE-001`",
+      "`release-frozen-no-remote-mutation`",
+      "本波只冻结 release，不新增功能",
       "下一条未收口线是远端 `update.json` / `update_link` 真实分发闭环",
       "真实远端 `update.json` / `update_link` 分发闭环留给下一波",
       "本波只推进远端 release distribution readiness / closure",
@@ -483,11 +469,11 @@ describe("Documentation Consistency", () => {
     assert.ok(roadmap.includes("`READER-HIGH-126`"));
     assert.ok(roadmap.includes("`AGENT_OBSIDIAN_VISUALS=1`"));
     assert.equal(readme.includes("`agent:gate` 当前已通过"), false);
-    assert.ok(assessment.includes("`STYLE-PROTOTYPE-HARDENING-WAVE-001`"));
+    assert.ok(assessment.includes("`STYLE-FEATURE-MATRIX-AND-ATTACHMENT-VERSION-WAVE-001`"));
     assert.equal(roadmap.includes("`capture-unstable` 不再是 fresh 主阻断"), false);
   });
 
-  it("should keep release freeze as the current mainline while preserving prior closed batches", () => {
+  it("should keep Attachment Version as the current mainline while preserving release freeze", () => {
     const backlog = readDoc("docs/CURRENT_BACKLOG.md");
     const readme = readDoc("README.md");
     const checklist = readDoc("FRAMEWORK_CHECKLIST.md");
@@ -511,22 +497,34 @@ describe("Documentation Consistency", () => {
     assert.ok(readme.includes("`STYLE-BACKLINKS-VISUAL-EVIDENCE-CLOSURE-WAVE-001`"));
     assert.ok(backlog.includes("`STYLE-CLOSURE-AND-RELEASE-PREFLIGHT-WAVE-001`"));
     assert.ok(readme.includes("`STYLE-CLOSURE-AND-RELEASE-PREFLIGHT-WAVE-001`"));
+    assert.ok(backlog.includes("`STYLE-FEATURE-MATRIX-AND-ATTACHMENT-VERSION-WAVE-001`"));
+    assert.ok(readme.includes("`STYLE-FEATURE-MATRIX-AND-ATTACHMENT-VERSION-WAVE-001`"));
+    assert.ok(backlog.includes("`planned-feature-matrix-and-local-attachment-version-preview`"));
+    assert.ok(readme.includes("`planned-feature-matrix-and-local-attachment-version-preview`"));
+    assert.ok(backlog.includes("`docs/evidence/STYLE_FEATURE_MATRIX.md`"));
+    assert.ok(readme.includes("`docs/evidence/STYLE_FEATURE_MATRIX.md`"));
+    assert.ok(backlog.includes("`attachmentVersion.enabled=false`"));
+    assert.ok(readme.includes("`attachmentVersion.enabled=false`"));
+    assert.ok(backlog.includes("`toolsbox-attachment-version`"));
+    assert.ok(readme.includes("`toolsbox-attachment-version`"));
+    assert.ok(backlog.includes("本地只读 Item Pane preview prototype"));
+    assert.ok(readme.includes("本地只读 Item Pane preview prototype"));
     assert.ok(backlog.includes("`RELEASE-FREEZE-WAVE-001`"));
     assert.ok(readme.includes("`RELEASE-FREEZE-WAVE-001`"));
-    assert.ok(backlog.includes("`release-frozen-no-remote-mutation`"));
-    assert.ok(readme.includes("`release-frozen-no-remote-mutation`"));
     assert.ok(backlog.includes("用户已要求“先冻结发布”"));
     assert.ok(readme.includes("用户已要求“先冻结发布”"));
-    assert.ok(backlog.includes("`RELEASE-REMOTE-DISTRIBUTION-WAVE-001` 已完成安全 readiness 检查但未执行发布"));
-    assert.ok(readme.includes("`RELEASE-REMOTE-DISTRIBUTION-WAVE-001` 已完成安全 readiness 检查但未执行发布"));
-    assert.ok(backlog.includes("`dist/release-matrix.json` 当前为 `attention`"));
-    assert.ok(readme.includes("`dist/release-matrix.json` 当前为 `attention`"));
+    assert.ok(backlog.includes("发布冻结继续有效且优先级不变"));
+    assert.ok(readme.includes("发布冻结继续有效且优先级不变"));
+    assert.ok(backlog.includes("`RELEASE-REMOTE-DISTRIBUTION-WAVE-001`"));
+    assert.ok(readme.includes("`RELEASE-REMOTE-DISTRIBUTION-WAVE-001`"));
+    assert.ok(backlog.includes("`dist/release-matrix.json` 为 `attention`"));
+    assert.equal(readme.includes("`dist/release-matrix.json` 当前为 `attention`"), false);
     assert.ok(backlog.includes("`gh auth status -h github.com` 显示未登录"));
-    assert.ok(readme.includes("`gh auth status -h github.com` 显示未登录"));
-    assert.ok(backlog.includes("`git remote -v` 仍指向 `https://github.com/OrlandoZh/AddonTemplate4Z.git`"));
-    assert.ok(readme.includes("`git remote -v` 仍指向 `https://github.com/OrlandoZh/AddonTemplate4Z.git`"));
-    assert.ok(backlog.includes("冻结未解除前，不运行真实 `gh release upload`"));
-    assert.ok(readme.includes("冻结未解除前，不运行真实 `gh release upload`"));
+    assert.ok(backlog.includes("当前 `git remote -v` 指向 `https://github.com/OrlandoZh/AddonTemplate4Z.git`"));
+    assert.ok(backlog.includes("冻结未解除前禁止执行 `gh release create`"));
+    assert.ok(readme.includes("冻结未解除前禁止执行 `gh release create`"));
+    assert.equal(backlog.includes("当前 active expansion wave: `RELEASE-FREEZE-WAVE-001`"), false);
+    assert.equal(readme.includes("当前 active expansion wave: `RELEASE-FREEZE-WAVE-001`"), false);
     assert.equal(backlog.includes("当前 active expansion wave: `RELEASE-REMOTE-DISTRIBUTION-WAVE-001`"), false);
     assert.equal(readme.includes("当前 active expansion wave: `RELEASE-REMOTE-DISTRIBUTION-WAVE-001`"), false);
     assert.equal(backlog.includes("本波只推进远端 release distribution readiness / closure"), false);
@@ -545,10 +543,13 @@ describe("Documentation Consistency", () => {
     assert.ok(readme.includes("不修改 item/note/annotation 数据"));
     assert.ok(backlog.includes("Backlinks local prototype"));
     assert.ok(readme.includes("Backlinks local prototype"));
-    assert.ok(backlog.includes("不追 `zotero-style` 全量复刻"));
-    assert.ok(readme.includes("不追 `zotero-style` 全量复刻"));
+    assert.ok(backlog.includes("本波不追 `zotero-style` 100% 复刻"));
+    assert.ok(readme.includes("本波不追 `zotero-style` 100% 复刻"));
     assert.ok(backlog.includes("planned/default-off"));
     assert.ok(readme.includes("planned/default-off"));
+    assert.ok(backlog.includes("Attachment Version | 本地只读 attachment version preview prototype"));
+    assert.ok(backlog.includes("Style Editor | planned/not implemented"));
+    assert.equal(backlog.includes("Attachment Version | planned/not implemented"), false);
     assert.ok(backlog.includes("`HOST-HIGH-201 / HOST-LOW-301~303`"));
     assert.ok(readme.includes("`HOST-HIGH-201 / HOST-LOW-301~303`"));
     assert.ok(checklist.includes("`HOST-HIGH-201 / HOST-LOW-301~303`"));
