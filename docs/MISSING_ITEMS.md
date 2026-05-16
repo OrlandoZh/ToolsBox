@@ -13,7 +13,6 @@
 
 - Style Editor
 - TLDR
-- Attachment Version
 - Custom External API
 - Paper Matrix Enhanced
 - Backlinks semantic search / relation writeback / cross-library sync

@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "status": "active",
   "currentContractId": "generic-expansion-wave-v1",
-  "currentWaveName": "STYLE-FEATURE-MATRIX-AND-ATTACHMENT-VERSION-WAVE-001",
-  "summary": "Active Style planned-function wave under an unchanged release freeze: add a feature implementation matrix and promote Attachment Version from planned/not implemented to a default-off, local-only, read-only Item Pane prototype. Do not mutate release remotes, attachment files, notes, annotations, updateURL, git remote, or visual baselines.",
+  "currentWaveName": "STYLE-ATTACHMENT-VERSION-ENABLED-E2E-WAVE-001",
+  "summary": "Active Style validation wave under an unchanged release freeze: prove Attachment Version stays default-off by default and, when explicitly enabled through scenario pref injection, renders a real Zotero Item Pane local attachment version preview without mutating attachments, notes, annotations, release remotes, updateURL, git remote, or visual baselines.",
   "inScopeModules": [
-    "style-feature-matrix",
     "attachment-version-local-preview",
+    "attachment-version-enabled-zotero-scenario",
     "feature-composer-default-off-registration",
     "truth-evidence-sync",
     "release-freeze-guard"
@@ -47,11 +47,11 @@
   ],
   "moduleArchetypes": [
     {
-      "module": "style-feature-matrix",
-      "archetype": "workspace-integration"
+      "module": "attachment-version-local-preview",
+      "archetype": "visible-surface"
     },
     {
-      "module": "attachment-version-local-preview",
+      "module": "attachment-version-enabled-zotero-scenario",
       "archetype": "visible-surface"
     },
     {
@@ -67,6 +67,6 @@
       "archetype": "workspace-integration"
     }
   ],
-  "acceptanceTrack": "planned-feature-matrix-and-local-attachment-version-preview",
+  "acceptanceTrack": "enabled-attachment-version-local-preview-real-zotero-e2e",
   "explicitVisualUpgradeModules": []
 }

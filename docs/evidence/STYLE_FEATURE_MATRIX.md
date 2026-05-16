@@ -9,8 +9,8 @@
 
 | 字段 | 当前值 |
 | --- | --- |
-| Wave | `STYLE-FEATURE-MATRIX-AND-ATTACHMENT-VERSION-WAVE-001` |
-| Acceptance track | `planned-feature-matrix-and-local-attachment-version-preview` |
+| Wave | `STYLE-ATTACHMENT-VERSION-ENABLED-E2E-WAVE-001` |
+| Acceptance track | `enabled-attachment-version-local-preview-real-zotero-e2e` |
 | Release boundary | 发布继续冻结；不改 remote / updateURL，不运行 remote verify 或 release gate |
 | Prototype policy | 未显式启用时不注册；不新增偏好设置面板可操作入口 |
 
@@ -28,7 +28,7 @@
 | Margin Annotation / PDF Background | hardened prototype | default-off | Reader | none | hardening tests |
 | Merge Annotations | local preview + ToolsBox note writeback prototype | default-off | Item Pane section | ToolsBox-owned child note only | unit + enabled Zotero scenario |
 | Backlinks | local graph/drilldown prototype | default-off | Item Pane section | none | unit + enabled Zotero scenario |
-| Attachment Version | local read-only preview prototype | default-off | Item Pane section | none | unit + composer lifecycle tests |
+| Attachment Version | local read-only preview prototype with enabled Zotero workflow evidence | default-off | Item Pane section | none | unit + composer lifecycle tests + enabled scenario |
 | Style Editor | planned | default-off | none | none | not implemented |
 | TLDR | planned | default-off | none | none | no AI/provider closure |
 | Custom External API | planned | default-off | none | none | no network/API closure |
@@ -41,8 +41,16 @@
 - For selected attachment items, treats sibling attachments under the same parent as local version candidates.
 - For selected regular items, treats child attachments as local version candidates.
 - Renders a read-only Item Pane list with owner-tagged DOM nodes and stable empty states.
+- Enabled E2E scope is limited to real Item Pane preview evidence: default-off section absence, explicit pref registration, child/sibling attachment list, selected marker, repeated render cleanup, and no attachment/note/annotation mutation.
 - Does not switch active attachments, overwrite files, delete files, rename attachments, create notes, mutate annotations, or call network/AI providers.
 - `attachmentVersion.enabled` remains `false` by default and is not exposed in the preference pane as a user-ready control.
+
+## Next Planned Order
+
+1. `Paper Matrix Enhanced` local field / filter enhancement.
+2. `Style Editor` default-off local CSS prototype.
+3. `TLDR` / `Custom External API` only after provider, privacy, and API contracts are explicit.
+4. Backlinks advanced semantic search / relation writeback / cross-library sync.
 
 ## Release Freeze Boundary
 

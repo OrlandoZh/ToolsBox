@@ -3,33 +3,36 @@
 **更新时间**: 2026-05-17
 **权威入口**: [../CURRENT_BACKLOG.md](../CURRENT_BACKLOG.md)
 
-本文档记录 Style prototype、当前 Attachment Version wave 与 release freeze 边界的证据口径。它不是完成度百分比表，也不替代 fresh 命令输出。
+本文档记录 Style prototype、当前 Attachment Version enabled E2E wave 与 release freeze 边界的证据口径。它不是完成度百分比表，也不替代 fresh 命令输出。
 
 ## Evidence Contract
 
 | 证据类型 | 当前要求 |
 | --- | --- |
-| Targeted tests | 当前 wave 触达 Attachment Version runtime；必须覆盖 Attachment Version helper/render/register cleanup、feature-composer pref gate、docs-consistency |
+| Targeted tests | 当前 wave 触达 Attachment Version enabled workflow 证据；必须覆盖 Attachment Version helper/render/register cleanup、feature-composer pref gate、docs-consistency |
 | Full tests | 改动 runtime 后需重跑 `npm run agent:check` |
-| Zotero E2E | Attachment Version 保持 default-off；本波不强制完整 UI baseline 更新，若 gate 判 stale 再补最小 no-ui / monitor 复验 |
+| Zotero E2E | Attachment Version 保持 default-off；本波新增 isolated enabled scenario，并重跑 no-ui E2E；不刷新完整 UI baseline |
 | Monitor / Gate | 开发门禁继续使用 `npm run agent:monitor` / `npm run agent:gate`；冻结期间不运行 `npm run agent:gate:release` |
 | Release distribution | 发布已按用户要求冻结；保留 plan-only artifacts 与 readiness blockers，不执行 `gh release create/upload`、remote verify 或远端 asset mutation |
 
 ## Fresh Evidence Snapshot
 
-截至 `2026-05-17`，`STYLE-FEATURE-MATRIX-AND-ATTACHMENT-VERSION-WAVE-001` 正在推进 feature matrix 与 Attachment Version local preview closure：
+截至 `2026-05-17`，`STYLE-ATTACHMENT-VERSION-ENABLED-E2E-WAVE-001` 正在推进 Attachment Version enabled real Zotero Item Pane preview workflow evidence：
 
 | 命令 / 证据 | 结果 |
 | --- | --- |
-| Attachment Version scope | default-off、本地只读 Item Pane prototype；不切换、不覆盖、不删除、不写回 attachment/note/annotation |
-| Feature matrix | 新增 `docs/evidence/STYLE_FEATURE_MATRIX.md`，作为 evidence/matrix，不替代 current truth |
+| Attachment Version scope | default-off、本地只读 Item Pane prototype；显式启用后只展示 local child/sibling attachment version preview，不切换、不覆盖、不删除、不写回 attachment/note/annotation |
+| Feature matrix | `docs/evidence/STYLE_FEATURE_MATRIX.md` 已记录 Attachment Version enabled scenario 与下一步未完成顺序；仍不替代 current truth |
+| Scenario listing | passed；`attachment version enabled preview workflow` 已注册 |
+| Default-off scenario | passed；未注入 pref 时 `attachmentVersion.enabled=false` 且 `toolsbox-attachment-version` section 不注册 |
+| Enabled scenario | passed；`1/1`，真实 Item Pane preview 渲染 child/sibling attachments、selected marker，重复 render 后 owner root count 为 `1`，`itemSnapshotsUnchanged=true` |
 | Targeted Attachment Version / feature-composer / docs-consistency | passed；`21/21` |
 | `npm run docs:sync-current-truth -- --check` | passed；current truth marker blocks in sync |
 | `npm run agent:check` | passed；full check 链单轮结束，`1590/1590` tests |
-| `npm run agent:zotero:e2e -- --no-ui-capture` | passed；2 cycles，scenario failed `0`，issues `[]` |
+| `npm run agent:zotero:e2e -- --no-ui-capture` | passed；2 cycles，scenario `32/32` each cycle，scenario failed `0`，runtime log error `0`，visual capture skipped by flag |
 | `npm run zotero:watch` | startup health passed；fresh watch status 写入 gate，随后停止常驻 watch |
 | `npm run agent:monitor` | stable；failed `0` |
-| `npm run agent:gate` | passed；issues `[]`，matched override `style-feature-matrix-and-attachment-version-wave-001`，validation level `visual-recommended` 且非阻断 |
+| `npm run agent:gate` | passed；issues `[]`，matched override `style-attachment-version-enabled-e2e-wave-001`，validation level `visual-recommended` 且非阻断 |
 | `npm run agent:sync` | passed；gate chain、agent-context、Obsidian handoff、evidence chain 与 strict Obsidian guard aligned |
 | Release freeze | 继续有效；不运行 remote upload、remote verify、release gate，不改 updateURL/git remote |
 
@@ -210,6 +213,7 @@
 | Attachment preview iframe | default-off prototype；本波要求幂等 cleanup、render 前 blank/remove 旧 iframe、稳定 empty state |
 | Backlinks item pane prototype | default-off prototype；本波要求 enabled isolated Zotero scenario 证明 live Item Pane local graph/list、async scanner、drilldown 选择来源条目、无 relation/item mutation、API 缺失 no-op、注册后幂等 cleanup |
 | Merge Annotations item pane prototype | default-off prototype；已补 enabled isolated Zotero scenario 证明 live Item Pane 按钮触发 ToolsBox 自有 child note create/update upsert、无重复 note、无 annotation mutation、API 缺失 no-op、注册后幂等 cleanup |
+| Attachment Version item pane prototype | default-off prototype；本波补 enabled isolated Zotero scenario 证明 live Item Pane child/sibling attachment preview、selected marker、重复 render cleanup、无 attachment/note/annotation mutation |
 
 ## 禁止口径
 

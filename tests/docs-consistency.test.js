@@ -315,7 +315,7 @@ describe("Documentation Consistency", () => {
     });
   });
 
-  it("should keep current truth aligned with the Attachment Version wave under release freeze", () => {
+  it("should keep current truth aligned with the Attachment Version enabled E2E wave under release freeze", () => {
     const summary = readCurrentTruthSummary(process.cwd());
     const backlog = readDoc("docs/CURRENT_BACKLOG.md");
     const readme = readDoc("README.md");
@@ -325,18 +325,22 @@ describe("Documentation Consistency", () => {
     const legal = readDoc("LEGAL_RISK_CHECKLIST.md");
 
     [
-      "`STYLE-FEATURE-MATRIX-AND-ATTACHMENT-VERSION-WAVE-001`",
-      "`planned-feature-matrix-and-local-attachment-version-preview`",
+      "`STYLE-ATTACHMENT-VERSION-ENABLED-E2E-WAVE-001`",
+      "`enabled-attachment-version-local-preview-real-zotero-e2e`",
       "`docs/evidence/STYLE_FEATURE_MATRIX.md`",
       "`Attachment Version`",
-      "`planned/not implemented`",
-      "默认关闭、本地只读、Item Pane 预览型 prototype",
+      "显式启用后的真实 Zotero workflow 证据",
+      "默认 `attachmentVersion.enabled=false`",
+      "真实 Item Pane section 能展示本地 child / sibling attachments 版本列表",
+      "重复 render 不残留旧 owner DOM",
       "`attachmentVersion.enabled=false`",
       "`toolsbox-attachment-version`",
       "选中 regular item 时列出 child attachments",
       "选中 attachment 时列出同 parent 下的 sibling attachments",
       "owner-tagged DOM",
       "`cleanup()` / `destroy()`",
+      "`attachment version enabled preview workflow`",
+      "`zotero:scenario -- --addon-pref attachmentVersion.enabled=true`",
       "不切换附件",
       "不覆盖文件",
       "不删除附件",
@@ -377,6 +381,7 @@ describe("Documentation Consistency", () => {
       "`TLDR`",
       "`Custom External API`",
       "`Paper Matrix Enhanced`",
+      "下一波未完成内容优先级",
       "Backlinks semantic search / relation writeback / cross-library sync",
       "不在偏好设置面板中表现为已可用功能",
       "不把缺 API key 当作本轮主阻断",
@@ -396,9 +401,9 @@ describe("Documentation Consistency", () => {
       "`OPTIONAL-BUNDLE-WAVE-001`",
       "`P2` 上下文感知记忆与趋势层深化已完成并保留为背景",
       "Backlinks full UI visual evidence 分类",
-      "release local preflight 与 release freeze closure",
+      "release local preflight、release freeze closure",
       "本波不追 `zotero-style` 100% 复刻",
-      "default-off local Attachment Version prototype 与 feature matrix",
+      "Attachment Version enabled real Zotero local preview workflow evidence",
     ].forEach((snippet) => {
       assert.ok(summary.includes(snippet), `Missing current-truth snippet: ${snippet}`);
     });
@@ -428,6 +433,8 @@ describe("Documentation Consistency", () => {
       "`remote-update-json-update-link-distribution-closure`",
       "本轮“完成”只表示远端 `update.json` / `update_link` 真实分发闭环通过",
       "远端 `update.json` 与其中的 `update_link` 真实公开可达",
+      "`planned-feature-matrix-and-local-attachment-version-preview`",
+      "本波只推进一个 default-off local Attachment Version prototype 与 feature matrix",
     ].forEach((snippet) => {
       assert.equal(summary.includes(snippet), false, `Unexpected stale current-truth snippet: ${snippet}`);
     });
@@ -473,7 +480,7 @@ describe("Documentation Consistency", () => {
     assert.equal(roadmap.includes("`capture-unstable` 不再是 fresh 主阻断"), false);
   });
 
-  it("should keep Attachment Version as the current mainline while preserving release freeze", () => {
+  it("should keep Attachment Version enabled E2E as the current mainline while preserving release freeze", () => {
     const backlog = readDoc("docs/CURRENT_BACKLOG.md");
     const readme = readDoc("README.md");
     const checklist = readDoc("FRAMEWORK_CHECKLIST.md");
@@ -499,8 +506,10 @@ describe("Documentation Consistency", () => {
     assert.ok(readme.includes("`STYLE-CLOSURE-AND-RELEASE-PREFLIGHT-WAVE-001`"));
     assert.ok(backlog.includes("`STYLE-FEATURE-MATRIX-AND-ATTACHMENT-VERSION-WAVE-001`"));
     assert.ok(readme.includes("`STYLE-FEATURE-MATRIX-AND-ATTACHMENT-VERSION-WAVE-001`"));
-    assert.ok(backlog.includes("`planned-feature-matrix-and-local-attachment-version-preview`"));
-    assert.ok(readme.includes("`planned-feature-matrix-and-local-attachment-version-preview`"));
+    assert.ok(backlog.includes("`STYLE-ATTACHMENT-VERSION-ENABLED-E2E-WAVE-001`"));
+    assert.ok(readme.includes("`STYLE-ATTACHMENT-VERSION-ENABLED-E2E-WAVE-001`"));
+    assert.ok(backlog.includes("`enabled-attachment-version-local-preview-real-zotero-e2e`"));
+    assert.ok(readme.includes("`enabled-attachment-version-local-preview-real-zotero-e2e`"));
     assert.ok(backlog.includes("`docs/evidence/STYLE_FEATURE_MATRIX.md`"));
     assert.ok(readme.includes("`docs/evidence/STYLE_FEATURE_MATRIX.md`"));
     assert.ok(backlog.includes("`attachmentVersion.enabled=false`"));
@@ -509,6 +518,10 @@ describe("Documentation Consistency", () => {
     assert.ok(readme.includes("`toolsbox-attachment-version`"));
     assert.ok(backlog.includes("本地只读 Item Pane preview prototype"));
     assert.ok(readme.includes("本地只读 Item Pane preview prototype"));
+    assert.ok(backlog.includes("`attachment version enabled preview workflow`"));
+    assert.ok(readme.includes("`attachment version enabled preview workflow`"));
+    assert.ok(backlog.includes("child / sibling attachments"));
+    assert.ok(readme.includes("child / sibling attachments"));
     assert.ok(backlog.includes("`RELEASE-FREEZE-WAVE-001`"));
     assert.ok(readme.includes("`RELEASE-FREEZE-WAVE-001`"));
     assert.ok(backlog.includes("用户已要求“先冻结发布”"));

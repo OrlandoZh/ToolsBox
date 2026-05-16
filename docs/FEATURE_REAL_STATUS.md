@@ -11,13 +11,13 @@
 - Style-like prototype 已通过 pref gate 收口，默认关闭。
 - Backlinks 已完成 default-off local graph/drilldown prototype 与 enabled Zotero scenario 证据。
 - Merge Annotations 已完成 default-off preview、ToolsBox child note writeback、enabled Zotero workflow 证据。
+- Attachment Version 已完成 default-off local read-only Item Pane preview prototype；当前波次补 enabled Zotero workflow 证据。
 - Collection / Reader / attachment preview 等高风险 prototype 保持 default-off，并具备 availability guard 与 cleanup 口径。
 
 ## Planned / Default-off
 
 - Style Editor
 - TLDR / remote AI summary
-- Attachment Version
 - Custom External API
 - Paper Matrix Enhanced
 - Backlinks semantic search / relation writeback / cross-library sync

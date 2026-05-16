@@ -1,8 +1,8 @@
 # ToolsBox 当前单一事实源
 
 **更新时间**: 2026-05-17
-**本轮主线**: `STYLE-FEATURE-MATRIX-AND-ATTACHMENT-VERSION-WAVE-001`
-**核心目标**: 在发布冻结边界内系统推进 planned Style-like 能力；本波只补 feature matrix 与默认关闭的本地只读 Attachment Version Item Pane prototype
+**本轮主线**: `STYLE-ATTACHMENT-VERSION-ENABLED-E2E-WAVE-001`
+**核心目标**: 发布继续冻结；本波只补 Attachment Version 显式启用后的真实 Zotero Item Pane 预览 workflow 证据
 
 ---
 
@@ -11,32 +11,32 @@
 本节是当前项目态的唯一 truth。消费者文档只同步 marker block，不维护第二份完成度结论。
 
 <!-- CURRENT-TRUTH-SUMMARY:START -->
-当前主线为 `STYLE-FEATURE-MATRIX-AND-ATTACHMENT-VERSION-WAVE-001`：在用户已要求“先冻结发布”的边界内，继续系统推进未实现 Style-like 能力。本波只做两件事：新增 `docs/evidence/STYLE_FEATURE_MATRIX.md` 作为非权威实现矩阵；把 `Attachment Version` 从 `planned/not implemented` 推进为默认关闭、本地只读、Item Pane 预览型 prototype。当前 active expansion wave: `STYLE-FEATURE-MATRIX-AND-ATTACHMENT-VERSION-WAVE-001`；验收主线: `planned-feature-matrix-and-local-attachment-version-preview`。
+当前主线为 `STYLE-ATTACHMENT-VERSION-ENABLED-E2E-WAVE-001`：在用户已要求“先冻结发布”的边界内，不扩新 Style 功能，只补 `Attachment Version` 显式启用后的真实 Zotero workflow 证据。本波验收目标是：默认 `attachmentVersion.enabled=false` 时 `toolsbox-attachment-version` Item Pane section 不注册；通过 `zotero:scenario -- --addon-pref attachmentVersion.enabled=true` 显式启用时，真实 Item Pane section 能展示本地 child / sibling attachments 版本列表、标记当前选中 attachment、重复 render 不残留旧 owner DOM，并证明不修改 attachment / note / annotation。当前 active expansion wave: `STYLE-ATTACHMENT-VERSION-ENABLED-E2E-WAVE-001`；验收主线: `enabled-attachment-version-local-preview-real-zotero-e2e`。
 
 发布冻结继续有效且优先级不变：冻结未解除前禁止执行 `gh release create`、`gh release upload`、真实远端 asset mutation、`npm run release:preflight -- --verify-remote`、`npm run agent:gate:release`，也不改 git remote 或 `config/addon.config.json` 的 `updateURL`。`RELEASE-REMOTE-DISTRIBUTION-WAVE-001` 已完成安全 readiness 检查但未执行发布；上一波 `RELEASE-FREEZE-WAVE-001` 与 `STYLE-CLOSURE-AND-RELEASE-PREFLIGHT-WAVE-001` 的本地 release artifacts、plan-only upload checklist、HTTP `404` readiness blocker、GitHub CLI 未登录状态和 origin / release config mismatch 只作为 retained release background；本波不继续三选一远端发布决策。
 
 已收敛并继续保留的实现口径：`createFeatureComposer({ ..., zotero })` 支持可注入 Zotero 依赖；生产默认继续读 `globalThis.Zotero`。Style-like 直接注册项全部通过显式 pref gate 控制，`annotationColumn.enabled` 是 canonical key，`annotationDistributionColumn.enabled` 仅保留 legacy fallback。缺省未显式开启时，直接 Style prototype 不应注册，也不在偏好设置面板中表现为已可用功能。
 
-Attachment Version 本波实现口径：`attachmentVersion.enabled=false` 继续是默认值，不新增偏好面板可操作入口；显式启用时才注册 `toolsbox-attachment-version` Item Pane section。该 prototype 只读取本地 Zotero item / attachment metadata：选中 regular item 时列出 child attachments；选中 attachment 时列出同 parent 下的 sibling attachments 并标记当前选中项。渲染只使用 owner-tagged DOM，重复 render 清理旧节点，`cleanup()` / `destroy()` 幂等 unregister section。它不切换附件、不覆盖文件、不删除附件、不重命名附件、不创建 note、不改 annotation、不接网络/AI。
+Attachment Version 当前实现口径：`attachmentVersion.enabled=false` 继续是默认值，不新增偏好面板可操作入口；显式启用时才注册 `toolsbox-attachment-version` Item Pane section。该 prototype 只读取本地 Zotero item / attachment metadata：选中 regular item 时列出 child attachments；选中 attachment 时列出同 parent 下的 sibling attachments 并标记当前选中项。渲染只使用 owner-tagged DOM，重复 render 清理旧节点，`cleanup()` / `destroy()` 幂等 unregister section。它不切换附件、不覆盖文件、不删除附件、不重命名附件、不创建 note、不改 annotation、不接网络/AI。本波新增 `attachment version enabled preview workflow` scenario，用 disposable profile + `--addon-pref attachmentVersion.enabled=true` 证明 enabled workflow 真实可走。
 
 Backlinks functional scope 已收口并保持历史 baseline：开发验收用 `zotero:scenario -- --addon-pref backlinks.enabled=true` pref 注入已证明默认 pref 未开启时 Backlinks section 不注册；显式开启时 live Item Pane local graph/list 与 `.toolsbox-backlinks-drilldown-button` 可选择来源条目，并保持 item fields 与 relations 不变。默认仍为 `backlinks.enabled=false`，不写 Zotero relation，不修改 item/note/annotation 数据，不调用网络，不接 AI。核心 helpers 保持为 `collectBacklinksForItemAsync`、`buildBacklinkGraphForItem` 与 `selectBacklinkSource`。
 
 Merge Annotations 继续作为历史 baseline：已完成本地 annotation 合并预览、ToolsBox 自有 child note writeback/upsert workflow，以及 enabled real Zotero Item Pane button E2E 证据；默认仍为 `mergeAnnotations.enabled=false`，不修改真实 annotation。
 
-Default-off / planned truth 更新为：`Attachment Version` 现在是本地只读 Item Pane preview prototype；`Style Editor`、`TLDR`、`Custom External API`、`Paper Matrix Enhanced`、Backlinks semantic search / relation writeback / cross-library sync、AI enrichment 与其它未完成能力保持 `planned/default-off`，不把缺 API key 当作本轮主阻断。
+Default-off / planned truth 更新为：`Attachment Version` 现在是本地只读 Item Pane preview prototype，本波只补 enabled Zotero scenario 证据，不实现附件真实版本管理。`docs/evidence/STYLE_FEATURE_MATRIX.md` 继续作为 feature matrix / evidence 索引，不替代 current truth。下一波未完成内容优先级为：`Paper Matrix Enhanced` 本地字段/筛选增强；随后 `Style Editor` default-off local CSS prototype；之后再评估 `TLDR` / `Custom External API` 的 provider、privacy 与 API contract；Backlinks semantic search / relation writeback / cross-library sync 继续排后。`TLDR`、`Custom External API`、Backlinks advanced、AI enrichment 与其它未完成能力保持 `planned/default-off`，不把缺 API key 当作本轮主阻断。
 
 已收敛的高风险 surface truth：Collection DOM patch、Reader `_iframeWindow`、attachment preview iframe、margin annotation、PDF background 等能力保持 prototype / default-off；已补 availability guard、owner-tagged DOM、幂等 cleanup / destroy 与 lifecycle cleanup。本波不重新打开这些 surface，不做 host surface 大重写，不把任何 prototype 升格为默认开启或 beta 可用入口。
 
-当前 release-only 历史线 `ENG-HIGH-104 / ENG-LOW-211~213` 已冻结在远端 readiness 之后；真实闭环仍取决于用户解冻、远端仓库 / 认证 / asset 上传确认。`ENG-HIGH-103`、`READER-HIGH-124 / READER-LOW-261~263`、`READER-HIGH-125`、`READER-HIGH-126`、`HOST-HIGH-201 / HOST-LOW-301~303`、`ZOTERO-HOST-POLISH-WAVE-001`、`OPTIONAL-BUNDLE-WAVE-001` 均只作为历史 contract / mirror 背景保留，不覆盖当前 Attachment Version + release freeze 口径。
+当前 release-only 历史线 `ENG-HIGH-104 / ENG-LOW-211~213` 已冻结在远端 readiness 之后；真实闭环仍取决于用户解冻、远端仓库 / 认证 / asset 上传确认。`ENG-HIGH-103`、`READER-HIGH-124 / READER-LOW-261~263`、`READER-HIGH-125`、`READER-HIGH-126`、`HOST-HIGH-201 / HOST-LOW-301~303`、`ZOTERO-HOST-POLISH-WAVE-001`、`OPTIONAL-BUNDLE-WAVE-001` 均只作为历史 contract / mirror 背景保留，不覆盖当前 Attachment Version enabled E2E + release freeze 口径。
 
-`P2` 上下文感知记忆与趋势层深化已完成并保留为背景；Style acceptance truth、默认关闭策略、测试链、Backlinks local prototype、Merge Annotations local preview、default-off note writeback workflow、enabled Merge Annotations writeback E2E、enabled Backlinks local graph/drilldown E2E、Backlinks full UI visual evidence 分类、Zotero 真机验收闭环、release local preflight 与 release freeze closure 已作为历史基线收口。历史 Style waves retained: `STYLE-PROTOTYPE-HARDENING-WAVE-001`、`STYLE-BACKLINKS-LOCAL-WAVE-001`、`STYLE-MERGE-ANNOTATIONS-PREVIEW-WAVE-001`、`STYLE-MERGE-ANNOTATIONS-WRITEBACK-WAVE-001`、`STYLE-MERGE-ANNOTATIONS-WRITEBACK-E2E-WAVE-001`、`STYLE-BACKLINKS-LOCAL-GRAPH-E2E-WAVE-001`、`STYLE-BACKLINKS-VISUAL-EVIDENCE-CLOSURE-WAVE-001`、`STYLE-CLOSURE-AND-RELEASE-PREFLIGHT-WAVE-001`、`RELEASE-FREEZE-WAVE-001`。本波不追 `zotero-style` 100% 复刻，只推进一个 default-off local Attachment Version prototype 与 feature matrix。
+`P2` 上下文感知记忆与趋势层深化已完成并保留为背景；Style acceptance truth、默认关闭策略、测试链、Backlinks local prototype、Merge Annotations local preview、default-off note writeback workflow、enabled Merge Annotations writeback E2E、enabled Backlinks local graph/drilldown E2E、Backlinks full UI visual evidence 分类、Zotero 真机验收闭环、release local preflight、release freeze closure、feature matrix 与 default-off local Attachment Version prototype 已作为历史基线收口。历史 Style waves retained: `STYLE-PROTOTYPE-HARDENING-WAVE-001`、`STYLE-BACKLINKS-LOCAL-WAVE-001`、`STYLE-MERGE-ANNOTATIONS-PREVIEW-WAVE-001`、`STYLE-MERGE-ANNOTATIONS-WRITEBACK-WAVE-001`、`STYLE-MERGE-ANNOTATIONS-WRITEBACK-E2E-WAVE-001`、`STYLE-BACKLINKS-LOCAL-GRAPH-E2E-WAVE-001`、`STYLE-BACKLINKS-VISUAL-EVIDENCE-CLOSURE-WAVE-001`、`STYLE-CLOSURE-AND-RELEASE-PREFLIGHT-WAVE-001`、`RELEASE-FREEZE-WAVE-001`、`STYLE-FEATURE-MATRIX-AND-ATTACHMENT-VERSION-WAVE-001`。本波不追 `zotero-style` 100% 复刻，只补 Attachment Version enabled real Zotero local preview workflow evidence。
 <!-- CURRENT-TRUTH-SUMMARY:END -->
 
 <!-- CURRENT-TRUTH-META:START -->
 {
-  "activeBatchId": "STYLE-FEATURE-MATRIX-AND-ATTACHMENT-VERSION-WAVE-001",
-  "currentWaveName": "STYLE-FEATURE-MATRIX-AND-ATTACHMENT-VERSION-WAVE-001",
-  "acceptanceTrack": "planned-feature-matrix-and-local-attachment-version-preview"
+  "activeBatchId": "STYLE-ATTACHMENT-VERSION-ENABLED-E2E-WAVE-001",
+  "currentWaveName": "STYLE-ATTACHMENT-VERSION-ENABLED-E2E-WAVE-001",
+  "acceptanceTrack": "enabled-attachment-version-local-preview-real-zotero-e2e"
 }
 <!-- CURRENT-TRUTH-META:END -->
 
@@ -44,27 +44,32 @@ Default-off / planned truth 更新为：`Attachment Version` 现在是本地只�
 
 ## 本轮验收标准
 
-本轮“完成”表示 planned Style-like 能力矩阵已经建立，`Attachment Version` 已形成默认关闭、本地只读、可注册/可清理/可测试的 Item Pane prototype，并且发布冻结边界没有被突破；不表示远端 `update.json` / `update_link` 真实分发闭环已经完成，也不表示 Attachment Version 的切换/覆盖/删除 workflow 已实现。
+本轮“完成”表示 `Attachment Version` 在默认关闭与显式启用两条路径上都有真实证据：默认关闭不可见/不注册，显式 `--addon-pref attachmentVersion.enabled=true` 时真实 Zotero Item Pane section 能展示本地 attachment version preview，并且不修改 attachment / note / annotation。它不表示远端 `update.json` / `update_link` 真实分发闭环已经完成，也不表示 Attachment Version 的切换/覆盖/删除 workflow 已实现。
 
-1. 新增并维护 `docs/evidence/STYLE_FEATURE_MATRIX.md`，但它只做 evidence/matrix，不替代 `docs/CURRENT_BACKLOG.md`。
-2. `attachmentVersion.enabled=false` 保持默认值；不新增偏好设置面板可操作入口，不把 Attachment Version 升格为默认开启或 beta opt-in。
-3. Attachment Version 显式启用时只注册 `toolsbox-attachment-version` Item Pane section，读取本地 attachment metadata 并渲染 owner-tagged 只读列表。
-4. Attachment Version 不切换附件、不覆盖文件、不删除附件、不重命名附件、不创建 note、不改 annotation、不调用网络/AI。
-5. Backlinks / Merge Annotations runtime 不在本波重开；`backlinks.enabled=false`、`mergeAnnotations.enabled=false` 与其它 Style-like prototype 默认关闭策略保持不变。
-6. 发布冻结继续有效：禁止执行 `gh release create`、`gh release upload`、真实远端 asset mutation、`npm run release:preflight -- --verify-remote`、`npm run agent:gate:release`。
-7. 不改 git remote，不改 `config/addon.config.json` 的 `updateURL`，不做 `OrlandoZh/ToolsBox` / `OrlandoZh/AddonTemplate4Z` / 其它远端三选一发布决策。
-8. 本轮验证以 targeted Attachment Version / feature-composer / docs-consistency、docs sync、`agent:check`、dev monitor / gate / sync 为主；不刷新视觉 baseline。
-9. 只有用户明确解冻并确认目标远端与认证方式后，才恢复 remote distribution closure。
+1. `attachmentVersion.enabled=false` 保持默认值；默认无 pref 注入时 `toolsbox-attachment-version` section 不注册。
+2. 不新增偏好设置面板可操作入口，不把 Attachment Version 升格为默认开启或 beta opt-in。
+3. 显式启用时 `toolsbox-attachment-version` Item Pane section 能在真实 Zotero 中读取 parent item 的 child attachments，并渲染 owner-tagged 只读列表。
+4. 选中 attachment 时，section 能列出同 parent 下的 sibling attachments，并通过 owner marker / selected marker 标记当前选中 attachment。
+5. 重复 render 不残留旧 owner DOM；`cleanup()` / `destroy()` 继续幂等 unregister section。
+6. Attachment Version 不切换附件、不覆盖文件、不删除附件、不重命名附件、不创建 note、不改 annotation、不调用网络/AI。
+7. Backlinks / Merge Annotations runtime 不在本波重开；`backlinks.enabled=false`、`mergeAnnotations.enabled=false` 与其它 Style-like prototype 默认关闭策略保持不变。
+8. 发布冻结继续有效：禁止执行 `gh release create`、`gh release upload`、真实远端 asset mutation、`npm run release:preflight -- --verify-remote`、`npm run agent:gate:release`。
+9. 不改 git remote，不改 `config/addon.config.json` 的 `updateURL`，不做 `OrlandoZh/ToolsBox` / `OrlandoZh/AddonTemplate4Z` / 其它远端三选一发布决策。
+10. 本轮验证以 targeted Attachment Version / feature-composer / docs-consistency、scenario listing、enabled Zotero scenario、docs sync、`agent:check`、no-ui E2E、dev monitor / gate / sync 为主；不刷新视觉 baseline。
+11. 只有用户明确解冻并确认目标远端与认证方式后，才恢复 remote distribution closure。
 
 本波 fresh evidence 已刷新：
 
 - Targeted Attachment Version / feature-composer / docs-consistency tests 通过；`21/21`。
 - `npm run docs:sync-current-truth -- --check` 通过；current truth marker blocks in sync。
+- Scenario listing 通过；`attachment version enabled preview workflow` 已注册。
+- Default-off scenario 通过；未注入 pref 时 `attachmentVersion.enabled=false`，`toolsbox-attachment-version` section 不注册。
+- Enabled scenario 通过；`npm run zotero:scenario -- --addon-pref attachmentVersion.enabled=true --scenario "attachment version enabled preview workflow"` 为 `1/1` passed，真实 Item Pane preview 渲染 child/sibling attachments、selected marker，重复 render 后 owner root count 为 `1`，`itemSnapshotsUnchanged=true`。
 - `npm run agent:check` 通过；full check 链单轮结束，`1590/1590` tests。
-- `npm run agent:zotero:e2e -- --no-ui-capture` 通过；2 cycles，scenario failed `0`，issues `[]`。
+- `npm run agent:zotero:e2e -- --no-ui-capture` 通过；2 cycles，scenario `32/32` each cycle，scenario failed `0`，runtime log error `0`，visual capture skipped by flag，默认关闭分支两轮均 `sectionRegistered=false`。
 - `npm run zotero:watch` startup health passed，随后已停止常驻 watch。
 - `npm run agent:monitor` 通过；failed `0`。
-- `npm run agent:gate` 通过；gate issues `[]`，matched override `style-feature-matrix-and-attachment-version-wave-001`，validation level `visual-recommended` 且非阻断。
+- `npm run agent:gate` 通过；gate issues `[]`，matched override `style-attachment-version-enabled-e2e-wave-001`，validation level `visual-recommended` 且非阻断。
 - `npm run agent:sync` 通过；gate chain、agent-context、Obsidian handoff、evidence chain 与 strict Obsidian guard aligned。
 
 发布冻结前的 remote distribution readiness 已刷新，当前结论是 retained blocker / frozen，不再继续推进：
@@ -225,7 +230,10 @@ Default-off / planned truth 更新为：`Attachment Version` 现在是本地只�
 ```bash
 npm run docs:sync-current-truth -- --check
 node --input-type=module -e "import './tests/features/test-attachment-version.js'; import './tests/feature-composer.test.js'; import './tests/docs-consistency.test.js'; const { runTests } = await import('./tests/test-framework.js'); await runTests();"
+npm run zotero:scenario -- --scenario-file attachment-version-enabled-preview.scenario.js --list-scenarios
+npm run zotero:scenario -- --addon-pref attachmentVersion.enabled=true --scenario "attachment version enabled preview workflow"
 npm run agent:check
+npm run agent:zotero:e2e -- --no-ui-capture
 npm run agent:monitor
 npm run agent:gate
 npm run agent:sync
@@ -238,6 +246,7 @@ gh release create ...
 gh release upload ...
 npm run release:preflight -- --verify-remote
 npm run agent:gate:release
+npm run agent:zotero:e2e:update-baseline
 ```
 
 如 watch 证据在 closure 检查中变 stale，再补跑：
