@@ -2,81 +2,58 @@
   "schemaVersion": 1,
   "status": "active",
   "currentContractId": "generic-expansion-wave-v1",
-  "currentWaveName": "ZOTERO-SURFACE-WIND-TUNNEL-WAVE-001",
-  "summary": "Active dev-only browser wind tunnel wave for template-level Zotero surface scene simulation, a comprehensive browser scene atlas across major Zotero product surfaces, modular scenario switching, reference-derived generic gap visualization, Zotero Web Library browser UI adaptation with redacted fixture display-field sampling and library interaction event simulation including Item Tree column resize semantics, Zotero client tag-system simulation for Tag Selector and Tags Box search/toggle/drag-drop/add/remove events, Zotero PDF.js document-analysis harnessing, controllable performance bottleneck injection, local browser serving, and focused static verification while keeping real host replacement, product-facing user features, release packaging, real AI providers, arbitrary source patching, source vendoring, and remote distribution out of scope.",
+  "currentWaveName": "RELEASE-FREEZE-WAVE-001",
+  "summary": "Active release freeze wave: keep Style runtime unchanged and default-off; preserve local release preflight artifacts and remote readiness blockers as evidence, but do not mutate remote assets, verify remote release URLs, change updateURL/git remote, or run release gate until the user explicitly unfreezes publishing.",
   "inScopeModules": [
-    "dev-only-surface-wind-tunnel",
-    "zotero-surface-scene-matrix",
-    "zotero-comprehensive-browser-scene-atlas",
-    "wind-tunnel-module-switcher",
-    "reference-derived-generic-scenario-modules",
-    "zotero-web-library-browser-ui-adapter",
-    "zotero-client-tag-system-simulation",
-    "wind-tunnel-coverage-gap-dashboard",
-    "zotero-pdfjs-document-analysis-harness",
-    "performance-bottleneck-simulator",
-    "local-browser-wind-tunnel-server",
-    "wind-tunnel-static-verification"
+    "release-freeze-guard",
+    "release-readiness-evidence-retention",
+    "truth-evidence-sync"
   ],
   "outOfScopeModules": [
-    "real-zotero-host-replacement",
+    "zotero-style-100-percent-parity",
+    "backlinks-runtime-changes",
+    "merge-annotations-runtime-changes",
+    "style-editor-implementation",
+    "tldr-remote-ai-provider",
+    "custom-external-api-provider",
+    "backlinks-semantic-search",
+    "backlinks-writeback-relations",
+    "backlinks-cross-library-sync",
+    "merge-annotations-real-annotation-mutation",
+    "merge-annotations-full-implementation",
+    "attachment-version-switch-full-implementation",
+    "paper-matrix-enhanced-full-implementation",
+    "beta-opt-in-preference-surface",
+    "default-enabled-prototype",
+    "visual-baseline-update-by-default",
+    "host-private-api-rewrite",
     "real-ai-provider",
-    "product-user-feature",
-    "release-package-surface",
-    "automatic-arbitrary-source-patching",
-    "vendored-official-source-copy",
-    "release-remote-distribution"
+    "real-remote-upload",
+    "gh-release-create",
+    "gh-release-upload",
+    "release-remote-url-verification",
+    "release-gate-closure",
+    "release-verify-remote",
+    "update-url-change",
+    "git-remote-change",
+    "silent-remote-upload",
+    "unconfirmed-release-target-mutation",
+    "vendored-reference-source-copy"
   ],
   "moduleArchetypes": [
     {
-      "module": "dev-only-surface-wind-tunnel",
-      "archetype": "visible-surface"
+      "module": "release-freeze-guard",
+      "archetype": "workspace-integration"
     },
     {
-      "module": "zotero-surface-scene-matrix",
+      "module": "release-readiness-evidence-retention",
+      "archetype": "workspace-integration"
+    },
+    {
+      "module": "truth-evidence-sync",
       "archetype": "runtime-capability"
-    },
-    {
-      "module": "zotero-comprehensive-browser-scene-atlas",
-      "archetype": "visible-surface"
-    },
-    {
-      "module": "wind-tunnel-module-switcher",
-      "archetype": "visible-surface"
-    },
-    {
-      "module": "reference-derived-generic-scenario-modules",
-      "archetype": "runtime-capability"
-    },
-    {
-      "module": "zotero-web-library-browser-ui-adapter",
-      "archetype": "workspace-integration"
-    },
-    {
-      "module": "zotero-client-tag-system-simulation",
-      "archetype": "visible-surface"
-    },
-    {
-      "module": "wind-tunnel-coverage-gap-dashboard",
-      "archetype": "visible-surface"
-    },
-    {
-      "module": "zotero-pdfjs-document-analysis-harness",
-      "archetype": "workspace-integration"
-    },
-    {
-      "module": "performance-bottleneck-simulator",
-      "archetype": "runtime-capability"
-    },
-    {
-      "module": "local-browser-wind-tunnel-server",
-      "archetype": "workspace-integration"
-    },
-    {
-      "module": "wind-tunnel-static-verification",
-      "archetype": "workspace-integration"
     }
   ],
-  "acceptanceTrack": "functional-first -> module taxonomy -> scenario matrix -> coverage gap dashboard -> bottleneck simulation -> local browser server -> static verification -> optional browser smoke",
+  "acceptanceTrack": "release-frozen-no-remote-mutation",
   "explicitVisualUpgradeModules": []
 }

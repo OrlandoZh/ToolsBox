@@ -1,7 +1,48 @@
 {
   "schemaVersion": 1,
-  "summary": "Project-local validation overrides for the active AGENT-REVIEW-WORKBENCH-WAVE-001 dev-only standalone window batch, the default-disabled Codex Computer Use optional validation lane, the completed ZOTERO-DOM-CONTRACT-WAVE-001 advisory DOM contract baseline, the completed ZOTERO-HOST-POLISH-WAVE-001 host-visible polish baseline, and the completed OPTIONAL-BUNDLE-WAVE-001 optional bundle baseline.",
+  "summary": "Project-local validation overrides for the active RELEASE-FREEZE-WAVE-001 no-remote-mutation batch, the completed RELEASE-REMOTE-DISTRIBUTION-WAVE-001 readiness check, STYLE-CLOSURE-AND-RELEASE-PREFLIGHT-WAVE-001, STYLE-BACKLINKS-VISUAL-EVIDENCE-CLOSURE-WAVE-001, STYLE-BACKLINKS-LOCAL-GRAPH-E2E-WAVE-001, STYLE-MERGE-ANNOTATIONS-WRITEBACK-E2E-WAVE-001, STYLE-MERGE-ANNOTATIONS-WRITEBACK-WAVE-001, STYLE-MERGE-ANNOTATIONS-PREVIEW-WAVE-001, STYLE-BACKLINKS-LOCAL-WAVE-001 and STYLE-PROTOTYPE-HARDENING-WAVE-001 baselines, the prior AGENT-REVIEW-WORKBENCH-WAVE-001 dev-only standalone window batch, the default-disabled Codex Computer Use optional validation lane, the completed ZOTERO-DOM-CONTRACT-WAVE-001 advisory DOM contract baseline, the completed ZOTERO-HOST-POLISH-WAVE-001 host-visible polish baseline, and the completed OPTIONAL-BUNDLE-WAVE-001 optional bundle baseline.",
   "overrides": [
+    {
+      "id": "release-freeze-wave-001",
+      "summary": "Release freeze is visual-not-needed and no-remote-mutation: do not change Style runtime or visual baselines; preserve local release artifacts and remote readiness blockers as retained evidence, keep updateURL/git remote unchanged, and do not publish, verify remote release URLs, or run release gate until the user explicitly unfreezes publishing.",
+      "pathMatchers": [
+        "^docs/CURRENT_BACKLOG\\.md$",
+        "^docs/(?:NEXT_STEPS|MISSING_ITEMS|FEATURE_REAL_STATUS|ACTUAL_STATUS|README_STATUS)\\.md$",
+        "^docs/evidence/SURFACE_EVIDENCE\\.md$",
+        "^config/project-expansion-wave\\.json$",
+        "^config/project-validation-overrides\\.json$",
+        "^config/addon\\.config\\.json$",
+        "^package\\.json$",
+        "^scripts/(?:release-(?:preflight|prepare|matrix|upload|metadata)|package)\\.mjs$",
+        "^build(?:/|$)",
+        "^dist/(?:update|release-(?:manifest|preflight|plan|upload-plan|matrix))\\.(?:json|md)$",
+        "^tests/(?:feature-composer|docs-consistency)\\.test\\.js$",
+        "^tests/features/test-backlinks\\.js$",
+        "^tests/run-all\\.js$"
+      ],
+      "decision": "visual-not-needed",
+      "requiredChecks": [
+        "Run `npm run docs:sync-current-truth -- --check` before and after truth/evidence edits.",
+        "Confirm the current truth states `RELEASE-FREEZE-WAVE-001` and `release-frozen-no-remote-mutation`.",
+        "Retain the previous local release artifacts, plan-only upload checklist, remote HTTP 404 readiness blockers, GitHub CLI unauthenticated status, and git remote mismatch as evidence, without regenerating or uploading remote assets.",
+        "Do not run `gh release create`, `gh release upload`, real remote asset mutation, `npm run release:preflight -- --verify-remote`, or `npm run agent:gate:release` while publishing is frozen.",
+        "Do not change git remote or `config/addon.config.json` `updateURL` while publishing is frozen.",
+        "Run targeted docs-consistency plus `npm run agent:monitor`, `npm run agent:gate`, and `npm run agent:sync` for local non-release closure.",
+        "Confirm `backlinks.enabled` and `mergeAnnotations.enabled` remain false by default and are not exposed as preference-pane controls.",
+        "Confirm unimplemented capabilities such as Style Editor, TLDR, Attachment Version, Custom External API, Paper Matrix Enhanced, Backlinks semantic search/writeback/cross-library sync remain planned/default-off and are not exposed as available preference controls.",
+        "Do not run `npm run agent:zotero:e2e:update-baseline`; this batch has no intentional visible UI changes."
+      ],
+      "nonGoals": [
+        "Claiming zotero-style 100% parity",
+        "Implementing semantic search, relation writeback, cross-library sync, remote AI, TLDR, custom external API, Style Editor, Attachment Version, Paper Matrix Enhanced, real annotation mutation, or full annotation editor workflows in this batch",
+        "Turning any prototype into a beta opt-in preference surface or default-enabled feature",
+        "Rewriting Collection DOM patch or Reader private iframe integration into a new host wrapper in this batch",
+        "Updating visual baselines by default",
+        "Changing git remote or updateURL while publishing is frozen",
+        "Running remote verification or release gate while publishing is frozen",
+        "Silently performing real remote upload or mutating a release target without explicit user approval"
+      ]
+    },
     {
       "id": "agent-review-workbench-wave-001",
       "summary": "Dev-only Agent Review Workbench changes stay visual-recommended: treat the standalone window as a visible surface, but gate v1 on window lifecycle, JSON state/store resilience, structured annotation CRUD, deterministic plan mapping, diagnostics summary, and workbench-specific acceptance telemetry before any screenshot-only review.",

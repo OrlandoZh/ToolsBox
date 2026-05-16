@@ -1,190 +1,203 @@
-# Surface Evidence 文档
+# ToolsBox Style Prototype Evidence
 
-**创建时间**: 2026-05-11
-**目的**: 记录 ToolsBox 功能的实际证据,满足 Contract 要求
+**更新时间**: 2026-05-17
+**权威入口**: [../CURRENT_BACKLOG.md](../CURRENT_BACKLOG.md)
 
----
+本文档记录 Style prototype 与当前 release freeze wave 的证据口径。它不是完成度百分比表，也不替代 fresh 命令输出。
 
-## Evidence 类别
+## Evidence Contract
 
-### 1. ItemTree 列 (Column Evidence)
+| 证据类型 | 当前要求 |
+| --- | --- |
+| Targeted tests | 当前 release freeze wave 不触达 Style runtime；docs-consistency 必须保持 truth 与 mirror 同步 |
+| Full tests | 冻结期间沿用上一波 `npm run agent:check` passed telemetry；如果改代码或 release config，再重跑 `npm run agent:check` |
+| Zotero E2E | 本波不触达 runtime UI；沿用上一波 full UI capture 分类与 no-ui E2E baseline，若 gate 判 stale 再补最小复验 |
+| Monitor / Gate | 开发门禁继续使用 `npm run agent:monitor` / `npm run agent:gate`；冻结期间不运行 `npm run agent:gate:release` |
+| Release distribution | 发布已按用户要求冻结；保留 plan-only artifacts 与 readiness blockers，不执行 `gh release create/upload`、remote verify 或远端 asset mutation |
 
-**已实现列**:
-- Reading Time Column
-- Annotation Column
-- Publication Tags Column
-- Title Column Enhanced
-- IF Column
-- Cited Count Column
+## Fresh Evidence Snapshot
 
-**证据方式**:
-- 代码位置记录
-- 功能测试结果
+截至 `2026-05-15T20:02:44.723Z`，`STYLE-PROTOTYPE-HARDENING-WAVE-001` 已完成 hardening evidence 刷新并通过 gate：
 
-### 2. Preference Pane (UI Evidence)
+| 命令 / 证据 | 结果 |
+| --- | --- |
+| Targeted feature-composer test | passed |
+| Targeted hardening tests | passed |
+| E2E harness targeted tests | passed；`71/71` |
+| `npm test` | passed；单轮结束 |
+| `npm run check` | passed；包含 `1548/1548` tests |
+| `npm run agent:zotero:e2e:update-baseline` | passed；刷新当前稳定视觉基线 |
+| `npm run agent:zotero:e2e` | passed；2 cycles，scenario failed `0`，runtime error `0`，visual drift `0`，DOM contract `passed` |
+| Capability coverage | covered / passed；未发现 uncovered blocker |
+| `npm run zotero:watch` | startup health passed；fresh watch status 写入 gate |
+| `npm run agent:monitor` | stable / generated；E2E fresh，surface evidence failing `0` |
+| `npm run agent:gate` | passed；blocker `0` |
+| `npm run agent:sync` | passed；gate chain、agent-context、Obsidian handoff 与 evidence chain aligned |
 
-**已创建**:
-- preferences.xhtml - 6 个配置面板
-- preferences.js - Bridge controller
-- preferences.css - 样式
+截至 `2026-05-16T04:45Z`，`STYLE-BACKLINKS-LOCAL-WAVE-001` 已完成 Backlinks local prototype 的 fresh evidence 刷新并通过 dev gate：
 
-### 3. Reader 功能 (Reader Evidence)
+| 命令 / 证据 | 结果 |
+| --- | --- |
+| Targeted Backlinks test | passed；`9/9` |
+| Targeted feature-composer test | passed；`7/7` |
+| Targeted docs-consistency test | passed；`6/6` |
+| Combined targeted Backlinks / feature-composer / docs-consistency | passed；`22/22` |
+| `npm run docs:sync-current-truth -- --check` | passed；current truth marker blocks in sync |
+| `npm test` | passed；单轮结束，`1557/1557` |
+| `npm run check` | passed；单轮结束，`1557/1557` |
+| E2E harness targeted tests | passed；`2/2` |
+| `npm run agent:zotero:e2e -- --no-ui-capture` | passed；2 cycles，scenario failed `0`，runtime error `0`，visual drift `0`，DOM contract `passed`，capability `11/11` |
+| `npm run zotero:watch` | startup health passed；fresh watch status 写入 gate，随后手动中断常驻 watch |
+| `npm run agent:monitor` | stable；watch healthy，E2E fresh，failed `0` |
+| `npm run agent:gate` | passed；gate blocker `0`，issues `[]` |
+| `npm run agent:sync` | passed；gate chain、agent-context、Obsidian handoff、evidence chain 与 strict Obsidian guard aligned |
 
-**已实现**:
-- Margin Annotation
-- PDF Background Color
+截至 `2026-05-16T10:08Z`，`STYLE-MERGE-ANNOTATIONS-WRITEBACK-E2E-WAVE-001` 已完成 enabled real Zotero writeback workflow evidence 刷新并通过 dev gate：
 
-### 4. Collection 功能 (Collection Evidence)
+| 命令 / 证据 | 结果 |
+| --- | --- |
+| Scenario listing | passed；`merge annotations enabled writeback workflow` 已注册 |
+| Enabled writeback scenario | passed；`1/1`，live Item Pane button create/update 同一个 ToolsBox-owned child note |
+| Default-off scenario | passed；未注入 pref 时 section 不注册 |
+| Targeted ItemPane / Merge Annotations / feature-composer / zotero-script / docs-consistency | passed；`46/46` |
+| `npm run docs:sync-current-truth -- --check` | passed；current truth marker blocks in sync |
+| `npm run agent:check` | passed；full test 链单轮结束，`1577/1577` |
+| `npm run agent:zotero:e2e -- --no-ui-capture` | passed；2 cycles，status `passed`，issues `[]` |
+| `npm run zotero:watch` | startup health passed；fresh watch status 写入 gate，随后手动停止常驻 watch |
+| `npm run agent:monitor` | stable；failed `0` |
+| `npm run agent:gate` | passed；gate issues `[]`，validation level `visual-recommended` 且非阻断 |
+| `npm run agent:sync` | passed；gate chain、agent-context、Obsidian handoff、evidence chain 与 strict Obsidian guard aligned |
 
-**已实现**:
-- Collection Item Count
-- Collection Sort
-- Favorite Collections
+截至 `2026-05-16T16:20Z`，`STYLE-BACKLINKS-LOCAL-GRAPH-E2E-WAVE-001` 已完成 enabled local graph/drilldown evidence 刷新并通过 dev gate：
 
----
+| 命令 / 证据 | 结果 |
+| --- | --- |
+| Scenario listing | passed；`backlinks local graph drilldown workflow` 已注册 |
+| Enabled graph/drilldown scenario | passed；`1/1`，live Item Pane graph/list 渲染本地 backlink sources，drilldown 选择来源条目，`itemSnapshotsUnchanged=true` |
+| Default-off branch | passed；未注入 pref 时 `backlinks.enabled=false` 且 section 不注册 |
+| Combined targeted Backlinks / feature-composer / docs-consistency | passed；`27/27` |
+| `npm run docs:sync-current-truth -- --check` | passed；current truth marker blocks in sync |
+| `npm run agent:check` | passed；full test 链单轮结束，`1582/1582` |
+| `npm run agent:zotero:e2e -- --no-ui-capture` | passed；2 cycles，cycle tests `3/3`，scenario `31/31` each cycle，scenario failed `0`，runtime log error `0`，UI capture skipped by flag |
+| `npm run zotero:watch` | startup health passed；fresh watch status healthy，startup error/warning `0/0`，随后手动停止常驻 watch |
+| `npm run agent:monitor` | stable；`12/12`，watch healthy，E2E fresh，failed `0` |
+| `npm run agent:gate` | passed；gate issues `[]`，validation level `visual-recommended` 且非阻断 |
+| `npm run agent:sync` | passed；gate chain、agent-context、Obsidian handoff、evidence chain 与 strict Obsidian guard aligned |
 
-## 代码位置证据
+截至 `2026-05-16T17:29Z`，`STYLE-BACKLINKS-VISUAL-EVIDENCE-CLOSURE-WAVE-001` 已完成完整 UI capture evidence 分类并通过 dev gate：
 
-### ItemTree 列实现
+| 命令 / 证据 | 结果 |
+| --- | --- |
+| Combined targeted Backlinks / feature-composer / docs-consistency | passed；`27/27` |
+| `npm run docs:sync-current-truth -- --check` | passed；current truth marker blocks in sync |
+| `npm run agent:zotero:e2e` | completed with visual drift；2 cycles，tests `3/3`，scenario `31/31`，scenario failed `0`，runtime log error `0`，visual drift / size mismatch reported |
+| Visual classification | non-blocking `visual-recommended` debt；Reader drift `7.92% > 5.00%` and surface-local preference/item/context/reader captures drifted from existing baselines |
+| Baseline update | not run；no intentional UI change in this wave |
+| `npm run agent:zotero:e2e -- --no-ui-capture` | passed；2 cycles，scenario failed `0`，runtime log error `0`，Backlinks default-off branch reports `backlinks.enabled=false` and `sectionRegistered=false` |
+| Surface smoke / DOM contract | passed；item pane DOM contract advisory, preference pane surface smoke, library item pane surface smoke, and reader surface smoke all passed in no-ui E2E |
+| `npm run zotero:watch` | startup health passed；fresh watch status healthy，startup error/warning `0/0`，随后手动停止常驻 watch |
+| `npm run agent:monitor` | stable；`12/12`，watch healthy，E2E fresh，failed `0` |
+| `npm run agent:gate` | passed；gate issues `[]`，validation level `visual-recommended` 且非阻断 |
 
-| 功能 | 文件位置 | 注册位置 |
-|------|---------|---------|
-| Reading Time | src/features/reading-time-column.js | feature-composer.js:393 |
-| Annotation | src/features/annotation-column.js | feature-composer.js:406 |
-| Publication Tags | src/features/publication-tags-column.js | feature-composer.js:419 |
-| IF Column | src/features/if-column.js | feature-composer.js:452 |
-| Cited Count | src/features/cited-count-column.js | feature-composer.js:282 |
+完整 UI capture 的 `npm run agent:zotero:e2e` 曾出现 Reader focus / activation brightness 类视觉漂移；当前 validation level 是 `visual-recommended`，且 Backlinks 保持 default-off、不触达偏好设置面板可操作入口，因此该视觉证据属于后续建议项，不作为本波功能闭环 blocker。
 
-### Preference Pane 实现
+截至 `2026-05-17T02:50+08:00`，`STYLE-CLOSURE-AND-RELEASE-PREFLIGHT-WAVE-001` 已完成合并前 closure 与 release-only 本地预检证据刷新；不新增 Style runtime 功能，不刷新 visual baseline，不执行真实远端上传：
 
-| 组件 | 文件位置 |
-|------|---------|
-| XUL Template | addon-static/content/preferences.xhtml |
-| Controller | addon-static/content/preferences.js |
-| CSS | addon-static/content/preferences.css |
-| Registration | feature-composer.js:153 |
+| 命令 / 证据 | 结果 |
+| --- | --- |
+| `npm run docs:sync-current-truth -- --check` | passed；current truth marker blocks in sync |
+| Combined targeted Backlinks / feature-composer / docs-consistency | passed；`27/27` |
+| `npm run agent:check` | passed；full test 链单轮结束，`1582/1582` |
+| `npm run zotero:watch` | startup health passed；watch status `健康`，startup error/warning `0/0`，随后手动停止常驻 watch |
+| `npm run agent:monitor` | stable；failed `0` |
+| `npm run agent:gate` | passed；gate issues `[]`，validation level `visual-recommended` 且非阻断 |
+| `npm run agent:sync` | passed；gate chain、agent-context、Obsidian handoff、evidence chain 与 strict Obsidian guard aligned |
+| `npm run release:plan` | passed；生成 `dist/toolsbox-0.1.0.xpi`、`dist/update.json`、`dist/release-manifest.json`、`dist/release-preflight.json`、`dist/release-plan.json`、`dist/release-matrix.json` 与 release notes |
+| Release identity / integrity | addonId `toolsbox@orlandozh.github`，version `0.1.0`，updateURL `https://github.com/OrlandoZh/ToolsBox/releases/download/release/update.json`，update_link `https://github.com/OrlandoZh/ToolsBox/releases/download/release/toolsbox-0.1.0.xpi`，XPI SHA256 `6aa361482f60bb62412b5678f359b6951d3b0b2d2a92041c97ad8c8165f7b965` |
+| `npm run release:upload -- --provider github-release --release-tag release --target-base-url https://github.com/OrlandoZh/ToolsBox/releases/download/release/` | passed；`dist/release-upload-plan.json` status `passed`，`executionMode="plan-only"`，`networkActionsPerformed=false` |
+| Release matrix | `attention`；stable / beta profile 均等待真实远端 update.json / update_link 验证，作为下一波 remote distribution 边界 |
 
-### Reader 功能实现
+截至 `2026-05-17T03:05+08:00`，`RELEASE-REMOTE-DISTRIBUTION-WAVE-001` 已完成远端 readiness 安全检查，当前 blocked / awaiting explicit remote publishing choice：
 
-| 功能 | 文件位置 | 注册位置 |
-|------|---------|---------|
-| Margin Annotation | src/features/margin-annotation.js | feature-composer.js:466 |
-| PDF Background | src/features/pdf-background-color.js | feature-composer.js:479 |
+| 命令 / 证据 | 结果 |
+| --- | --- |
+| `git remote -v` | 当前 origin 为 `https://github.com/OrlandoZh/AddonTemplate4Z.git`，与 release config 的 `OrlandoZh/ToolsBox` 不一致 |
+| `command -v gh` | passed；GitHub CLI 位于 `/opt/homebrew/bin/gh` |
+| `gh auth status -h github.com` | failed；未登录任何 GitHub host，不能执行 authenticated release upload |
+| `gh release view release --repo OrlandoZh/ToolsBox` | failed；因 GitHub CLI 未登录而无法查询 release |
+| `curl -sI https://github.com/OrlandoZh/ToolsBox` | HTTP `404`；目标仓库在未登录视角下不可见或不存在 |
+| `curl -sI https://github.com/OrlandoZh/ToolsBox/releases/download/release/update.json` | HTTP `404`；远端 update.json 尚不可达 |
+| `curl -sI https://github.com/OrlandoZh/ToolsBox/releases/download/release/toolsbox-0.1.0.xpi` | HTTP `404`；远端 XPI 尚不可达 |
+| `curl -sI https://github.com/OrlandoZh/AddonTemplate4Z/releases/download/release/update.json` | HTTP `404`；当前 origin 对应 release asset 同样不可达 |
+| Release decision | 不运行真实 `gh release create/upload`、不运行 `release:preflight -- --verify-remote` 覆盖本地 passed preflight；等待用户确认目标远端与认证方式 |
 
-### Collection 功能实现
+截至 `2026-05-17`，`RELEASE-FREEZE-WAVE-001` 已按用户“先冻结发布”的指令进入 no-remote-mutation 状态：
 
-| 功能 | 文件位置 | 注册位置 |
-|------|---------|---------|
-| Item Count | src/features/collection-item-count.js | feature-composer.js:355 |
-| Sort | src/features/collection-sort.js | feature-composer.js:367 |
-| Favorites | src/features/favorite-collections.js | feature-composer.js:380 |
+| 命令 / 证据 | 结果 |
+| --- | --- |
+| Freeze decision | 发布冻结；不继续三选一远端发布决策，不改 git remote，不改 `config/addon.config.json` 的 `updateURL` |
+| Retained release artifacts | 保留 `dist/toolsbox-0.1.0.xpi`、`dist/update.json`、`dist/release-manifest.json`、`dist/release-upload-plan.json` 与 plan-only upload evidence |
+| Retained readiness blockers | `OrlandoZh/ToolsBox` 与 release asset URL 仍记录为 HTTP `404`；GitHub CLI 未登录；origin 仍为 `OrlandoZh/AddonTemplate4Z` |
+| Forbidden while frozen | 不执行 `gh release create`、`gh release upload`、真实远端 asset mutation、`npm run release:preflight -- --verify-remote`、`npm run agent:gate:release` |
+| Validation scope | 只跑 docs sync、targeted docs-consistency 与 dev `agent:monitor` / `agent:gate` / `agent:sync` 这类本地非发布检查 |
+| `npm run docs:sync-current-truth -- --check` | passed；current truth marker blocks in sync |
+| Combined targeted Backlinks / feature-composer / docs-consistency | passed；`27/27` |
+| `npm run zotero:watch` | startup health passed；fresh watch status 写入 gate，随后停止常驻 watch |
+| `npm run agent:monitor` | stable；failed `0` |
+| `npm run agent:gate` | passed；issues `[]`，validation level `visual-not-needed`，matched override `release-freeze-wave-001` |
+| `npm run agent:sync` | passed；gate chain、agent-context、Obsidian handoff、evidence chain 与 strict Obsidian guard aligned |
 
----
+截至 `2026-05-16T05:48:43Z`，`STYLE-MERGE-ANNOTATIONS-PREVIEW-WAVE-001` 已完成 Merge Annotations local preview prototype 的 fresh evidence 刷新并通过 dev gate：
 
-## 构建证据
+| 命令 / 证据 | 结果 |
+| --- | --- |
+| Targeted Merge Annotations test | passed；`10/10` |
+| Targeted feature-composer test | passed；`7/7` |
+| Targeted docs-consistency test | passed；`6/6` |
+| Combined targeted Merge Annotations / feature-composer / docs-consistency | passed；`23/23` |
+| `npm run docs:sync-current-truth -- --check` | passed；current truth marker blocks in sync |
+| `npm run agent:check` | passed；full test 链单轮结束，`1567/1567` |
+| `npm run agent:zotero:e2e -- --no-ui-capture` | passed；2 cycles，cycle tests `3/3`，scenario `29/29` each cycle，scenario failed `0`，runtime log error `0`，visual drift `0`，DOM contract `passed`，scenario-bound capability `11/11` |
+| `npm run zotero:watch` | startup health passed；fresh watch status 写入 gate，随后手动中断常驻 watch |
+| `npm run agent:monitor` | stable；failed `0` |
+| `npm run agent:gate` | passed；gate issues `[]`，validation level `visual-recommended` 且非阻断 |
+| `npm run agent:sync` | passed；gate chain、agent-context、Obsidian handoff、evidence chain 与 strict Obsidian guard aligned |
 
-### Build Report
+截至 `2026-05-16T06:54:02Z`，`STYLE-MERGE-ANNOTATIONS-WRITEBACK-WAVE-001` 已完成 Merge Annotations note writeback workflow 的 fresh evidence 刷新并通过 dev gate：
 
-```json
-{
-  "generatedAt": "2026-05-11T11:57:25.121Z",
-  "addonRef": "toolsbox",
-  "addonVersion": "0.1.0",
-  "buildRoot": "build/toolsbox",
-  "bundlePath": "build/toolsbox/content/scripts/toolsbox.js"
-}
-```
+| 命令 / 证据 | 结果 |
+| --- | --- |
+| Targeted Merge Annotations writeback test | passed；`15/15` |
+| Targeted feature-composer test | passed；`7/7` |
+| Targeted docs-consistency test | passed；`6/6` |
+| Combined targeted Merge Annotations / feature-composer / docs-consistency | passed；`28/28` |
+| `npm run docs:sync-current-truth -- --check` | passed；current truth marker blocks in sync |
+| `npm run agent:check` | passed；full test 链单轮结束，`1572/1572` |
+| `npm run agent:zotero:e2e -- --no-ui-capture` | passed；2 cycles，cycle tests `3/3`，scenario `29/29` each cycle，scenario failed `0`，runtime log error `0`，visual drift `0`，DOM contract `passed`，scenario-bound capability `11/11` |
+| `npm run zotero:watch` | startup health passed；fresh watch status 写入 gate，随后手动中断常驻 watch |
+| `npm run agent:monitor` | stable；failed `0` |
+| `npm run agent:gate` | passed；gate issues `[]`，validation level `visual-recommended` 且非阻断 |
+| `npm run agent:sync` | passed；gate chain、agent-context、Obsidian handoff、evidence chain 与 strict Obsidian guard aligned |
 
-### Build Files
+## Surface Notes
 
-- manifest.json ✅
-- bootstrap.js ✅
-- prefs.js ✅
-- content/scripts/toolsbox.js ✅
-- content/preferences.xhtml ✅
-- locale/en-US/main.ftl ✅
+- 未实现能力保持 planned/default-off，不需要截图证明“可用”。
+- default-off prototype 若未显式启用，不应以偏好面板截图证明功能完成。
+- 如果 E2E 报视觉漂移，先看 surface smoke / DOM contract 是否通过；整窗截图只能作为补充证据。
 
----
+## High-risk Prototype Notes
 
-## 测试证据
+| Surface | 当前边界 |
+| --- | --- |
+| Collection DOM patch | default-off prototype；本波要求 owner-tagged DOM、重复注册不重复注入、destroy 清理 DOM / listener / notifier |
+| Reader `_iframeWindow` | default-off prototype；本波要求 bounded frame resolver，缺 frame/document/body/canvas 时 unavailable/no-op |
+| Attachment preview iframe | default-off prototype；本波要求幂等 cleanup、render 前 blank/remove 旧 iframe、稳定 empty state |
+| Backlinks item pane prototype | default-off prototype；本波要求 enabled isolated Zotero scenario 证明 live Item Pane local graph/list、async scanner、drilldown 选择来源条目、无 relation/item mutation、API 缺失 no-op、注册后幂等 cleanup |
+| Merge Annotations item pane prototype | default-off prototype；已补 enabled isolated Zotero scenario 证明 live Item Pane 按钮触发 ToolsBox 自有 child note create/update upsert、无重复 note、无 annotation mutation、API 缺失 no-op、注册后幂等 cleanup |
 
-### npm run check
+## 禁止口径
 
-| 检查项 | 结果 |
-|--------|------|
-| lint | ✅ Pass |
-| format:check | ✅ Pass |
-| typecheck | ✅ Pass |
-| verify | ✅ Pass |
-| cleanroom:audit | ✅ Pass |
-
-### npm test
-
-- **总测试数**: 313
-- **通过率**: 100%
-- **测试框架**: 自定义 test-framework.js
-
----
-
-## Contract 合规证据
-
-### 已满足项
-
-| Contract 要求 | 证据 |
-|--------------|------|
-| Feature inventory | docs/ACTUAL_STATUS.md |
-| Clean-room boundary | 源码重新实现 |
-| Preference Pane | addon-static/content/preferences.xhtml |
-| Default-off | addon.config.json (AI功能 disabled) |
-
-### 待修复项
-
-| Contract 要求 | 当前状态 | 缺失证据 |
-|--------------|---------|---------|
-| Wrapper Usage | 违规 | 需重构 Collection |
-| Surface Evidence | 本文档 | ✅ 正在创建 |
-| Cleanup 函数 | 缺失 | 需添加 |
-
----
-
-## 真机测试计划
-
-### 测试环境
-
-- Zotero 版本: 7.x
-- 安装方式: 开发模式 (build/toolsbox)
-
-### 测试清单
-
-1. Preference Pane 加载
-2. ItemTree 列显示
-3. Collection 功能
-4. Reader 功能
-5. AI 功能 (需 API key)
-
----
-
-## 截图计划
-
-**需要截图的 Surface**:
-1. Preference Pane - General 面板
-2. Preference Pane - Columns 面板
-3. ItemTree - Reading Time 列
-4. ItemTree - Annotation 列
-5. Collection - Favorite 标记
-
-**截图方法**: 真机测试时使用 Playwright 或手动截图
-
----
-
-## Evidence Summary
-
-| 类别 | 状态 | 完成度 |
-|------|------|--------|
-| 代码位置 | ✅ 记录 | 100% |
-| 构建产物 | ✅ 存在 | 100% |
-| 测试结果 | ✅ 通过 | 100% |
-| 截图证据 | ⏳ 待真机 | 0% |
-| Contract合规 | ⚠️ 部分 | 43% |
-
-**下一步**: 执行真机测试,补充截图证据
+- 不用单测数量包装完成度。
+- 不用功能文件数量包装完成度。
+- 不把配置存在等同于功能完成。
+- 不把 `zotero-style` 参考项目能力照搬成 ToolsBox 已实现能力。

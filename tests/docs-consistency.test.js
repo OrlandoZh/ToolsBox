@@ -291,13 +291,13 @@ describe("Documentation Consistency", () => {
     assert.ok(deliveryRights.includes("UNLICENSED"));
   });
 
-  it("should keep P2 marked as completed in backlog and roadmap", () => {
+  it("should keep P2 marked as completed background in backlog and roadmap", () => {
     const backlog = readDoc("docs/CURRENT_BACKLOG.md");
     const roadmap = readDoc("docs/AGENT_AUTONOMY_ROADMAP.md");
 
-    assert.ok(backlog.includes("`P2` 上下文感知记忆与趋势层深化已在本轮代码与测试中落地"));
-    assert.ok(backlog.includes("`本轮已完成`"));
-    assert.ok(roadmap.includes("`P2` 上下文感知记忆与趋势层深化已按代码与测试落地"));
+    assert.ok(backlog.includes("`P2` 上下文感知记忆与趋势层深化已完成并保留为背景"));
+    assert.ok(backlog.includes("历史基线收口"));
+    assert.ok(roadmap.includes("`P2` 上下文感知记忆与趋势层深化已完成并保留为背景"));
   });
 
   it("should keep the current truth marker blocks synchronized", () => {
@@ -315,7 +315,7 @@ describe("Documentation Consistency", () => {
     });
   });
 
-  it("should keep current truth aligned with the latest single-source stable state and next priority", () => {
+  it("should keep current truth aligned with the release freeze state", () => {
     const summary = readCurrentTruthSummary(process.cwd());
     const backlog = readDoc("docs/CURRENT_BACKLOG.md");
     const readme = readDoc("README.md");
@@ -325,119 +325,123 @@ describe("Documentation Consistency", () => {
     const legal = readDoc("LEGAL_RISK_CHECKLIST.md");
 
     [
+      "`RELEASE-FREEZE-WAVE-001`",
+      "`release-frozen-no-remote-mutation`",
+      "用户已要求“先冻结发布”",
+      "发布冻结期间只允许读取/保留现有 release artifacts",
+      "禁止执行 `gh release create`",
+      "`gh release upload`",
+      "真实远端 asset mutation",
+      "`npm run release:preflight -- --verify-remote`",
+      "`npm run agent:gate:release`",
+      "也不改 git remote 或 `config/addon.config.json` 的 `updateURL`",
+      "只有用户明确解冻并确认远端目标与认证方式后",
+      "`RELEASE-REMOTE-DISTRIBUTION-WAVE-001` 已完成安全 readiness 检查但未执行发布",
+      "`STYLE-CLOSURE-AND-RELEASE-PREFLIGHT-WAVE-001`",
+      "上一波 `STYLE-CLOSURE-AND-RELEASE-PREFLIGHT-WAVE-001` 已完成合并前 closure 与本地 release preflight",
+      "`dist/toolsbox-0.1.0.xpi`",
+      "`dist/update.json`",
+      "`dist/release-manifest.json`",
+      "`executionMode=\"plan-only\"`",
+      "`networkActionsPerformed=false`",
+      "Release artifact identity 已对齐",
+      "addonId `toolsbox@orlandozh.github`",
+      "XPI `dist/toolsbox-0.1.0.xpi` 的 SHA256",
+      "`dist/release-matrix.json` 当前为 `attention`",
+      "stable / beta profile 均等待真实远端验证",
+      "冻结期间该状态只作为 retained release readiness debt",
+      "HTTP `404`",
+      "`gh` CLI 已安装在 `/opt/homebrew/bin/gh`",
+      "`gh auth status -h github.com` 显示未登录",
+      "`git remote -v` 仍指向 `https://github.com/OrlandoZh/AddonTemplate4Z.git`",
+      "release config 指向 `OrlandoZh/ToolsBox`",
+      "冻结期间不再执行三选一发布决策",
+      "冻结未解除前，不运行真实 `gh release upload`",
+      "不改远端仓库",
+      "不运行 `npm run release:preflight -- --verify-remote` 覆盖本地 passed preflight",
+      "`STYLE-BACKLINKS-VISUAL-EVIDENCE-CLOSURE-WAVE-001`",
+      "视觉差异记录为 `visual-recommended` 非阻断 debt",
+      "`STYLE-BACKLINKS-LOCAL-GRAPH-E2E-WAVE-001`",
+      "`createFeatureComposer({ ..., zotero })`",
+      "`globalThis.Zotero`",
+      "`annotationColumn.enabled`",
+      "`annotationDistributionColumn.enabled`",
+      "Backlinks functional scope 已收口",
+      "`zotero:scenario -- --addon-pref backlinks.enabled=true`",
+      "live Item Pane local graph/list",
+      ".toolsbox-backlinks-drilldown-button",
+      "Backlinks section 不注册",
+      "local graph/list",
+      "不写 Zotero relation",
+      "不修改 item/note/annotation 数据",
+      "`backlinks.enabled=false`",
+      "`collectBacklinksForItemAsync`",
+      "`buildBacklinkGraphForItem`",
+      "`selectBacklinkSource`",
+      "`onAsyncRender`",
+      "ZoteroPane.selectItem",
+      "`npm run release:plan`",
+      "`npm run release:upload -- --provider github-release --release-tag release --target-base-url https://github.com/OrlandoZh/ToolsBox/releases/download/release/`",
+      "`planned/default-off`",
+      "`Style Editor`",
+      "`TLDR`",
+      "`Attachment Version`",
+      "`Custom External API`",
+      "`Paper Matrix Enhanced`",
+      "Backlinks semantic search / relation writeback / cross-library sync",
+      "不在偏好设置面板中表现为已可用功能",
+      "不把缺 API key 当作本轮主阻断",
+      "Collection DOM patch",
+      "Reader `_iframeWindow`",
+      "owner-tagged DOM",
+      "幂等 cleanup / destroy",
+      "本波不重新打开这些 surface",
+      "不把任何 prototype 升格为默认开启或 beta 可用入口",
+      "当前 release-only 历史线 `ENG-HIGH-104 / ENG-LOW-211~213` 已冻结在远端 readiness 之后",
       "`ENG-HIGH-103`",
       "`READER-HIGH-124 / READER-LOW-261~263`",
       "`READER-HIGH-125`",
       "`READER-HIGH-126`",
-      "`99%`",
-      "`2026-04-08T01:24:38.171Z`",
-      "`2026-04-08T01:26:26.211Z`",
-      "`2026-04-08T01:29:27.786Z`",
-      "`2026-04-06T06:35:06.375Z`",
-      "`2026-04-06T06:37:05.164Z`",
-      "`2026-04-06T06:37:56.329Z`",
-      "`2026-04-06T06:37:56.574Z`",
-      "`2026-04-04T10:03:46.084Z`",
-      "最新开发态 `agent:monitor` / `agent:gate`",
-      "`stable / ready`",
-      "`restart` 与 `hot-reload` 两轮均通过",
-      "`agent:zotero:e2e:update-baseline`",
-      "`visualEvidenceFailingItemCount`",
-      "受控刷新了一次 surface-local baseline",
-      "surface-local evidence 与基线比对均已通过",
-      "supplemental `capture-unstable`",
-      "blocking `surface-local` evidence 优先",
-      "dev-only 性能诊断链",
-      "`agent:zotero:memory`",
-      "memoryDiagnostics.json",
-      "`preferences.openPane` 为 `1113ms / 1600ms`",
-      "活动 `4/4` 全部通过",
-      "`latestPassed=true`",
-      "`gatePassed=true`",
-      "`zotero:watch`",
-      "`agent:context`",
-      "`runtime-compact-v1`",
       "`HOST-HIGH-201 / HOST-LOW-301~303`",
       "`ZOTERO-HOST-POLISH-WAVE-001`",
       "`OPTIONAL-BUNDLE-WAVE-001`",
-      "`config/optional-bundles.json`",
-      "`host-first -> live geometry / interaction consistency -> surface smoke -> surface-local evidence -> full gate`",
-      "`react-ui` 当前固定为 `ts-isolated + implemented + enabled=false`",
-      "`agent-runtime` 固定为 `ts-isolated + planned + enabled=false`",
-      "`ai-service` 固定为 `js-core + planned + enabled=false`",
-      "`build:react-ui`",
-      "`window-shell + theme-manager + host action gating`",
-      "`config/project-validation-surfaces.json`",
-      "`details.runtimeSanitization`",
-      "`exclusiveProjectRuntime=true`",
-      "project-managed `watch` `zotero` / `plugin-container`",
-      "`visibleBannerIDs=[mac-word-plugin-install-container]`",
-      "`main.ftl + i18n bridge`",
-      "`sync-reminder-container`",
-      "`post-upgrade-container`",
-      "`file-renaming-banner-container`",
-      "`retracted-items-container`",
-      "`architecture-warning-container`",
-      "`selectedTabMatched=true`",
-      "`capture-command-failed`",
-      "`windowBounds + sidebarWidth`",
-      "`ENG-HIGH-103` 的启动诊断 + runtime 清理 + `pre-capture settle`",
-      "`agent:gate:release`",
-      "`gatePassed=false`",
-      "`release-preflight` / `release-plan` / `release-matrix`",
-      "刷新为 `远端验证失败 / failed`",
-      "`readinessMode=native`",
-      "`apiReady=true`",
-      "`https://gitee.com/zouser/user/releases/download/1.1/update.json`",
-      "`updateURLHTTPStatus=200`",
-      "未包含 `cleanroom-template@example.com` 首条更新记录",
-      "未提供有效 `update_link`",
-      "仅用于这个模板仓库自身的远端发布验收与测试",
-      "下游项目仍需在各自 `config/addon.config.json` 中替换自己的 `addonId` / `homepage` / `updateURL`",
-      "`2026-04-04T11:51:00.836Z`",
-      "`2026-04-04T11:51:01.248Z`",
-      "`2026-04-04T11:53:52.789Z`",
-      "`2026-04-04T11:54:00.719Z`",
-      "`2026-04-04T11:54:09.269Z`",
-      "`2026-04-04T11:54:15.996Z`",
-      "`workflowState`",
-      "`gateContract`",
-      "`nextSteps`",
-      "`npm run agent:release`",
-      "`release-plan` 遥测",
-      "当前 active 开发阻断已清零",
-      "当前唯一未收口主线已切到 release-only 的 `ENG-HIGH-104 / ENG-LOW-211~213`",
-      "`ENG-HIGH-104 / ENG-LOW-211~213`",
+      "`P2` 上下文感知记忆与趋势层深化已完成并保留为背景",
+      "上一波 enabled E2E fresh 证据已刷新并通过 dev gate",
+      "combined targeted Backlinks / feature-composer / docs-consistency tests 为 `27/27`",
+      "`npm run agent:check` 通过并写入 fresh telemetry",
+      "`npm run agent:monitor` 为 `12/12`",
+      "上一波完整 UI capture 视觉证据已刷新并分类",
+      "`npm run agent:zotero:e2e`",
+      "不刷新视觉 baseline",
+      "`npm run agent:zotero:e2e -- --no-ui-capture` fresh 通过",
+      "`sectionRegistered=false`",
+      "视觉差异记录为 `visual-recommended` 非阻断 debt",
+      "本波只冻结 release，不新增功能",
     ].forEach((snippet) => {
       assert.ok(summary.includes(snippet), `Missing current-truth snippet: ${snippet}`);
     });
 
     [
-      "`2026-04-05T16:57:19.319Z`",
-      "`2026-04-05T16:50:34.863Z`",
-      "`2026-04-05T16:55:50.350Z`",
-      "`2026-04-05T16:47:07.196Z`",
-      "`2026-04-05T16:58:58.507Z`",
-      "`2026-04-05T16:58:58.729Z`",
-      "`visualDriftCount=0`",
-      "`blockerCount=0`",
+      "313 tests 100%",
+      "功能代码 100%",
+      "`99%`",
+      "当前唯一未收口主线已切到 release-only",
+      "`agent:gate` 当前已通过",
       "fresh visual evidence fully aligned",
-      "`startup / RDP bring-up timeout`",
-      "`failedStage=launch-session`",
-      "`agent:obsidian`",
-      "`watch stale`",
-      "`nextAction=npm run agent:gate`",
-      "`agent:gate` 为 `ready`",
-      "`2026-03-29T14:51:46.240Z`",
-      "`2026-03-30T02:18:25.631Z`",
-      "`2026-03-30T03:23:12.011Z`",
-      "`2026-03-30T03:24:42.589Z`",
-      "`2026-03-30T03:24:42.678Z`",
-      "`2026-03-29T17:31:23.539Z`",
       "缺少库视图截图",
       "缺少 Reader 截图",
       "双层口径",
       "`实际回归`",
+      "本波只在绿色 hardening baseline 上推进一个 default-off local Backlinks prototype",
+      "本波只在绿色 baseline 上推进一个 default-off local Merge Annotations note writeback workflow",
+      "本波已在绿色 baseline 上完成一个 default-off local Merge Annotations note writeback workflow",
+      "本波只补 enabled Merge Annotations 真实 Zotero Item Pane writeback/upsert E2E 证据",
+      "下一条未收口线是远端 `update.json` / `update_link` 真实分发闭环",
+      "真实远端 `update.json` / `update_link` 分发闭环留给下一波",
+      "本波只推进远端 release distribution readiness / closure",
+      "`remote-update-json-update-link-distribution-closure`",
+      "本轮“完成”只表示远端 `update.json` / `update_link` 真实分发闭环通过",
+      "远端 `update.json` 与其中的 `update_link` 真实公开可达",
     ].forEach((snippet) => {
       assert.equal(summary.includes(snippet), false, `Unexpected stale current-truth snippet: ${snippet}`);
     });
@@ -479,18 +483,72 @@ describe("Documentation Consistency", () => {
     assert.ok(roadmap.includes("`READER-HIGH-126`"));
     assert.ok(roadmap.includes("`AGENT_OBSIDIAN_VISUALS=1`"));
     assert.equal(readme.includes("`agent:gate` 当前已通过"), false);
-    assert.ok(assessment.includes("`gatePassed=true`"));
-    assert.ok(assessment.includes("`gatePassed=false`"));
+    assert.ok(assessment.includes("`STYLE-PROTOTYPE-HARDENING-WAVE-001`"));
     assert.equal(roadmap.includes("`capture-unstable` 不再是 fresh 主阻断"), false);
   });
 
-  it("should keep ENG-HIGH-104 as the only remaining mainline while preserving HOST-HIGH-201 as a closed batch", () => {
+  it("should keep release freeze as the current mainline while preserving prior closed batches", () => {
     const backlog = readDoc("docs/CURRENT_BACKLOG.md");
     const readme = readDoc("README.md");
     const checklist = readDoc("FRAMEWORK_CHECKLIST.md");
     const assessment = readDoc("FRAMEWORK_ASSESSMENT.md");
     const roadmap = readDoc("docs/AGENT_AUTONOMY_ROADMAP.md");
 
+    assert.ok(backlog.includes("`STYLE-PROTOTYPE-HARDENING-WAVE-001`"));
+    assert.ok(readme.includes("`STYLE-PROTOTYPE-HARDENING-WAVE-001`"));
+    assert.ok(checklist.includes("`STYLE-PROTOTYPE-HARDENING-WAVE-001`"));
+    assert.ok(assessment.includes("`STYLE-PROTOTYPE-HARDENING-WAVE-001`"));
+    assert.ok(roadmap.includes("`STYLE-PROTOTYPE-HARDENING-WAVE-001`"));
+    assert.ok(backlog.includes("`STYLE-BACKLINKS-LOCAL-WAVE-001`"));
+    assert.ok(readme.includes("`STYLE-BACKLINKS-LOCAL-WAVE-001`"));
+    assert.ok(backlog.includes("`STYLE-MERGE-ANNOTATIONS-PREVIEW-WAVE-001`"));
+    assert.ok(readme.includes("`STYLE-MERGE-ANNOTATIONS-PREVIEW-WAVE-001`"));
+    assert.ok(backlog.includes("`STYLE-MERGE-ANNOTATIONS-WRITEBACK-WAVE-001`"));
+    assert.ok(readme.includes("`STYLE-MERGE-ANNOTATIONS-WRITEBACK-WAVE-001`"));
+    assert.ok(backlog.includes("`STYLE-MERGE-ANNOTATIONS-WRITEBACK-E2E-WAVE-001`"));
+    assert.ok(readme.includes("`STYLE-MERGE-ANNOTATIONS-WRITEBACK-E2E-WAVE-001`"));
+    assert.ok(backlog.includes("`STYLE-BACKLINKS-VISUAL-EVIDENCE-CLOSURE-WAVE-001`"));
+    assert.ok(readme.includes("`STYLE-BACKLINKS-VISUAL-EVIDENCE-CLOSURE-WAVE-001`"));
+    assert.ok(backlog.includes("`STYLE-CLOSURE-AND-RELEASE-PREFLIGHT-WAVE-001`"));
+    assert.ok(readme.includes("`STYLE-CLOSURE-AND-RELEASE-PREFLIGHT-WAVE-001`"));
+    assert.ok(backlog.includes("`RELEASE-FREEZE-WAVE-001`"));
+    assert.ok(readme.includes("`RELEASE-FREEZE-WAVE-001`"));
+    assert.ok(backlog.includes("`release-frozen-no-remote-mutation`"));
+    assert.ok(readme.includes("`release-frozen-no-remote-mutation`"));
+    assert.ok(backlog.includes("用户已要求“先冻结发布”"));
+    assert.ok(readme.includes("用户已要求“先冻结发布”"));
+    assert.ok(backlog.includes("`RELEASE-REMOTE-DISTRIBUTION-WAVE-001` 已完成安全 readiness 检查但未执行发布"));
+    assert.ok(readme.includes("`RELEASE-REMOTE-DISTRIBUTION-WAVE-001` 已完成安全 readiness 检查但未执行发布"));
+    assert.ok(backlog.includes("`dist/release-matrix.json` 当前为 `attention`"));
+    assert.ok(readme.includes("`dist/release-matrix.json` 当前为 `attention`"));
+    assert.ok(backlog.includes("`gh auth status -h github.com` 显示未登录"));
+    assert.ok(readme.includes("`gh auth status -h github.com` 显示未登录"));
+    assert.ok(backlog.includes("`git remote -v` 仍指向 `https://github.com/OrlandoZh/AddonTemplate4Z.git`"));
+    assert.ok(readme.includes("`git remote -v` 仍指向 `https://github.com/OrlandoZh/AddonTemplate4Z.git`"));
+    assert.ok(backlog.includes("冻结未解除前，不运行真实 `gh release upload`"));
+    assert.ok(readme.includes("冻结未解除前，不运行真实 `gh release upload`"));
+    assert.equal(backlog.includes("当前 active expansion wave: `RELEASE-REMOTE-DISTRIBUTION-WAVE-001`"), false);
+    assert.equal(readme.includes("当前 active expansion wave: `RELEASE-REMOTE-DISTRIBUTION-WAVE-001`"), false);
+    assert.equal(backlog.includes("本波只推进远端 release distribution readiness / closure"), false);
+    assert.equal(readme.includes("本波只推进远端 release distribution readiness / closure"), false);
+    assert.ok(backlog.includes("`STYLE-BACKLINKS-LOCAL-GRAPH-E2E-WAVE-001`"));
+    assert.ok(readme.includes("`STYLE-BACKLINKS-LOCAL-GRAPH-E2E-WAVE-001`"));
+    assert.ok(backlog.includes("`zotero:scenario -- --addon-pref backlinks.enabled=true`"));
+    assert.ok(readme.includes("`zotero:scenario -- --addon-pref backlinks.enabled=true`"));
+    assert.ok(backlog.includes("默认仍为 `backlinks.enabled=false`"));
+    assert.ok(readme.includes("默认仍为 `backlinks.enabled=false`"));
+    assert.ok(backlog.includes("`.toolsbox-backlinks-drilldown-button`"));
+    assert.ok(readme.includes("`.toolsbox-backlinks-drilldown-button`"));
+    assert.ok(backlog.includes("不写 Zotero relation"));
+    assert.ok(readme.includes("不写 Zotero relation"));
+    assert.ok(backlog.includes("不修改 item/note/annotation 数据"));
+    assert.ok(readme.includes("不修改 item/note/annotation 数据"));
+    assert.ok(backlog.includes("Backlinks local prototype"));
+    assert.ok(readme.includes("Backlinks local prototype"));
+    assert.ok(backlog.includes("不追 `zotero-style` 全量复刻"));
+    assert.ok(readme.includes("不追 `zotero-style` 全量复刻"));
+    assert.ok(backlog.includes("planned/default-off"));
+    assert.ok(readme.includes("planned/default-off"));
     assert.ok(backlog.includes("`HOST-HIGH-201 / HOST-LOW-301~303`"));
     assert.ok(readme.includes("`HOST-HIGH-201 / HOST-LOW-301~303`"));
     assert.ok(checklist.includes("`HOST-HIGH-201 / HOST-LOW-301~303`"));
@@ -503,15 +561,8 @@ describe("Documentation Consistency", () => {
     assert.ok(checklist.includes("`ENG-HIGH-104 / ENG-LOW-211~213`"));
     assert.ok(assessment.includes("`ENG-HIGH-104 / ENG-LOW-211~213`"));
     assert.ok(roadmap.includes("`ENG-HIGH-104 / ENG-LOW-211~213`"));
-    assert.ok(backlog.includes("当前唯一未收口主线"));
-    assert.ok(readme.includes("当前唯一未收口主线"));
-    assert.ok(checklist.includes("当前唯一未收口主线"));
-    assert.ok(assessment.includes("当前唯一未收口主线"));
-    assert.ok(roadmap.includes("当前唯一未收口主线"));
-    assert.ok(backlog.includes("宿主可见 UI"));
-    assert.ok(backlog.includes("贴边式 geometry"));
-    assert.ok(backlog.includes("远端发布编排"));
-    assert.ok(backlog.includes("远端 `updateURL` 闭环验证"));
+    assert.ok(backlog.includes("当前 blocker 是用户已要求先冻结发布，目标远端仓库 / CLI auth / asset upload 尚未确认"));
+    assert.ok(readme.includes("当前 release-only 历史线 `ENG-HIGH-104 / ENG-LOW-211~213` 已冻结在远端 readiness 之后"));
     assert.equal(backlog.includes("当前 active 高逻辑已切到 `READER-HIGH-126`"), false);
     assert.equal(readme.includes("当前 active 高逻辑已切到 `READER-HIGH-126`"), false);
     assert.equal(assessment.includes("当前 active 高逻辑已切到 `READER-HIGH-126`"), false);
@@ -520,5 +571,7 @@ describe("Documentation Consistency", () => {
     assert.equal(readme.includes("`HOST-HIGH-201` 为当前主批次"), false);
     assert.equal(assessment.includes("`HOST-HIGH-201` 为当前主批次"), false);
     assert.equal(roadmap.includes("`HOST-HIGH-201` 为当前主批次"), false);
+    assert.equal(backlog.includes("当前唯一未收口主线已切到 release-only"), false);
+    assert.equal(readme.includes("当前唯一未收口主线已切到 release-only"), false);
   });
 });
