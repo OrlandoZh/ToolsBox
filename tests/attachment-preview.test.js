@@ -1,85 +1,120 @@
 /**
  * Attachment Preview Panel Tests
- * Tests for right sidebar PDF/image preview panel
+ * Tests for sidePanelArgs + render hijack right-sidebar PDF preview.
  */
 import { describe, it, beforeEach, afterEach, assert } from "./test-framework.js";
 import { createAttachmentPreview } from "../src/features/attachment-preview.js";
 
-function createMockLogger() {
-  const logs = [];
-  return {
-    logs,
-    debug(message, data) {
-      logs.push({ level: 'debug', message, data });
-    },
-    error(message, data) {
-      logs.push({ level: 'error', message, data });
-    },
-    warn(message, data) {
-      logs.push({ level: 'warn', message, data });
-    },
-    info(message, data) {
-      logs.push({ level: 'info', message, data });
-    }
-  };
-}
-
-function createMockI18n() {
-  return {
-    t(key, fallback) {
-      return fallback || key;
-    }
-  };
-}
-
-function createMockDocument() {
+function createMockMainWindow() {
   const elements = [];
-  return {
-    createElement(tagName) {
-      const element = {
-        tagName: tagName.toUpperCase(),
-        className: '',
-        style: {},
-        children: [],
-        textContent: '',
-        src: '',
-        appendChild(child) {
-          this.children.push(child);
-        },
-        remove() {
-          this.removed = true;
-        }
-      };
-      elements.push(element);
-      return element;
-    },
-    elements
-  };
-}
+  const intervals = new Set();
+  let renderCallCount = 0;
 
-function createMockItem(isAttachment, filePath) {
+  const librarySidenav = {
+    tagName: 'div',
+    render: function () { renderCallCount++; },
+    _render: null,
+    getAttribute() { return null; },
+    setAttribute() {},
+    addEventListener() {},
+    querySelector() { return null; },
+    children: [],
+  };
+
+  const readerSidenav = {
+    tagName: 'div',
+    render: function () {},
+    _render: null,
+    getAttribute() { return null; },
+    setAttribute() {},
+    addEventListener() {},
+    querySelector() { return null; },
+    children: [],
+  };
+
+  const itemPaneContent = {
+    tagName: 'deck',
+    querySelector() { return null; },
+    appendChild(el) { elements.push(el); },
+  };
+
   return {
-    isAttachment: () => isAttachment,
-    getFilePath: () => filePath
+    elements,
+    intervals,
+    librarySidenav,
+    readerSidenav,
+    renderCallCount: () => renderCallCount,
+    document: {
+      querySelector(selector) {
+        if (selector === '#zotero-view-item-sidenav') return librarySidenav;
+        if (selector === '#zotero-item-pane-content') return itemPaneContent;
+        if (selector === '#zotero-context-pane-sidenav') return readerSidenav;
+        return null;
+      },
+      createElementNS(ns, tagName) {
+        const el = {
+          tagName: tagName,
+          id: '',
+          classList: { add() {} },
+          style: {},
+          children: [],
+          setAttribute() {},
+          appendChild(child) { this.children.push(child); },
+          remove() { this.removed = true; },
+        };
+        elements.push(el);
+        return el;
+      },
+      createElement(tagName) {
+        const el = {
+          tagName: tagName,
+          id: '',
+          className: '',
+          children: [],
+          setAttribute() {},
+          appendChild(child) { this.children.push(child); },
+          remove() { this.removed = true; },
+        };
+        elements.push(el);
+        return el;
+      },
+    },
+    setInterval(fn, ms) {
+      const id = intervals.size + 1;
+      intervals.add(id);
+      return id;
+    },
+    clearInterval(id) {
+      intervals.delete(id);
+    },
+    setTimeout(fn) { fn(); },
+    MozXULElement: {
+      parseXULToFragment(xul) {
+        const frag = document.createDocumentFragment();
+        return frag;
+      },
+    },
   };
 }
 
 describe("Attachment Preview", () => {
   let mockZotero;
-  let registeredSections;
+  let mockWindow;
 
   beforeEach(() => {
-    registeredSections = [];
-
+    mockWindow = createMockMainWindow();
     mockZotero = {
-      ItemPaneManager: {
-        registerSection(options) {
-          registeredSections.push(options);
-        }
-      }
+      sidePanelArgs: null,
+      debug() {},
+      getMainWindow() {
+        return mockWindow;
+      },
+      Promise: {
+        delay(ms) {
+          return new Promise((resolve) => setTimeout(resolve, 1));
+        },
+      },
     };
-
-    globalThis.Zotero = mockZotero;
   });
 
   afterEach(() => {
@@ -87,127 +122,78 @@ describe("Attachment Preview", () => {
   });
 
   it("should register with proper API and return true", () => {
-    const logger = createMockLogger();
-    const i18n = createMockI18n();
-
-    const preview = createAttachmentPreview({ logger, i18n, zotero: mockZotero });
+    const preview = createAttachmentPreview({ zotero: mockZotero });
     const result = preview.register();
 
     assert.ok(result, "register should return true");
-    assert.equal(registeredSections.length, 1, "should register one section");
-    assert.equal(registeredSections[0].paneID, 'toolsbox-attachment-preview');
-    assert.equal(registeredSections[0].pluginID, 'toolsbox@orlandozh.github');
-    assert.typeOf(registeredSections[0].onItemChange, 'function');
-    assert.equal(preview.sectionID, 'toolsbox-attachment-preview');
+    assert.ok(mockZotero.sidePanelArgs, "sidePanelArgs should be created");
+    assert.equal(mockZotero.sidePanelArgs.length, 1, "should register one panel");
+    assert.equal(mockZotero.sidePanelArgs[0].name, 'preview');
+    assert.equal(mockZotero.sidePanelArgs[0].type, 'library');
+    assert.equal(mockZotero.sidePanelArgs[0].icon, 'chrome://toolsbox/content/icons/preview.svg');
+    assert.typeOf(mockZotero.sidePanelArgs[0].buildContent, 'function');
   });
 
-  it("should fail registration when ItemPaneManager not available", () => {
-    const logger = createMockLogger();
-    const i18n = createMockI18n();
+  it("should be idempotent on register", () => {
+    const preview = createAttachmentPreview({ zotero: mockZotero });
 
-    const preview = createAttachmentPreview({
-      logger,
-      i18n,
-      zotero: { ItemPaneManager: null }
-    });
-    const result = preview.register();
-
-    assert.notOk(result, "register should return false");
-    assert.equal(registeredSections.length, 0, "should not register any section");
-    assert.equal(logger.logs.filter(l => l.level === 'warn').length, 1, "should log warning");
+    assert.ok(preview.register(), "first register should return true");
+    assert.ok(preview.register(), "second register should return true");
+    assert.equal(mockZotero.sidePanelArgs.length, 1, "second register should skip push (idempotent)");
   });
 
-  it("should create preview container for attachment items with file path", () => {
-    const logger = createMockLogger();
-    const i18n = createMockI18n();
-    const doc = createMockDocument();
-    const mockItem = createMockItem(true, '/path/to/file.pdf');
+  it("should skip registration when Zotero unavailable", () => {
+    const preview = createAttachmentPreview({ zotero: null });
+    assert.equal(preview.register(), false);
+  });
 
-    const preview = createAttachmentPreview({ logger, i18n, zotero: mockZotero });
+  it("should cleanup intervals and clear state", () => {
+    const preview = createAttachmentPreview({ zotero: mockZotero });
     preview.register();
 
-    const section = registeredSections[0];
-    const container = section.onItemChange({ item: mockItem, doc });
+    const result = preview.cleanup();
 
-    assert.ok(container, "should return container element");
-    assert.equal(container.className, 'attachment-preview-container');
-    assert.equal(container.children.length, 1, "should have iframe child");
-    assert.equal(container.children[0].tagName, 'IFRAME');
-    assert.equal(container.children[0].src, 'moz-file://%2Fpath%2Fto%2Ffile.pdf');
-  });
-
-  it("should handle non-attachment items gracefully", () => {
-    const logger = createMockLogger();
-    const i18n = createMockI18n();
-    const doc = createMockDocument();
-    const mockItem = createMockItem(false, null);
-
-    const preview = createAttachmentPreview({ logger, i18n, zotero: mockZotero });
-    preview.register();
-
-    const section = registeredSections[0];
-    const container = section.onItemChange({ item: mockItem, doc });
-
-    assert.ok(container, "should return container element");
-    assert.equal(container.className, 'attachment-preview-container');
-    assert.equal(container.children.length, 1, "should render an empty-state child for non-attachment");
-    assert.equal(container.children[0].className, 'attachment-preview-empty');
-    assert.equal(container.children[0].textContent, 'No attachment selected');
-  });
-
-  it("should handle attachment items without file path", () => {
-    const logger = createMockLogger();
-    const i18n = createMockI18n();
-    const doc = createMockDocument();
-    const mockItem = createMockItem(true, null);
-
-    const preview = createAttachmentPreview({ logger, i18n, zotero: mockZotero });
-    preview.register();
-
-    const section = registeredSections[0];
-    const container = section.onItemChange({ item: mockItem, doc });
-
-    assert.ok(container, "should return container element");
-    assert.equal(container.className, 'attachment-preview-container');
-    assert.equal(container.children.length, 1, "should render an empty-state child when no file path");
-    assert.equal(container.children[0].className, 'attachment-preview-empty');
-    assert.equal(container.children[0].textContent, 'File not found');
-  });
-
-  it("should cleanup old iframe before rendering a new preview", () => {
-    const logger = createMockLogger();
-    const i18n = createMockI18n();
-    const doc = createMockDocument();
-    const firstItem = createMockItem(true, '/path/to/first.pdf');
-    const secondItem = createMockItem(true, '/path/to/second.pdf');
-
-    const preview = createAttachmentPreview({ logger, i18n, zotero: mockZotero });
-    preview.register();
-
-    const section = registeredSections[0];
-    const firstContainer = section.onItemChange({ item: firstItem, doc });
-    const firstIframe = firstContainer.children[0];
-    const secondContainer = section.onItemChange({ item: secondItem, doc });
-
-    assert.equal(firstIframe.src, 'about:blank');
-    assert.equal(firstIframe.removed, true);
-    assert.equal(secondContainer.children[0].src, 'moz-file://%2Fpath%2Fto%2Fsecond.pdf');
+    assert.ok(result.stopped, "cleanup should indicate stopped");
+    assert.ok(result.resources.includes('sidePanelArgs'), "should report sidePanelArgs resource");
+    assert.ok(result.resources.includes('sidenav-hijack'), "should report sidenav-hijack resource");
+    assert.ok(result.resources.includes('preview-elements'), "should report preview-elements resource");
   });
 
   it("should make cleanup idempotent", () => {
-    const logger = createMockLogger();
-    const i18n = createMockI18n();
-    const doc = createMockDocument();
-    const mockItem = createMockItem(true, '/path/to/file.pdf');
-
-    const preview = createAttachmentPreview({ logger, i18n, zotero: mockZotero });
+    const preview = createAttachmentPreview({ zotero: mockZotero });
     preview.register();
 
-    registeredSections[0].onItemChange({ item: mockItem, doc });
     const first = preview.cleanup();
     const second = preview.cleanup();
 
-    assert.deepEqual(first, { stopped: true, resources: ['iframe'] });
-    assert.deepEqual(second, { stopped: true, resources: ['iframe'] });
+    assert.deepEqual(second, { stopped: true, resources: ['sidePanelArgs', 'sidenav-hijack', 'preview-elements'] });
+    assert.equal(first.stopped, second.stopped);
+  });
+
+  it("should expose destroy as alias for cleanup", () => {
+    const preview = createAttachmentPreview({ zotero: mockZotero });
+    preview.register();
+
+    const result = preview.destroy();
+
+    assert.ok(result.stopped);
+    assert.ok(Array.isArray(result.resources));
+  });
+
+  it("should hijack library sidenav render", () => {
+    const preview = createAttachmentPreview({ zotero: mockZotero });
+    preview.register();
+
+    assert.ok(mockWindow.librarySidenav._render, "sidenav._render should be saved");
+    assert.typeOf(mockWindow.librarySidenav.render, 'function', "sidenav.render should be replaced");
+    assert.equal(mockWindow.renderCallCount(), 1, "initial render should have been triggered");
+  });
+
+  it("should hijack reader sidenav render", () => {
+    const preview = createAttachmentPreview({ zotero: mockZotero });
+    preview.register();
+
+    assert.ok(mockWindow.readerSidenav._render, "reader sidenav._render should be saved");
+    assert.typeOf(mockWindow.readerSidenav.render, 'function', "reader sidenav.render should be replaced");
   });
 });

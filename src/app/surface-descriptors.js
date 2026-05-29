@@ -43,6 +43,7 @@ export function createSurfaceDescriptors(config = {}) {
     relationshipGraphContextMenuID: `${addonRef}-research-graph-context`,
     paperMatrixCommandID: `${addonRef}-paper-matrix`,
     paperMatrixContextMenuID: `${addonRef}-paper-matrix-context`,
+    styleEditorCommandID: `${addonRef}-style-editor`,
     notesManagerCommandID: `${addonRef}-notes-manager`,
     notesManagerContextMenuID: `${addonRef}-notes-manager-context`,
     tabHelperCommandIDPrefix: `${addonRef}-tab-helper`,

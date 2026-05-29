@@ -4,7 +4,7 @@ import {
   createMenuStateResolver,
 } from "../src/features/menu-manager.js";
 
-function createManagerHarness() {
+function createManagerHarness(options = {}) {
   const calls = [];
   const unregisterCalls = [];
   const manager = createMenuManager({
@@ -13,7 +13,7 @@ function createManagerHarness() {
       error() {},
     },
     lifecycle: null,
-    i18n: null,
+    i18n: options.i18n || null,
     pluginID: "cleanroom-template@example.com",
     zotero: {
       MenuManager: {
@@ -106,6 +106,34 @@ describe("Menu Manager", () => {
     assert.equal(calls[0].menus[0].label, "Item Action");
     assert.equal(calls[1].target, manager.MENU_TARGETS.ITEM_PANE_INFO_ROW);
     assert.equal(calls[1].menus[0].label, "Field Action");
+  });
+
+  it("should provide a plain label fallback for l10n-only official menu items", () => {
+    const { manager, calls } = createManagerHarness({
+      i18n: {
+        t(key, fallback) {
+          return key === "cleanroom-menu-label" ? "打开 ToolsBox" : fallback;
+        },
+      },
+    });
+
+    manager.registerItemMenuItem({
+      id: "item-l10n-action",
+      l10nID: "cleanroom-menu-label",
+      onCommand() {},
+    });
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].menus[0].l10nID, "cleanroom-menu-label");
+    assert.equal(calls[0].menus[0].label, "打开 ToolsBox");
+
+    const menuElem = createFakeElement("menuitem", createFakeDocument());
+    calls[0].menus[0].onShowing(null, {
+      menuElem,
+      items: [{ id: 1 }],
+    });
+    assert.equal(menuElem.label, "打开 ToolsBox");
+    assert.equal(menuElem.getAttribute("label"), "打开 ToolsBox");
   });
 
   it("should register scene-oriented reader menubar helper to reader/menubar/view", () => {
@@ -241,7 +269,106 @@ describe("Menu Manager", () => {
     });
 
     assert.equal(manager.unregister(menuID), true);
-    assert.deepEqual(unregisterCalls, ["cleanroom-template@example.com:reader-item"]);
+    assert.deepEqual(unregisterCalls, ["reader-item", "cleanroom-template@example.com:reader-item"]);
+  });
+
+  it("should replace an existing official menu before registering the same id again", () => {
+    const { manager, calls, unregisterCalls } = createManagerHarness();
+
+    manager.registerItemMenuItem({
+      id: "item-action",
+      label: "First",
+      onCommand() {},
+    });
+    manager.registerItemMenuItem({
+      id: "item-action",
+      label: "Second",
+      onCommand() {},
+    });
+
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1].menus[0].label, "Second");
+    assert.deepEqual(unregisterCalls, [
+      "item-action",
+      "cleanroom-template@example.com:item-action",
+    ]);
+    assert.deepEqual(manager.getMenuRegistrationSnapshot("item-action")?.menus, [{
+      menuType: "menuitem",
+      label: "Second",
+    }]);
+  });
+
+  it("should promote fallback item menu registrations when the official API appears", () => {
+    const calls = [];
+    const unregisterCalls = [];
+    const zotero = {
+      MenuManager: {
+        unregisterMenu(menuID) {
+          unregisterCalls.push(menuID);
+        },
+      },
+    };
+    const manager = createMenuManager({
+      logger: {
+        debug() {},
+        error() {},
+      },
+      lifecycle: null,
+      i18n: null,
+      pluginID: "cleanroom-template@example.com",
+      zotero,
+    });
+
+    const menuID = manager.registerItemSubmenu({
+      id: "late-item-menu",
+      label: "Late Item Menu",
+      menus: [{
+        menuType: manager.MENU_TYPES.MENUITEM,
+        label: "Late Child",
+      }],
+    });
+
+    assert.equal(menuID, "late-item-menu");
+    assert.deepEqual(manager.getMenuRegistrationSnapshot(menuID), {
+      id: "late-item-menu",
+      registeredMenuID: "late-item-menu",
+      target: manager.MENU_TARGETS.LIBRARY_ITEM,
+      useOfficialAPI: false,
+      menuPaths: ["0", "0.0"],
+      menus: [{
+        menuType: "submenu",
+        label: "Late Item Menu",
+        menus: [{
+          menuType: "menuitem",
+          label: "Late Child",
+        }],
+      }],
+    });
+
+    zotero.MenuManager.registerMenu = (options) => {
+      calls.push(options);
+      return `${options.pluginID}:${options.menuID}`;
+    };
+
+    assert.equal(manager.isOfficialAPIAvailable(), true);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].target, manager.MENU_TARGETS.LIBRARY_ITEM);
+    assert.deepEqual(manager.getMenuRegistrationSnapshot(menuID), {
+      id: "late-item-menu",
+      registeredMenuID: "cleanroom-template@example.com:late-item-menu",
+      target: manager.MENU_TARGETS.LIBRARY_ITEM,
+      useOfficialAPI: true,
+      menuPaths: ["0", "0.0"],
+      menus: [{
+        menuType: "submenu",
+        label: "Late Item Menu",
+        menus: [{
+          menuType: "menuitem",
+          label: "Late Child",
+        }],
+      }],
+    });
+    assert.deepEqual(unregisterCalls, []);
   });
 
   it("should normalize reusable menu state from context and preference flags", () => {

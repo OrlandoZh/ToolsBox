@@ -893,11 +893,29 @@ function readReaderSidebarDomOpen(result = {}) {
   }
 
   const outerContainer = safeQuery(doc, "#outerContainer");
-  if (outerContainer && hasClassToken(outerContainer, "sidebarOpen")) {
+  if (outerContainer && (
+    hasClassToken(outerContainer, "sidebarOpen")
+    || hasClassToken(outerContainer, "viewsManagerOpen")
+  )) {
     return true;
   }
 
-  const sidebarToggleButton = safeQuery(doc, "#sidebarToggleButton");
+  if (doc.body && (
+    hasClassToken(doc.body, "sidebar-open")
+    || hasClassToken(doc.body, "sidebarOpen")
+  )) {
+    return true;
+  }
+
+  const sidebarContainer = safeQuery(doc, "#sidebarContainer");
+  if (sidebarContainer && hasClassToken(sidebarContainer, "sidebarOpen")) {
+    return true;
+  }
+
+  const sidebarToggleButton = safeQuery(
+    doc,
+    "#sidebarToggleButton, #viewsManagerToggleButton, #sidebarToggle, .toolbar .sidebar-toggle",
+  );
   if (sidebarToggleButton) {
     if (hasClassToken(sidebarToggleButton, "toggled")) {
       return true;
@@ -2767,14 +2785,20 @@ export function createHostActionRunner({
       const surfaceElement = result?.panel || result?.button || null;
       const sidebarButtonSurface = inspectElementSurface(result?.button || null);
       const sidebarPanelSurface = inspectElementSurface(result?.panel || null);
-      const activationStrategy = toPlainString(result?.activationStrategy);
-      const actionDispatched = Boolean(result?.actionDispatched);
-      const actionElementObserved = result?.actionElementObserved ?? Boolean(result?.button);
       const sidebarDomOpen = readReaderSidebarDomOpen(result);
       const sidebarOpenObserved = result?.uiState?.sidebarOpen === false
         ? sidebarDomOpen
         : result?.uiState?.sidebarOpen ?? sidebarDomOpen;
-      const liveUiActivation = activationPolicy !== "ui-required" || isLiveClickActivationStrategy(activationStrategy);
+      const alreadySatisfied = result?.alreadySatisfied === true
+        && result?.uiState?.sidebarView === view
+        && sidebarOpenObserved !== false;
+      const activationStrategy = toPlainString(result?.activationStrategy)
+        || (alreadySatisfied ? "already-selected" : null);
+      const actionDispatched = Boolean(result?.actionDispatched) || alreadySatisfied;
+      const actionElementObserved = result?.actionElementObserved ?? Boolean(result?.button);
+      const liveUiActivation = activationPolicy !== "ui-required"
+        || isLiveClickActivationStrategy(activationStrategy)
+        || alreadySatisfied;
       try {
         surfaceElement?.ownerGlobal?.focus?.();
         surfaceElement?.ownerDocument?.defaultView?.focus?.();
@@ -2789,11 +2813,13 @@ export function createHostActionRunner({
         details: {
           view,
           target,
-          surfaceEvidenceElement: surfaceElement === result?.panel
+          surfaceEvidenceElement: surfaceElement && surfaceElement === result?.panel
             ? "sidebar-panel"
-            : surfaceElement === result?.button
+            : surfaceElement && surfaceElement === result?.button
               ? "sidebar-button"
-              : null,
+              : alreadySatisfied
+                ? "state-only"
+                : null,
         },
       });
       const edgeState = buildEdgeAttachmentState({
@@ -2805,6 +2831,9 @@ export function createHostActionRunner({
         active: Boolean(surfaceElement) || sidebarOpenObserved === true || Number(result?.uiState?.sidebarWidth) > 0,
       });
       attachEdgeStateToSurfaceTarget(surfaceTarget, edgeState);
+      const stateOnlySidebarEvidence = !surfaceElement
+        && alreadySatisfied
+        && hasExplicitEdgeAttachmentHandling(edgeState);
       return buildResult({
         actionId,
         preconditions,
@@ -2814,6 +2843,7 @@ export function createHostActionRunner({
           sidebarOpen: result?.uiState?.sidebarOpen ?? null,
           sidebarDomOpen,
           sidebarOpenObserved,
+          alreadySatisfied,
           buttonFound: Boolean(result?.button),
           panelFound: Boolean(result?.panel),
           sidebarButtonSurface,
@@ -2835,19 +2865,24 @@ export function createHostActionRunner({
             domActual: sidebarDomOpen,
             observed: sidebarOpenObserved,
           }),
-          createCheck("sidebar-surface-observed", Boolean(result?.button || result?.panel), {
+          createCheck("sidebar-surface-observed", Boolean(result?.button || result?.panel) || stateOnlySidebarEvidence, {
             view,
+            stateOnlySidebarEvidence,
           }),
           createCheck("sidebar-surface-structure-observed", hasSurfaceStructure(sidebarPanelSurface)
             || hasSurfaceStructure(sidebarButtonSurface)
-            || hasSurfaceContent(sidebarButtonSurface), {
+            || hasSurfaceContent(sidebarButtonSurface)
+            || stateOnlySidebarEvidence, {
             sidebarButtonSurface,
             sidebarPanelSurface,
+            stateOnlySidebarEvidence,
           }),
           createCheck("sidebar-surface-content-observed", hasSurfaceContent(sidebarPanelSurface)
-            || hasSurfaceContent(sidebarButtonSurface), {
+            || hasSurfaceContent(sidebarButtonSurface)
+            || stateOnlySidebarEvidence, {
             sidebarButtonSurface,
             sidebarPanelSurface,
+            stateOnlySidebarEvidence,
           }),
           createCheck("sidebar-edge-geometry-ready", hasExplicitEdgeAttachmentHandling(edgeState), edgeState),
           createCheck("activation-strategy-observed", Boolean(activationStrategy), {

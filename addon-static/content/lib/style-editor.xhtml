@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" data-addon-ref="toolsbox" data-addon-name="ToolsBox">
+  <head>
+    <meta charset="utf-8" />
+    <title>Style Editor</title>
+    <link rel="stylesheet" type="text/css" href="./style-editor.css" />
+  </head>
+  <body>
+    <div id="style-editor-root" class="se-shell" data-toolsbox-owner="toolsbox-style-editor" data-toolsbox-style-editor-root="true">
+      <header class="se-header">
+        <div>
+          <h1>Style Editor</h1>
+          <p id="se-status" class="se-status">Local CSS prototype</p>
+        </div>
+        <div class="se-actions">
+          <button id="se-preview" type="button" class="se-btn">Preview</button>
+          <button id="se-save" type="button" class="se-btn se-btn-primary">Save</button>
+          <button id="se-reset" type="button" class="se-btn">Reset</button>
+        </div>
+      </header>
+
+      <main class="se-workspace">
+        <section class="se-editor-pane">
+          <label class="se-label" for="se-css">CSS</label>
+          <textarea id="se-css" class="se-textarea" spellcheck="false"></textarea>
+        </section>
+        <section
+          id="se-preview-root"
+          class="se-preview-pane"
+          data-toolsbox-owner="toolsbox-style-editor"
+          data-toolsbox-style-editor-root="true"
+        >
+          <div class="se-preview-card">
+            <div class="se-preview-title">ToolsBox Preview</div>
+            <div class="se-preview-row">
+              <span class="se-preview-chip">Item Pane</span>
+              <span class="se-preview-chip">Window</span>
+              <span class="se-preview-chip">Section</span>
+            </div>
+            <p class="se-preview-text">Saved CSS is scoped to ToolsBox-owned roots.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="./style-editor.js"></script>
+  </body>
+</html>

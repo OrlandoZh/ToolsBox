@@ -165,6 +165,9 @@ cleanroom-nm-window-title = Notes & Annotation Manager
 # Paper Matrix
 cleanroom-pm-command-label = Open Paper Matrix
 cleanroom-pm-window-title = Paper Matrix
+# Style Editor
+cleanroom-style-editor-command-label = Open Style Editor
+cleanroom-style-editor-window-title = Style Editor
 # Relationship Graph
 cleanroom-rg-command-label = Open Relationship Graph
 cleanroom-rg-window-title = Relationship Graph
@@ -219,6 +222,28 @@ toolsbox-attachment-version-empty = No attachment versions
 toolsbox-attachment-version-modified = Modified
 toolsbox-attachment-version-selected = Selected
 toolsbox-attachment-version-omitted = attachments omitted
+# TLDR
+toolsbox-section-tldr = TLDR
+toolsbox-tldr-loading = Preparing local TLDR preview...
+toolsbox-tldr-no-item = No item selected
+toolsbox-tldr-item-type = Item type
+toolsbox-tldr-abstract-length = Abstract length
+toolsbox-tldr-empty-abstract = No abstract available
+toolsbox-tldr-request-preview = Request preview
+toolsbox-tldr-provider-unavailable = Provider unavailable
+# Custom External API
+toolsbox-section-custom-external-api = Custom External API
+toolsbox-custom-external-api-loading = Preparing local request preview...
+toolsbox-custom-external-api-no-item = No item selected
+toolsbox-custom-external-api-item-type = Item type
+toolsbox-custom-external-api-endpoint = Endpoint
+toolsbox-custom-external-api-endpoint-missing = Endpoint missing
+toolsbox-custom-external-api-request-preview = Request preview
+toolsbox-custom-external-api-tags = Tags
+toolsbox-custom-external-api-run = Run
+toolsbox-custom-external-api-running = Running request...
+toolsbox-custom-external-api-result = Result
+toolsbox-custom-external-api-idle = Ready to send one explicit request
 # Annotation Manager
 toolsbox-menu-annotation-manager = Annotation Manager
 toolsbox-annotation-manager-title = Annotation Manager

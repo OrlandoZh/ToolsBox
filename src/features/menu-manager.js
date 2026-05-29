@@ -444,7 +444,48 @@ export function createMenuManager(options) {
       : null;
   }
 
+  function normalizeMenuLabel(value) {
+    return typeof value === "string" && value.trim() ? value.trim() : null;
+  }
+
+  function resolveMenuLabel(menuItem) {
+    const explicitLabel = normalizeMenuLabel(menuItem?.label);
+    if (explicitLabel) {
+      return explicitLabel;
+    }
+
+    const l10nID = normalizeMenuLabel(menuItem?.l10nID);
+    if (!l10nID) {
+      return null;
+    }
+
+    if (i18n && typeof i18n.t === "function") {
+      try {
+        const translated = menuItem?.l10nArgs && typeof menuItem.l10nArgs === "object"
+          ? i18n.t(l10nID, menuItem.l10nArgs, l10nID)
+          : i18n.t(l10nID, l10nID);
+        const normalized = normalizeMenuLabel(translated);
+        if (normalized && normalized !== l10nID) {
+          return normalized;
+        }
+      }
+      catch {}
+    }
+
+    return null;
+  }
+
+  function applyPlainMenuLabel(menuElem, label) {
+    const normalizedLabel = normalizeMenuLabel(label);
+    if (!menuElem || !normalizedLabel) {
+      return;
+    }
+    setElementAttribute(menuElem, "label", normalizedLabel);
+    menuElem.label = normalizedLabel;
+  }
+
   function wrapMenuData(menuId, menuItem, path = "0", menuPaths = []) {
+    const resolvedLabel = resolveMenuLabel(menuItem);
     const data = {
       menuType: menuItem.menuType || MENU_TYPES.MENUITEM,
     };
@@ -454,9 +495,12 @@ export function createMenuManager(options) {
       if (menuItem.l10nArgs) {
         data.l10nArgs = menuItem.l10nArgs;
       }
+      if (resolvedLabel) {
+        data.label = resolvedLabel;
+      }
     }
-    else if (menuItem.label) {
-      data.label = menuItem.label;
+    else if (resolvedLabel) {
+      data.label = resolvedLabel;
     }
 
     if (menuItem.icon) {
@@ -473,6 +517,9 @@ export function createMenuManager(options) {
     const wrapHook = (hookName, original) => (event, context) => {
       try {
         setLiveMenuBinding(context, menuId, path);
+        if (resolvedLabel) {
+          applyPlainMenuLabel(context?.menuElem, resolvedLabel);
+        }
         if (typeof original === "function") {
           return original(event, context);
         }
@@ -484,7 +531,7 @@ export function createMenuManager(options) {
     };
 
     data.onShowing = wrapHook("onShowing", menuItem.onShowing);
-    if (typeof menuItem.onShown === "function") {
+    if (typeof menuItem.onShown === "function" || resolvedLabel) {
       data.onShown = wrapHook("onShown", menuItem.onShown);
     }
     if (typeof menuItem.onHiding === "function") {
@@ -552,6 +599,19 @@ export function createMenuManager(options) {
     };
   }
 
+  function collectMenuPaths(menuItem, path = "0", menuPaths = []) {
+    if (menuItem?.menuType === MENU_TYPES.SUBMENU && Array.isArray(menuItem.menus)) {
+      menuPaths.push(path);
+      menuItem.menus.forEach((child, index) => {
+        collectMenuPaths(child, `${path}.${index}`, menuPaths);
+      });
+    }
+    else {
+      menuPaths.push(path);
+    }
+    return menuPaths;
+  }
+
   function setElementAttribute(element, name, value) {
     if (!element || typeof element !== "object") {
       return;
@@ -607,9 +667,9 @@ export function createMenuManager(options) {
       return;
     }
 
-    if (typeof menuItem?.label === "string" && menuItem.label.trim()) {
-      setElementAttribute(menuElem, "label", menuItem.label.trim());
-      menuElem.label = menuItem.label.trim();
+    const resolvedLabel = resolveMenuLabel(menuItem);
+    if (resolvedLabel) {
+      applyPlainMenuLabel(menuElem, resolvedLabel);
     }
 
     if (typeof menuItem?.l10nID === "string" && menuItem.l10nID.trim()) {
@@ -916,6 +976,41 @@ export function createMenuManager(options) {
     context[RESOLVED_MENU_MODEL] = clonePlainValue(menuItem || {});
   }
 
+  function storeFallbackRegistration(menuId, target, config, menus, reason = "official-unavailable", menuPaths = null) {
+    debug("menuManager.register.fallback", { menuId, target, reason });
+
+    registeredMenus.set(menuId, {
+      id: menuId,
+      target,
+      config,
+      cleanup: () => {},
+      useOfficialAPI: false,
+      menuPaths: Array.isArray(menuPaths) ? [...menuPaths] : [],
+      menus: clonePlainValue(menus),
+    });
+
+    return menuId;
+  }
+
+  function promoteFallbackRegistration(menuId) {
+    const registration = registeredMenus.get(menuId);
+    if (!registration || registration.useOfficialAPI !== false || !registration.config || !hasOfficialAPI()) {
+      return registration || null;
+    }
+
+    const promotedId = register(registration.config);
+    return registeredMenus.get(promotedId) || registeredMenus.get(menuId) || registration;
+  }
+
+  function promoteFallbackRegistrations() {
+    if (!hasOfficialAPI()) {
+      return;
+    }
+    Array.from(registeredMenus.keys()).forEach((menuId) => {
+      promoteFallbackRegistration(menuId);
+    });
+  }
+
   /**
    * 注册菜单（使用官方 API）
    * @param {Object} config - 菜单配置
@@ -959,6 +1054,16 @@ export function createMenuManager(options) {
     // 使用官方 API
     if (hasOfficialAPI()) {
       try {
+        if (registeredMenus.has(menuId)) {
+          unregister(menuId);
+        }
+        else if (Zotero.MenuManager && typeof Zotero.MenuManager.unregisterMenu === "function") {
+          try {
+            Zotero.MenuManager.unregisterMenu(menuId);
+          }
+          catch {}
+        }
+
         const menuPaths = [];
         const menuData = menus.map((menuItem, index) => wrapMenuData(menuId, menuItem, `${index}`, menuPaths));
 
@@ -993,6 +1098,12 @@ export function createMenuManager(options) {
           debug("menuManager.register.created", { menuId, registeredMenuID, target });
           return menuId;
         }
+
+        error("menuManager.register.officialReturnedFalsy", {
+          menuId,
+          target,
+        });
+        return storeFallbackRegistration(menuId, target, config, menus, "official-returned-falsy", menuPaths);
       } catch (err) {
         error("menuManager.register.failed", {
           message: String(err?.message || err),
@@ -1003,19 +1114,11 @@ export function createMenuManager(options) {
     }
 
     // 降级：存储配置等待窗口加载
-    debug("menuManager.register.fallback", { menuId, target });
-
-    registeredMenus.set(menuId, {
-      id: menuId,
-      target,
-      config,
-      cleanup: () => {},
-      useOfficialAPI: false,
-      menuPaths: [],
-      menus: clonePlainValue(menus),
+    const fallbackMenuPaths = [];
+    menus.forEach((menuItem, index) => {
+      collectMenuPaths(menuItem, `${index}`, fallbackMenuPaths);
     });
-
-    return menuId;
+    return storeFallbackRegistration(menuId, target, config, menus, "official-unavailable", fallbackMenuPaths);
   }
 
   /**
@@ -1291,6 +1394,7 @@ export function createMenuManager(options) {
    * @returns {number}
    */
   function getMenuCount() {
+    promoteFallbackRegistrations();
     return registeredMenus.size;
   }
 
@@ -1300,6 +1404,7 @@ export function createMenuManager(options) {
    * @returns {boolean}
    */
   function hasMenu(menuId) {
+    promoteFallbackRegistration(menuId);
     return registeredMenus.has(menuId);
   }
 
@@ -1308,12 +1413,13 @@ export function createMenuManager(options) {
    * @returns {string[]}
    */
   function getRegisteredMenuIds() {
+    promoteFallbackRegistrations();
     return Array.from(registeredMenus.keys());
   }
 
   function getMenuRegistrationSnapshot(menuId = null) {
     if (menuId) {
-      const registration = registeredMenus.get(menuId);
+      const registration = promoteFallbackRegistration(menuId) || registeredMenus.get(menuId);
       return registration
         ? clonePlainValue({
           id: registration.id,
@@ -1325,6 +1431,7 @@ export function createMenuManager(options) {
         })
         : null;
     }
+    promoteFallbackRegistrations();
     return Array.from(registeredMenus.values()).map((registration) => clonePlainValue({
       id: registration.id,
       registeredMenuID: registration.registeredMenuID || registration.id,
@@ -1336,6 +1443,7 @@ export function createMenuManager(options) {
   }
 
   function getLiveMenuState(menuId, menuPath = null) {
+    promoteFallbackRegistration(menuId);
     const resolvedPath = pickMenuPath(menuId, menuPath);
     if (!resolvedPath) {
       return null;
@@ -1348,7 +1456,11 @@ export function createMenuManager(options) {
    * @returns {boolean}
    */
   function isOfficialAPIAvailable() {
-    return hasOfficialAPI();
+    const available = hasOfficialAPI();
+    if (available) {
+      promoteFallbackRegistrations();
+    }
+    return available;
   }
 
   // 如果提供了 lifecycle，注册自动清理

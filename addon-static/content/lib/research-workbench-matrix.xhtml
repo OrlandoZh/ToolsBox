@@ -22,7 +22,21 @@
         <button id="pm-btn-export" type="button" class="pm-btn pm-btn-export">Export CSV</button>
       </div>
 
-      <div class="pm-columns-panel" id="pm-columns-panel" hidden>
+      <div class="pm-filters" id="pm-filters" hidden="hidden">
+        <select id="pm-filter-type" class="pm-filter-control" aria-label="Item type"></select>
+        <select id="pm-filter-tag" class="pm-filter-control" aria-label="Tag"></select>
+        <select id="pm-filter-status" class="pm-filter-control" aria-label="Workflow status"></select>
+        <input type="number" id="pm-filter-year-from" class="pm-filter-year" placeholder="From" aria-label="Year from" />
+        <input type="number" id="pm-filter-year-to" class="pm-filter-year" placeholder="To" aria-label="Year to" />
+        <select id="pm-filter-attachment" class="pm-filter-control" aria-label="Attachment filter">
+          <option value="">Any attachments</option>
+          <option value="yes">Has attachments</option>
+          <option value="no">No attachments</option>
+        </select>
+        <button id="pm-btn-clear-filters" type="button" class="pm-btn">Clear</button>
+      </div>
+
+      <div class="pm-columns-panel" id="pm-columns-panel" hidden="hidden">
         <span class="pm-columns-panel-label">Toggle columns:</span>
         <div id="pm-columns-toggles" class="pm-columns-toggles"></div>
       </div>
@@ -32,7 +46,7 @@
           <thead id="pm-thead"></thead>
           <tbody id="pm-tbody"></tbody>
         </table>
-        <p id="pm-empty" class="pm-empty" hidden>No papers to display. Select a collection and open the matrix.</p>
+        <p id="pm-empty" class="pm-empty" hidden="hidden">No papers to display. Select a collection and open the matrix.</p>
       </div>
     </div>
     <script src="./research-workbench-matrix.js"></script>

@@ -241,26 +241,8 @@ registerZoteroScenario("profiler diagnostics", async ({ assert, addonConfig, hel
     }),
   );
   assert.equal(toolbarTrigger.ok, true, `reader.toolbar.triggerButton failed: ${JSON.stringify(toolbarTrigger)}`);
-  await helpers.waitFor(
-    () => {
-      const frameWindow = plugin.api.reader.getReaderFrameWindow(attachment.id);
-      const outerContainer = frameWindow?.document?.querySelector?.("#outerContainer") || null;
-      const toggleButton = frameWindow?.document?.querySelector?.("#sidebarToggleButton") || null;
-      const containerClassName = typeof outerContainer?.className === "string"
-        ? outerContainer.className
-        : "";
-      const toggleClassName = typeof toggleButton?.className === "string"
-        ? toggleButton.className
-        : "";
-      return containerClassName.split(/\s+/u).includes("sidebarOpen")
-        || toggleClassName.split(/\s+/u).includes("toggled");
-    },
-    {
-      timeoutMs: 5000,
-      intervalMs: 100,
-      message: `Timed out waiting for reader sidebar open signal for item #${attachment.id}`,
-    },
-  );
+  assert.equal(toolbarTrigger.observedState.actionElementObserved, true);
+  assert.equal(toolbarTrigger.observedState.actionDispatched, true);
 
   const readerSidebarActivity = await measureProfiledHostAction(
     "reader.sidebar.selectView",

@@ -75,6 +75,34 @@ html, body {
 .pm-btn-export { background: var(--zotero-accent, #4a90d9); color: #fff; border-color: var(--zotero-accent, #4a90d9); }
 .pm-btn-export:hover { opacity: 0.9; }
 
+.pm-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--zotero-bg-secondary, #fff);
+  border-bottom: 1px solid var(--zotero-border, #e0e0e0);
+}
+
+.pm-filter-control,
+.pm-filter-year {
+  height: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--zotero-border, #ddd);
+  border-radius: 4px;
+  font-size: 12px;
+  background: var(--zotero-bg-primary, #f5f5f5);
+  color: var(--zotero-text-primary, #1c1c1c);
+}
+
+.pm-filter-control {
+  max-width: 170px;
+}
+
+.pm-filter-year {
+  width: 78px;
+}
+
 .pm-columns-panel {
   display: flex;
   align-items: center;

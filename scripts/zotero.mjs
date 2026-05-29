@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs";
+import http from "node:http";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -212,6 +213,106 @@ export function buildAddonPrefUserPrefs(config, addonPrefs = []) {
     userPrefs[`${prefsPrefix}.${key}`] = parsed.value;
   }
   return userPrefs;
+}
+
+function isLoopbackHostname(hostname) {
+  const normalized = String(hostname || "").trim().toLowerCase();
+  return normalized === "127.0.0.1" || normalized === "localhost" || normalized === "::1" || normalized === "[::1]";
+}
+
+function findAddonPrefEntry(addonPrefs, key) {
+  return (Array.isArray(addonPrefs) ? addonPrefs : [])
+    .find((entry) => String(entry?.key || "").trim() === key) || null;
+}
+
+async function createCustomExternalAPIScenarioLoopback(addonPrefs = []) {
+  const enabledEntry = findAddonPrefEntry(addonPrefs, "customExternalAPI.enabled");
+  const endpointEntry = findAddonPrefEntry(addonPrefs, "customExternalAPI.endpoint");
+  if (enabledEntry?.value !== true || !endpointEntry) {
+    return null;
+  }
+
+  let endpointURL = null;
+  try {
+    endpointURL = new URL(String(endpointEntry.value || ""));
+  } catch {
+    return null;
+  }
+  if (endpointURL.protocol !== "http:" || !isLoopbackHostname(endpointURL.hostname)) {
+    return null;
+  }
+
+  const requests = [];
+  const expectedPath = endpointURL.pathname || "/";
+  const server = http.createServer((request, response) => {
+    const chunks = [];
+    request.on("data", (chunk) => {
+      chunks.push(chunk);
+    });
+    request.on("end", () => {
+      const bodyText = Buffer.concat(chunks).toString("utf-8");
+      let body = null;
+      try {
+        body = bodyText ? JSON.parse(bodyText) : null;
+      } catch {
+        body = null;
+      }
+      const requestRecord = {
+        method: request.method,
+        url: request.url,
+        body,
+      };
+      requests.push(requestRecord);
+      const ok = request.method === "POST" && String(request.url || "").startsWith(expectedPath);
+      const payload = {
+        ok,
+        received: true,
+        requestCount: requests.length,
+        method: request.method,
+        path: request.url,
+        schemaVersion: body?.schemaVersion ?? null,
+        capability: body?.capability || null,
+        consumer: body?.consumer || null,
+        payloadKeys: Object.keys(body?.payload || {}).sort(),
+        title: body?.payload?.title || "",
+      };
+      response.writeHead(ok ? 200 : 404, {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        connection: "close",
+      });
+      response.end(JSON.stringify(payload));
+    });
+  });
+
+  const requestedPort = Number(endpointURL.port || 0);
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(requestedPort, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  const address = server.address();
+  const actualPort = typeof address === "object" && address ? address.port : requestedPort;
+  const actualEndpoint = `http://127.0.0.1:${actualPort}${expectedPath}${endpointURL.search || ""}`;
+  const effectiveAddonPrefs = addonPrefs.map((entry) => (
+    String(entry?.key || "").trim() === "customExternalAPI.endpoint"
+      ? { ...entry, value: actualEndpoint }
+      : entry
+  ));
+
+  return {
+    endpoint: actualEndpoint,
+    requests,
+    addonPrefs: effectiveAddonPrefs,
+    close() {
+      return new Promise((resolve) => {
+        server.close(() => resolve());
+      });
+    },
+  };
 }
 
 export function parseCli(argv) {
@@ -841,7 +942,15 @@ export async function runScenarioMode({
       failedStage: "resolve-rdp-port",
     });
   });
-  const addonPrefUserPrefs = buildAddonPrefUserPrefs(config, addonPrefs);
+  const customExternalAPILoopback = listScenarios
+    ? null
+    : await createCustomExternalAPIScenarioLoopback(addonPrefs).catch((error) => {
+      throw wrapScriptError(error, {
+        failedStage: "start-custom-external-api-loopback",
+      });
+    });
+  const effectiveAddonPrefs = customExternalAPILoopback?.addonPrefs || addonPrefs;
+  const addonPrefUserPrefs = buildAddonPrefUserPrefs(config, effectiveAddonPrefs);
   const runtimeSanitization = await prepareRuntime({
     projectRoot: projectRootPath,
     profilePath: runnerConfig.profilePath,
@@ -883,6 +992,9 @@ export async function runScenarioMode({
     console.log(`[zotero:${mode}] RDP Port: ${rdpPort}`);
     if (Object.keys(addonPrefUserPrefs).length > 0) {
       console.log(`[zotero:${mode}] Add-on Pref Overrides: ${Object.keys(addonPrefUserPrefs).join(", ")}`);
+    }
+    if (customExternalAPILoopback) {
+      console.log(`[zotero:${mode}] Custom External API loopback: ${customExternalAPILoopback.endpoint}`);
     }
   }
 
@@ -965,6 +1077,9 @@ export async function runScenarioMode({
     });
   } finally {
     await stopManagedSession(session);
+    if (customExternalAPILoopback) {
+      await customExternalAPILoopback.close();
+    }
   }
 }
 

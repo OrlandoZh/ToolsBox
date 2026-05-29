@@ -315,7 +315,7 @@ describe("Documentation Consistency", () => {
     });
   });
 
-  it("should keep current truth aligned with the Attachment Version enabled E2E wave under release freeze", () => {
+  it("should keep current truth aligned with the Custom External API opt-in wave under release freeze", () => {
     const summary = readCurrentTruthSummary(process.cwd());
     const backlog = readDoc("docs/CURRENT_BACKLOG.md");
     const readme = readDoc("README.md");
@@ -325,29 +325,43 @@ describe("Documentation Consistency", () => {
     const legal = readDoc("LEGAL_RISK_CHECKLIST.md");
 
     [
-      "`STYLE-ATTACHMENT-VERSION-ENABLED-E2E-WAVE-001`",
-      "`enabled-attachment-version-local-preview-real-zotero-e2e`",
+      "`STYLE-CUSTOM-EXTERNAL-API-OPT-IN-WORKFLOW-WAVE-001`",
+      "`default-off-custom-external-api-opt-in-endpoint-workflow`",
       "`docs/evidence/STYLE_FEATURE_MATRIX.md`",
-      "`Attachment Version`",
-      "显式启用后的真实 Zotero workflow 证据",
-      "默认 `attachmentVersion.enabled=false`",
-      "真实 Item Pane section 能展示本地 child / sibling attachments 版本列表",
-      "重复 render 不残留旧 owner DOM",
+      "`Custom External API`",
+      "`toolsbox-custom-external-api`",
+      "opt-in endpoint invocation preview prototype",
+      "`customExternalAPI.enabled=false`",
+      "`customExternalAPI.endpoint=\"\"`",
+      ".toolsbox-custom-external-api-run-button",
+      "`custom/external-api`",
+      "`networkPolicy=\"allow-network\"`",
+      "`invokeExternal`",
+      "`schemaVersion: 1`",
+      "`consumer: \"customExternalAPI\"`",
+      "`networkUsed=true/false`",
+      "只渲染响应预览",
+      "不发送 notes/annotations/attachment bytes",
+      "不读取 PDF 全文",
+      "不写 Zotero item / note / annotation / attachment",
+      "AI provider contract 现在扩展为当前 wave 的 runtime 基座",
+      "`STYLE-AI-PROVIDER-CONTRACT-NO-NETWORK-WAVE-001`",
+      "`TLDR`",
+      "`tldrPanel.enabled=false`",
+      "`toolsbox-tldr-panel`",
+      "`summarizeItem`",
+      "`noop/mock-local`",
+      "`networkUsed=false`",
+      "不请求 OpenAI / custom endpoint",
+      "不新增 preference pane 控件",
+      "Style Editor 现在降为历史 baseline",
+      "Paper Matrix Enhanced 现在降为历史 baseline",
+      "`paperMatrix.enabled=false`",
+      "`toolsbox-paper-matrix`",
+      "paper matrix enhanced local workflow",
+      "Attachment Version 现在降为历史 baseline",
       "`attachmentVersion.enabled=false`",
-      "`toolsbox-attachment-version`",
-      "选中 regular item 时列出 child attachments",
-      "选中 attachment 时列出同 parent 下的 sibling attachments",
-      "owner-tagged DOM",
-      "`cleanup()` / `destroy()`",
       "`attachment version enabled preview workflow`",
-      "`zotero:scenario -- --addon-pref attachmentVersion.enabled=true`",
-      "不切换附件",
-      "不覆盖文件",
-      "不删除附件",
-      "不重命名附件",
-      "不创建 note",
-      "不改 annotation",
-      "不接网络/AI",
       "用户已要求“先冻结发布”",
       "禁止执行 `gh release create`",
       "`gh release upload`",
@@ -377,11 +391,6 @@ describe("Documentation Consistency", () => {
       "Merge Annotations 继续作为历史 baseline",
       "`mergeAnnotations.enabled=false`",
       "`planned/default-off`",
-      "`Style Editor`",
-      "`TLDR`",
-      "`Custom External API`",
-      "`Paper Matrix Enhanced`",
-      "下一波未完成内容优先级",
       "Backlinks semantic search / relation writeback / cross-library sync",
       "不在偏好设置面板中表现为已可用功能",
       "不把缺 API key 当作本轮主阻断",
@@ -389,8 +398,8 @@ describe("Documentation Consistency", () => {
       "Reader `_iframeWindow`",
       "owner-tagged DOM",
       "幂等 cleanup / destroy",
-      "本波不重新打开这些 surface",
-      "不把任何 prototype 升格为默认开启或 beta 可用入口",
+      "本波不重新打开 Collection DOM patch / Reader / margin annotation / PDF background 这些 surface",
+      "不把其它 prototype 升格为默认开启或 beta 可用入口",
       "当前 release-only 历史线 `ENG-HIGH-104 / ENG-LOW-211~213` 已冻结在远端 readiness 之后",
       "`ENG-HIGH-103`",
       "`READER-HIGH-124 / READER-LOW-261~263`",
@@ -403,7 +412,9 @@ describe("Documentation Consistency", () => {
       "Backlinks full UI visual evidence 分类",
       "release local preflight、release freeze closure",
       "本波不追 `zotero-style` 100% 复刻",
-      "Attachment Version enabled real Zotero local preview workflow evidence",
+      "Style Editor local CSS prototype",
+      "AI provider no-network contract",
+      "TLDR local Item Pane no-network preview",
     ].forEach((snippet) => {
       assert.ok(summary.includes(snippet), `Missing current-truth snippet: ${snippet}`);
     });
@@ -435,6 +446,18 @@ describe("Documentation Consistency", () => {
       "远端 `update.json` 与其中的 `update_link` 真实公开可达",
       "`planned-feature-matrix-and-local-attachment-version-preview`",
       "本波只推进一个 default-off local Attachment Version prototype 与 feature matrix",
+      "当前主线为 `STYLE-ATTACHMENT-VERSION-ENABLED-E2E-WAVE-001`",
+      "`enabled-attachment-version-local-preview-real-zotero-e2e`",
+      "当前只补 Attachment Version 显式启用后的真实 Zotero Item Pane 预览 workflow 证据",
+      "Paper Matrix Enhanced | planned/not implemented",
+      "Style Editor | planned/not implemented",
+      "下一波未完成内容优先级为：`Style Editor`",
+      "`default-off-paper-matrix-local-field-filter-preview`",
+      "本波只补 enhanced local workflow",
+      "当前主线为 `STYLE-AI-PROVIDER-CONTRACT-NO-NETWORK-WAVE-001`",
+      "当前 active expansion wave: `STYLE-AI-PROVIDER-CONTRACT-NO-NETWORK-WAVE-001`",
+      "`default-off-ai-provider-contract-no-network`；验收主线",
+      "本波只补 TLDR default-off local Item Pane no-network preview prototype",
     ].forEach((snippet) => {
       assert.equal(summary.includes(snippet), false, `Unexpected stale current-truth snippet: ${snippet}`);
     });
@@ -480,7 +503,7 @@ describe("Documentation Consistency", () => {
     assert.equal(roadmap.includes("`capture-unstable` 不再是 fresh 主阻断"), false);
   });
 
-  it("should keep Attachment Version enabled E2E as the current mainline while preserving release freeze", () => {
+  it("should keep Custom External API as the current mainline while preserving release freeze", () => {
     const backlog = readDoc("docs/CURRENT_BACKLOG.md");
     const readme = readDoc("README.md");
     const checklist = readDoc("FRAMEWORK_CHECKLIST.md");
@@ -508,20 +531,74 @@ describe("Documentation Consistency", () => {
     assert.ok(readme.includes("`STYLE-FEATURE-MATRIX-AND-ATTACHMENT-VERSION-WAVE-001`"));
     assert.ok(backlog.includes("`STYLE-ATTACHMENT-VERSION-ENABLED-E2E-WAVE-001`"));
     assert.ok(readme.includes("`STYLE-ATTACHMENT-VERSION-ENABLED-E2E-WAVE-001`"));
-    assert.ok(backlog.includes("`enabled-attachment-version-local-preview-real-zotero-e2e`"));
-    assert.ok(readme.includes("`enabled-attachment-version-local-preview-real-zotero-e2e`"));
+    assert.ok(backlog.includes("`STYLE-PAPER-MATRIX-ENHANCED-LOCAL-WAVE-001`"));
+    assert.ok(readme.includes("`STYLE-PAPER-MATRIX-ENHANCED-LOCAL-WAVE-001`"));
+    assert.ok(backlog.includes("`STYLE-EDITOR-LOCAL-CSS-PROTOTYPE-WAVE-001`"));
+    assert.ok(readme.includes("`STYLE-EDITOR-LOCAL-CSS-PROTOTYPE-WAVE-001`"));
+    assert.ok(backlog.includes("`STYLE-AI-PROVIDER-CONTRACT-NO-NETWORK-WAVE-001`"));
+    assert.ok(readme.includes("`STYLE-AI-PROVIDER-CONTRACT-NO-NETWORK-WAVE-001`"));
+    assert.ok(backlog.includes("`STYLE-TLDR-LOCAL-ITEM-PANE-PROTOTYPE-WAVE-001`"));
+    assert.ok(readme.includes("`STYLE-TLDR-LOCAL-ITEM-PANE-PROTOTYPE-WAVE-001`"));
+    assert.ok(backlog.includes("`STYLE-CUSTOM-EXTERNAL-API-OPT-IN-WORKFLOW-WAVE-001`"));
+    assert.ok(readme.includes("`STYLE-CUSTOM-EXTERNAL-API-OPT-IN-WORKFLOW-WAVE-001`"));
+    assert.ok(backlog.includes("`default-off-custom-external-api-opt-in-endpoint-workflow`"));
+    assert.ok(readme.includes("`default-off-custom-external-api-opt-in-endpoint-workflow`"));
     assert.ok(backlog.includes("`docs/evidence/STYLE_FEATURE_MATRIX.md`"));
     assert.ok(readme.includes("`docs/evidence/STYLE_FEATURE_MATRIX.md`"));
+    assert.ok(backlog.includes("`tldrPanel.enabled=false`"));
+    assert.ok(readme.includes("`tldrPanel.enabled=false`"));
+    assert.ok(backlog.includes("`customExternalAPI.enabled=false`"));
+    assert.ok(readme.includes("`customExternalAPI.enabled=false`"));
+    assert.ok(backlog.includes("`customExternalAPI.endpoint=\"\"`"));
+    assert.ok(readme.includes("`customExternalAPI.endpoint=\"\"`"));
+    assert.ok(backlog.includes("Custom External API 当前实现口径"));
+    assert.ok(readme.includes("Custom External API 当前实现口径"));
+    assert.ok(backlog.includes("AI provider contract 现在扩展为当前 wave 的 runtime 基座"));
+    assert.ok(readme.includes("AI provider contract 现在扩展为当前 wave 的 runtime 基座"));
+    assert.ok(backlog.includes("TLDR 现在降为历史 baseline"));
+    assert.ok(readme.includes("TLDR 现在降为历史 baseline"));
+    assert.ok(backlog.includes("`toolsbox-custom-external-api`"));
+    assert.ok(readme.includes("`toolsbox-custom-external-api`"));
+    assert.ok(backlog.includes(".toolsbox-custom-external-api-run-button"));
+    assert.ok(readme.includes(".toolsbox-custom-external-api-run-button"));
+    assert.ok(backlog.includes("`custom/external-api`"));
+    assert.ok(readme.includes("`custom/external-api`"));
+    assert.ok(backlog.includes("`toolsbox-tldr-panel`"));
+    assert.ok(readme.includes("`toolsbox-tldr-panel`"));
+    assert.ok(backlog.includes("`noop/mock-local`"));
+    assert.ok(readme.includes("`noop/mock-local`"));
+    assert.ok(backlog.includes("`summarizeItem`"));
+    assert.ok(readme.includes("`summarizeItem`"));
+    assert.ok(backlog.includes("`invokeExternal`"));
+    assert.ok(readme.includes("`invokeExternal`"));
+    assert.ok(backlog.includes("response preview"));
+    assert.ok(readme.includes("response preview"));
+    assert.ok(backlog.includes("不发送 notes/annotations/attachment bytes"));
+    assert.ok(readme.includes("不发送 notes/annotations/attachment bytes"));
+    assert.ok(backlog.includes("不读取 PDF 全文"));
+    assert.ok(readme.includes("不读取 PDF 全文"));
+    assert.ok(backlog.includes("Style Editor 现在降为历史 baseline"));
+    assert.ok(readme.includes("Style Editor 现在降为历史 baseline"));
+    assert.ok(backlog.includes("`paperMatrix.enabled=false`"));
+    assert.ok(readme.includes("`paperMatrix.enabled=false`"));
+    assert.ok(backlog.includes("`toolsbox-paper-matrix`"));
+    assert.ok(readme.includes("`toolsbox-paper-matrix`"));
+    assert.ok(backlog.includes("Paper Matrix Enhanced 现在降为历史 baseline"));
+    assert.ok(readme.includes("Paper Matrix Enhanced 现在降为历史 baseline"));
+    assert.ok(backlog.includes("paper matrix enhanced local workflow"));
+    assert.ok(readme.includes("paper matrix enhanced local workflow"));
     assert.ok(backlog.includes("`attachmentVersion.enabled=false`"));
     assert.ok(readme.includes("`attachmentVersion.enabled=false`"));
     assert.ok(backlog.includes("`toolsbox-attachment-version`"));
     assert.ok(readme.includes("`toolsbox-attachment-version`"));
-    assert.ok(backlog.includes("本地只读 Item Pane preview prototype"));
-    assert.ok(readme.includes("本地只读 Item Pane preview prototype"));
+    assert.ok(backlog.includes("Attachment Version 现在降为历史 baseline"));
+    assert.ok(readme.includes("Attachment Version 现在降为历史 baseline"));
     assert.ok(backlog.includes("`attachment version enabled preview workflow`"));
     assert.ok(readme.includes("`attachment version enabled preview workflow`"));
-    assert.ok(backlog.includes("child / sibling attachments"));
-    assert.ok(readme.includes("child / sibling attachments"));
+    assert.ok(backlog.includes("child attachments"));
+    assert.ok(readme.includes("child attachments"));
+    assert.ok(backlog.includes("sibling attachments"));
+    assert.ok(readme.includes("sibling attachments"));
     assert.ok(backlog.includes("`RELEASE-FREEZE-WAVE-001`"));
     assert.ok(readme.includes("`RELEASE-FREEZE-WAVE-001`"));
     assert.ok(backlog.includes("用户已要求“先冻结发布”"));
@@ -561,8 +638,11 @@ describe("Documentation Consistency", () => {
     assert.ok(backlog.includes("planned/default-off"));
     assert.ok(readme.includes("planned/default-off"));
     assert.ok(backlog.includes("Attachment Version | 本地只读 attachment version preview prototype"));
-    assert.ok(backlog.includes("Style Editor | planned/not implemented"));
+    assert.ok(backlog.includes("Paper Matrix Enhanced | 本地只读 standalone Paper Matrix enhanced payload"));
+    assert.ok(backlog.includes("Style Editor | 本地 CSS standalone window prototype"));
     assert.equal(backlog.includes("Attachment Version | planned/not implemented"), false);
+    assert.equal(backlog.includes("Paper Matrix Enhanced | planned/not implemented"), false);
+    assert.equal(backlog.includes("Style Editor | planned/not implemented"), false);
     assert.ok(backlog.includes("`HOST-HIGH-201 / HOST-LOW-301~303`"));
     assert.ok(readme.includes("`HOST-HIGH-201 / HOST-LOW-301~303`"));
     assert.ok(checklist.includes("`HOST-HIGH-201 / HOST-LOW-301~303`"));

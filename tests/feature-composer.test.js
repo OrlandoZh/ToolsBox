@@ -14,6 +14,7 @@ const DIRECT_STYLE_FEATURE_PREFS = new Set([
   "citedCountColumn.enabled",
   "collectionItemCount.enabled",
   "collectionSort.enabled",
+  "customExternalAPI.enabled",
   "favoriteCollections.enabled",
   "graphView.enabled",
   "ifColumn.enabled",
@@ -23,8 +24,10 @@ const DIRECT_STYLE_FEATURE_PREFS = new Set([
   "publicationTagsColumn.enabled",
   "readTimeColumn.enabled",
   "sidebarToggle.enabled",
+  "styleEditor.enabled",
   "tabManager.enabled",
   "titleColumnEnhanced.enabled",
+  "tldrPanel.enabled",
   "viewGroups.enabled",
 ]);
 
@@ -168,8 +171,10 @@ function createDeps() {
     primary: 0,
   };
   const sectionUnregistrations = [];
+  const sectionRegistrations = [];
   const paneRegistrations = [];
   const commandRegistrations = [];
+  const logEntries = [];
 
   return {
     calls,
@@ -184,10 +189,18 @@ function createDeps() {
         },
       },
       logger: {
-        info() {},
-        debug() {},
-        warn() {},
-        error() {},
+        info(message, details) {
+          logEntries.push({ level: "info", message, details });
+        },
+        debug(message, details) {
+          logEntries.push({ level: "debug", message, details });
+        },
+        warn(message, details) {
+          logEntries.push({ level: "warn", message, details });
+        },
+        error(message, details) {
+          logEntries.push({ level: "error", message, details });
+        },
       },
       host: {
         resolveContentUrl(path) {
@@ -277,6 +290,7 @@ function createDeps() {
         },
         registerSection(options = {}) {
           calls.sections += 1;
+          sectionRegistrations.push(options);
           return options.paneID || `section-${calls.sections}`;
         },
         unregisterSection(paneID) {
@@ -326,8 +340,10 @@ function createDeps() {
       updateDemoNotifierState() {},
     },
     paneRegistrations,
+    sectionRegistrations,
     commandRegistrations,
     sectionUnregistrations,
+    logEntries,
   };
 }
 
@@ -382,6 +398,9 @@ describe("Feature Composer", () => {
     deps.prefs.values.set("backlinks.enabled", true);
     deps.prefs.values.set("mergeAnnotations.enabled", true);
     deps.prefs.values.set("attachmentVersion.enabled", true);
+    deps.prefs.values.set("tldrPanel.enabled", true);
+    deps.prefs.values.set("customExternalAPI.enabled", true);
+    deps.prefs.values.set("customExternalAPI.endpoint", "http://127.0.0.1:49209/toolsbox");
     deps.prefs.values.set("collectionItemCount.enabled", true);
     deps.prefs.values.set("marginAnnotation.enabled", true);
     deps.lifecycle = {
@@ -394,7 +413,7 @@ describe("Feature Composer", () => {
     await composer.registerBaselineFeatures();
     assert.equal(deps.zotero.notifierObservers.some((entry) => entry.id === "toolsbox-collection-count"), true);
     assert.equal(deps.zotero.notifierObservers.some((entry) => entry.id === "mock-observer"), true);
-    assert.equal(calls.sections, 4);
+    assert.equal(calls.sections, 6);
 
     cleanups[0]();
     cleanups[0]();
@@ -405,8 +424,72 @@ describe("Feature Composer", () => {
       "toolsbox-attachment-version",
       "toolsbox-merge-annotations",
       "toolsbox-backlinks",
+      "toolsbox-custom-external-api",
+      "toolsbox-tldr-panel",
     ]);
-    assert.equal(calls.sectionUnregisters, 3);
+    assert.equal(calls.sectionUnregisters, 5);
+  });
+
+  it("should keep Style Editor command unregistered by default and register it only when enabled", async () => {
+    const { deps, calls, commandRegistrations } = createDeps();
+    const composer = createFeatureComposer(deps);
+
+    await composer.registerBaselineFeatures();
+
+    assert.equal(commandRegistrations.some((entry) => entry.id === "cleanroomtemplate-style-editor"), false);
+    assert.equal(calls.commands, 9);
+
+    const enabled = createDeps();
+    enabled.deps.prefs.values.set("styleEditor.enabled", true);
+    const enabledComposer = createFeatureComposer(enabled.deps);
+
+    await enabledComposer.registerBaselineFeatures();
+
+    const styleEditorCommand = enabled.commandRegistrations
+      .find((entry) => entry.id === "cleanroomtemplate-style-editor");
+    assert.ok(styleEditorCommand);
+    assert.equal(styleEditorCommand.condition(), true);
+    assert.equal(enabled.calls.commands, 10);
+  });
+
+  it("should register TLDR as no-network preview and Custom External API only with an endpoint", async () => {
+    const { deps, calls, commandRegistrations, sectionRegistrations, logEntries } = createDeps();
+    deps.prefs.values.set("tldrPanel.enabled", true);
+    deps.prefs.values.set("customExternalAPI.enabled", true);
+    deps.prefs.values.set("customExternalAPI.endpoint", "http://127.0.0.1:49210/toolsbox");
+    deps.prefs.values.set("openai.apiKey", "real-looking-key");
+    const composer = createFeatureComposer(deps);
+
+    await composer.registerBaselineFeatures();
+
+    assert.equal(calls.commands, 9);
+    assert.equal(calls.sections, 3);
+    assert.ok(sectionRegistrations.some((entry) => entry.paneID === "toolsbox-tldr-panel"));
+    assert.ok(sectionRegistrations.some((entry) => entry.paneID === "toolsbox-custom-external-api"));
+    assert.equal(commandRegistrations.some((entry) => String(entry.id || "").includes("tldr")), false);
+    assert.equal(commandRegistrations.some((entry) => String(entry.id || "").includes("external")), false);
+
+    const tldrLog = logEntries.find((entry) => entry.message === "features.tldrPanel.registered");
+    const externalLog = logEntries.find((entry) => entry.message === "features.customExternalAPI.registered");
+    assert.ok(tldrLog);
+    assert.ok(externalLog);
+  });
+
+  it("should keep Custom External API unregistered when enabled without an endpoint", async () => {
+    const { deps, calls, sectionRegistrations, logEntries } = createDeps();
+    deps.prefs.values.set("customExternalAPI.enabled", true);
+    deps.prefs.values.set("customExternalAPI.endpoint", "");
+    const composer = createFeatureComposer(deps);
+
+    await composer.registerBaselineFeatures();
+
+    assert.equal(calls.sections, 1);
+    assert.equal(sectionRegistrations.some((entry) => entry.paneID === "toolsbox-custom-external-api"), false);
+    const externalLog = logEntries.find((entry) => entry.message === "features.customExternalAPI.unavailable");
+    assert.ok(externalLog);
+    assert.equal(externalLog.details.reason, "endpoint-missing");
+    assert.equal(externalLog.details.requestedCapability, "invokeExternal");
+    assert.equal(externalLog.details.endpointConfigured, false);
   });
 
   it("should wait for baseline host APIs before registering Zotero manager-backed surfaces", async () => {
@@ -596,5 +679,39 @@ describe("Feature Composer", () => {
     assert.equal(contextMenus[0].label, undefined);
     assert.equal(contextMenus[1].l10nID, "cleanroom-rg-item-menu-label");
     assert.equal(contextMenus[1].label, undefined);
+  });
+
+  it("should hand library item menus to the menu manager before the official API is ready", async () => {
+    const { deps } = createDeps();
+    const contextMenus = [];
+
+    deps.menuManager = {
+      MENU_TARGETS: {
+        READER_MENU_VIEW: "reader-view",
+      },
+      isOfficialAPIAvailable() {
+        return false;
+      },
+      registerItemMenuItem(menuItem) {
+        contextMenus.push(menuItem);
+        return menuItem.id;
+      },
+      registerReaderMenubarViewMenuItem() {},
+      getMenuCount() {
+        return contextMenus.length;
+      },
+    };
+
+    const composer = createFeatureComposer(deps);
+    await composer.registerBaselineFeatures();
+
+    assert.equal(
+      contextMenus.some((menuItem) => menuItem.id === "cleanroomtemplate-context-action"),
+      true,
+    );
+    assert.equal(
+      contextMenus.some((menuItem) => menuItem.id === "cleanroomtemplate-research-graph-context"),
+      true,
+    );
   });
 });

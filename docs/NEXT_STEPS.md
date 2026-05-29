@@ -1,19 +1,17 @@
 # ToolsBox Next Steps
 
-**更新时间**: 2026-05-17
+**更新时间**: 2026-05-19
 **权威入口**: [CURRENT_BACKLOG.md](./CURRENT_BACKLOG.md)
 
 ## 当前下一步
 
-发布保持冻结；当前只做工作树整理、分批提交与本地非发布验证。
+发布保持冻结；`STYLE-CUSTOM-EXTERNAL-API-OPT-IN-WORKFLOW-WAVE-001` 的本地非发布验证闭环已刷新通过。
 
 推荐顺序：
 
-1. 保持 `RELEASE-FREEZE-WAVE-001` truth 与 mirrors 同步。
-2. 提交 default-off Style runtime、Backlinks、Merge Annotations 与测试。
-3. 单独提交视觉 baseline evidence。
-4. 提交 release freeze truth、surface evidence、worktree inventory 与 status docs。
-5. 运行 docs sync、targeted tests、`agent:check`、monitor、gate、sync。
+1. 下一波再拆 TLDR real AI summary / provider key management 的 privacy/network/provider contract。
+2. Custom External API response-to-note / credential management / automatic enrichment 继续保持 planned/default-off。
+3. 发布继续冻结，不运行 release remote verify 或 release gate。
 
 ## 解冻后才做
 

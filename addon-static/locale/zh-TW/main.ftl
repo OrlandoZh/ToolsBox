@@ -165,6 +165,9 @@ cleanroom-nm-window-title = 筆記與標註管理器
 # Paper Matrix
 cleanroom-pm-command-label = 開啟論文矩陣
 cleanroom-pm-window-title = 論文矩陣
+# Style Editor
+cleanroom-style-editor-command-label = 開啟樣式編輯器
+cleanroom-style-editor-window-title = 樣式編輯器
 # Relationship Graph
 cleanroom-rg-command-label = 開啟關係圖
 cleanroom-rg-window-title = 關係圖
@@ -219,6 +222,28 @@ toolsbox-attachment-version-empty = 無附件版本
 toolsbox-attachment-version-modified = 修改時間
 toolsbox-attachment-version-selected = 目前選中
 toolsbox-attachment-version-omitted = 個附件已省略
+# TLDR
+toolsbox-section-tldr = TLDR
+toolsbox-tldr-loading = 正在準備本地 TLDR 預覽...
+toolsbox-tldr-no-item = 未選擇條目
+toolsbox-tldr-item-type = 條目類型
+toolsbox-tldr-abstract-length = 摘要長度
+toolsbox-tldr-empty-abstract = 無可用摘要
+toolsbox-tldr-request-preview = 請求預覽
+toolsbox-tldr-provider-unavailable = Provider 不可用
+# Custom External API
+toolsbox-section-custom-external-api = Custom External API
+toolsbox-custom-external-api-loading = 正在準備本地請求預覽...
+toolsbox-custom-external-api-no-item = 未選擇條目
+toolsbox-custom-external-api-item-type = 條目類型
+toolsbox-custom-external-api-endpoint = Endpoint
+toolsbox-custom-external-api-endpoint-missing = 未設定 Endpoint
+toolsbox-custom-external-api-request-preview = 請求預覽
+toolsbox-custom-external-api-tags = 標籤
+toolsbox-custom-external-api-run = Run
+toolsbox-custom-external-api-running = 正在傳送請求...
+toolsbox-custom-external-api-result = 結果
+toolsbox-custom-external-api-idle = 可手動傳送一次明確請求
 # Annotation Manager
 toolsbox-menu-annotation-manager = 批註管理器
 toolsbox-annotation-manager-title = 批註管理器

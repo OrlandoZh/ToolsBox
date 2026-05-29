@@ -2,37 +2,39 @@
   "schemaVersion": 1,
   "status": "active",
   "currentContractId": "generic-expansion-wave-v1",
-  "currentWaveName": "STYLE-ATTACHMENT-VERSION-ENABLED-E2E-WAVE-001",
-  "summary": "Active Style validation wave under an unchanged release freeze: prove Attachment Version stays default-off by default and, when explicitly enabled through scenario pref injection, renders a real Zotero Item Pane local attachment version preview without mutating attachments, notes, annotations, release remotes, updateURL, git remote, or visual baselines.",
+  "currentWaveName": "STYLE-CUSTOM-EXTERNAL-API-OPT-IN-WORKFLOW-WAVE-001",
+  "summary": "Active Style validation wave under an unchanged release freeze: add a default-off Custom External API opt-in Item Pane prototype that only registers when enabled with an endpoint, sends one allowlisted local metadata POST after a manual Run click, renders response preview, and avoids Zotero data mutation, release remotes, updateURL, git remote, or visual baseline changes.",
   "inScopeModules": [
-    "attachment-version-local-preview",
-    "attachment-version-enabled-zotero-scenario",
-    "feature-composer-default-off-registration",
+    "custom-external-api-item-pane-runtime",
+    "custom-external-api-opt-in-provider",
+    "custom-external-api-request-boundary",
+    "feature-composer-custom-external-api-default-off-guard",
+    "custom-external-api-enabled-zotero-scenario",
     "truth-evidence-sync",
     "release-freeze-guard"
   ],
   "outOfScopeModules": [
     "zotero-style-100-percent-parity",
+    "tldr-real-summary-generation",
+    "tldr-network-provider",
+    "tldr-provider-key-management",
+    "tldr-pdf-fulltext-read",
+    "tldr-note-writeback",
+    "custom-external-api-response-to-note",
+    "custom-external-api-automatic-enrichment",
+    "custom-external-api-provider-key-management",
+    "openai-real-network-call",
+    "real-ai-provider",
+    "preference-pane-ai-controls",
     "backlinks-runtime-changes",
-    "merge-annotations-runtime-changes",
-    "style-editor-implementation",
-    "tldr-remote-ai-provider",
-    "custom-external-api-provider",
     "backlinks-semantic-search",
     "backlinks-writeback-relations",
     "backlinks-cross-library-sync",
     "merge-annotations-real-annotation-mutation",
     "merge-annotations-full-implementation",
-    "attachment-version-switch-full-implementation",
-    "attachment-version-file-writeback",
-    "attachment-version-file-delete",
-    "attachment-version-attachment-overwrite",
-    "paper-matrix-enhanced-full-implementation",
-    "beta-opt-in-preference-surface",
     "default-enabled-prototype",
+    "beta-opt-in-preference-surface",
     "visual-baseline-update-by-default",
-    "host-private-api-rewrite",
-    "real-ai-provider",
     "real-remote-upload",
     "gh-release-create",
     "gh-release-upload",
@@ -47,15 +49,23 @@
   ],
   "moduleArchetypes": [
     {
-      "module": "attachment-version-local-preview",
-      "archetype": "visible-surface"
+      "module": "custom-external-api-item-pane-runtime",
+      "archetype": "workspace-integration"
     },
     {
-      "module": "attachment-version-enabled-zotero-scenario",
-      "archetype": "visible-surface"
+      "module": "custom-external-api-opt-in-provider",
+      "archetype": "runtime-capability"
     },
     {
-      "module": "feature-composer-default-off-registration",
+      "module": "custom-external-api-request-boundary",
+      "archetype": "runtime-capability"
+    },
+    {
+      "module": "feature-composer-custom-external-api-default-off-guard",
+      "archetype": "workspace-integration"
+    },
+    {
+      "module": "custom-external-api-enabled-zotero-scenario",
       "archetype": "workspace-integration"
     },
     {
@@ -67,6 +77,6 @@
       "archetype": "workspace-integration"
     }
   ],
-  "acceptanceTrack": "enabled-attachment-version-local-preview-real-zotero-e2e",
+  "acceptanceTrack": "default-off-custom-external-api-opt-in-endpoint-workflow",
   "explicitVisualUpgradeModules": []
 }

@@ -1247,29 +1247,37 @@ export function createReader(options = {}) {
 
     if (["thumbnails", "thumbnail", "thumbs", "thumb"].includes(token)) {
       selectors.unshift(
+        "#thumbnailsViewMenu",
         "#viewThumbnail",
         "button[data-l10n-id='pdfjs-thumbs-button']",
+        "button[data-l10n-id='pdfjs-views-manager-pages-option-label']",
       );
     }
 
     if (token === "outline") {
       selectors.unshift(
+        "#outlinesViewMenu",
         "#viewOutline",
         "button[data-l10n-id='pdfjs-document-outline-button']",
+        "button[data-l10n-id='pdfjs-views-manager-outlines-option-label']",
       );
     }
 
     if (token === "attachments") {
       selectors.unshift(
+        "#attachmentsViewMenu",
         "#viewAttachments",
         "button[data-l10n-id='pdfjs-attachments-button']",
+        "button[data-l10n-id='pdfjs-views-manager-attachments-option-label']",
       );
     }
 
     if (token === "layers") {
       selectors.unshift(
+        "#layersViewMenu",
         "#viewLayers",
         "button[data-l10n-id='pdfjs-layers-button']",
+        "button[data-l10n-id='pdfjs-views-manager-layers-option-label']",
       );
     }
 
@@ -1290,11 +1298,11 @@ export function createReader(options = {}) {
     ];
 
     if (["thumbnails", "thumbnail", "thumbs", "thumb"].includes(token)) {
-      selectors.unshift("#thumbnailView");
+      selectors.unshift("#thumbnailsView", "#thumbnailView");
     }
 
     if (token === "outline") {
-      selectors.unshift("#outlineView");
+      selectors.unshift("#outlinesView", "#outlineView");
     }
 
     if (token === "attachments") {
@@ -1314,6 +1322,16 @@ export function createReader(options = {}) {
       ? selector.trim()
       : null;
     if (explicitSelector) {
+      if (explicitSelector === "#sidebarToggleButton") {
+        return [
+          "#sidebarToggleButton",
+          "#viewsManagerToggleButton",
+          "button[data-l10n-id='pdfjs-toggle-views-manager-button1']",
+          "#sidebarToggle",
+          ".toolbar .sidebar-toggle",
+          ".toolbar button.sidebar-toggle",
+        ];
+      }
       return [explicitSelector];
     }
 
@@ -1326,6 +1344,10 @@ export function createReader(options = {}) {
       "#toolbarViewer .toolbarButton",
       "#viewFindButton",
       "#sidebarToggleButton",
+      "#viewsManagerToggleButton",
+      "button[data-l10n-id='pdfjs-toggle-views-manager-button1']",
+      "#sidebarToggle",
+      ".toolbar .sidebar-toggle",
       "[role='toolbar'] [data-cleanroom-surface]",
       ".toolbar .cleanroom-surface",
       "[role='toolbar']",
@@ -1406,6 +1428,8 @@ export function createReader(options = {}) {
     const activationPolicy = normalizeActivationPolicy(options.activationPolicy);
 
     const initialState = getReaderUIStateSnapshot(resolvedReader);
+    const initiallySatisfied = initialState?.sidebarView === normalizedView
+      && initialState?.sidebarOpen !== false;
     if (initialState?.sidebarOpen === false && typeof resolvedReader.toggleSidebar === "function") {
       try {
         resolvedReader.toggleSidebar(true);
@@ -1468,6 +1492,7 @@ export function createReader(options = {}) {
         return {
           view: normalizedView,
           uiState: snapshot,
+          alreadySatisfied: initiallySatisfied,
           activationPolicy,
           activationStrategy,
           actionElementObserved: Boolean(button),
@@ -1481,6 +1506,7 @@ export function createReader(options = {}) {
     return {
       view: normalizedView,
       uiState: getReaderUIStateSnapshot(resolvedReader),
+      alreadySatisfied: initiallySatisfied,
       activationPolicy,
       activationStrategy,
       actionElementObserved: Boolean(button),

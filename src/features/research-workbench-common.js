@@ -1,6 +1,6 @@
 import { createWindowShellManager } from "../utils/window-shell.js";
 
-const WINDOW_FEATURES = "chrome,centerscreen,resizable,status,dialog=no";
+const WINDOW_FEATURES = "chrome,dialog=no,centerscreen,resizable,status";
 
 function noop() {}
 
@@ -15,6 +15,48 @@ export function resolveThemeMode(prefs) {
 export function resolveShellHref(rootURI, fileName) {
   const base = String(rootURI || "").replace(/\/+$/, "");
   return `${base}/content/lib/${fileName}`;
+}
+
+function waitForWorkbenchShellNavigation(window, shellFileName, { timeoutMs = 10000, intervalMs = 50 } = {}) {
+  return new Promise((resolve, reject) => {
+    const deadline = Date.now() + timeoutMs;
+
+    function readState() {
+      try {
+        return {
+          href: String(window?.location?.href || ""),
+          readyState: String(window?.document?.readyState || ""),
+        };
+      } catch {
+        return {
+          href: "",
+          readyState: "",
+        };
+      }
+    }
+
+    function poll() {
+      if (!window || window.closed) {
+        reject(new Error("workbench shell closed before navigation"));
+        return;
+      }
+      const state = readState();
+      if (
+        state.href.includes(shellFileName)
+        && (state.readyState === "interactive" || state.readyState === "complete")
+      ) {
+        resolve(window);
+        return;
+      }
+      if (Date.now() >= deadline) {
+        reject(new Error(`Timed out waiting for workbench shell navigation: href=${state.href || "unknown"}`));
+        return;
+      }
+      setTimeout(poll, intervalMs);
+    }
+
+    poll();
+  });
 }
 
 export function createWorkbenchShellManager(options) {
@@ -50,14 +92,41 @@ export function createWorkbenchShellManager(options) {
     if (existing && !existing.closed) {
       return { window: existing };
     }
-    const mainWindow = host?.getPrimaryWindow?.() || host?.getMainWindow?.();
+    const mainWindow = host?.getPrimaryWindow?.()
+      || host?.getMainWindow?.()
+      || globalThis.Zotero?.getMainWindow?.();
     if (!mainWindow || mainWindow.closed) {
       throw new Error("No main Zotero window available");
     }
+    const openerWindow = typeof globalThis.ChromeUtils?.waiveXrays === "function"
+      ? globalThis.ChromeUtils.waiveXrays(mainWindow)
+      : mainWindow;
     const href = resolveShellHref(rootURI, shellFileName);
     const features = `${WINDOW_FEATURES},width=${windowWidth},height=${windowHeight}`;
-    const win = mainWindow.openDialog(href, windowName, features);
-    return { window: win };
+    let win = null;
+    if (typeof openerWindow.eval === "function" && typeof openerWindow.openDialog === "function") {
+      win = openerWindow.eval(
+        `window.openDialog(${JSON.stringify(href)}, ${JSON.stringify(windowName)}, ${JSON.stringify(features)})`,
+      );
+    }
+    if (!win && typeof globalThis.Services?.ww?.openWindow === "function") {
+      win = globalThis.Services.ww.openWindow(openerWindow, href, windowName, features, null);
+    }
+    if (!win && typeof openerWindow.openDialog === "function") {
+      win = openerWindow.openDialog(href, windowName, features);
+    }
+    if (!win && typeof openerWindow.open === "function") {
+      win = openerWindow.open(href, windowName, `resizable,width=${windowWidth},height=${windowHeight}`);
+    }
+    try {
+      if (win && !String(win.location?.href || "").includes(shellFileName)) {
+        win.location.href = href;
+      }
+    } catch {}
+    return {
+      window: win,
+      readyPromise: waitForWorkbenchShellNavigation(win, shellFileName),
+    };
   }
 
   function mountWindow({ window, context }) {

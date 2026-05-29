@@ -613,6 +613,32 @@ describe("Reader", () => {
     );
   });
 
+  it("should resolve the legacy PDF.js sidebar toggle selector to the current Reader toolbar button", () => {
+    const sidebarToggle = { id: "sidebarToggle" };
+    activeReader = {
+      itemID: 94,
+      tabID: "reader-tab-94",
+      _iframeWindow: {
+        document: {
+          querySelector(selector) {
+            if (selector === "#sidebarToggle") {
+              return sidebarToggle;
+            }
+            return null;
+          },
+        },
+      },
+    };
+    globalThis.Zotero.Reader._readers = [activeReader];
+
+    assert.equal(
+      readerAPI.findToolbarElement(94, {
+        selector: "#sidebarToggleButton",
+      }),
+      sidebarToggle,
+    );
+  });
+
   it("should resolve reader sidebar panels from PDF.js host containers", () => {
     const sidebarButton = { id: "viewThumbnail" };
     const sidebarPanel = { id: "thumbnailView" };

@@ -4,6 +4,10 @@
 import { describe, it, beforeEach, afterEach, assert } from "./test-framework.js";
 import { createPlugin } from "../src/app/plugin.js";
 
+const EXPECTED_HOST_ITEM_TREE_REGISTRATIONS = 25;
+const EXPECTED_WRAPPED_ITEM_TREE_COUNT = 11;
+const EXPECTED_HOST_ITEM_TREE_UNREGISTRATIONS = 20;
+
 function createDeferred() {
   let resolve;
   const promise = new Promise((res) => {
@@ -313,6 +317,10 @@ describe("Plugin", () => {
         refreshInfoRow() {},
       },
       ItemTreeManager: {
+        registerColumn(options) {
+          itemTreeColumns.push(options);
+          return options.dataKey;
+        },
         registerColumns(options) {
           itemTreeColumns.push(options);
           return [options.dataKey];
@@ -386,7 +394,7 @@ describe("Plugin", () => {
     assert.equal(menuRegistrations.length, 5);
     assert.equal(itemPaneSections.length, 1);
     assert.equal(itemPaneRows.length, 0);
-    assert.equal(itemTreeColumns.length, 11);
+    assert.equal(itemTreeColumns.length, EXPECTED_HOST_ITEM_TREE_REGISTRATIONS);
     assert.equal(notifierRegistrations.length, 0);
   });
 
@@ -434,7 +442,7 @@ describe("Plugin", () => {
     assert.equal(menuRegistrations.length, 5);
     assert.equal(itemPaneSections.length, 1);
     assert.equal(itemPaneRows.length, 0);
-    assert.equal(itemTreeColumns.length, 11);
+    assert.equal(itemTreeColumns.length, EXPECTED_HOST_ITEM_TREE_REGISTRATIONS);
     assert.equal(notifierRegistrations.length, 0);
 
     assert.ok(plugin.api);
@@ -448,7 +456,7 @@ describe("Plugin", () => {
     assert.typeOf(plugin.api.menuManager.registerReaderMenubarViewMenuItem, "function");
     assert.equal(plugin.api.itemPane.getSectionCount(), 1);
     assert.equal(plugin.api.itemPane.getInfoRowCount(), 0);
-    assert.equal(plugin.api.itemTree.getColumnCount(), 11);
+    assert.equal(plugin.api.itemTree.getColumnCount(), EXPECTED_WRAPPED_ITEM_TREE_COUNT);
     assert.equal(plugin.api.notifier.getActiveCount(), 0);
     assert.typeOf(plugin.api.agent, "object");
     assert.typeOf(plugin.api.agent.inspectItem, "function");
@@ -650,11 +658,20 @@ describe("Plugin", () => {
     assert.equal(plugin.api.itemTree.getColumnCount(), 0);
     assert.equal(plugin.api.notifier.getActiveCount(), 0);
     assert.equal(preferenceUnregistrations[0], "cleanroomtemplate-preferences");
-    assert.equal(menuUnregistrations[0], "cleanroomtemplate-context-action");
-    assert.equal(menuUnregistrations.length, 5);
+    const expectedMenuIDs = [
+      "cleanroomtemplate-context-action",
+      "cleanroomtemplate-workflow-item-menu",
+      "cleanroomtemplate-workflow-collection-menu",
+      "cleanroomtemplate-workflow-reader-menu",
+      "cleanroomtemplate-research-graph-context",
+    ];
+    assert.deepEqual(menuUnregistrations, [
+      ...expectedMenuIDs,
+      ...expectedMenuIDs,
+    ]);
     assert.equal(itemPaneSectionUnregistrations.length, 1);
     assert.equal(itemPaneRowUnregistrations.length, 0);
-    assert.equal(itemTreeUnregistrations.length, 11);
+    assert.equal(itemTreeUnregistrations.length, EXPECTED_HOST_ITEM_TREE_UNREGISTRATIONS);
     assert.equal(notifierUnregistrations.length, 0);
   });
 

@@ -536,6 +536,14 @@ const PROTECTED_SOURCE_LITERAL_REPLACEMENTS = Object.freeze({
     ["Notes Manager", "View"],
     ["notes-manager", "w2"],
   ]),
+  "features/style-editor.js": Object.freeze([
+    ["ToolsBox", "Tool"],
+    ["Open Style Editor", "Open View"],
+    ["Style Editor", "View"],
+  ]),
+  "features/attachment-preview.js": Object.freeze([
+    ["ToolsBox", "Tool"],
+  ]),
   "features/research-workbench-tabs.js": Object.freeze([
     ["reader.openReader", "reader.r0"],
     ["ToolsBox", "Tool"],

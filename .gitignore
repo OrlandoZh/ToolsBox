@@ -1,5 +1,7 @@
 .DS_Store
 .env.local
+.codegraph/
+.omo/
 .sisyphus/
 .zotero-runtime/
 build/

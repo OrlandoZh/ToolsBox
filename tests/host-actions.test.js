@@ -2815,6 +2815,53 @@ describe("Host Actions", () => {
     assert.equal(result.surfaceTarget.captureKind, "surface-reader-sidebar-thumbnails");
   });
 
+  it("should accept an already selected reader sidebar view under ui-required activation", async () => {
+    const runner = createHostActionRunner({
+      config: {
+        addonRef: "cleanroomtemplate",
+      },
+      host: {
+        buildSurfaceTarget(input) {
+          return createSurfaceTargetWithDetails(
+            input.surfaceId,
+            input.captureKind,
+            input.details,
+          );
+        },
+      },
+      reader: {
+        async selectSidebarView() {
+          return {
+            button: null,
+            panel: null,
+            alreadySatisfied: true,
+            activationStrategy: null,
+            actionElementObserved: false,
+            actionDispatched: false,
+            uiState: {
+              sidebarView: "thumbnails",
+              sidebarOpen: true,
+              sidebarWidth: 240,
+            },
+          };
+        },
+      },
+      menuManager: {},
+    });
+
+    const result = await runner.runHostAction("reader.sidebar.selectView", {
+      target: "reader-tab-1",
+      view: "thumbnails",
+      activationPolicy: "ui-required",
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.readiness.ok, true);
+    assert.equal(result.observedState.activationStrategy, "already-selected");
+    assert.equal(result.observedState.actionDispatched, true);
+    assert.equal(result.surfaceTarget.details.surfaceEvidenceElement, "state-only");
+  });
+
   it("should fail reader sidebar ui-required activation when only the host api path is reported", async () => {
     const runner = createHostActionRunner({
       config: {

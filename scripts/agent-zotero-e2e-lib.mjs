@@ -653,7 +653,7 @@ export function deriveFixHints({ issues = [], logSummary = null }) {
     hints.push("优先核对 `src/app/feature-composer.js` 中 `*-primary-action` 的 command palette 注册块是否仍保留在 baseline 注册链中。");
   }
   if (issueText.includes("主窗口上下文菜单项未注册")) {
-    hints.push("优先核对 `src/app/feature-composer.js` 中 `menuManager.registerItemMenuItem(...)` 是否仍位于官方菜单 API 分支内。");
+    hints.push("优先核对 `src/app/feature-composer.js` 中 `menuManager.registerItemMenuItem(...)` 是否已无条件交给 menuManager，避免被 `isOfficialAPIAvailable()` 启动时序跳过。");
   }
   if (issueText.includes("偏好设置面板未注册")) {
     hints.push("优先核对 `src/app/feature-composer.js` 中 `preferencePanes.registerPane(...)` 是否仍在 baseline 注册阶段执行，并确认 `content/preferences.xhtml` 仍可访问。");

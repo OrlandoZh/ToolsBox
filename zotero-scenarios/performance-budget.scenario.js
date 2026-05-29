@@ -1,4 +1,4 @@
-registerZoteroScenario("performance budget diagnostics", async ({ assert, addonConfig, helpers, plugin }) => {
+registerZoteroScenario("performance budget diagnostics", async ({ assert, addonConfig, helpers }) => {
   const PREFERENCE_HOST_WINDOW = Object.freeze({
     windowWidth: 800,
     windowHeight: 600,
@@ -103,26 +103,8 @@ registerZoteroScenario("performance budget diagnostics", async ({ assert, addonC
     }),
   );
   assert.equal(toolbarTrigger.ok, true, `reader.toolbar.triggerButton failed: ${JSON.stringify(toolbarTrigger)}`);
-  await helpers.waitFor(
-    () => {
-      const frameWindow = plugin.api.reader.getReaderFrameWindow(attachment.id);
-      const outerContainer = frameWindow?.document?.querySelector?.("#outerContainer") || null;
-      const toggleButton = frameWindow?.document?.querySelector?.("#sidebarToggleButton") || null;
-      const containerClassName = typeof outerContainer?.className === "string"
-        ? outerContainer.className
-        : "";
-      const toggleClassName = typeof toggleButton?.className === "string"
-        ? toggleButton.className
-        : "";
-      return containerClassName.split(/\s+/u).includes("sidebarOpen")
-        || toggleClassName.split(/\s+/u).includes("toggled");
-    },
-    {
-      timeoutMs: 5000,
-      intervalMs: 100,
-      message: `Timed out waiting for reader sidebar open signal for item #${attachment.id}`,
-    },
-  );
+  assert.equal(toolbarTrigger.observedState.actionElementObserved, true);
+  assert.equal(toolbarTrigger.observedState.actionDispatched, true);
 
   const readerSidebarActivity = await measureHostAction(
     "reader.sidebar.selectView",

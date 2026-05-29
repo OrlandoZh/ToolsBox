@@ -7,14 +7,14 @@ export function createSidebarToggle(options) {
   const Zotero = zotero || globalThis.Zotero;
 
   function isLeftSidebarVisible() {
-    const mainWindow = Zotero.getMainWindow();
-    const leftSidebar = mainWindow.document.getElementById('zotero-collections-pane');
+    const mainWindow = Zotero?.getMainWindow?.();
+    const leftSidebar = mainWindow?.document?.getElementById?.('zotero-collections-pane');
     return Boolean(leftSidebar && !leftSidebar.hidden);
   }
 
   function toggleLeftSidebar() {
-    const mainWindow = Zotero.getMainWindow();
-    const leftSidebar = mainWindow.document.getElementById('zotero-collections-pane');
+    const mainWindow = Zotero?.getMainWindow?.();
+    const leftSidebar = mainWindow?.document?.getElementById?.('zotero-collections-pane');
     if (leftSidebar) {
       leftSidebar.hidden = !leftSidebar.hidden;
       logger.debug('sidebarToggle.leftSidebar.toggled', { visible: !leftSidebar.hidden });
@@ -22,14 +22,14 @@ export function createSidebarToggle(options) {
   }
 
   function isRightSidebarVisible() {
-    const mainWindow = Zotero.getMainWindow();
-    const rightSidebar = mainWindow.document.getElementById('zotero-item-pane');
+    const mainWindow = Zotero?.getMainWindow?.();
+    const rightSidebar = mainWindow?.document?.getElementById?.('zotero-item-pane');
     return Boolean(rightSidebar && !rightSidebar.hidden);
   }
 
   function toggleRightSidebar() {
-    const mainWindow = Zotero.getMainWindow();
-    const rightSidebar = mainWindow.document.getElementById('zotero-item-pane');
+    const mainWindow = Zotero?.getMainWindow?.();
+    const rightSidebar = mainWindow?.document?.getElementById?.('zotero-item-pane');
     if (rightSidebar) {
       rightSidebar.hidden = !rightSidebar.hidden;
       logger.debug('sidebarToggle.rightSidebar.toggled', { visible: !rightSidebar.hidden });
@@ -37,7 +37,11 @@ export function createSidebarToggle(options) {
   }
 
   function register() {
-    const mainWindow = Zotero.getMainWindow();
+    const mainWindow = Zotero?.getMainWindow?.();
+    if (!mainWindow || typeof mainWindow.addEventListener !== 'function') {
+      logger?.warn?.('sidebarToggle.register.skipped', { reason: 'main window unavailable' });
+      return false;
+    }
 
     mainWindow.addEventListener('keydown', (event) => {
       if (event.shiftKey && event.key === '{') {

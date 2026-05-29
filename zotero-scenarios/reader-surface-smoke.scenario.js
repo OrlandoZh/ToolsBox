@@ -18,6 +18,48 @@ registerZoteroScenario("reader surface smoke", async ({ assert, helpers, plugin 
     assert.equal(result.readiness.checks.find((entry) => entry.name === checkName)?.ok, true);
   }
 
+  function hasClassToken(element, token) {
+    const className = typeof element?.className === "string"
+      ? element.className
+      : "";
+    return className.split(/\s+/u).includes(token);
+  }
+
+  function resolveToolbarAnchor(doc) {
+    return doc?.querySelector?.(
+      "#sidebarToggleButton, #viewsManagerToggleButton, #sidebarToggle, .toolbar .sidebar-toggle",
+    ) || null;
+  }
+
+  function readSidebarOpenSignal(frameWindow) {
+    const doc = frameWindow?.document || null;
+    const outerContainer = doc?.querySelector?.("#outerContainer") || null;
+    const toggleButton = resolveToolbarAnchor(doc);
+    const containerClassName = typeof outerContainer?.className === "string"
+      ? outerContainer.className
+      : "";
+    const bodyClassName = typeof doc?.body?.className === "string"
+      ? doc.body.className
+      : "";
+    const toggleClassName = typeof toggleButton?.className === "string"
+      ? toggleButton.className
+      : "";
+    const toggleExpanded = String(toggleButton?.getAttribute?.("aria-expanded") || "").toLowerCase() === "true";
+    return hasClassToken(outerContainer, "sidebarOpen")
+      || hasClassToken(outerContainer, "viewsManagerOpen")
+      || hasClassToken(doc?.body, "sidebar-open")
+      || hasClassToken(toggleButton, "toggled")
+      || hasClassToken(toggleButton, "active")
+      || toggleExpanded
+      ? {
+        bodyClassName,
+        containerClassName,
+        toggleClassName,
+        toggleExpanded,
+      }
+      : null;
+  }
+
   const parentItem = await helpers.createItem({
     itemType: "report",
     fields: {
@@ -81,9 +123,8 @@ registerZoteroScenario("reader surface smoke", async ({ assert, helpers, plugin 
   );
   const frameWindow = plugin.api.reader.getReaderFrameWindow(attachment.id);
   const frameDocument = frameWindow?.document || null;
-  const resolveToolbarAnchor = () => frameDocument?.querySelector?.(toolbarSidebarToggleSelector) || null;
   const toolbarAnchor = await helpers.waitFor(
-    resolveToolbarAnchor,
+    () => resolveToolbarAnchor(frameDocument),
     {
       timeoutMs: 5000,
       intervalMs: 100,
@@ -102,26 +143,9 @@ registerZoteroScenario("reader surface smoke", async ({ assert, helpers, plugin 
   assert.equal(toolbarHook.hasAppend, true, "toolbarHook.hasAppend");
   assert.equal(toolbarHook.appendError, null, "toolbarHook.appendError");
   assert.equal(toolbarTrigger.ok, true, "toolbarTrigger.ok");
-  const toolbarAnchorAfterReplay = resolveToolbarAnchor();
+  const toolbarAnchorAfterReplay = resolveToolbarAnchor(frameDocument);
   const sidebarOpenSignal = await helpers.waitFor(
-    () => {
-      const frameWindow = plugin.api.reader.getReaderFrameWindow(attachment.id);
-      const outerContainer = frameWindow?.document?.querySelector?.("#outerContainer") || null;
-      const toggleButton = frameWindow?.document?.querySelector?.("#sidebarToggleButton") || null;
-      const containerClassName = typeof outerContainer?.className === "string"
-        ? outerContainer.className
-        : "";
-      const toggleClassName = typeof toggleButton?.className === "string"
-        ? toggleButton.className
-        : "";
-      return containerClassName.split(/\s+/u).includes("sidebarOpen")
-        || toggleClassName.split(/\s+/u).includes("toggled")
-        ? {
-          containerClassName,
-          toggleClassName,
-        }
-        : null;
-    },
+    () => readSidebarOpenSignal(plugin.api.reader.getReaderFrameWindow(attachment.id)),
     {
       timeoutMs: 5000,
       intervalMs: 100,

@@ -1,6 +1,6 @@
 # ToolsBox Missing Items
 
-**更新时间**: 2026-05-17
+**更新时间**: 2026-05-19
 **权威入口**: [CURRENT_BACKLOG.md](./CURRENT_BACKLOG.md)
 
 ## 当前未收口主线
@@ -11,13 +11,18 @@
 
 ## Planned / Default-off 功能
 
-- Style Editor
-- TLDR
-- Custom External API
-- Paper Matrix Enhanced
+- TLDR real AI summary generation / remote provider integration
+- Custom External API response-to-note / credential management / automatic enrichment
 - Backlinks semantic search / relation writeback / cross-library sync
 - Merge Annotations real annotation mutation / full annotation editor workflow
-- AI provider enrichment
+- Network-enabled AI provider enrichment
+
+## 本轮已收口
+
+- Style Editor default-off local CSS prototype：targeted tests、default-off / enabled Zotero scenario、`agent:check`、no-ui E2E、watch、monitor、gate、sync 证据已刷新。
+- AI Provider Contract no-network 基座：targeted AI provider contract / feature-composer / docs-consistency、`agent:check`、no-ui E2E、watch、monitor、gate、sync 证据已刷新；不实现真实 TLDR UI 或 endpoint 调用。
+- TLDR local Item Pane no-network preview：targeted TLDR / provider / feature-composer / docs-consistency tests、scenario listing、default-off scenario、enabled Zotero scenario、`agent:check`、no-ui E2E、watch、monitor、gate、sync 证据已刷新。
+- Custom External API opt-in endpoint invocation preview：targeted tests、default-off / enabled loopback Zotero scenario、`agent:check`、no-ui E2E、watch、monitor、gate、sync 证据已刷新。
 
 ## 非阻断 debt
 
