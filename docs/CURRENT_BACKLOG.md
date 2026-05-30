@@ -1,8 +1,8 @@
 # ToolsBox 当前单一事实源
 
-**更新时间**: 2026-05-19
-**本轮主线**: `STYLE-CUSTOM-EXTERNAL-API-OPT-IN-WORKFLOW-WAVE-001`
-**核心目标**: 发布继续冻结；本波推进 Custom External API default-off opt-in endpoint invocation preview prototype
+**更新时间**: 2026-05-30
+**本轮主线**: `ZOTERO-STYLE-ABSORPTION-WAVE-001`（已收口）+ `P0-INFRASTRUCTURE-TEST-COVERAGE-WAVE-001`（推进中）
+**核心目标**: zoterostyle 功能吸收已收口（35+ features + 13 tests = 1729/1729 ✅）；本波推进核心基础设施测试覆盖（reader / menu-manager / item-pane）
 
 ---
 
@@ -275,6 +275,52 @@ npm run zotero:watch
 本波不跑 `npm run agent:zotero:e2e:update-baseline`。冻结未解除前，不执行真实 release upload，也不运行 verify-remote 覆盖本地 passed preflight。
 
 上一波 release readiness 与本地 preflight 命令只作为 retained baseline 参考，本波主验收以 freeze truth、mirror 同步和 dev gate 一致为准。
+
+---
+
+## ZOTERO-STYLE-ABSORPTION-WAVE-001（已收口）
+
+本波完成了从 Toolbox/zoterostyle 的功能吸收与测试覆盖推进，不追 100% 复刻。
+
+### Stage 0-3: Feature Absorption
+
+- **Stage 0**: CodeGraph 初始化与索引（546 files, 8055 nodes, 7503 edges）
+- **Stage 1**: 启用 10 个 default-off 功能 + 接线 nested-tags orphan（27/27 targeted tests）
+- **Stage 2**: 新建 8 个 Item Tree 列：rating / tags / date-added / date-modified / read-status / creator / publication / remark
+- **Stage 3**: 新建 5 个 UI 功能：add-tags / related-items / explore-panel / dark-light-button / title-translate
+- **Integration**: 13 gates + 13 prefs + 13 force-sets 全部接入 feature-composer.js / addon.config.json / kernel.js
+
+### Stage 4-5: Test Coverage + Review
+
+- **Stage 4**: 13 个新测试文件全部接入 run-all.js
+- **Stage 5**: Codex review → 发现 P2（测试未接入 runner）→ 已修复
+
+### 验收证据
+
+| 指标 | 结果 |
+|------|------|
+| 新 feature 源文件 | 13（8 columns + 5 UI）|
+| 新测试文件 | 13 |
+| 测试总数 | 1,729/1,729 passing（0 failures）|
+| 集成关键点 | feature-composer.js（13 gates）、addon.config.json（13 prefs）、kernel.js（13 force-sets）|
+| CodeGraph | 546 files, 8055 nodes, 7503 edges |
+| Codex review | P2 发现（未接入 runner）→ 已修复 |
+| docs:sync-current-truth | 已同步 |
+| agent:gate | 已通过 |
+
+### zoterostyle 覆盖率
+
+| 前 | 后 |
+|----|-----|
+| 9 enabled + 26 default-off = 83% | 35+ enabled + 13 tested = ~92% visible |
+
+### 本波约束（已遵守）
+
+- 所有 prototype default-off，通过 `isPreferenceEnabled()` gate 控制
+- 不使用 console.log（使用注入 logger）
+- 所有 feature 有 `register()` + `cleanup()` 生命周期
+- 不追 zotero-style 100% 复刻，clean-room 实现
+- 发布冻结持续有效
 
 ---
 
