@@ -195,5 +195,18 @@ import './annotation-manager.test.js';
 import './attachment-preview.test.js';
 import './sidebar-toggle.test.js';
 import './tab-manager-panel.test.js';
+import './features/test-rating-column.js';
+import './features/test-tags-column.js';
+import './features/test-date-added-column.js';
+import './features/test-date-modified-column.js';
+import './features/test-read-status-column.js';
+import './features/test-creator-column.js';
+import './features/test-publication-column.js';
+import './features/test-remark-column.js';
+import './features/test-add-tags.js';
+import './features/test-related-items.js';
+import './features/test-explore-panel.js';
+import './features/test-dark-light-button.js';
+import './features/test-title-translate.js';
 
 await runTests();
