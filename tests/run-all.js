@@ -208,5 +208,8 @@ import './features/test-related-items.js';
 import './features/test-explore-panel.js';
 import './features/test-dark-light-button.js';
 import './features/test-title-translate.js';
+import './features/test-reader.js';
+import './features/test-menu-manager.js';
+import './features/test-item-pane.js';
 
 await runTests();
