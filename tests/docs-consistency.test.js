@@ -609,8 +609,8 @@ describe("Documentation Consistency", () => {
     assert.ok(readme.includes("`RELEASE-REMOTE-DISTRIBUTION-WAVE-001`"));
     assert.ok(backlog.includes("`dist/release-matrix.json` 为 `attention`"));
     assert.equal(readme.includes("`dist/release-matrix.json` 当前为 `attention`"), false);
-    assert.ok(backlog.includes("`gh auth status -h github.com` 显示未登录"));
-    assert.ok(backlog.includes("当前 `git remote -v` 指向 `https://github.com/OrlandoZh/AddonTemplate4Z.git`"));
+    assert.ok(backlog.includes("`gh auth status -h github.com` 显示已登录"));
+    assert.ok(backlog.includes("当前 `git remote -v` 指向 `https://github.com/OrlandoZh/ToolsBox.git`"));
     assert.ok(backlog.includes("冻结未解除前禁止执行 `gh release create`"));
     assert.ok(readme.includes("冻结未解除前禁止执行 `gh release create`"));
     assert.equal(backlog.includes("当前 active expansion wave: `RELEASE-FREEZE-WAVE-001`"), false);

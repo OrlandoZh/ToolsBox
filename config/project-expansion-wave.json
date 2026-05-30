@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "status": "active",
   "currentContractId": "generic-expansion-wave-v1",
-  "currentWaveName": "STYLE-CUSTOM-EXTERNAL-API-OPT-IN-WORKFLOW-WAVE-001",
-  "summary": "Active Style validation wave under an unchanged release freeze: add a default-off Custom External API opt-in Item Pane prototype that only registers when enabled with an endpoint, sends one allowlisted local metadata POST after a manual Run click, renders response preview, and avoids Zotero data mutation, release remotes, updateURL, git remote, or visual baseline changes.",
+  "currentWaveName": "FULL-TEST-COVERAGE-CLOSURE-WAVE-001",
+  "summary": "Closure wave: zoterostyle absorption + full test coverage (60/60 features, 2110/2110 tests), release unfrozen, repo created, branch pushed. Previous wave STYLE-CUSTOM-EXTERNAL-API-OPT-IN-WORKFLOW-WAVE-001 completed.",
   "inScopeModules": [
     "custom-external-api-item-pane-runtime",
     "custom-external-api-opt-in-provider",

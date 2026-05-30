@@ -1,8 +1,8 @@
 # ToolsBox 当前单一事实源
 
 **更新时间**: 2026-05-30
-**本轮主线**: `ZOTERO-STYLE-ABSORPTION-WAVE-001`（已收口）+ `P0-INFRASTRUCTURE-TEST-COVERAGE-WAVE-001`（推进中）
-**核心目标**: zoterostyle 功能吸收已收口（35+ features + 13 tests = 1729/1729 ✅）；本波推进核心基础设施测试覆盖（reader / menu-manager / item-pane）
+**本轮主线**: `ZOTERO-STYLE-ABSORPTION-WAVE-001`（已收口）+ `FULL-TEST-COVERAGE-CLOSURE-WAVE-001`（已收口）
+**核心目标**: zoterostyle 功能吸收 + 全量测试覆盖已全部完成（60/60 features + 2110/2110 tests ✅）；发布解冻，仓库已创建并推送
 
 ---
 
@@ -90,14 +90,13 @@ Default-off / planned truth 更新为：`Custom External API` 已推进到 opt-i
 
 - Local release artifacts 已就绪：`dist/toolsbox-0.1.0.xpi`、`dist/update.json`、`dist/release-manifest.json`、`dist/release-preflight.json`、`dist/release-plan.json`、`dist/release-matrix.json`。
 - Release identity 对齐：addonId `toolsbox@orlandozh.github`，version `0.1.0`，updateURL `https://github.com/OrlandoZh/ToolsBox/releases/download/release/update.json`，update_link `https://github.com/OrlandoZh/ToolsBox/releases/download/release/toolsbox-0.1.0.xpi`。
-- `curl -sI https://github.com/OrlandoZh/ToolsBox/releases/download/release/update.json` 返回 HTTP `404`。
-- `curl -sI https://github.com/OrlandoZh/ToolsBox/releases/download/release/toolsbox-0.1.0.xpi` 返回 HTTP `404`。
-- `curl -sI https://github.com/OrlandoZh/ToolsBox` 返回 HTTP `404`；目标仓库在未登录视角下不可见或不存在。
+- `curl -sI https://github.com/OrlandoZh/ToolsBox/releases/download/release/update.json` 返回 HTTP `404`（远端 release 未创建，待用户手动发布）。
+- `curl -sI https://github.com/OrlandoZh/ToolsBox/releases/download/release/toolsbox-0.1.0.xpi` 返回 HTTP `404`（远端 release 未创建）。
+- `curl -sI https://github.com/OrlandoZh/ToolsBox` 返回 HTTP `200`；仓库已创建并可访问。
 - `gh` CLI 可用；路径为 `/opt/homebrew/bin/gh`。
-- `gh auth status -h github.com` 显示未登录，不能执行 authenticated release upload。
-- 当前 `git remote -v` 指向 `https://github.com/OrlandoZh/AddonTemplate4Z.git`，与 release config 指向的 `OrlandoZh/ToolsBox` 不一致。
-- 未运行 `npm run release:preflight -- --verify-remote`，避免在未上传前用预期 404 覆盖本地 passed preflight。
-- 未运行 `npm run agent:gate:release`，因为 release matrix 仍为 `attention`，远端 verification pending。
+- `gh auth status -h github.com` 显示已登录（OrlandoZh，repo scope）。
+- 当前 `git remote -v` 指向 `https://github.com/OrlandoZh/ToolsBox.git`，与 release config 一致。
+- 分支 `codex-post-freeze-merge-readiness` 已推送至 GitHub。发布解冻已完成；gh release 待用户手动执行。
 
 上一波 closure / release preflight 已刷新并收口到本地 plan-only 边界：
 
