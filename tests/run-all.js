@@ -211,5 +211,10 @@ import './features/test-title-translate.js';
 import './features/test-reader.js';
 import './features/test-menu-manager.js';
 import './features/test-item-pane.js';
+import './features/test-research-workflow.js';
+import './features/test-workflow-state.js';
+import './features/test-prompt.js';
+import './features/test-item-tree.js';
+import './features/test-preference-panes.js';
 
 await runTests();
