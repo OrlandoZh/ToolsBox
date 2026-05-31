@@ -30,6 +30,8 @@ export function createAttachmentPreview(options = {}) {
   let libraryContainer = null;
   let readerContainer = null;
   let itemSelectListenerRegistered = false;
+  let savedSidePanelEntry = null;
+  const savedSidenavRenders = new Map();
 
   function debugLog(msg) {
     log?.info?.(msg);
@@ -391,6 +393,7 @@ export function createAttachmentPreview(options = {}) {
     sidenav._render = sidenav._render || sidenav.render;
 
     const originalRender = sidenav._render;
+    savedSidenavRenders.set(context, { sidenav, originalRender });
     sidenav.render = function () {
       originalRender?.bind(this)();
 
@@ -461,6 +464,7 @@ export function createAttachmentPreview(options = {}) {
     };
 
     Z.sidePanelArgs.push(previewPanel);
+    savedSidePanelEntry = previewPanel;
     debugLog('sidePanelArgs registered');
 
     let libOk = hijackSidenavRender('library');
@@ -508,7 +512,7 @@ export function createAttachmentPreview(options = {}) {
     return true;
   }
 
-  function cleanup() {
+   function cleanup() {
     debugLog('Cleanup called');
 
     const win = getMainWindow();
@@ -530,6 +534,24 @@ export function createAttachmentPreview(options = {}) {
 
       const pane = queryOne(doc, '#preview-pane');
       if (pane) pane.remove();
+    }
+
+    for (const [context, { sidenav, originalRender }] of savedSidenavRenders) {
+      if (sidenav && typeof originalRender === 'function') {
+        sidenav.render = originalRender;
+      }
+    }
+    savedSidenavRenders.clear();
+
+    if (savedSidePanelEntry && Z?.sidePanelArgs) {
+      Z.sidePanelArgs = Z.sidePanelArgs.filter((p) => p !== savedSidePanelEntry);
+    }
+    savedSidePanelEntry = null;
+
+    if (itemSelectListenerRegistered && win?.ZoteroPane?.itemsView?.onSelect) {
+      try {
+        win.ZoteroPane.itemsView.onSelect.removeListener(updatePreviewAfterItemSelect);
+      } catch (_) {}
     }
 
     libraryContainer = null;

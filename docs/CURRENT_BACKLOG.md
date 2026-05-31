@@ -44,9 +44,9 @@ Default-off / planned truth 更新为：`Custom External API` 已推进到 opt-i
 
 <!-- CURRENT-TRUTH-META:START -->
 {
-  "activeBatchId": "STYLE-CUSTOM-EXTERNAL-API-OPT-IN-WORKFLOW-WAVE-001",
-  "currentWaveName": "STYLE-CUSTOM-EXTERNAL-API-OPT-IN-WORKFLOW-WAVE-001",
-  "acceptanceTrack": "default-off-custom-external-api-opt-in-endpoint-workflow"
+  "activeBatchId": "FULL-TEST-COVERAGE-CLOSURE-WAVE-001",
+  "currentWaveName": "FULL-TEST-COVERAGE-CLOSURE-WAVE-001",
+  "acceptanceTrack": "full-test-coverage-closure"
 }
 <!-- CURRENT-TRUTH-META:END -->
 

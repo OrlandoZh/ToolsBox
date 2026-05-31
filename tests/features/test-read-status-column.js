@@ -127,7 +127,7 @@ describe("ReadStatusColumn", () => {
     assert.ok(Array.isArray(cleanupResult.resources), "cleanup should list freed resources");
     assert.ok(cleanupResult.resources.includes('column:toolsbox-read-status'), "resources should contain column ID");
     assert.ok(unregisterCalled, "unregisterColumn should have been called");
-    assert.equal(unregisterID, 'toolsbox-read-status', "unregisterColumn should be called with correct ID");
+    assert.equal(unregisterID, 'readStatus', "unregisterColumn should be called with correct ID");
   });
 
   it("should handle null/undefined item in dataProvider gracefully", () => {

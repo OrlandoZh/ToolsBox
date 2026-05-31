@@ -127,7 +127,7 @@ describe("DateAddedColumn", () => {
     assert.ok(Array.isArray(cleanupResult.resources), "cleanup should list freed resources");
     assert.ok(cleanupResult.resources.includes('column:toolsbox-date-added'), "resources should contain column ID");
     assert.ok(unregisterCalled, "unregisterColumn should have been called");
-    assert.equal(unregisterID, 'toolsbox-date-added', "unregisterColumn should be called with correct ID");
+    assert.equal(unregisterID, 'dateAdded', "unregisterColumn should be called with correct ID");
   });
 
   it("should handle null/undefined item in dataProvider gracefully", () => {

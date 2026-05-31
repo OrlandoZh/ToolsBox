@@ -101,7 +101,7 @@ export function createPublicationColumn(options) {
 
   function cleanup() {
     if (Zotero?.ItemTreeManager) {
-      Zotero.ItemTreeManager.unregisterColumn(columnID);
+      Zotero.ItemTreeManager.unregisterColumn(dataKey);
     }
     return {
       stopped: true,

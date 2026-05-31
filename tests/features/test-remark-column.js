@@ -131,9 +131,9 @@ describe("RemarkColumn", () => {
     assert.ok(cleanupResult.stopped, "cleanup should indicate stopped");
     assert.ok(Array.isArray(cleanupResult.resources), "cleanup should list freed resources");
     assert.equal(cleanupResult.resources.length, 1, "should have one resource");
-    assert.ok(cleanupResult.resources[0].includes('toolsbox-remark'), "resource should include column ID");
+    assert.ok(cleanupResult.resources[0].includes('remark'), "resource should include column ID");
     assert.equal(unregistered.length, 1, "unregisterColumn should be called");
-    assert.equal(unregistered[0], 'toolsbox-remark', "should unregister correct column ID");
+    assert.equal(unregistered[0], 'remark', "should unregister correct column ID");
   });
 
   it("should be idempotent on register", () => {

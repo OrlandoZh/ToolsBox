@@ -129,24 +129,30 @@ export function createPluginKernel({
       hostReadyRecorded = true;
       publishLifecycleTelemetry();
       settings.ensureDefaults();
-      // Force-update attachmentPreview pref to ensure it matches the current config default
-      // (ensureDefaults() only writes when no user value exists; we must overwrite stale user values)
+      // One-time migration: only set prefs when undefined, preserving user settings
       if (typeof settings.set === "function") {
-        settings.set("attachmentPreview.enabled", true);
-        settings.set("nestedTags.enabled", true);
-        settings.set("ratingColumn.enabled", true);
-        settings.set("tagsColumn.enabled", true);
-        settings.set("dateAddedColumn.enabled", true);
-        settings.set("dateModifiedColumn.enabled", true);
-        settings.set("readStatusColumn.enabled", true);
-        settings.set("creatorColumn.enabled", true);
-        settings.set("publicationColumn.enabled", true);
-        settings.set("remarkColumn.enabled", true);
-        settings.set("addTags.enabled", true);
-        settings.set("relatedItems.enabled", true);
-        settings.set("explorePanel.enabled", true);
-        settings.set("darkLightButton.enabled", true);
-        settings.set("titleTranslate.enabled", true);
+        const migrationKeys = [
+          "attachmentPreview.enabled",
+          "nestedTags.enabled",
+          "ratingColumn.enabled",
+          "tagsColumn.enabled",
+          "dateAddedColumn.enabled",
+          "dateModifiedColumn.enabled",
+          "readStatusColumn.enabled",
+          "creatorColumn.enabled",
+          "publicationColumn.enabled",
+          "remarkColumn.enabled",
+          "addTags.enabled",
+          "relatedItems.enabled",
+          "explorePanel.enabled",
+          "darkLightButton.enabled",
+          "titleTranslate.enabled",
+        ];
+        for (const key of migrationKeys) {
+          if (settings.get(key) === undefined) {
+            settings.set(key, true);
+          }
+        }
       }
       applySettings();
 

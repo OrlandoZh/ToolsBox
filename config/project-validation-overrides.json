@@ -105,10 +105,10 @@
         "^src/platform/zotero-json-state-store\\.js$",
         "^src/services/file-state-store\\.js$",
         "^src/utils/window-shell\\.js$",
-        "^scripts/(?:agent-frontpage-summary-lib|agent-monitor|agent-gate)\\.mjs$",
+        "^scripts/(?:agent-frontpage-summary-lib|agent-monitor)\\.mjs$",
         "^dev/agent-review-workbench/static/content/lib/agent-review-workbench\\.(?:xhtml|js|css)$",
         "^zotero-scenarios/review-workbench-window-lifecycle\\.scenario\\.js$",
-        "^tests/(?:agent-review-workbench|review-workbench-runtime-provider|feature-composer|host-actions|plugin|plugin-agent|plugin-api|agent-telemetry|agent-validation-decision-lib|run-all)\\.test\\.js$"
+        "^tests/(?:agent-review-workbench|review-workbench-runtime-provider|feature-composer|host-actions|plugin|plugin-agent|plugin-api|agent-validation-decision-lib|run-all)\\.test\\.js$"
       ],
       "decision": "visual-recommended",
       "requiredChecks": [

@@ -104,7 +104,7 @@ export function createCreatorColumn(options) {
 
   function cleanup() {
     if (Zotero?.ItemTreeManager) {
-      Zotero.ItemTreeManager.unregisterColumn(columnID);
+      Zotero.ItemTreeManager.unregisterColumn(dataKey);
     }
     return {
       stopped: true,

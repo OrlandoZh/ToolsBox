@@ -712,27 +712,27 @@ export function createFeatureComposer({
 
       // --- Stage 3: New zoterostyle UI features ---
       if (isPreferenceEnabled("addTags.enabled", { defaultValue: true })) {
-        const addTags = createAddTags({ logger, i18n, zotero: ZoteroAPI, menuManager });
+        const addTags = createAddTags({ logger, i18n, zotero: ZoteroAPI, menuManager, prefs });
         if (addTags.register()) { trackPrototypeCleanup(addTags, "addTags"); logger.info("features.addTags.registered"); }
       }
 
       if (isPreferenceEnabled("relatedItems.enabled", { defaultValue: true })) {
-        const relatedItems = createRelatedItems({ logger, i18n, zotero: ZoteroAPI, menuManager, host });
+        const relatedItems = createRelatedItems({ logger, i18n, zotero: ZoteroAPI, menuManager, host, prefs });
         if (relatedItems.register()) { trackPrototypeCleanup(relatedItems, "relatedItems"); logger.info("features.relatedItems.registered"); }
       }
 
       if (isPreferenceEnabled("explorePanel.enabled", { defaultValue: true })) {
-        const explorePanel = createExplorePanel({ logger, i18n, zotero: ZoteroAPI, itemPane });
+        const explorePanel = createExplorePanel({ logger, i18n, zotero: ZoteroAPI, itemPane, prefs });
         if (explorePanel.register()) { trackPrototypeCleanup(explorePanel, "explorePanel"); logger.info("features.explorePanel.registered"); }
       }
 
       if (isPreferenceEnabled("darkLightButton.enabled", { defaultValue: true })) {
-        const darkLightButton = createDarkLightButton({ logger, i18n, zotero: ZoteroAPI, host });
+        const darkLightButton = createDarkLightButton({ logger, i18n, zotero: ZoteroAPI, host, prefs });
         if (darkLightButton.register()) { trackPrototypeCleanup(darkLightButton, "darkLightButton"); logger.info("features.darkLightButton.registered"); }
       }
 
       if (isPreferenceEnabled("titleTranslate.enabled", { defaultValue: true })) {
-        const titleTranslate = createTitleTranslate({ logger, i18n, zotero: ZoteroAPI, reader });
+        const titleTranslate = createTitleTranslate({ logger, i18n, zotero: ZoteroAPI, reader, prefs });
         if (titleTranslate.register()) { trackPrototypeCleanup(titleTranslate, "titleTranslate"); logger.info("features.titleTranslate.registered"); }
       }
 
